@@ -364,17 +364,20 @@ class MonitorService : Service() {
         val (title, text) = when (s.status) {
             Status.OK -> "Telegram доступен" to
                 "Ответ за ${s.latencyMs} мс · проверено в ${timeStr(s.checkedAt)}"
-            Status.TG_DOWN -> "Telegram НЕДОСТУПЕН" to
+            Status.TG_DOWN -> "🔴 Telegram НЕДОСТУПЕН" to
                 "Нет связи с ${timeStr(s.since)} · ${s.reason}"
-            Status.NO_NETWORK -> "Нет подключения к интернету" to
+            Status.NO_NETWORK -> "🔴 Нет подключения к интернету" to
                 "С ${timeStr(s.since)}"
             Status.UNKNOWN -> "Проверяю связь с Telegram…" to CHECK_URL
         }
         val bad = s.status == Status.TG_DOWN || s.status == Status.NO_NETWORK
 
         val builder = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(if (bad) R.drawable.ic_stat_fail else R.drawable.ic_stat_ok)
+            // Когда связи нет — значок в строке состояния мигает,
+            // а само уведомление в шторке целиком закрашивается красным.
+            .setSmallIcon(if (bad) R.drawable.ic_stat_fail_blink else R.drawable.ic_stat_ok)
             .setColor(if (bad) COLOR_FAIL else COLOR_OK)
+            .setColorized(bad)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
