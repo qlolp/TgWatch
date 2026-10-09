@@ -11,6 +11,13 @@ object Prefs {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_INTERVAL = "interval_sec"
     private const val KEY_KEEP_AWAKE = "keep_awake"
+    private const val KEY_VIBRATE = "vibrate"
+    private const val KEY_LAST_STATUS = "last_status"
+    private const val KEY_LAST_CHECKED = "last_checked"
+    private const val KEY_LAST_SINCE = "last_since"
+    private const val KEY_LAST_LATENCY = "last_latency"
+    private const val KEY_LAST_REASON = "last_reason"
+    private const val KEY_LAST_VIBE = "last_vibe"
 
     const val DEFAULT_INTERVAL_SEC = 15
 
@@ -35,6 +42,62 @@ object Prefs {
 
     fun setKeepAwake(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_KEEP_AWAKE, value).apply()
+    }
+
+    /** Вибрировать при потере связи. */
+    fun vibrateEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VIBRATE, true)
+
+    fun setVibrateEnabled(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VIBRATE, value).apply()
+    }
+
+    /** Сохраняем последний статус, чтобы экран и значок не «мигали» после перезапуска процесса. */
+    fun saveLastState(
+        ctx: Context,
+        status: MonitorService.Status,
+        checkedAt: Long,
+        since: Long,
+        latencyMs: Long,
+        reason: String,
+        lastVibrationAt: Long,
+    ) {
+        sp(ctx).edit()
+            .putString(KEY_LAST_STATUS, status.name)
+            .putLong(KEY_LAST_CHECKED, checkedAt)
+            .putLong(KEY_LAST_SINCE, since)
+            .putLong(KEY_LAST_LATENCY, latencyMs)
+            .putString(KEY_LAST_REASON, reason)
+            .putLong(KEY_LAST_VIBE, lastVibrationAt)
+            .apply()
+    }
+
+    fun loadLastState(ctx: Context): MonitorService.State? {
+        val name = sp(ctx).getString(KEY_LAST_STATUS, null) ?: return null
+        val status = try {
+            MonitorService.Status.valueOf(name)
+        } catch (_: Exception) {
+            return null
+        }
+        if (status == MonitorService.Status.UNKNOWN) return null
+        return MonitorService.State(
+            status = status,
+            checkedAt = sp(ctx).getLong(KEY_LAST_CHECKED, 0L),
+            since = sp(ctx).getLong(KEY_LAST_SINCE, System.currentTimeMillis()),
+            latencyMs = sp(ctx).getLong(KEY_LAST_LATENCY, -1L),
+            reason = sp(ctx).getString(KEY_LAST_REASON, "") ?: "",
+            lastVibrationAt = sp(ctx).getLong(KEY_LAST_VIBE, 0L),
+        )
+    }
+
+    fun clearLastState(ctx: Context) {
+        sp(ctx).edit()
+            .remove(KEY_LAST_STATUS)
+            .remove(KEY_LAST_CHECKED)
+            .remove(KEY_LAST_SINCE)
+            .remove(KEY_LAST_LATENCY)
+            .remove(KEY_LAST_REASON)
+            .remove(KEY_LAST_VIBE)
+            .apply()
     }
 }
 
