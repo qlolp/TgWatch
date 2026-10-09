@@ -2,150 +2,310 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/bg"
     android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
 
-        <!-- Текущий статус -->
-        <TextView
-            android:id="@+id/tvTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:lineSpacingExtra="3dp"
-            android:textSize="15sp" />
-
-        <Button
-            android:id="@+id/btnToggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp" />
-
-        <Button
-            android:id="@+id/btnCheck"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Проверить сейчас" />
-
-        <!-- Настройки -->
+        <!-- Заголовок -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Как часто проверять"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="4dp"
+            android:text="@string/app_name"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
+            android:fontFamily="sans-serif-medium" />
 
-        <RadioGroup
-            android:id="@+id/rgInterval"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+            android:layout_marginStart="4dp"
+            android:text="Следит, доступен ли Telegram"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
 
-            <RadioButton
-                android:id="@+id/rb15"
-                android:layout_width="0dp"
+        <!-- Большая карточка статуса -->
+        <LinearLayout
+            android:id="@+id/statusCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_status"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="15 с" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <RadioButton
-                android:id="@+id/rb30"
-                android:layout_width="0dp"
+                <ImageView
+                    android:id="@+id/ivStatus"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_status_icon"
+                    android:importantForAccessibility="no"
+                    android:padding="14dp"
+                    android:src="@drawable/ic_stat_wait" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:accessibilityLiveRegion="polite"
+                        android:textColor="@color/on_status"
+                        android:textSize="22sp"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/tvSince"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:alpha="0.85"
+                        android:textColor="@color/on_status"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvReason"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="30 с" />
+                android:layout_marginTop="14dp"
+                android:alpha="0.92"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/on_status"
+                android:textSize="14sp" />
+        </LinearLayout>
 
-            <RadioButton
-                android:id="@+id/rb60"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="1 мин" />
-
-            <RadioButton
-                android:id="@+id/rb120"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="2 мин" />
-        </RadioGroup>
-
-        <Switch
-            android:id="@+id/swKeepAwake"
+        <!-- Три цифры -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Не давать телефону засыпать: проверки идут и при выключенном экране (расходует больше батареи)" />
+            android:orientation="horizontal">
+
+            <LinearLayout style="@style/StatBox">
+
+                <TextView
+                    android:id="@+id/tvLatency"
+                    style="@style/StatValue" />
+
+                <TextView
+                    style="@style/StatLabel"
+                    android:text="Время ответа" />
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/StatBox"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp">
+
+                <TextView
+                    android:id="@+id/tvUptime"
+                    style="@style/StatValue" />
+
+                <TextView
+                    style="@style/StatLabel"
+                    android:text="Доступен за сутки" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/StatBox">
+
+                <TextView
+                    android:id="@+id/tvChecked"
+                    style="@style/StatValue" />
+
+                <TextView
+                    style="@style/StatLabel"
+                    android:text="Проверка" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Кнопки -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnCheck"
+                style="@style/ButtonFilled"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Проверить сейчас" />
+
+            <Button
+                android:id="@+id/btnToggle"
+                style="@style/ButtonOutlined"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1" />
+        </LinearLayout>
+
+        <!-- График за последний час -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Последний час" />
+
+            <ru.tgwatch.ChartView
+                android:id="@+id/chart"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="12dp" />
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:text="Столбик = минута. Высота — время ответа, красный — Telegram недоступен, оранжевый — нет интернета."
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Настройки -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Как часто проверять" />
+
+            <RadioGroup
+                android:id="@+id/rgInterval"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_segment_group"
+                android:orientation="horizontal"
+                android:padding="2dp">
+
+                <RadioButton
+                    android:id="@+id/rb10"
+                    style="@style/Segment"
+                    android:text="10 с" />
+
+                <RadioButton
+                    android:id="@+id/rb15"
+                    style="@style/Segment"
+                    android:text="15 с" />
+
+                <RadioButton
+                    android:id="@+id/rb30"
+                    style="@style/Segment"
+                    android:text="30 с" />
+
+                <RadioButton
+                    android:id="@+id/rb60"
+                    style="@style/Segment"
+                    android:text="1 мин" />
+
+                <RadioButton
+                    android:id="@+id/rb120"
+                    style="@style/Segment"
+                    android:text="2 мин" />
+            </RadioGroup>
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:text="Пока связи нет, проверка идёт каждые 10 секунд, чтобы сразу заметить, что она вернулась."
+                android:textSize="12sp" />
+
+            <Switch
+                android:id="@+id/swKeepAwake"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Проверять при выключенном экране"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="2dp"
+                android:text="Не даёт телефону засыпать. Расходует немного больше батареи."
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnVibe"
+                style="@style/ButtonText"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="-12dp"
+                android:text="Проверить вибрацию" />
+        </LinearLayout>
 
         <!-- Разрешения -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Работа в фоне"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+        <LinearLayout style="@style/Card">
 
-        <TextView
-            android:id="@+id/tvNotif"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp" />
+            <TextView
+                style="@style/CardTitle"
+                android:text="Работа в фоне" />
 
-        <Button
-            android:id="@+id/btnNotif"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Включить уведомления" />
+            <TextView
+                android:id="@+id/tvNotif"
+                style="@style/Body"
+                android:layout_marginTop="8dp" />
 
-        <TextView
-            android:id="@+id/tvBattery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" />
+            <Button
+                android:id="@+id/btnNotif"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Включить уведомления" />
 
-        <Button
-            android:id="@+id/btnBattery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Разрешить работу без ограничений" />
+            <TextView
+                android:id="@+id/tvBattery"
+                style="@style/Body"
+                android:layout_marginTop="8dp" />
 
-        <Button
-            android:id="@+id/btnVibe"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Проверить вибрацию" />
+            <Button
+                android:id="@+id/btnBattery"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Разрешить работу без ограничений" />
+        </LinearLayout>
 
         <!-- Журнал -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Журнал"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Журнал" />
+
+            <TextView
+                android:id="@+id/tvLog"
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:fontFamily="monospace"
+                android:lineSpacingExtra="4dp"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tvLog"
+            android:id="@+id/tvVersion"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:fontFamily="monospace"
-            android:textIsSelectable="true"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
     </LinearLayout>

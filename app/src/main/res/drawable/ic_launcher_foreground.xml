@@ -1,16 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Значок приложения: самолётик Telegram и «волны» сигнала над ним -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:scaleX="2.3"
-        android:scaleY="2.3"
-        android:translateX="26"
-        android:translateY="26">
+        android:scaleX="1.9"
+        android:scaleY="1.9"
+        android:translateX="31"
+        android:translateY="34">
         <path
             android:fillColor="#FFFFFFFF"
             android:pathData="M2.01,21L23,12 2.01,3 2,10l15,2 -15,2z" />
     </group>
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M66,32a10,10 0,0 1,10 10"
+        android:strokeWidth="3.5"
+        android:strokeColor="#CCFFFFFF"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M66,25a17,17 0,0 1,17 17"
+        android:strokeWidth="3.5"
+        android:strokeColor="#88FFFFFF"
+        android:strokeLineCap="round" />
 </vector>

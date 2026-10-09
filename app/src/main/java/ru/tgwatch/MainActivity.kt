@@ -1,12 +1,14 @@
 package ru.tgwatch
 
 import android.Manifest
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,16 +18,24 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.RadioGroup
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 
-/** Экран приложения: статус, кнопки и настройки. */
+/** Экран приложения: статус, график, кнопки и настройки. */
 class MainActivity : Activity() {
 
+    private lateinit var statusCard: View
+    private lateinit var ivStatus: ImageView
     private lateinit var tvTitle: TextView
-    private lateinit var tvDetails: TextView
+    private lateinit var tvSince: TextView
+    private lateinit var tvReason: TextView
+    private lateinit var tvLatency: TextView
+    private lateinit var tvUptime: TextView
+    private lateinit var tvChecked: TextView
+    private lateinit var chart: ChartView
     private lateinit var btnToggle: Button
     private lateinit var btnCheck: Button
     private lateinit var rgInterval: RadioGroup
@@ -48,15 +58,28 @@ class MainActivity : Activity() {
     }
 
     private val intervalButtons by lazy {
-        mapOf(15 to R.id.rb15, 30 to R.id.rb30, 60 to R.id.rb60, 120 to R.id.rb120)
+        mapOf(10 to R.id.rb10, 15 to R.id.rb15, 30 to R.id.rb30, 60 to R.id.rb60, 120 to R.id.rb120)
     }
+
+    private var cardColor = 0
+    private var colorAnimator: ValueAnimator? = null
+    private var shownHistoryVersion = -1L
+    private var shownLog: List<String>? = null
+    private var shownChartMinute = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        statusCard = findViewById(R.id.statusCard)
+        ivStatus = findViewById(R.id.ivStatus)
         tvTitle = findViewById(R.id.tvTitle)
-        tvDetails = findViewById(R.id.tvDetails)
+        tvSince = findViewById(R.id.tvSince)
+        tvReason = findViewById(R.id.tvReason)
+        tvLatency = findViewById(R.id.tvLatency)
+        tvUptime = findViewById(R.id.tvUptime)
+        tvChecked = findViewById(R.id.tvChecked)
+        chart = findViewById(R.id.chart)
         btnToggle = findViewById(R.id.btnToggle)
         btnCheck = findViewById(R.id.btnCheck)
         rgInterval = findViewById(R.id.rgInterval)
@@ -67,6 +90,15 @@ class MainActivity : Activity() {
         btnNotif = findViewById(R.id.btnNotif)
         btnVibe = findViewById(R.id.btnVibe)
         tvLog = findViewById(R.id.tvLog)
+
+        cardColor = getColor(R.color.status_idle)
+        statusCard.backgroundTintList = ColorStateList.valueOf(cardColor)
+
+        findViewById<TextView>(R.id.tvVersion).text = try {
+            "Версия " + packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (e: Exception) {
+            ""
+        }
 
         btnToggle.setOnClickListener {
             if (MonitorService.running) {
@@ -86,7 +118,7 @@ class MainActivity : Activity() {
             }
         }
 
-        rgInterval.check(intervalButtons[Prefs.intervalSec(this)] ?: R.id.rb30)
+        rgInterval.check(intervalButtons[Prefs.intervalSec(this)] ?: R.id.rb15)
         rgInterval.setOnCheckedChangeListener { _, checkedId ->
             val sec = intervalButtons.entries.firstOrNull { it.value == checkedId }?.key
                 ?: Prefs.DEFAULT_INTERVAL_SEC
@@ -173,72 +205,103 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------------ экран
 
     private fun render() {
+        val now = System.currentTimeMillis()
         val running = MonitorService.running
         val s = MonitorService.state
 
-        btnToggle.text = if (running) "Остановить мониторинг" else "Запустить мониторинг"
+        btnToggle.text = if (running) "Остановить" else "Запустить"
         btnCheck.isEnabled = running
 
+        var color = getColor(R.color.status_idle)
         if (!running) {
+            ivStatus.setImageResource(R.drawable.ic_stat_pause)
             tvTitle.text = "Мониторинг выключен"
-            tvTitle.setTextColor(COLOR_GRAY)
-            tvDetails.text = "Нажми «Запустить мониторинг», и в строке состояния появится значок."
+            tvSince.text = "Значка в строке состояния нет"
+            tvReason.text = "Нажми «Запустить», и приложение начнёт следить за Telegram."
         } else {
             when (s.status) {
                 MonitorService.Status.OK -> {
-                    tvTitle.text = "✅ Telegram доступен"
-                    tvTitle.setTextColor(COLOR_OK)
+                    color = getColor(R.color.status_ok)
+                    ivStatus.setImageResource(R.drawable.ic_stat_ok)
+                    tvTitle.text = "Telegram доступен"
                 }
                 MonitorService.Status.TG_DOWN -> {
-                    tvTitle.text = "❌ Telegram недоступен"
-                    tvTitle.setTextColor(COLOR_FAIL)
+                    color = getColor(R.color.status_fail)
+                    ivStatus.setImageResource(R.drawable.ic_stat_fail)
+                    tvTitle.text = "Telegram недоступен"
                 }
                 MonitorService.Status.NO_NETWORK -> {
-                    tvTitle.text = "📵 Нет интернета"
-                    tvTitle.setTextColor(COLOR_FAIL)
+                    color = getColor(R.color.status_offline)
+                    ivStatus.setImageResource(R.drawable.ic_stat_offline)
+                    tvTitle.text = "Нет интернета"
                 }
                 MonitorService.Status.UNKNOWN -> {
-                    tvTitle.text = "⏳ Проверяю…"
-                    tvTitle.setTextColor(COLOR_GRAY)
+                    ivStatus.setImageResource(R.drawable.ic_stat_wait)
+                    tvTitle.text = "Проверяю…"
                 }
             }
-            val sb = StringBuilder()
-            sb.append("Проверяю адрес: ").append(MonitorService.CHECK_URL).append('\n')
-            sb.append("Последняя проверка: ").append(timeStr(s.checkedAt)).append('\n')
-            if (s.status == MonitorService.Status.OK) {
-                sb.append("Время ответа: ").append(s.latencyMs).append(" мс\n")
-            } else if (s.reason.isNotEmpty()) {
-                sb.append("Причина: ").append(s.reason).append('\n')
+            tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
+                "Первая проверка идёт прямо сейчас"
+            } else {
+                "Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}"
             }
-            sb.append("В этом состоянии с: ").append(timeStr(s.since)).append('\n')
-            sb.append("Последняя вибрация: ").append(timeStr(s.lastVibrationAt))
-            tvDetails.text = sb.toString()
+            tvReason.text = when (s.status) {
+                MonitorService.Status.OK -> "Сервер api.telegram.org отвечает. Если связь пропадёт, телефон завибрирует."
+                MonitorService.Status.TG_DOWN -> "Причина: ${s.reason}. Остальной интернет при этом работает."
+                MonitorService.Status.NO_NETWORK -> "Причина: ${s.reason}."
+                MonitorService.Status.UNKNOWN -> "Стучусь на ${MonitorService.CHECK_URL}"
+            } + if (s.lastVibrationAt > 0L) "\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}" else ""
         }
+        animateCardColor(color)
 
-        if (ignoringBatteryOptimizations()) {
-            tvBattery.text = "✅ Работа в фоне без ограничений разрешена"
-            btnBattery.visibility = View.GONE
-        } else {
-            tvBattery.text = "⚠️ Android может «усыплять» приложение при выключенном экране — " +
-                "тогда проверки будут останавливаться. Разреши работу без ограничений:"
-            btnBattery.visibility = View.VISIBLE
+        tvLatency.text = if (running && s.status == MonitorService.Status.OK) "${s.latencyMs} мс" else "—"
+        val uptime = History.uptimePercent(this)
+        tvUptime.text = if (uptime >= 0) formatPercent(uptime) else "—"
+        tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
+
+        // График и журнал перерисовываем только когда что-то изменилось.
+        val minute = now / 60_000L
+        if (History.version != shownHistoryVersion || minute != shownChartMinute) {
+            shownHistoryVersion = History.version
+            shownChartMinute = minute
+            chart.setData(History.lastMinutes(this, 60, now), now)
+        }
+        val log = EventLog.all(this)
+        if (log !== shownLog) {
+            shownLog = log
+            tvLog.text = if (log.isEmpty()) "Пока пусто" else log.joinToString("\n")
         }
 
         if (notificationsAllowed()) {
-            tvNotif.text = "✅ Уведомления включены — значок виден в строке состояния"
+            tvNotif.text = "✓ Уведомления включены, значок виден в строке состояния."
             btnNotif.visibility = View.GONE
         } else {
-            tvNotif.text = "⚠️ Уведомления выключены — значка в строке состояния не будет:"
+            tvNotif.text = "Уведомления выключены, поэтому значка в строке состояния не будет."
             btnNotif.visibility = View.VISIBLE
         }
 
-        val log = MonitorService.log
-        tvLog.text = if (log.isEmpty()) "Пока пусто" else log.joinToString("\n")
+        if (ignoringBatteryOptimizations()) {
+            tvBattery.text = "✓ Работа в фоне без ограничений разрешена."
+            btnBattery.visibility = View.GONE
+        } else {
+            tvBattery.text = "Android может «усыплять» приложение при выключенном экране, " +
+                "и тогда проверки будут останавливаться."
+            btnBattery.visibility = View.VISIBLE
+        }
     }
 
-    private companion object {
-        val COLOR_OK = Color.rgb(0x2E, 0x7D, 0x32)
-        val COLOR_FAIL = Color.rgb(0xC6, 0x28, 0x28)
-        val COLOR_GRAY = Color.rgb(0x75, 0x75, 0x75)
+    /** Плавно перекрашиваем карточку статуса, когда статус меняется. */
+    private fun animateCardColor(target: Int) {
+        if (target == cardColor) return
+        colorAnimator?.cancel()
+        val from = cardColor
+        cardColor = target
+        colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), from, target).apply {
+            duration = 350L
+            addUpdateListener {
+                statusCard.backgroundTintList = ColorStateList.valueOf(it.animatedValue as Int)
+            }
+            start()
+        }
     }
 }

@@ -12,9 +12,9 @@ object Prefs {
     private const val KEY_INTERVAL = "interval_sec"
     private const val KEY_KEEP_AWAKE = "keep_awake"
 
-    const val DEFAULT_INTERVAL_SEC = 30
+    const val DEFAULT_INTERVAL_SEC = 15
 
-    private fun sp(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    fun sp(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     /** Включён ли мониторинг (пользователь не нажимал «Остановить»). */
     fun isEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_ENABLED, true)
@@ -41,3 +41,21 @@ object Prefs {
 /** Время в виде 15:42:10, либо прочерк, если времени нет. */
 fun timeStr(millis: Long): String =
     if (millis <= 0L) "—" else SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(millis))
+
+/** Длительность словами: «12 с», «5 мин», «2 ч 15 мин», «3 д 4 ч». */
+fun durationStr(ms: Long): String {
+    val sec = (ms / 1000L).coerceAtLeast(0L)
+    val min = sec / 60
+    val hours = min / 60
+    val days = hours / 24
+    return when {
+        sec < 60 -> "$sec с"
+        min < 60 -> "$min мин"
+        hours < 24 -> if (min % 60 == 0L) "$hours ч" else "$hours ч ${min % 60} мин"
+        else -> if (hours % 24 == 0L) "$days д" else "$days д ${hours % 24} ч"
+    }
+}
+
+/** «5 с назад» или прочерк, если события ещё не было. */
+fun agoStr(millis: Long, now: Long = System.currentTimeMillis()): String =
+    if (millis <= 0L) "—" else if (now - millis < 2000L) "только что" else durationStr(now - millis) + " назад"
