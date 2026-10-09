@@ -232,7 +232,9 @@ class MonitorService : Service() {
         nm.cancel(NOTIFICATION_ID)
         if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
         History.flush(this)
-        Prefs.clearLastState(this)
+        // Если пользователь выключил мониторинг — забываем статус.
+        // Если службу убил Android — оставляем, чтобы после перезапуска значок не мигал «Проверяю…».
+        if (!Prefs.isEnabled(this)) Prefs.clearLastState(this)
         state = State()
         broadcastState()
         super.onDestroy()
