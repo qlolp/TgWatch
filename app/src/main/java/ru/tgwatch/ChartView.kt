@@ -97,7 +97,11 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         canvas.drawText("${scale.toLong()} мс", 0f, top - 4f * dp, textPaint)
         canvas.drawText("60 мин назад", 0f, height - 2f * dp, textPaint)
         textPaint.textAlign = Paint.Align.RIGHT
-        canvas.drawText("сейчас", w, height - 2f * dp, textPaint)
+        val avg = minutes.mapNotNull { m -> m.avgLatency.takeIf { it >= 0 } }.average().takeIf { !it.isNaN() }
+        canvas.drawText(
+            if (avg != null) "сейчас · ср. ${avg.toLong()} мс" else "сейчас",
+            w, height - 2f * dp, textPaint
+        )
     }
 
     private fun describe(): String {

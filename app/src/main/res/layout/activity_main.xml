@@ -53,7 +53,7 @@
                     android:layout_width="56dp"
                     android:layout_height="56dp"
                     android:background="@drawable/bg_status_icon"
-                    android:importantForAccessibility="no"
+                    android:contentDescription="@string/status_icon"
                     android:padding="14dp"
                     android:src="@drawable/ic_stat_wait" />
 
@@ -161,6 +161,20 @@
                 android:layout_weight="1" />
         </LinearLayout>
 
+        <!-- Статистика за сутки -->
+        <LinearLayout style="@style/Card">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="За сутки" />
+
+            <TextView
+                android:id="@+id/tvDayStats"
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:text="Пока нет данных — подожди несколько проверок." />
+        </LinearLayout>
+
         <!-- График за последний час -->
         <LinearLayout style="@style/Card">
 
@@ -244,6 +258,21 @@
                 android:text="Не даёт телефону засыпать. Расходует немного больше батареи."
                 android:textSize="12sp" />
 
+            <Switch
+                android:id="@+id/swVibrate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Вибрация при потере связи"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="2dp"
+                android:text="Три длинных импульса, не чаще одного раза в 5 минут."
+                android:textSize="12sp" />
+
             <Button
                 android:id="@+id/btnVibe"
                 style="@style/ButtonText"
@@ -280,6 +309,13 @@
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
                 android:text="Разрешить работу без ограничений" />
+
+            <TextView
+                android:id="@+id/tvOem"
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Журнал -->
@@ -297,6 +333,24 @@
                 android:lineSpacingExtra="4dp"
                 android:textIsSelectable="true"
                 android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnShareLog"
+                    style="@style/ButtonText"
+                    android:layout_marginStart="-12dp"
+                    android:text="Поделиться" />
+
+                <Button
+                    android:id="@+id/btnClearLog"
+                    style="@style/ButtonText"
+                    android:text="Очистить" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

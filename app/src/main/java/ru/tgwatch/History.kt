@@ -26,8 +26,18 @@ object History {
 
     enum class Kind { OK, FAIL, OFFLINE }
 
+    data class DayStats(
+        val uptimePercent: Double,
+        val checks: Long,
+        val failMinutes: Int,
+        val offlineMinutes: Int,
+        val longestOutageMin: Int,
+        val avgLatencyMs: Long,
+    )
+
     private const val FILE = "history.csv"
     private const val KEEP_MINUTES = 24 * 60
+    private const val TAG = "TgWatch"
 
     private val minutes = ArrayDeque<Minute>()
     private var loaded = false
@@ -80,6 +90,47 @@ object History {
         return if (total == 0L) -1.0 else ok * 100.0 / total
     }
 
+    /** Сводка за сутки для экрана: доступность, минуты сбоев, самый долгий простой, среднее время ответа. */
+    @Synchronized
+    fun dayStats(ctx: Context): DayStats? {
+        load(ctx)
+        if (minutes.isEmpty()) return null
+        var ok = 0L
+        var total = 0L
+        var latencySum = 0L
+        var latencyN = 0L
+        var failMinutes = 0
+        var offlineMinutes = 0
+        var longest = 0
+        var streak = 0
+        for (m in minutes) {
+            ok += m.ok
+            total += m.total
+            if (m.ok > 0) {
+                latencySum += m.latencySum
+                latencyN += m.ok
+            }
+            val bad = m.fail > 0 || m.offline > 0
+            if (m.fail > 0 && m.fail >= m.offline) failMinutes++
+            else if (m.offline > 0) offlineMinutes++
+            if (bad) {
+                streak++
+                if (streak > longest) longest = streak
+            } else {
+                streak = 0
+            }
+        }
+        if (total == 0L) return null
+        return DayStats(
+            uptimePercent = ok * 100.0 / total,
+            checks = total,
+            failMinutes = failMinutes,
+            offlineMinutes = offlineMinutes,
+            longestOutageMin = longest,
+            avgLatencyMs = if (latencyN > 0) latencySum / latencyN else -1L,
+        )
+    }
+
     @Synchronized
     fun flush(ctx: Context) {
         if (loaded) save(ctx)
@@ -100,7 +151,7 @@ object History {
                 }
             }
         } catch (e: Exception) {
-            Log.w("TgWatch", "history load", e)
+            Log.w(TAG, "history load", e)
             minutes.clear()
         }
     }
@@ -110,11 +161,20 @@ object History {
             val text = minutes.joinToString("\n") {
                 "${it.minute},${it.ok},${it.fail},${it.offline},${it.latencySum}"
             }
-            val tmp = File(ctx.filesDir, "$FILE.tmp")
+            val dir = ctx.filesDir
+            val target = File(dir, FILE)
+            val tmp = File(dir, "$FILE.tmp")
             tmp.writeText(text)
-            tmp.renameTo(File(ctx.filesDir, FILE))
+            // На части устройств renameTo не перезаписывает существующий файл.
+            if (target.exists() && !target.delete()) {
+                Log.w(TAG, "history: could not delete old file")
+            }
+            if (!tmp.renameTo(target)) {
+                tmp.copyTo(target, overwrite = true)
+                tmp.delete()
+            }
         } catch (e: Exception) {
-            Log.w("TgWatch", "history save", e)
+            Log.w(TAG, "history save", e)
         }
     }
 }
@@ -122,7 +182,7 @@ object History {
 /** Журнал смен статуса, новые записи сверху. Хранится в настройках, поэтому не пропадает после перезапуска. */
 object EventLog {
     private const val KEY = "log"
-    private const val MAX = 100
+    private const val MAX = 150
 
     @Volatile
     private var items: List<String>? = null
@@ -146,5 +206,16 @@ object EventLog {
         val updated = (listOf("$time  $message") + all(ctx)).take(MAX)
         items = updated
         Prefs.sp(ctx).edit().putString(KEY, updated.joinToString("\n")).apply()
+    }
+
+    @Synchronized
+    fun clear(ctx: Context) {
+        items = emptyList()
+        Prefs.sp(ctx).edit().remove(KEY).apply()
+    }
+
+    fun exportText(ctx: Context): String {
+        val log = all(ctx)
+        return if (log.isEmpty()) "Журнал пуст" else log.joinToString("\n")
     }
 }

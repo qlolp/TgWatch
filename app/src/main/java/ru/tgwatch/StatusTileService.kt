@@ -1,9 +1,14 @@
 package ru.tgwatch
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
@@ -13,9 +18,50 @@ import android.service.quicksettings.TileService
  */
 class StatusTileService : TileService() {
 
+    private val ui = Handler(Looper.getMainLooper())
+    private var listening = false
+
+    private val stateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (listening) refresh()
+        }
+    }
+
+    /** Пока шторка открыта — подтягиваем статус раз в 2 секунды. */
+    private val ticker = object : Runnable {
+        override fun run() {
+            if (!listening) return
+            refresh()
+            ui.postDelayed(this, 2_000L)
+        }
+    }
+
     override fun onStartListening() {
         super.onStartListening()
+        listening = true
+        MonitorService.restorePersistedState(this)
+        try {
+            val filter = IntentFilter(MonitorService.ACTION_STATE_CHANGED)
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(stateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(stateReceiver, filter)
+            }
+        } catch (_: Exception) {
+        }
         refresh()
+        ui.removeCallbacks(ticker)
+        ui.postDelayed(ticker, 2_000L)
+    }
+
+    override fun onStopListening() {
+        listening = false
+        ui.removeCallbacks(ticker)
+        try {
+            unregisterReceiver(stateReceiver)
+        } catch (_: Exception) {
+        }
+        super.onStopListening()
     }
 
     override fun onClick() {
@@ -23,7 +69,8 @@ class StatusTileService : TileService() {
         if (MonitorService.running) {
             try {
                 MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
-            } catch (e: Exception) {
+                ui.postDelayed({ refresh() }, 400L)
+            } catch (_: Exception) {
                 openApp()
             }
         } else {
