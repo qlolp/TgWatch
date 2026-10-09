@@ -5,12 +5,17 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
+import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * График за последний час: один столбик на минуту.
- * Высота — среднее время ответа, красный — Telegram недоступен,
- * оранжевый — нет интернета, серая черта — проверок не было.
+ * Высота — среднее время ответа; цвет по большинству проверок в минуте.
+ * Нажатие на столбик показывает детали.
  */
 class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
@@ -35,12 +40,44 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
     }
 
     private val rect = RectF()
+    private val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     fun setData(data: List<History.Minute>, now: Long) {
         minutes = data
         nowMinute = now / 60_000L
         contentDescription = describe()
         invalidate()
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action != MotionEvent.ACTION_UP) return true
+        val w = width.toFloat()
+        if (w <= 0f) return true
+        val slotW = w / slots
+        val i = (event.x / slotW).toInt().coerceIn(0, slots - 1)
+        val minute = nowMinute - (slots - 1 - i)
+        val m = minutes.firstOrNull { it.minute == minute }
+        val whenText = timeFmt.format(Date(minute * 60_000L))
+        val msg = if (m == null || m.total == 0) {
+            "$whenText — проверок не было"
+        } else {
+            buildString {
+                append(whenText)
+                append(": ")
+                append("${m.ok} ok")
+                if (m.fail > 0) append(", ${m.fail} без Telegram")
+                if (m.offline > 0) append(", ${m.offline} без сети")
+                if (m.avgLatency >= 0) append(", ср. ${m.avgLatency} мс")
+            }
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        performClick()
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -54,7 +91,6 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
 
         val byMinute = minutes.associateBy { it.minute }
         val maxLatency = minutes.maxOfOrNull { it.avgLatency } ?: -1L
-        // Шкала не меньше 300 мс, чтобы обычные 50–150 мс не выглядели «высокими».
         val scale = maxOf(300L, (maxLatency * 1.15).toLong()).toFloat()
 
         canvas.drawLine(0f, bottom, w, bottom, gridPaint)
@@ -76,17 +112,17 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
             val paint: Paint
             val h: Float
             when {
-                m.fail > 0 && m.fail >= m.offline -> {
+                m.isFailDominant -> {
                     paint = failPaint
                     h = chartH
                 }
-                m.offline > 0 -> {
+                m.isOfflineDominant -> {
                     paint = offlinePaint
                     h = chartH
                 }
                 else -> {
                     paint = okPaint
-                    h = maxOf(3f * dp, chartH * (m.avgLatency / scale).coerceIn(0f, 1f))
+                    h = maxOf(3f * dp, chartH * (m.avgLatency.coerceAtLeast(0) / scale).coerceIn(0f, 1f))
                 }
             }
             rect.set(left, bottom - h, right, bottom)
@@ -108,6 +144,6 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val ok = minutes.sumOf { it.ok }
         val fail = minutes.sumOf { it.fail }
         val offline = minutes.sumOf { it.offline }
-        return "За последний час: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline"
+        return "За последний час: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline. Нажми столбик, чтобы увидеть детали."
     }
 }

@@ -2,6 +2,7 @@ package ru.tgwatch
 
 import android.content.Context
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -12,6 +13,11 @@ object Prefs {
     private const val KEY_INTERVAL = "interval_sec"
     private const val KEY_KEEP_AWAKE = "keep_awake"
     private const val KEY_VIBRATE = "vibrate"
+    private const val KEY_VIBRATE_OFFLINE = "vibrate_offline"
+    private const val KEY_VIBRATE_RECOVERY = "vibrate_recovery"
+    private const val KEY_QUIET_HOURS = "quiet_hours"
+    private const val KEY_QUIET_START = "quiet_start_hour"
+    private const val KEY_QUIET_END = "quiet_end_hour"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -20,6 +26,8 @@ object Prefs {
     private const val KEY_LAST_VIBE = "last_vibe"
 
     const val DEFAULT_INTERVAL_SEC = 15
+    const val DEFAULT_QUIET_START = 23
+    const val DEFAULT_QUIET_END = 8
 
     fun sp(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
@@ -37,18 +45,53 @@ object Prefs {
         sp(ctx).edit().putInt(KEY_INTERVAL, value).apply()
     }
 
-    /** Держать процессор в рабочем состоянии, чтобы проверки шли и при выключенном экране. */
+    /** Будить процессор на время каждой проверки при выключенном экране. */
     fun keepAwake(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_KEEP_AWAKE, true)
 
     fun setKeepAwake(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_KEEP_AWAKE, value).apply()
     }
 
-    /** Вибрировать при потере связи. */
+    /** Вибрировать, когда недоступен именно Telegram. */
     fun vibrateEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VIBRATE, true)
 
     fun setVibrateEnabled(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_VIBRATE, value).apply()
+    }
+
+    /** Вибрировать также при полной потере интернета (по умолчанию выкл.). */
+    fun vibrateOffline(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VIBRATE_OFFLINE, false)
+
+    fun setVibrateOffline(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VIBRATE_OFFLINE, value).apply()
+    }
+
+    /** Короткая вибрация, когда связь с Telegram вернулась. */
+    fun vibrateOnRecovery(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VIBRATE_RECOVERY, true)
+
+    fun setVibrateOnRecovery(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VIBRATE_RECOVERY, value).apply()
+    }
+
+    /** Не вибрировать ночью. */
+    fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)
+
+    fun setQuietHoursEnabled(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_QUIET_HOURS, value).apply()
+    }
+
+    fun quietStartHour(ctx: Context): Int = sp(ctx).getInt(KEY_QUIET_START, DEFAULT_QUIET_START)
+
+    fun quietEndHour(ctx: Context): Int = sp(ctx).getInt(KEY_QUIET_END, DEFAULT_QUIET_END)
+
+    fun inQuietHoursNow(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
+        if (!quietHoursEnabled(ctx)) return false
+        val cal = Calendar.getInstance().apply { timeInMillis = now }
+        return ProbeRules.inQuietHours(
+            cal.get(Calendar.HOUR_OF_DAY),
+            quietStartHour(ctx),
+            quietEndHour(ctx),
+        )
     }
 
     /** Сохраняем последний статус, чтобы экран и значок не «мигали» после перезапуска процесса. */

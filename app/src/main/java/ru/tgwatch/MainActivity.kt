@@ -28,6 +28,11 @@ import android.widget.Toast
 /** Экран приложения: статус, график, кнопки и настройки. */
 class MainActivity : Activity() {
 
+    private lateinit var setupCard: View
+    private lateinit var tvSetup: TextView
+    private lateinit var btnSetupNotif: Button
+    private lateinit var btnSetupBattery: Button
+    private lateinit var btnSetupApp: Button
     private lateinit var statusCard: View
     private lateinit var ivStatus: ImageView
     private lateinit var tvTitle: TextView
@@ -40,14 +45,19 @@ class MainActivity : Activity() {
     private lateinit var chart: ChartView
     private lateinit var btnToggle: Button
     private lateinit var btnCheck: Button
+    private lateinit var btnShareStats: Button
     private lateinit var rgInterval: RadioGroup
     private lateinit var swKeepAwake: Switch
     private lateinit var swVibrate: Switch
+    private lateinit var swVibrateOffline: Switch
+    private lateinit var swVibrateRecovery: Switch
+    private lateinit var swQuietHours: Switch
     private lateinit var tvBattery: TextView
     private lateinit var btnBattery: Button
     private lateinit var tvNotif: TextView
     private lateinit var btnNotif: Button
     private lateinit var tvOem: TextView
+    private lateinit var btnAppDetails: Button
     private lateinit var btnVibe: Button
     private lateinit var tvLog: TextView
     private lateinit var btnShareLog: Button
@@ -55,7 +65,6 @@ class MainActivity : Activity() {
 
     private val ui = Handler(Looper.getMainLooper())
 
-    /** Обновляем экран раз в секунду, пока он открыт. */
     private val ticker = object : Runnable {
         override fun run() {
             render()
@@ -78,6 +87,11 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         MonitorService.restorePersistedState(this)
 
+        setupCard = findViewById(R.id.setupCard)
+        tvSetup = findViewById(R.id.tvSetup)
+        btnSetupNotif = findViewById(R.id.btnSetupNotif)
+        btnSetupBattery = findViewById(R.id.btnSetupBattery)
+        btnSetupApp = findViewById(R.id.btnSetupApp)
         statusCard = findViewById(R.id.statusCard)
         ivStatus = findViewById(R.id.ivStatus)
         tvTitle = findViewById(R.id.tvTitle)
@@ -90,14 +104,19 @@ class MainActivity : Activity() {
         chart = findViewById(R.id.chart)
         btnToggle = findViewById(R.id.btnToggle)
         btnCheck = findViewById(R.id.btnCheck)
+        btnShareStats = findViewById(R.id.btnShareStats)
         rgInterval = findViewById(R.id.rgInterval)
         swKeepAwake = findViewById(R.id.swKeepAwake)
         swVibrate = findViewById(R.id.swVibrate)
+        swVibrateOffline = findViewById(R.id.swVibrateOffline)
+        swVibrateRecovery = findViewById(R.id.swVibrateRecovery)
+        swQuietHours = findViewById(R.id.swQuietHours)
         tvBattery = findViewById(R.id.tvBattery)
         btnBattery = findViewById(R.id.btnBattery)
         tvNotif = findViewById(R.id.tvNotif)
         btnNotif = findViewById(R.id.btnNotif)
         tvOem = findViewById(R.id.tvOem)
+        btnAppDetails = findViewById(R.id.btnAppDetails)
         btnVibe = findViewById(R.id.btnVibe)
         tvLog = findViewById(R.id.tvLog)
         btnShareLog = findViewById(R.id.btnShareLog)
@@ -145,14 +164,28 @@ class MainActivity : Activity() {
         }
 
         swVibrate.isChecked = Prefs.vibrateEnabled(this)
-        swVibrate.setOnCheckedChangeListener { _, checked ->
-            Prefs.setVibrateEnabled(this, checked)
-        }
+        swVibrate.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateEnabled(this, checked) }
 
-        btnBattery.setOnClickListener { openBatterySettings() }
-        btnNotif.setOnClickListener { openNotificationSettings() }
+        swVibrateOffline.isChecked = Prefs.vibrateOffline(this)
+        swVibrateOffline.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateOffline(this, checked) }
+
+        swVibrateRecovery.isChecked = Prefs.vibrateOnRecovery(this)
+        swVibrateRecovery.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateOnRecovery(this, checked) }
+
+        swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
+        swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
+
+        val openNotif = View.OnClickListener { openNotificationSettings() }
+        val openBatt = View.OnClickListener { openBatterySettings() }
+        btnBattery.setOnClickListener(openBatt)
+        btnNotif.setOnClickListener(openNotif)
+        btnSetupNotif.setOnClickListener(openNotif)
+        btnSetupBattery.setOnClickListener(openBatt)
+        btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
+        btnAppDetails.setOnClickListener { OemTips.openAppDetails(this) }
         btnVibe.setOnClickListener { Vibe.alarm(this) }
-        btnShareLog.setOnClickListener { shareLog() }
+        btnShareLog.setOnClickListener { shareText("Журнал TG Монитор", EventLog.exportText(this)) }
+        btnShareStats.setOnClickListener { shareText("Сводка TG Монитор", History.exportSummary(this)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
         val oem = OemTips.manufacturerHint()
@@ -161,8 +194,6 @@ class MainActivity : Activity() {
             tvOem.text = oem
         }
 
-        // При первом запуске на Android 13+ спросим разрешение на уведомления,
-        // без него значок в строке состояния не появится.
         if (savedInstanceState == null) requestNotificationPermissionIfNeeded()
     }
 
@@ -190,15 +221,14 @@ class MainActivity : Activity() {
         if (MonitorService.running) MonitorService.send(this, MonitorService.ACTION_SETTINGS)
     }
 
-    private fun shareLog() {
-        val text = EventLog.exportText(this)
+    private fun shareText(subject: String, text: String) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Журнал TG Монитор")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, text)
         }
         try {
-            startActivity(Intent.createChooser(send, "Поделиться журналом"))
+            startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
             Toast.makeText(this, "Не удалось поделиться: ${e.message}", Toast.LENGTH_SHORT).show()
         }
@@ -216,8 +246,6 @@ class MainActivity : Activity() {
             .setNegativeButton("Отмена", null)
             .show()
     }
-
-    // ------------------------------------------------------------- разрешения
 
     private fun notificationsAllowed(): Boolean =
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()
@@ -254,12 +282,15 @@ class MainActivity : Activity() {
         false
     }
 
-    // ------------------------------------------------------------------ экран
-
     private fun render() {
         val now = System.currentTimeMillis()
         val running = MonitorService.running
         val s = MonitorService.state
+        val stale = running && s.isStale(now, Prefs.intervalSec(this))
+        val notifOk = notificationsAllowed()
+        val batteryOk = ignoringBatteryOptimizations()
+
+        renderSetup(notifOk, batteryOk)
 
         btnToggle.text = if (running) "Остановить" else "Запустить"
         btnCheck.isEnabled = running
@@ -270,6 +301,17 @@ class MainActivity : Activity() {
             tvTitle.text = "Мониторинг выключен"
             tvSince.text = "Значка в строке состояния нет"
             tvReason.text = "Нажми «Запустить», и приложение начнёт следить за Telegram."
+        } else if (stale) {
+            color = getColor(R.color.status_idle)
+            ivStatus.setImageResource(R.drawable.ic_stat_wait)
+            tvTitle.text = when (s.status) {
+                MonitorService.Status.OK -> "Последний раз: доступен"
+                MonitorService.Status.TG_DOWN -> "Последний раз: недоступен"
+                MonitorService.Status.NO_NETWORK -> "Последний раз: нет сети"
+                MonitorService.Status.UNKNOWN -> "Проверяю…"
+            }
+            tvSince.text = "Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку"
+            tvReason.text = "Статус мог устареть, пока служба перезапускалась. Новая проверка уже идёт."
         } else {
             when (s.status) {
                 MonitorService.Status.OK -> {
@@ -298,20 +340,21 @@ class MainActivity : Activity() {
                 "Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}"
             }
             tvReason.text = when (s.status) {
-                MonitorService.Status.OK -> "Серверы Telegram отвечают. Если связь пропадёт, телефон завибрирует."
-                MonitorService.Status.TG_DOWN -> "Причина: ${s.reason}. Остальной интернет при этом работает."
-                MonitorService.Status.NO_NETWORK -> "Причина: ${s.reason}."
+                MonitorService.Status.OK ->
+                    if (Prefs.vibrateEnabled(this)) "Серверы Telegram отвечают. При потере связи телефон завибрирует."
+                    else "Серверы Telegram отвечают."
+                MonitorService.Status.TG_DOWN -> "Причина: ${s.reason}"
+                MonitorService.Status.NO_NETWORK -> "Причина: ${s.reason}"
                 MonitorService.Status.UNKNOWN -> "Стучусь на ${MonitorService.CHECK_URL}"
             } + if (s.lastVibrationAt > 0L) "\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}" else ""
         }
         animateCardColor(color)
 
-        tvLatency.text = if (running && s.status == MonitorService.Status.OK) "${s.latencyMs} мс" else "—"
+        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) "${s.latencyMs} мс" else "—"
         val uptime = History.uptimePercent(this)
         tvUptime.text = if (uptime >= 0) formatPercent(uptime) else "—"
         tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
 
-        // График, статистика и журнал — только когда данные изменились.
         val minute = now / 60_000L
         if (History.version != shownHistoryVersion || minute != shownChartMinute) {
             shownHistoryVersion = History.version
@@ -325,7 +368,7 @@ class MainActivity : Activity() {
             tvLog.text = if (log.isEmpty()) "Пока пусто" else log.joinToString("\n")
         }
 
-        if (notificationsAllowed()) {
+        if (notifOk) {
             tvNotif.text = "✓ Уведомления включены, значок виден в строке состояния."
             btnNotif.visibility = View.GONE
         } else {
@@ -333,7 +376,7 @@ class MainActivity : Activity() {
             btnNotif.visibility = View.VISIBLE
         }
 
-        if (ignoringBatteryOptimizations()) {
+        if (batteryOk) {
             tvBattery.text = "✓ Работа в фоне без ограничений разрешена."
             btnBattery.visibility = View.GONE
         } else {
@@ -343,13 +386,31 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun renderSetup(notifOk: Boolean, batteryOk: Boolean) {
+        if (notifOk && batteryOk) {
+            setupCard.visibility = View.GONE
+            return
+        }
+        setupCard.visibility = View.VISIBLE
+        val lines = mutableListOf("Без этих разрешений значок в строке состояния может пропасть или врать.")
+        if (!notifOk) lines += "• Включи уведомления — иначе постоянного значка не будет."
+        if (!batteryOk) lines += "• Разреши работу без ограничений — иначе Android усыпит проверки."
+        OemTips.manufacturerHint()?.let { lines += "• $it" }
+        tvSetup.text = lines.joinToString("\n")
+        btnSetupNotif.visibility = if (notifOk) View.GONE else View.VISIBLE
+        btnSetupBattery.visibility = if (batteryOk) View.GONE else View.VISIBLE
+    }
+
     private fun formatDayStats(stats: History.DayStats?): String {
         if (stats == null) return "Пока нет данных — подожди несколько проверок."
         val parts = mutableListOf<String>()
-        parts += "Доступность ${formatPercent(stats.uptimePercent)} · ${stats.checks} проверок"
+        if (stats.uptimePercent >= 0) {
+            parts += "Telegram ${formatPercent(stats.uptimePercent)} · ${stats.telegramChecks} проверок с интернетом"
+        } else {
+            parts += "Пока не было проверок с интернетом"
+        }
         if (stats.avgLatencyMs >= 0) parts += "Среднее время ответа ${stats.avgLatencyMs} мс"
-        val badMin = stats.failMinutes + stats.offlineMinutes
-        if (badMin == 0) {
+        if (stats.failMinutes == 0 && stats.offlineMinutes == 0) {
             parts += "Сбоев за сутки не было"
         } else {
             val detail = buildList {
@@ -358,13 +419,12 @@ class MainActivity : Activity() {
             }.joinToString(", ")
             parts += detail
             if (stats.longestOutageMin > 0) {
-                parts += "Самый долгий простой: ${stats.longestOutageMin} мин"
+                parts += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
             }
         }
         return parts.joinToString("\n")
     }
 
-    /** Плавно перекрашиваем карточку статуса, когда статус меняется. */
     private fun animateCardColor(target: Int) {
         if (target == cardColor) return
         colorAnimator?.cancel()

@@ -14,7 +14,6 @@
         android:paddingEnd="16dp"
         android:paddingBottom="24dp">
 
-        <!-- Заголовок -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -32,7 +31,48 @@
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
-        <!-- Большая карточка статуса -->
+        <!-- Чеклист первого запуска: без этого значок врёт -->
+        <LinearLayout
+            android:id="@+id/setupCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Нужно разрешить работу" />
+
+            <TextView
+                android:id="@+id/tvSetup"
+                style="@style/Body"
+                android:layout_marginTop="8dp" />
+
+            <Button
+                android:id="@+id/btnSetupNotif"
+                style="@style/ButtonFilled"
+                android:layout_width="match_parent"
+                android:layout_marginTop="12dp"
+                android:text="Включить уведомления" />
+
+            <Button
+                android:id="@+id/btnSetupBattery"
+                style="@style/ButtonFilled"
+                android:layout_width="match_parent"
+                android:layout_marginTop="8dp"
+                android:text="Разрешить работу без ограничений" />
+
+            <Button
+                android:id="@+id/btnSetupApp"
+                style="@style/ButtonOutlined"
+                android:layout_width="match_parent"
+                android:layout_marginTop="8dp"
+                android:text="Открыть настройки приложения" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/statusCard"
             android:layout_width="match_parent"
@@ -95,7 +135,6 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- Три цифры -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -124,7 +163,7 @@
 
                 <TextView
                     style="@style/StatLabel"
-                    android:text="Доступен за сутки" />
+                    android:text="Telegram за сутки" />
             </LinearLayout>
 
             <LinearLayout style="@style/StatBox">
@@ -139,7 +178,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Кнопки -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -161,7 +199,6 @@
                 android:layout_weight="1" />
         </LinearLayout>
 
-        <!-- Статистика за сутки -->
         <LinearLayout style="@style/Card">
 
             <TextView
@@ -173,9 +210,15 @@
                 style="@style/Body"
                 android:layout_marginTop="8dp"
                 android:text="Пока нет данных — подожди несколько проверок." />
+
+            <Button
+                android:id="@+id/btnShareStats"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:layout_marginTop="4dp"
+                android:text="Поделиться сводкой" />
         </LinearLayout>
 
-        <!-- График за последний час -->
         <LinearLayout style="@style/Card">
 
             <TextView
@@ -191,11 +234,10 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Столбик = минута. Высота — время ответа, красный — Telegram недоступен, оранжевый — нет интернета."
+                android:text="Столбик = минута. Нажми столбик — увидишь детали. Высота — время ответа, красный — Telegram недоступен, оранжевый — нет интернета."
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Настройки -->
         <LinearLayout style="@style/Card">
 
             <TextView
@@ -240,7 +282,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Пока связи нет, проверка идёт каждые 10 секунд, чтобы сразу заметить, что она вернулась."
+                android:text="Пока связи нет, проверка идёт каждые 10 секунд."
                 android:textSize="12sp" />
 
             <Switch
@@ -255,7 +297,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Не даёт телефону засыпать. Расходует немного больше батареи."
+                android:text="Будит процессор только на время проверки — экономнее, чем раньше."
                 android:textSize="12sp" />
 
             <Switch
@@ -263,15 +305,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Вибрация при потере связи"
+                android:text="Вибрация, если недоступен Telegram"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
-            <TextView
-                style="@style/Body"
-                android:layout_marginTop="2dp"
-                android:text="Три длинных импульса, не чаще одного раза в 5 минут."
-                android:textSize="12sp" />
+            <Switch
+                android:id="@+id/swVibrateOffline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Вибрация при потере интернета"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <Switch
+                android:id="@+id/swVibrateRecovery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Короткая вибрация, когда связь вернулась"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <Switch
+                android:id="@+id/swQuietHours"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Тихие часы 23:00–08:00 (без вибрации)"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
 
             <Button
                 android:id="@+id/btnVibe"
@@ -281,7 +344,6 @@
                 android:text="Проверить вибрацию" />
         </LinearLayout>
 
-        <!-- Разрешения -->
         <LinearLayout style="@style/Card">
 
             <TextView
@@ -316,9 +378,14 @@
                 android:layout_marginTop="8dp"
                 android:textSize="12sp"
                 android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnAppDetails"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Открыть настройки приложения" />
         </LinearLayout>
 
-        <!-- Журнал -->
         <LinearLayout style="@style/Card">
 
             <TextView

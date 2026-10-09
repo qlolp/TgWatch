@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLException
 
 /**
@@ -44,13 +45,16 @@ class MonitorService : Service() {
 
     data class State(
         val status: Status = Status.UNKNOWN,
-        val checkedAt: Long = 0L,                       // когда была последняя проверка
-        val since: Long = System.currentTimeMillis(),   // с какого момента держится текущий статус
-        val latencyMs: Long = -1L,                      // время ответа сервера
-        val reason: String = "",                        // почему недоступен
-        val lastVibrationAt: Long = 0L,                 // когда последний раз вибрировали
+        val checkedAt: Long = 0L,
+        val since: Long = System.currentTimeMillis(),
+        val latencyMs: Long = -1L,
+        val reason: String = "",
+        val lastVibrationAt: Long = 0L,
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
+
+        fun isStale(now: Long, intervalSec: Int): Boolean =
+            status != Status.UNKNOWN && ProbeRules.isStale(checkedAt, now, intervalSec)
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String)
@@ -62,64 +66,43 @@ class MonitorService : Service() {
         const val ACTION_STOP = "ru.tgwatch.action.STOP"
         const val ACTION_CHECK_NOW = "ru.tgwatch.action.CHECK_NOW"
         const val ACTION_SETTINGS = "ru.tgwatch.action.SETTINGS"
-
-        /** Плитка быстрых настроек слушает эту рассылку и обновляется сразу. */
         const val ACTION_STATE_CHANGED = "ru.tgwatch.action.STATE_CHANGED"
 
-        /** Что проверяем. Любой HTTP-ответ от сервера = Telegram доступен. */
         const val CHECK_URL = "https://api.telegram.org/"
 
-        /**
-         * Запасные адреса Telegram: если api.telegram.org молчит, а web/core отвечают,
-         * считаем, что Telegram в целом доступен (локальный сбой одного хоста).
-         */
         private val TG_URLS = listOf(
             CHECK_URL,
             "https://web.telegram.org/",
             "https://core.telegram.org/",
         )
 
-        /**
-         * Контрольные адреса: если Telegram молчит, а они отвечают, значит,
-         * интернет работает и недоступен именно Telegram.
-         */
         private val CONTROL_URLS = listOf(
-            "https://www.gstatic.com/generate_204",
             "https://ya.ru/",
+            "https://mail.ru/",
+            "https://vk.com/favicon.ico",
+            "https://www.gstatic.com/generate_204",
             "https://connectivitycheck.gstatic.com/generate_204",
         )
 
-        private const val CHANNEL_ID = "status_v1"
+        private const val CHANNEL_OK = "status_ok_v2"
+        private const val CHANNEL_ALERT = "status_alert_v2"
         private const val NOTIFICATION_ID = 1
-
-        /** Вибрировать не чаще, чем раз в 5 минут. */
         private const val VIBRATION_GAP_MS = 5 * 60 * 1000L
-
-        /** Сколько ждём ответа. Живой сервер отвечает за доли секунды. */
         private const val TIMEOUT_MS = 5_000
-
-        /** Через сколько перепроверяем после первой неудачи. */
         private const val RETRY_DELAY_MS = 1_500L
-
-        /** Пока связи нет, проверяем не реже этого, чтобы быстро заметить, что она вернулась. */
         private const val BAD_INTERVAL_SEC = 10
-
-        /**
-         * При переключении Wi‑Fi ↔ мобильная сеть интернет пропадает на пару секунд.
-         * Столько ждём, прежде чем решить, что сети действительно нет.
-         */
         private const val NETWORK_GRACE_MS = 4_000L
+        private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
 
         private val COLOR_OK = Color.rgb(0x22, 0x9E, 0xD9)
         private val COLOR_FAIL = Color.rgb(0xE5, 0x39, 0x35)
         private val COLOR_OFFLINE = Color.rgb(0xF5, 0x7C, 0x00)
+        private val COLOR_STALE = Color.rgb(0x8A, 0x96, 0xA3)
 
-        /** Работает ли служба сейчас (для экрана приложения). */
         @Volatile
         var running = false
             private set
 
-        /** Последний известный статус (для экрана приложения). */
         @Volatile
         var state = State()
             private set
@@ -129,14 +112,18 @@ class MonitorService : Service() {
         }
 
         fun send(ctx: Context, action: String) {
-            ctx.startService(Intent(ctx, MonitorService::class.java).setAction(action))
+            val intent = Intent(ctx, MonitorService::class.java).setAction(action)
+            if (running) {
+                ctx.startService(intent)
+            } else {
+                ctx.startForegroundService(intent)
+            }
         }
 
         fun stop(ctx: Context) {
             ctx.stopService(Intent(ctx, MonitorService::class.java))
         }
 
-        /** Восстановить последний статус из настроек (после смерти процесса). */
         fun restorePersistedState(ctx: Context) {
             if (state.status != Status.UNKNOWN) return
             Prefs.loadLastState(ctx)?.let { state = it }
@@ -147,9 +134,9 @@ class MonitorService : Service() {
     private lateinit var worker: Handler
     private lateinit var nm: NotificationManager
     private lateinit var cm: ConnectivityManager
+    private lateinit var pm: PowerManager
 
-    /** Пул для параллельных контрольных и запасных проверок. */
-    private val probeExecutor: ExecutorService = Executors.newFixedThreadPool(3)
+    private val probeExecutor: ExecutorService = Executors.newFixedThreadPool(4)
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -160,7 +147,6 @@ class MonitorService : Service() {
 
     private val checkRunnable = Runnable { runCheck() }
 
-    /** Как только сеть пропала или появилась — проверяем сразу, не дожидаясь интервала. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) = scheduleCheck(1_500L)
         override fun onLost(network: Network) = scheduleCheck(500L)
@@ -177,8 +163,10 @@ class MonitorService : Service() {
         super.onCreate()
         nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        createChannel()
+        pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        createChannels()
         restorePersistedState(this)
+        seedVibrationCooldown()
 
         workerThread = HandlerThread("tg-check")
         workerThread.start()
@@ -193,7 +181,6 @@ class MonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Android требует показать уведомление сразу после запуска службы.
         if (!goForeground()) {
             stopSelf()
             return START_NOT_STICKY
@@ -205,8 +192,6 @@ class MonitorService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-
-        applyWakeLock()
 
         val first = !loopStarted
         loopStarted = true
@@ -232,12 +217,19 @@ class MonitorService : Service() {
         nm.cancel(NOTIFICATION_ID)
         if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
         History.flush(this)
-        // Если пользователь выключил мониторинг — забываем статус.
-        // Если службу убил Android — оставляем, чтобы после перезапуска значок не мигал «Проверяю…».
         if (!Prefs.isEnabled(this)) Prefs.clearLastState(this)
         state = State()
         broadcastState()
         super.onDestroy()
+    }
+
+    private fun seedVibrationCooldown() {
+        val last = state.lastVibrationAt
+        if (last <= 0L) return
+        val age = System.currentTimeMillis() - last
+        if (age in 0 until VIBRATION_GAP_MS) {
+            lastVibrationMono = SystemClock.elapsedRealtime() - age
+        }
     }
 
     // ---------------------------------------------------------------- проверка
@@ -250,9 +242,14 @@ class MonitorService : Service() {
 
     private fun runCheck() {
         if (destroyed) return
-        val result = performCheck()
-        if (destroyed) return
-        handleResult(result)
+        acquireWakeLockForCheck()
+        try {
+            val result = performCheck()
+            if (destroyed) return
+            handleResult(result)
+        } finally {
+            releaseWakeLock()
+        }
         val interval = Prefs.intervalSec(this)
         val next = if (state.bad) minOf(interval, BAD_INTERVAL_SEC) else interval
         scheduleCheck(next * 1000L)
@@ -264,10 +261,8 @@ class MonitorService : Service() {
         val first = probeTelegram()
         if (first.status == Status.OK) return first
 
-        // Одна неудача может быть случайной — перепроверяем, а заодно (параллельно)
-        // смотрим, работает ли остальной интернет.
-        val control: Future<Boolean>? = try {
-            probeExecutor.submit(Callable { CONTROL_URLS.any { probe(it).status == Status.OK } })
+        val control: Future<String?>? = try {
+            probeExecutor.submit(Callable { firstWorkingControl() })
         } catch (_: Exception) {
             null
         }
@@ -286,13 +281,13 @@ class MonitorService : Service() {
             return second
         }
 
-        val internetOk = try {
-            control?.get(TIMEOUT_MS * 3L, TimeUnit.MILLISECONDS) ?: true
+        val controlHost = try {
+            control?.get(TIMEOUT_MS * 2L, TimeUnit.MILLISECONDS)
         } catch (_: Exception) {
-            false
+            null
         }
-        return if (internetOk) {
-            Probe(Status.TG_DOWN, -1L, second.reason)
+        return if (controlHost != null) {
+            Probe(Status.TG_DOWN, -1L, "${second.reason}; интернет есть ($controlHost)")
         } else {
             Probe(Status.NO_NETWORK, -1L, "сеть подключена, но интернет не отвечает")
         }
@@ -300,25 +295,60 @@ class MonitorService : Service() {
 
     private fun noNetwork() = Probe(Status.NO_NETWORK, -1L, "нет активного подключения к сети")
 
-    /** Проверяем все адреса Telegram; достаточно одного ответа. */
-    private fun probeTelegram(): Probe {
-        var lastFail: Probe? = null
-        for (url in TG_URLS) {
-            val p = probe(url)
-            if (p.status == Status.OK) {
-                val host = try {
+    private fun firstWorkingControl(): String? {
+        for (url in CONTROL_URLS) {
+            if (probe(url).status == Status.OK) {
+                return try {
                     URL(url).host
                 } catch (_: Exception) {
                     url
                 }
-                return if (url == CHECK_URL) p else Probe(Status.OK, p.latencyMs, "HTTP через $host")
             }
-            lastFail = p
         }
+        return null
+    }
+
+    /** Параллельно стучимся во все адреса Telegram; берём первый успешный. */
+    private fun probeTelegram(): Probe {
+        val winner = AtomicReference<Probe?>(null)
+        val futures = TG_URLS.map { url ->
+            probeExecutor.submit(Callable {
+                if (winner.get() != null) return@Callable null
+                val p = probe(url)
+                if (p.status == Status.OK) {
+                    val host = try {
+                        URL(url).host
+                    } catch (_: Exception) {
+                        url
+                    }
+                    val ok = if (url == CHECK_URL) p else Probe(Status.OK, p.latencyMs, "HTTP через $host")
+                    winner.compareAndSet(null, ok)
+                    // Отменяем остальных через общий флаг winner.
+                }
+                p
+            })
+        }
+        val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MS * 2L + 500L
+        var lastFail: Probe? = null
+        for (f in futures) {
+            val left = deadline - SystemClock.elapsedRealtime()
+            if (left <= 0L) break
+            val done = winner.get()
+            if (done != null) {
+                futures.forEach { it.cancel(true) }
+                return done
+            }
+            try {
+                val p = f.get(left, TimeUnit.MILLISECONDS) ?: continue
+                if (p.status != Status.OK) lastFail = p
+            } catch (_: Exception) {
+            }
+        }
+        winner.get()?.let { return it }
+        futures.forEach { it.cancel(true) }
         return lastFail ?: Probe(Status.TG_DOWN, -1L, "нет ответа от серверов Telegram")
     }
 
-    /** Есть ли сеть; если нет — даём пару секунд на переключение между Wi‑Fi и мобильной сетью. */
     private fun waitForNetwork(): Boolean {
         if (hasInternet()) return true
         try {
@@ -329,10 +359,6 @@ class MonitorService : Service() {
         return hasInternet()
     }
 
-    /**
-     * Один лёгкий HTTPS-запрос. Сначала HEAD (без тела), если сервер не умеет —
-     * повторяем GET и сразу закрываем поток.
-     */
     private fun probe(url: String): Probe {
         val head = probeOnce(url, "HEAD")
         if (head.status == Status.OK) return head
@@ -358,22 +384,20 @@ class MonitorService : Service() {
             c.requestMethod = method
             c.instanceFollowRedirects = false
             c.useCaches = false
-            c.setRequestProperty("User-Agent", "TgWatch/1.2 (Android)")
+            c.setRequestProperty("User-Agent", "TgWatch/1.3 (Android)")
             c.setRequestProperty("Accept", "*/*")
             c.setRequestProperty("Connection", "keep-alive")
             val code = c.responseCode
             val ms = SystemClock.elapsedRealtime() - started
-            // Закрываем ответ, но не рвём соединение: оно вернётся в пул, и следующая
-            // проверка обойдётся без нового TLS-рукопожатия — быстрее и экономнее.
             try {
                 (if (code >= 400) c.errorStream else c.inputStream)?.close()
             } catch (_: Exception) {
             }
             conn = null
-            if (code in 100..599) {
+            if (ProbeRules.isReachableHttpCode(code)) {
                 Probe(Status.OK, ms, "HTTP $code")
             } else {
-                Probe(Status.TG_DOWN, -1L, "некорректный ответ сервера")
+                Probe(Status.TG_DOWN, -1L, ProbeRules.describeHttpFailure(code))
             }
         } catch (e: Exception) {
             Probe(Status.TG_DOWN, -1L, describe(e))
@@ -395,10 +419,7 @@ class MonitorService : Service() {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
-        // Captive portal (гостиничный Wi‑Fi без логина) — это не настоящий интернет.
         if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) return false
-        // VALIDATED — Android уже убедился, что сеть ходит в интернет.
-        // Если флага ещё нет (первые секунды после подключения), всё равно пробуем.
         return true
     }
 
@@ -408,7 +429,12 @@ class MonitorService : Service() {
         val changed = prev.status != p.status
         var lastVibration = prev.lastVibrationAt
 
-        if (p.status != Status.OK && Prefs.vibrateEnabled(this)) {
+        val shouldAlarm = when (p.status) {
+            Status.TG_DOWN -> Prefs.vibrateEnabled(this)
+            Status.NO_NETWORK -> Prefs.vibrateOffline(this)
+            else -> false
+        }
+        if (shouldAlarm && !Prefs.inQuietHoursNow(this, now)) {
             val mono = SystemClock.elapsedRealtime()
             if (lastVibrationMono < 0L || mono - lastVibrationMono >= VIBRATION_GAP_MS) {
                 lastVibrationMono = mono
@@ -418,6 +444,15 @@ class MonitorService : Service() {
                 } catch (e: Exception) {
                     Log.w(TAG, "vibrate", e)
                 }
+            }
+        }
+
+        val recovered = changed && p.status == Status.OK && prev.bad
+        if (recovered && Prefs.vibrateOnRecovery(this) && !Prefs.inQuietHoursNow(this, now)) {
+            try {
+                Vibe.recovery(this)
+            } catch (e: Exception) {
+                Log.w(TAG, "vibrate recovery", e)
             }
         }
 
@@ -471,17 +506,32 @@ class MonitorService : Service() {
 
     // ------------------------------------------------------------ уведомление
 
-    private fun createChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID, "Статус Telegram", NotificationManager.IMPORTANCE_DEFAULT
+    private fun createChannels() {
+        val ok = NotificationChannel(
+            CHANNEL_OK, "Telegram доступен", NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Постоянный значок с состоянием связи с Telegram"
+            description = "Постоянный значок, когда Telegram отвечает"
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
-        nm.createNotificationChannel(channel)
+        val alert = NotificationChannel(
+            CHANNEL_ALERT, "Telegram недоступен", NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Тревожный значок, когда связи нет"
+            setSound(null, null)
+            enableVibration(false)
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+        nm.createNotificationChannel(ok)
+        nm.createNotificationChannel(alert)
+        // Старый канал больше не используем.
+        try {
+            nm.deleteNotificationChannel("status_v1")
+        } catch (_: Exception) {
+        }
     }
 
     private fun goForeground(): Boolean {
@@ -506,7 +556,6 @@ class MonitorService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "notify", e)
         }
-        // Если службу остановили, пока шла проверка, — убираем значок.
         if (destroyed) nm.cancel(NOTIFICATION_ID)
     }
 
@@ -525,49 +574,63 @@ class MonitorService : Service() {
             this, 2, Intent(this, MonitorService::class.java).setAction(ACTION_STOP), piFlags
         )
 
+        val now = System.currentTimeMillis()
+        val stale = s.isStale(now, Prefs.intervalSec(this))
         val uptime = History.uptimePercent(this)
-        val uptimeText = if (uptime >= 0) " · за сутки ${formatPercent(uptime)}" else ""
-        val (title, text) = when (s.status) {
-            Status.OK -> "Telegram доступен · ${s.latencyMs} мс" to
-                "Проверено в ${timeStr(s.checkedAt)}$uptimeText"
-            Status.TG_DOWN -> "Telegram НЕДОСТУПЕН" to
-                "Нет связи с ${timeStr(s.since)} · ${s.reason}. Остальной интернет работает."
-            Status.NO_NETWORK -> "Нет подключения к интернету" to
-                "С ${timeStr(s.since)} · ${s.reason}"
-            Status.UNKNOWN -> "Проверяю связь с Telegram…" to CHECK_URL
+        val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
+
+        val (title, text, channel, icon, color, colorized) = when {
+            s.status == Status.UNKNOWN -> Notif(
+                "Проверяю связь с Telegram…", CHECK_URL, CHANNEL_OK,
+                R.drawable.ic_stat_wait, COLOR_OK, false
+            )
+            stale && s.status == Status.OK -> Notif(
+                "Последний раз: доступен · ${s.latencyMs} мс",
+                "Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку$uptimeText",
+                CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_STALE, false
+            )
+            stale && s.status == Status.TG_DOWN -> Notif(
+                "Последний раз: НЕДОСТУПЕН",
+                "Проверено ${agoStr(s.checkedAt, now)} · ${s.reason}",
+                CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true
+            )
+            stale && s.status == Status.NO_NETWORK -> Notif(
+                "Последний раз: нет интернета",
+                "Проверено ${agoStr(s.checkedAt, now)} · ${s.reason}",
+                CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true
+            )
+            s.status == Status.OK -> Notif(
+                "Telegram доступен · ${s.latencyMs} мс",
+                "Проверено в ${timeStr(s.checkedAt)}$uptimeText",
+                CHANNEL_OK, R.drawable.ic_stat_ok, COLOR_OK, false
+            )
+            s.status == Status.TG_DOWN -> Notif(
+                "Telegram НЕДОСТУПЕН",
+                "Нет связи с ${timeStr(s.since)} · ${s.reason}",
+                CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true
+            )
+            else -> Notif(
+                "Нет подключения к интернету",
+                "С ${timeStr(s.since)} · ${s.reason}",
+                CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true
+            )
         }
 
-        val builder = Notification.Builder(this, CHANNEL_ID)
-            // Когда связи нет — значок в строке состояния мигает,
-            // а само уведомление в шторке целиком закрашивается цветом тревоги.
-            .setSmallIcon(
-                when (s.status) {
-                    Status.TG_DOWN -> R.drawable.ic_stat_fail_blink
-                    Status.NO_NETWORK -> R.drawable.ic_stat_offline_blink
-                    else -> R.drawable.ic_stat_ok
-                }
-            )
-            .setColor(
-                when (s.status) {
-                    Status.TG_DOWN -> COLOR_FAIL
-                    Status.NO_NETWORK -> COLOR_OFFLINE
-                    else -> COLOR_OK
-                }
-            )
-            .setColorized(s.bad)
+        val builder = Notification.Builder(this, channel)
+            .setSmallIcon(icon)
+            .setColor(color)
+            .setColorized(colorized)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
-            // Пока связи нет, в уведомлении тикает секундомер с момента потери связи.
-            .setWhen(if (s.bad) s.since else if (s.checkedAt > 0L) s.checkedAt else System.currentTimeMillis())
-            .setUsesChronometer(s.bad)
+            .setWhen(if (s.bad && !stale) s.since else if (s.checkedAt > 0L) s.checkedAt else System.currentTimeMillis())
+            .setUsesChronometer(s.bad && !stale)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(openApp)
-            // Если уведомление смахнули — служба перепроверит связь и вернёт значок.
             .setDeleteIntent(checkNow)
             .addAction(
                 Notification.Action.Builder(
@@ -585,25 +648,37 @@ class MonitorService : Service() {
         return builder.build()
     }
 
+    private data class Notif(
+        val title: String,
+        val text: String,
+        val channel: String,
+        val icon: Int,
+        val color: Int,
+        val colorized: Boolean,
+    )
+
     // --------------------------------------------------------------- wake lock
 
-    private fun applyWakeLock() {
-        if (Prefs.keepAwake(this)) {
+    /** Держим wake lock только на время одной проверки, а не весь день. */
+    private fun acquireWakeLockForCheck() {
+        if (!Prefs.keepAwake(this)) return
+        try {
             if (wakeLock == null) {
-                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TgWatch:monitor").apply {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TgWatch:check").apply {
                     setReferenceCounted(false)
-                    acquire()
                 }
             }
-        } else {
-            releaseWakeLock()
+            wakeLock?.acquire(WAKE_LOCK_TIMEOUT_MS)
+        } catch (e: Exception) {
+            Log.w(TAG, "wakeLock", e)
         }
     }
 
     private fun releaseWakeLock() {
-        wakeLock?.let { if (it.isHeld) it.release() }
-        wakeLock = null
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {
+        }
     }
 }
 
