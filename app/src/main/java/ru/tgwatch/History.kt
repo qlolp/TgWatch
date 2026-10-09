@@ -21,14 +21,21 @@ object History {
         val total get() = ok + fail + offline
         val avgLatency get() = if (ok > 0) latencySum / ok else -1L
 
+        /** Минута «красная», только если сбоев Telegram не меньше успешных. */
+        val isFailDominant get() = fail > 0 && fail >= ok && fail >= offline
+
+        /** Минута «оранжевая» — в основном без интернета. */
+        val isOfflineDominant get() = offline > 0 && offline >= ok && offline > fail
+
         fun copy() = Minute(minute, ok, fail, offline, latencySum)
     }
 
     enum class Kind { OK, FAIL, OFFLINE }
 
     data class DayStats(
-        val uptimePercent: Double,
+        val uptimePercent: Double,      // Telegram: ok/(ok+fail), без offline
         val checks: Long,
+        val telegramChecks: Long,
         val failMinutes: Int,
         val offlineMinutes: Int,
         val longestOutageMin: Int,
@@ -37,10 +44,12 @@ object History {
 
     private const val FILE = "history.csv"
     private const val KEEP_MINUTES = 24 * 60
+    private const val FLUSH_EVERY = 8
     private const val TAG = "TgWatch"
 
     private val minutes = ArrayDeque<Minute>()
     private var loaded = false
+    private var unsaved = 0
 
     /** Меняется после каждой записи: экран по нему понимает, что пора перерисовать график. */
     @Volatile
@@ -64,9 +73,12 @@ object History {
         }
         while (minutes.isNotEmpty() && minutes.first().minute <= minute - KEEP_MINUTES) minutes.removeFirst()
         version++
-        // На диск пишем не чаще раза в минуту: при переходе на новую минуту
-        // сохраняем всё, что накопилось за предыдущую.
-        if (newMinute) save(ctx)
+        unsaved++
+        // На диск: при новой минуте или каждые несколько проверок (защита от kill).
+        if (newMinute || unsaved >= FLUSH_EVERY) {
+            save(ctx)
+            unsaved = 0
+        }
     }
 
     /** Копия минут за последние [count] минут (старые сначала). */
@@ -77,26 +89,31 @@ object History {
         return minutes.filter { it.minute >= from }.map { it.copy() }
     }
 
-    /** Доля успешных проверок за сутки, в процентах; -1, если проверок не было. */
+    /**
+     * Доступность Telegram за сутки: только проверки, когда интернет был.
+     * Offline минуты не портят процент.
+     */
     @Synchronized
     fun uptimePercent(ctx: Context): Double {
         load(ctx)
         var ok = 0L
-        var total = 0L
+        var fail = 0L
         for (m in minutes) {
             ok += m.ok
-            total += m.total
+            fail += m.fail
         }
+        val total = ok + fail
         return if (total == 0L) -1.0 else ok * 100.0 / total
     }
 
-    /** Сводка за сутки для экрана: доступность, минуты сбоев, самый долгий простой, среднее время ответа. */
+    /** Сводка за сутки для экрана. */
     @Synchronized
     fun dayStats(ctx: Context): DayStats? {
         load(ctx)
         if (minutes.isEmpty()) return null
         var ok = 0L
-        var total = 0L
+        var fail = 0L
+        var offline = 0L
         var latencySum = 0L
         var latencyN = 0L
         var failMinutes = 0
@@ -105,25 +122,31 @@ object History {
         var streak = 0
         for (m in minutes) {
             ok += m.ok
-            total += m.total
+            fail += m.fail
+            offline += m.offline
             if (m.ok > 0) {
                 latencySum += m.latencySum
                 latencyN += m.ok
             }
-            val bad = m.fail > 0 || m.offline > 0
-            if (m.fail > 0 && m.fail >= m.offline) failMinutes++
-            else if (m.offline > 0) offlineMinutes++
-            if (bad) {
-                streak++
-                if (streak > longest) longest = streak
-            } else {
-                streak = 0
+            when {
+                m.isFailDominant -> {
+                    failMinutes++
+                    streak++
+                    if (streak > longest) longest = streak
+                }
+                m.isOfflineDominant -> {
+                    offlineMinutes++
+                    streak = 0
+                }
+                else -> streak = 0
             }
         }
-        if (total == 0L) return null
+        val telegramChecks = ok + fail
+        if (ok + fail + offline == 0L) return null
         return DayStats(
-            uptimePercent = ok * 100.0 / total,
-            checks = total,
+            uptimePercent = if (telegramChecks == 0L) -1.0 else ok * 100.0 / telegramChecks,
+            checks = ok + fail + offline,
+            telegramChecks = telegramChecks,
             failMinutes = failMinutes,
             offlineMinutes = offlineMinutes,
             longestOutageMin = longest,
@@ -131,9 +154,27 @@ object History {
         )
     }
 
+    fun exportSummary(ctx: Context): String {
+        val stats = dayStats(ctx) ?: return "За сутки данных ещё нет."
+        val lines = mutableListOf("TG Монитор — сводка за сутки")
+        if (stats.uptimePercent >= 0) {
+            lines += "Доступность Telegram: ${formatPercent(stats.uptimePercent)} (${stats.telegramChecks} проверок с интернетом)"
+        }
+        lines += "Всего проверок: ${stats.checks}"
+        if (stats.avgLatencyMs >= 0) lines += "Среднее время ответа: ${stats.avgLatencyMs} мс"
+        if (stats.failMinutes > 0) lines += "Минут без Telegram: ${stats.failMinutes}"
+        if (stats.offlineMinutes > 0) lines += "Минут без интернета: ${stats.offlineMinutes}"
+        if (stats.longestOutageMin > 0) lines += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
+        if (stats.failMinutes == 0 && stats.offlineMinutes == 0) lines += "Сбоев не было"
+        return lines.joinToString("\n")
+    }
+
     @Synchronized
     fun flush(ctx: Context) {
-        if (loaded) save(ctx)
+        if (loaded) {
+            save(ctx)
+            unsaved = 0
+        }
     }
 
     private fun load(ctx: Context) {
@@ -165,7 +206,6 @@ object History {
             val target = File(dir, FILE)
             val tmp = File(dir, "$FILE.tmp")
             tmp.writeText(text)
-            // На части устройств renameTo не перезаписывает существующий файл.
             if (target.exists() && !target.delete()) {
                 Log.w(TAG, "history: could not delete old file")
             }

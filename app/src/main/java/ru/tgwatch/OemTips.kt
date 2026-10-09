@@ -1,6 +1,10 @@
 package ru.tgwatch
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 
 /** Подсказки по снятию ограничений батареи на разных оболочках. */
 object OemTips {
@@ -22,6 +26,18 @@ object OemTips {
             listOf("meizu").any { m.contains(it) || brand.contains(it) } ->
                 "Meizu: отключи энергосбережение для TG Монитор и разреши автозапуск."
             else -> null
+        }
+    }
+
+    fun openAppDetails(ctx: Context): Boolean {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.parse("package:${ctx.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            ctx.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 }

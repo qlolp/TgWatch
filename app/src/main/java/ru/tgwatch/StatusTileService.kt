@@ -27,7 +27,6 @@ class StatusTileService : TileService() {
         }
     }
 
-    /** Пока шторка открыта — подтягиваем статус раз в 2 секунды. */
     private val ticker = object : Runnable {
         override fun run() {
             if (!listening) return
@@ -74,8 +73,6 @@ class StatusTileService : TileService() {
                 openApp()
             }
         } else {
-            // Из плитки Android не всегда разрешает запускать фоновую службу,
-            // поэтому включаем мониторинг и открываем приложение: оно запустит службу само.
             Prefs.setEnabled(this, true)
             openApp()
         }
@@ -96,14 +93,22 @@ class StatusTileService : TileService() {
     private fun refresh() {
         val tile = qsTile ?: return
         val s = MonitorService.state
+        val now = System.currentTimeMillis()
+        val stale = s.isStale(now, Prefs.intervalSec(this))
         val (tileState, icon, subtitle) = when {
             !MonitorService.running -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, "Выключен")
+            stale && s.status == MonitorService.Status.OK ->
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, "Устарело · ${agoStr(s.checkedAt, now)}")
+            stale && s.status == MonitorService.Status.TG_DOWN ->
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, "Недоступен?")
+            stale && s.status == MonitorService.Status.NO_NETWORK ->
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_offline, "Без сети?")
             s.status == MonitorService.Status.OK ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_ok, "Доступен · ${s.latencyMs} мс")
             s.status == MonitorService.Status.TG_DOWN ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, "Недоступен")
             s.status == MonitorService.Status.NO_NETWORK ->
-                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_offline, "Нет интернета")
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_offline, "Нет интернета")
             else -> Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_wait, "Проверяю…")
         }
         tile.state = tileState
