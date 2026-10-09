@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Тёмная тема -->
+    <color name="bg">#FF0E1217</color>
+    <color name="surface">#FF1A2129</color>
+    <color name="text_primary">#FFE6EAEE</color>
+    <color name="text_secondary">#FF95A1AD</color>
+    <color name="divider">#FF2A333D</color>
+    <color name="chart_empty">#FF2A333D</color>
+</resources>
