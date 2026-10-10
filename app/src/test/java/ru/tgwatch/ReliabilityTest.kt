@@ -7,6 +7,50 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class ReliabilityTest {
+    @Test fun repeatedCancelledEndpointCannotStarveHealthyEndpoints() {
+        val pool = Executors.newFixedThreadPool(2)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val blockedCalls = java.util.concurrent.atomic.AtomicInteger()
+        val endpoints = listOf(ProbeEndpoint("blocked", ProbeGroup.WEB, "blocked"),
+            ProbeEndpoint("healthy", ProbeGroup.CONTROL, "healthy"))
+        try {
+            repeat(5) {
+                val result = ProbeBatch(pool, 150).run(endpoints) { ep, _ ->
+                    if (ep.name == "blocked") {
+                        blockedCalls.incrementAndGet()
+                        while (release.count > 0) try { release.await() } catch (_: InterruptedException) {}
+                    }
+                    ProbeOutcome(ep.name, ep.group, true, 1, "ok")
+                }
+                assertTrue(result.single { it.endpoint == "healthy" }.reachable)
+            }
+            assertEquals(1, blockedCalls.get())
+        } finally { release.countDown(); pool.shutdownNow() }
+    }
+    @Test fun slowCancellationCleanupDoesNotExtendBatchDeadline() {
+        val pool = Executors.newFixedThreadPool(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val start = System.nanoTime()
+        try {
+            ProbeBatch(pool, 100).run(listOf(ProbeEndpoint("slow", ProbeGroup.WEB, "slow"))) { ep, cancel ->
+                cancel.register { release.await(2, java.util.concurrent.TimeUnit.SECONDS) }
+                Thread.sleep(2000)
+                ProbeOutcome(ep.name, ep.group, true, 1, "ok")
+            }
+            assertTrue(java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 700)
+        } finally { release.countDown(); pool.shutdownNow() }
+    }
+    @Test fun futurePersistedStatusIsStale() {
+        assertTrue(ProbeRules.isStale(2000, 1000, 30))
+    }
+    @Test fun oldClockEpochIsPreservedButCannotSupplyCurrentCoverage() {
+        val old = Observation(1000, 2000, "OK", clockEpoch = 0)
+        val current = Observation(500, 900, "TG_DOWN", clockEpoch = 1)
+        val stats = Timeline.stats(listOf(old, current), 0, 3000)
+        assertEquals(0L, stats.okMs)
+        assertEquals(400L, stats.downMs)
+        assertTrue(Timeline.csv(listOf(old, current), 0, 3000).contains(",OK,1000,,0,false"))
+    }
     @Test fun timeWeightedUptimeDoesNotDependOnSamplingFrequency() {
         val samples = (0 until 50).map { Observation(it * 60_000L, (it + 1) * 60_000L, "OK", 50) } +
             (0 until 60).map { Observation(3_000_000L + it * 10_000L, 3_000_000L + (it + 1) * 10_000L, "TG_DOWN") }

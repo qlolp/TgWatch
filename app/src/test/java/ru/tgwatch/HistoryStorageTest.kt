@@ -5,6 +5,22 @@ import org.junit.Test
 import java.nio.file.Files
 
 class HistoryStorageTest {
+    @Test fun failedLegacyMigrationKeepsHealthyDestinationUsableAndPending() {
+        val dir = Files.createTempDirectory("tg-migration").toFile()
+        try {
+            val destination = java.io.File(dir, "history-v2.csv")
+            val unreadable = java.io.File(dir, "legacy-directory").apply { mkdir() }
+            val marker = java.io.File(dir, "migrated")
+            val current = listOf(Observation(2000, 3000, "PARTIAL"))
+            HistoryStorage.write(destination, current)
+            val result = HistoryStorage.migrateLegacy(unreadable, destination, marker, current)
+            assertFalse(result.complete)
+            assertEquals(current, result.samples)
+            assertFalse(marker.exists())
+            HistoryStorage.append(destination, Observation(3000, 4000, "OK"))
+            assertEquals(2, HistoryStorage.read(destination).size)
+        } finally { dir.deleteRecursively() }
+    }
     @Test fun corruptLineDoesNotEraseOtherObservations() {
         val dir = Files.createTempDirectory("tg-history").toFile()
         try {
