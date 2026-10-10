@@ -8,3 +8,9 @@ local.properties
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# Android signing material must remain outside version control.
+*.jks
+*.keystore
+*.p12
+*signing-password*.txt

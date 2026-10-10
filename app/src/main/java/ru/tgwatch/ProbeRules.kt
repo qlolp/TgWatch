@@ -32,7 +32,7 @@ object ProbeRules {
      * [slowExpected] — экран может быть выключен, тогда ждём минимум минуту.
      */
     fun isStale(checkedAt: Long, now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean {
-        if (checkedAt <= 0L) return true
+        if (checkedAt <= 0L || now < checkedAt) return true
         val expected = maxOf(intervalSec, if (slowExpected) SCREEN_OFF_INTERVAL_SEC else BAD_INTERVAL_SEC)
         return now - checkedAt > expected * 3L * 1000L
     }
@@ -57,3 +57,4 @@ object ProbeRules {
         return if (start < end) h in start until end else h >= start || h < end
     }
 }
+

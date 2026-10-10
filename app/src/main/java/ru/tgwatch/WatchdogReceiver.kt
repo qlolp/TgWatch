@@ -28,6 +28,10 @@ class WatchdogReceiver : BroadcastReceiver() {
                 Log.w(TAG, "watchdog start", e)
             }
         }
+        if (MonitorService.running) {
+            try { MonitorService.send(context, MonitorService.ACTION_HEALTH) }
+            catch (e: Exception) { Log.w(TAG, "watchdog health", e) }
+        }
         StatusWidget.updateAll(context)
         schedule(context)
     }
@@ -72,3 +76,4 @@ class WatchdogReceiver : BroadcastReceiver() {
             )
     }
 }
+

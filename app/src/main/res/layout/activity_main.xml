@@ -210,8 +210,9 @@
 
             <TextView
                 style="@style/CardTitle"
-                android:text="За сутки" />
+                android:text="История доступности" />
 
+            <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="Период: сутки" />
             <TextView
                 android:id="@+id/tvDayStats"
                 style="@style/Body"
@@ -224,12 +225,16 @@
                 android:layout_marginStart="-12dp"
                 android:layout_marginTop="4dp"
                 android:text="Поделиться сводкой" />
+            <Button android:id="@+id/btnExportCsv" style="@style/ButtonText" android:text="Сохранить CSV" />
+            <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="Диагностика подключения" />
+            <TextView android:id="@+id/tvDiagnostics" style="@style/Body" android:visibility="gone" android:textIsSelectable="true" />
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
 
             <TextView
                 style="@style/CardTitle"
+                android:id="@+id/tvChartTitle"
                 android:text="Последний час" />
 
             <ru.tgwatch.ChartView
@@ -241,7 +246,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Столбик = минута. Нажми столбик — увидишь детали. Высота — время ответа, красный — Telegram недоступен, оранжевый — нет интернета."
+                android:text="Нажми столбик — увидишь результаты проверок за период. Красный — сбой, оранжевый — нет сети или частичная доступность, серый — нет данных. Процент доступности считается по времени в сводке."
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -251,6 +256,7 @@
                 style="@style/CardTitle"
                 android:text="Как часто проверять" />
 
+            <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="Профиль: Обычный" />
             <RadioGroup
                 android:id="@+id/rgInterval"
                 android:layout_width="match_parent"
@@ -289,7 +295,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Пока связи нет, проверка идёт каждые 10 секунд."
+                android:text="Профиль задаёт интервалы при активном экране, во сне и при сбое. Выбор секунд ниже включает свой интервал."
                 android:textSize="12sp" />
 
             <Switch
@@ -304,7 +310,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Системный будильник будит телефон к проверке. При выключенном экране, если Telegram доступен, проверяем не чаще раза в минуту — так меньше расход батареи."
+                android:text="Интервал во сне зависит от профиля. Android может откладывать будильники; время последней проверки всегда видно."
                 android:textSize="12sp" />
 
             <Switch
@@ -455,3 +461,4 @@
 
     </LinearLayout>
 </ScrollView>
+

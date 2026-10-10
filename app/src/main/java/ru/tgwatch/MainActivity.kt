@@ -86,10 +86,49 @@ class MainActivity : Activity() {
     private var shownHistoryVersion = -1L
     private var shownLog: List<String>? = null
     private var shownChartMinute = -1L
+    private var historyDays = 1
+    private var exportDays = 7
+    private lateinit var btnPeriod: Button
+    private lateinit var btnProfile: Button
+    private lateinit var tvDiagnostics: TextView
+    private var changingProfile = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
+        exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
+        btnPeriod = findViewById(R.id.btnPeriod)
+        btnProfile = findViewById(R.id.btnProfile)
+        tvDiagnostics = findViewById(R.id.tvDiagnostics)
+        btnPeriod.text = if (historyDays == 1) "Период: сутки" else "Период: неделя"
+        btnPeriod.setOnClickListener {
+            historyDays = if (historyDays == 1) 7 else 1
+            btnPeriod.text = if (historyDays == 1) "Период: сутки" else "Период: неделя"
+            shownHistoryVersion = -1L
+            render()
+        }
+        findViewById<Button>(R.id.btnExportCsv).setOnClickListener {
+            exportDays = historyDays
+            safeStartExport()
+        }
+        findViewById<Button>(R.id.btnDiagnostics).setOnClickListener {
+            tvDiagnostics.visibility = if (tvDiagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            render()
+        }
+        updateProfileLabel()
+        btnProfile.setOnClickListener {
+            AlertDialog.Builder(this).setTitle("Расход батареи")
+                .setItems(PowerProfile.entries.map { "${it.title}: ${it.awake} с / сон ${it.asleep} с / сбой ${it.failure} с" }.toTypedArray()) { _, index ->
+                    val profile = PowerProfile.entries[index]
+                    Prefs.setProfile(this, profile)
+                    changingProfile = true
+                    rgInterval.check(intervalButtons[profile.awake] ?: R.id.rb30)
+                    changingProfile = false
+                    updateProfileLabel()
+                    notifyServiceSettingsChanged()
+                }.show()
+        }
         MonitorService.restorePersistedState(this)
 
         setupCard = findViewById(R.id.setupCard)
@@ -162,8 +201,11 @@ class MainActivity : Activity() {
         rgInterval.setOnCheckedChangeListener { _, checkedId ->
             val sec = intervalButtons.entries.firstOrNull { it.value == checkedId }?.key
                 ?: Prefs.DEFAULT_INTERVAL_SEC
-            Prefs.setIntervalSec(this, sec)
-            notifyServiceSettingsChanged()
+            if (!changingProfile) {
+                Prefs.setIntervalSec(this, sec)
+                updateProfileLabel()
+                notifyServiceSettingsChanged()
+            }
         }
 
         swKeepAwake.isChecked = Prefs.keepAwake(this)
@@ -199,7 +241,7 @@ class MainActivity : Activity() {
         btnAppDetails.setOnClickListener { OemTips.openAppDetails(this) }
         btnVibe.setOnClickListener { Vibe.alarm(this) }
         btnShareLog.setOnClickListener { shareText("Журнал TG Монитор", EventLog.exportText(this)) }
-        btnShareStats.setOnClickListener { shareText("Сводка TG Монитор", History.exportSummary(this)) }
+        btnShareStats.setOnClickListener { shareText("Сводка TG Монитор", History.exportSummary(this, historyDays)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
         val oem = OemTips.manufacturerHint()
@@ -346,25 +388,31 @@ class MainActivity : Activity() {
         if (!running) {
             ivStatus.setImageResource(R.drawable.ic_stat_pause)
             tvTitle.text = "Мониторинг выключен"
-            tvSince.text = "Значка в строке состояния нет"
+            tvSince.text = "Проверки остановлены"
             tvReason.text = "Нажми «Запустить», и приложение начнёт следить за Telegram."
         } else if (stale) {
             color = getColor(R.color.status_idle)
             ivStatus.setImageResource(R.drawable.ic_stat_wait)
             tvTitle.text = when (s.status) {
                 MonitorService.Status.OK -> "Последний раз: доступен"
+                MonitorService.Status.PARTIAL -> "Последний раз: частично доступен"
                 MonitorService.Status.TG_DOWN -> "Последний раз: недоступен"
                 MonitorService.Status.NO_NETWORK -> "Последний раз: нет сети"
                 MonitorService.Status.UNKNOWN -> "Проверяю…"
             }
             tvSince.text = "Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку"
-            tvReason.text = "Статус мог устареть, пока служба перезапускалась. Новая проверка уже идёт."
+            tvReason.text = "Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить»."
         } else {
             when (s.status) {
                 MonitorService.Status.OK -> {
                     color = getColor(R.color.status_ok)
                     ivStatus.setImageResource(R.drawable.ic_stat_ok)
-                    tvTitle.text = "Telegram доступен"
+                    tvTitle.text = "Telegram отвечает"
+                }
+                MonitorService.Status.PARTIAL -> {
+                    color = getColor(R.color.status_offline)
+                    ivStatus.setImageResource(R.drawable.ic_stat_wait)
+                    tvTitle.text = "Telegram частично доступен"
                 }
                 MonitorService.Status.TG_DOWN -> {
                     color = getColor(R.color.status_fail)
@@ -378,21 +426,20 @@ class MainActivity : Activity() {
                 }
                 MonitorService.Status.UNKNOWN -> {
                     ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                    tvTitle.text = "Проверяю…"
+                    tvTitle.text = if (s.checkedAt > 0) "Доступность не определена" else "Проверяю…"
                 }
             }
             tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
-                "Первая проверка идёт прямо сейчас"
+                if (s.checkedAt > 0) "Проверено ${agoStr(s.checkedAt, now)}" else "Первая проверка идёт прямо сейчас"
             } else {
                 "Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}"
             }
             tvReason.text = when (s.status) {
-                MonitorService.Status.OK ->
-                    if (Prefs.vibrateEnabled(this)) "Серверы Telegram отвечают. При потере связи телефон завибрирует."
-                    else "Серверы Telegram отвечают."
+                MonitorService.Status.OK -> "MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется."
+                MonitorService.Status.PARTIAL -> s.reason
                 MonitorService.Status.TG_DOWN -> "Причина: ${s.reason}"
                 MonitorService.Status.NO_NETWORK -> "Причина: ${s.reason}"
-                MonitorService.Status.UNKNOWN -> "Стучусь на ${MonitorService.CHECK_URL}"
+                MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { "Проверяю веб-ресурсы и MTProto" }
             } + if (s.lastVibrationAt > 0L) "\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}" else ""
         }
         animateCardColor(color)
@@ -406,8 +453,14 @@ class MainActivity : Activity() {
         if (History.version != shownHistoryVersion || minute != shownChartMinute) {
             shownHistoryVersion = History.version
             shownChartMinute = minute
-            chart.setData(History.lastMinutes(this, 60, now), now)
-            tvDayStats.text = formatDayStats(History.dayStats(this))
+            val window = if (historyDays == 1) 60 else 7 * 24 * 60
+            chart.setData(History.lastMinutes(this, window, now), now, window)
+            findViewById<TextView>(R.id.tvChartTitle).text = if (historyDays == 1) "Последний час" else "Последняя неделя"
+            tvDayStats.text = History.describeStats(History.stats(this, historyDays, now), historyDays)
+        }
+        if (tvDiagnostics.visibility == View.VISIBLE) {
+            tvDiagnostics.text = s.diagnostics.ifEmpty { "Диагностика появится после первой проверки." } +
+                "\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с."
         }
         val log = EventLog.all(this)
         if (log !== shownLog) {
@@ -433,7 +486,7 @@ class MainActivity : Activity() {
         }
 
         if (alarmOk) {
-            tvAlarm.text = "✓ Точные будильники разрешены — проверки идут и при выключенном экране."
+            tvAlarm.text = "✓ Точные будильники разрешены. Android всё равно может откладывать проверки в глубоком сне."
             btnAlarm.visibility = View.GONE
         } else {
             tvAlarm.text = "Без точных будильников Android откладывает проверки во сне, и статус устаревает."
@@ -458,31 +511,43 @@ class MainActivity : Activity() {
         btnSetupAlarm.visibility = if (alarmOk) View.GONE else View.VISIBLE
     }
 
-    private fun formatDayStats(stats: History.DayStats?): String {
-        if (stats == null) return "Пока нет данных — подожди несколько проверок."
-        val parts = mutableListOf<String>()
-        if (stats.uptimePercent >= 0) {
-            parts += "Telegram ${formatPercent(stats.uptimePercent)} · ${stats.telegramChecks} проверок с интернетом"
-        } else {
-            parts += "Пока не было проверок с интернетом"
+    private fun updateProfileLabel() {
+        val profile = Prefs.profile(this)
+        btnProfile.text = "Профиль: ${profile?.title ?: "Свой интервал"}"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("history_days", historyDays)
+        outState.putInt("export_days", exportDays)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun safeStartExport() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/csv"
+            putExtra(Intent.EXTRA_TITLE, "tgwatch-${if (exportDays == 1) "day" else "week"}.csv")
         }
-        if (stats.avgLatencyMs >= 0) parts += "Среднее время ответа ${stats.avgLatencyMs} мс"
-        if (stats.failMinutes == 0 && stats.offlineMinutes == 0) {
-            parts += "Сбоев за сутки не было"
-        } else {
-            val detail = buildList {
-                if (stats.failMinutes > 0) add("Telegram недоступен ${stats.failMinutes} мин")
-                if (stats.offlineMinutes > 0) add("без интернета ${stats.offlineMinutes} мин")
-            }.joinToString(", ")
-            parts += detail
-            if (stats.longestOutageMin > 0) {
-                parts += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
-            }
-        }
-        if (stats.unmonitoredMinutes > 0) {
-            parts += "Без проверки ${stats.unmonitoredMinutes} мин (служба спала или была убита)"
-        }
-        return parts.joinToString("\n")
+        try { startActivityForResult(intent, 20) }
+        catch (e: Exception) { Toast.makeText(this, "Не удалось открыть сохранение файла", Toast.LENGTH_LONG).show() }
+    }
+
+    @Deprecated("Platform activity result API for dependency-free native UI")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 20 || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        val days = exportDays
+        val app = applicationContext
+        Thread({
+            val message = try {
+                val csv = History.exportCsv(app, days)
+                val output = app.contentResolver.openOutputStream(uri, "wt") ?: error("Файл недоступен")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(csv) }
+                "CSV сохранён"
+            } catch (e: Exception) { "Не удалось сохранить CSV: ${e.message}" }
+            runOnUiThread { if (!isFinishing && !isDestroyed) Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+        }, "tg-export").start()
     }
 
     private fun animateCardColor(target: Int) {
@@ -499,3 +564,4 @@ class MainActivity : Activity() {
         }
     }
 }
+

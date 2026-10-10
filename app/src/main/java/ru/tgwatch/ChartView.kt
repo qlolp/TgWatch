@@ -23,6 +23,8 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
 
     private var minutes: List<History.Minute> = emptyList()
     private var nowMinute = 0L
+    private var bucketMinutes = 1
+    private var windowMinutes = 60
 
     private val dp = resources.displayMetrics.density
 
@@ -42,9 +44,15 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
     private val rect = RectF()
     private val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-    fun setData(data: List<History.Minute>, now: Long) {
-        minutes = data
+    fun setData(data: List<History.Minute>, now: Long, window: Int = 60) {
+        windowMinutes = window
+        bucketMinutes = (window / slots).coerceAtLeast(1)
         nowMinute = now / 60_000L
+        val first = nowMinute - window + 1
+        minutes = data.groupBy { first + ((it.minute - first) / bucketMinutes) * bucketMinutes }.map { (key, values) ->
+            History.Minute(key, values.sumOf { it.ok }, values.sumOf { it.fail }, values.sumOf { it.offline },
+                values.sumOf { it.latencySum }, values.sumOf { it.partial }, values.sumOf { it.unknown })
+        }
         contentDescription = describe()
         invalidate()
     }
@@ -55,9 +63,9 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         if (w <= 0f) return true
         val slotW = w / slots
         val i = (event.x / slotW).toInt().coerceIn(0, slots - 1)
-        val minute = nowMinute - (slots - 1 - i)
+        val minute = nowMinute - windowMinutes + 1 + i * bucketMinutes
         val m = minutes.firstOrNull { it.minute == minute }
-        val whenText = timeFmt.format(Date(minute * 60_000L))
+        val whenText = (if (windowMinutes > 60) SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) else timeFmt).format(Date(minute * 60_000L))
         val msg = if (m == null || m.total == 0) {
             "$whenText — проверок не было"
         } else {
@@ -67,6 +75,8 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
                 append("${m.ok} ok")
                 if (m.fail > 0) append(", ${m.fail} без Telegram")
                 if (m.offline > 0) append(", ${m.offline} без сети")
+                if (m.partial > 0) append(", ${m.partial} частично")
+                if (m.unknown > 0) append(", ${m.unknown} не определено")
                 if (m.avgLatency >= 0) append(", ср. ${m.avgLatency} мс")
             }
         }
@@ -100,7 +110,7 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val gap = maxOf(1f, slotW * 0.25f)
         val radius = minOf(3f * dp, (slotW - gap) / 2f)
         for (i in 0 until slots) {
-            val minute = nowMinute - (slots - 1 - i)
+            val minute = nowMinute - windowMinutes + 1 + i * bucketMinutes
             val m = byMinute[minute]
             val left = i * slotW + gap / 2f
             val right = (i + 1) * slotW - gap / 2f
@@ -112,6 +122,14 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
             val paint: Paint
             val h: Float
             when {
+                m.isUnknownDominant -> {
+                    paint = emptyPaint
+                    h = 4f * dp
+                }
+                m.isPartialDominant -> {
+                    paint = offlinePaint
+                    h = chartH * 0.5f
+                }
                 m.isFailDominant -> {
                     paint = failPaint
                     h = chartH
@@ -131,7 +149,7 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
 
         textPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("${scale.toLong()} мс", 0f, top - 4f * dp, textPaint)
-        canvas.drawText("60 мин назад", 0f, height - 2f * dp, textPaint)
+        canvas.drawText(if (windowMinutes > 60) "7 дней назад" else "60 мин назад", 0f, height - 2f * dp, textPaint)
         textPaint.textAlign = Paint.Align.RIGHT
         val avg = minutes.mapNotNull { m -> m.avgLatency.takeIf { it >= 0 } }.average().takeIf { !it.isNaN() }
         canvas.drawText(
@@ -144,6 +162,7 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val ok = minutes.sumOf { it.ok }
         val fail = minutes.sumOf { it.fail }
         val offline = minutes.sumOf { it.offline }
-        return "За последний час: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline. Нажми столбик, чтобы увидеть детали."
+        return "За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline. Нажми столбик, чтобы увидеть детали."
     }
 }
+
