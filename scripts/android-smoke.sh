@@ -112,8 +112,13 @@ check_crashes
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
+adb shell input keyevent 82
 adb shell am start -W -n ru.tgwatch/.MainActivity
-sleep 1
-adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
+for attempt in $(seq 1 10); do
+  if adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch; then break; fi
+  sleep 1
+done
 adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
+adb shell dumpsys window | grep -F mCurrentFocus
+adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
 rm -rf "$legacy_dir"

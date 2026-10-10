@@ -121,6 +121,7 @@ class MonitorService : Service() {
     private lateinit var am: AlarmManager
     private lateinit var eventNotifications: EventNotifications
     private val offlineBackoff = OfflineBackoff()
+    private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
 
     /**
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
@@ -132,7 +133,6 @@ class MonitorService : Service() {
     private var lastVibrationMono = -1L
     @Volatile private var lastProgressMono = 0L
     @Volatile private var checkStartedMono = 0L
-    @Volatile private var networkRevision = 0L
     private val healthHandler = Handler(android.os.Looper.getMainLooper())
     private val healthTick = object : Runnable {
         override fun run() {
@@ -159,13 +159,11 @@ class MonitorService : Service() {
     private val checkRunnable = Runnable { runCheck() }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { networkRevision++; offlineBackoff.reset(); scheduleCheck(1_500L) }
-        override fun onLost(network: Network) { networkRevision++; offlineBackoff.reset(); scheduleCheck(500L) }
+        override fun onAvailable(network: Network) { checkSchedule.networkChanged(1_500L) }
+        override fun onLost(network: Network) { checkSchedule.networkChanged(500L) }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                networkRevision++
-                offlineBackoff.reset()
-                scheduleCheck(800L)
+                checkSchedule.networkChanged(800L)
             }
         }
     }
@@ -269,6 +267,10 @@ class MonitorService : Service() {
     // ---------------------------------------------------------------- проверка
 
     private fun scheduleCheck(delayMs: Long) {
+        checkSchedule.request(delayMs)
+    }
+
+    private fun enqueueCheck(delayMs: Long) {
         if (destroyed) return
         worker.removeCallbacks(checkRunnable)
         worker.postDelayed(checkRunnable, delayMs)
@@ -321,12 +323,12 @@ class MonitorService : Service() {
         // An interrupt from the health monitor must not poison the following check.
         Thread.interrupted()
         checkStartedMono = SystemClock.elapsedRealtime()
-        val revision = networkRevision
+        val revision = checkSchedule.revision
         acquireWakeLockForCheck()
         try {
             val result = performCheck()
             if (destroyed) return
-            if (revision == networkRevision) handleResult(result)
+            if (revision == checkSchedule.revision) handleResult(result)
             else handleResult(Probe(Status.UNKNOWN, -1, "Сеть изменилась во время проверки", result.diagnostics))
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
@@ -336,7 +338,7 @@ class MonitorService : Service() {
             checkStartedMono = 0L
             releaseWakeLock()
         }
-        scheduleCheck(if (revision != networkRevision) 1_000L else state.expectedIntervalSec * 1000L)
+        checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
     }
 
     private fun performCheck(): Probe {
