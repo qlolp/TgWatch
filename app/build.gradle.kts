@@ -11,8 +11,8 @@ android {
         applicationId = "ru.tgwatch"
         minSdk = 26
         targetSdk = 34
-        versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull()?.plus(100) ?: 9
-        versionName = "1.8"
+        versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull()?.plus(100) ?: 10
+        versionName = "1.9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {

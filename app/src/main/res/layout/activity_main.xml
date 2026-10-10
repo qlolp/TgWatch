@@ -370,6 +370,36 @@
                 android:textSize="15sp" />
 
             <Switch
+                android:id="@+id/swNotifyRecovery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="Уведомление о восстановлении связи"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <Switch
+                android:id="@+id/swEventSound"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="Звук при сбое Telegram и восстановлении"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Звук по умолчанию выключен. Сигнал сбоя — не чаще раза в 5 минут. В тихие часы и в режиме «Не беспокоить» события остаются без звука и вибрации."
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnAlarmPattern"
+                style="@style/ButtonText"
+                android:text="Сигнал вибрации: Тройной" />
+
+            <Switch
                 android:id="@+id/swQuietHours"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

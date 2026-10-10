@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Disposable root-capable emulator. Verify the real published 1.7 -> new release update.
+# Disposable root-capable emulator. Verify the real published 1.8.33 -> new release update.
 set -euo pipefail
 old_apk=${1:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
 new_apk=${2:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
@@ -40,7 +40,8 @@ tree = ET.parse('upgrade-before-prefs.xml')
 root = tree.getroot()
 for name, tag, value in [('power_profile', 'string', 'ECONOMY'),
                           ('interval_sec', 'int', '60'),
-                          ('vibrate_offline', 'boolean', 'true')]:
+                          ('vibrate_offline', 'boolean', 'true'),
+                          ('vibrate_partial', 'boolean', 'true')]:
     for node in list(root):
         if node.get('name') == name: root.remove(node)
     node = ET.SubElement(root, tag, name=name)
@@ -70,6 +71,7 @@ values = {e.get('name'): e.text if e.tag == 'string' else e.get('value')
 assert values['power_profile'] == 'ECONOMY'
 assert values['interval_sec'] == '60'
 assert values['vibrate_offline'] == 'true'
-assert values.get('vibrate_partial', 'false') == 'false', 'Upgrade opted into new alerts'
-print('Published 1.7.28 -> signed release: installation, history, settings and new observations verified.')
+assert values['vibrate_partial'] == 'true', 'Existing PARTIAL opt-in was lost'
+assert values.get('event_sound', 'false') == 'false', 'Upgrade opted into new sounds'
+print('Published 1.8.33 -> signed release: installation, history, settings and new observations verified.')
 PY

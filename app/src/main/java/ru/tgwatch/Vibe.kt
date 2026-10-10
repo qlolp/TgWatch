@@ -11,10 +11,9 @@ import android.os.VibratorManager
 /** Вибросигналы: тревога при потере связи и короткий импульс при восстановлении. */
 object Vibe {
 
-    private val ALARM = longArrayOf(0, 700, 300, 700, 300, 700)
     private val RECOVERY = longArrayOf(0, 120, 80, 120)
 
-    fun alarm(ctx: Context) = play(ctx, ALARM)
+    fun alarm(ctx: Context) = play(ctx, Prefs.alarmPattern(ctx).timings())
 
     fun recovery(ctx: Context) = play(ctx, RECOVERY)
 

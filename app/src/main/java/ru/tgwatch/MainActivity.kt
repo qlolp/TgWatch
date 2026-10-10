@@ -54,6 +54,9 @@ class MainActivity : Activity() {
     private lateinit var swVibratePartial: Switch
     private lateinit var swVibrateOffline: Switch
     private lateinit var swVibrateRecovery: Switch
+    private lateinit var swNotifyRecovery: Switch
+    private lateinit var swEventSound: Switch
+    private lateinit var btnAlarmPattern: Button
     private lateinit var swQuietHours: Switch
     private lateinit var btnQuietHours: Button
     private lateinit var tvBattery: TextView
@@ -168,6 +171,9 @@ class MainActivity : Activity() {
         swVibratePartial = findViewById(R.id.swVibratePartial)
         swVibrateOffline = findViewById(R.id.swVibrateOffline)
         swVibrateRecovery = findViewById(R.id.swVibrateRecovery)
+        swNotifyRecovery = findViewById(R.id.swNotifyRecovery)
+        swEventSound = findViewById(R.id.swEventSound)
+        btnAlarmPattern = findViewById(R.id.btnAlarmPattern)
         swQuietHours = findViewById(R.id.swQuietHours)
         btnQuietHours = findViewById(R.id.btnQuietHours)
         tvBattery = findViewById(R.id.tvBattery)
@@ -239,6 +245,21 @@ class MainActivity : Activity() {
         swVibrateRecovery.isChecked = Prefs.vibrateOnRecovery(this)
         swVibrateRecovery.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateOnRecovery(this, checked) }
 
+        swNotifyRecovery.isChecked = Prefs.notifyRecovery(this)
+        swNotifyRecovery.setOnCheckedChangeListener { _, checked -> Prefs.setNotifyRecovery(this, checked) }
+        swEventSound.isChecked = Prefs.eventSound(this)
+        swEventSound.setOnCheckedChangeListener { _, checked -> Prefs.setEventSound(this, checked) }
+        updateAlarmPatternLabel()
+        btnAlarmPattern.setOnClickListener {
+            AlertDialog.Builder(this).setTitle("Сигнал вибрации при сбое")
+                .setSingleChoiceItems(AlarmPattern.entries.map { it.title }.toTypedArray(),
+                    Prefs.alarmPattern(this).ordinal) { dialog, index ->
+                    Prefs.setAlarmPattern(this, AlarmPattern.entries[index])
+                    updateAlarmPatternLabel()
+                    dialog.dismiss()
+                }.show()
+        }
+
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
         updateQuietHoursLabel()
@@ -273,6 +294,7 @@ class MainActivity : Activity() {
         advancedSettings.visibility = if (advancedExpanded) View.VISIBLE else View.GONE
         btnAdvanced.text = if (advancedExpanded) "Скрыть дополнительные настройки ▴" else "Дополнительные настройки ▾"
     }
+    private fun updateAlarmPatternLabel() { btnAlarmPattern.text = "Сигнал вибрации: ${Prefs.alarmPattern(this).title}" }
 
     override fun onResume() {
         super.onResume()

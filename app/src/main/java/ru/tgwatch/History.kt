@@ -103,6 +103,8 @@ object History {
         return Timeline.stats(samples, now - days.coerceIn(1,7) * 86_400_000L, now).also { statsCache[cacheKey] = it }
     }
     @Synchronized fun uptimePercent(ctx: Context): Double = stats(ctx).uptimePercent
+    @Synchronized fun recovery(ctx: Context, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? =
+        if (ready(ctx)) Timeline.recovery(samples, checkedAt, partialEnabled) else null
     @Synchronized fun dayStats(ctx: Context): DayStats? {
         val s = stats(ctx)
         if (s.checks == 0) return null
@@ -141,6 +143,9 @@ object History {
         append("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n")
         append("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n")
         append("Нет данных: ${durationStr(s.unknownMs)}\n")
+        append("Подтверждённых эпизодов сбоя Telegram: ${s.outageCount}; потерь сети: ${s.offlineCount}\n")
+        if (s.outageCount > 0) append(if (s.lastOutageOngoing) "Текущий сбой: " else "Последний наблюдаемый сбой: ")
+            .append(recoveryDurationStr(s.lastOutageMs)).append('\n')
         append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
         append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
     }

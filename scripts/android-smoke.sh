@@ -31,6 +31,10 @@ await_observation() {
   return 1
 }
 bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
+adb root
+adb wait-for-device
+mkdir -p app/build/reports/androidTests/ui-screenshots
+adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)
@@ -94,8 +98,27 @@ adb shell input text 1234
 adb shell input keyevent 66
 sleep 3
 adb shell locksettings clear --old 1234
+adb shell wm dismiss-keyguard
+for attempt in $(seq 1 10); do
+  if adb shell dumpsys user | grep -q RUNNING_UNLOCKED; then break; fi
+  sleep 1
+done
+adb shell dumpsys user | grep -q RUNNING_UNLOCKED
 adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q "^$((minute * 60000)),"
 check_crashes
+# After all assertions, capture the real main screen for documentation.
+adb shell dumpsys deviceidle whitelist +ru.tgwatch
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
+adb shell input keyevent 82
+adb shell am start -W -n ru.tgwatch/.MainActivity
+for attempt in $(seq 1 10); do
+  if adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch; then break; fi
+  sleep 1
+done
+adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
+adb shell dumpsys window | grep -F mCurrentFocus
+adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
 rm -rf "$legacy_dir"
