@@ -8,9 +8,22 @@ import java.util.TimeZone
 data class Observation(val at: Long, val until: Long, val kind: String, val latencyMs: Long = -1L,
     val clockEpoch: Long = 0L)
 data class TimeStats(val okMs: Long, val downMs: Long, val partialMs: Long, val offlineMs: Long,
-    val unknownMs: Long, val longestOutageMs: Long, val checks: Int, val avgLatencyMs: Long) {
+    val unknownMs: Long, val longestOutageMs: Long, val checks: Int, val avgLatencyMs: Long,
+    val outageCount: Int = 0, val lastOutageMs: Long = 0, val lastOutageOngoing: Boolean = false,
+    val offlineCount: Int = 0) {
     val uptimePercent: Double get() = if (okMs + downMs + partialMs == 0L) -1.0
         else okMs * 100.0 / (okMs + downMs + partialMs)
+}
+
+data class RecoveryEvent(val durationMs: Long)
+
+fun recoveryDurationStr(ms: Long): String {
+    val seconds = (ms / 1000).coerceAtLeast(0)
+    return buildList {
+        if (seconds >= 3600) add("${seconds / 3600} ч")
+        if (seconds >= 60) add("${seconds / 60 % 60} мин")
+        add("${seconds % 60} с")
+    }.joinToString(" ")
 }
 
 /** Observations expire. Neither a dead service nor two distant failures fill a gap. */
@@ -43,17 +56,44 @@ object Timeline {
         val duration = mutableMapOf<String, Long>()
         var streak = 0L
         var longest = 0L
+        var outages = 0
+        var lastOutage = 0L
+        var offlineCount = 0
+        var previous = "UNKNOWN"
         for (segment in segments(samples, from, until)) {
             val length = segment.until - segment.at
             duration[segment.kind] = (duration[segment.kind] ?: 0) + length
+            if (segment.kind == "TG_DOWN" && previous != "TG_DOWN") outages++
+            if (segment.kind == "NO_NETWORK" && previous != "NO_NETWORK") offlineCount++
             streak = if (segment.kind == "TG_DOWN") streak + length else 0L
+            if (segment.kind == "TG_DOWN") lastOutage = streak
             longest = maxOf(longest, streak)
+            previous = segment.kind
         }
         val inRange = current(samples).filter { it.at >= from && it.at < until }
         val latency = inRange.filter { it.kind == "OK" && it.latencyMs >= 0 }.map { it.latencyMs }
         return TimeStats(duration["OK"] ?: 0, duration["TG_DOWN"] ?: 0, duration["PARTIAL"] ?: 0,
             duration["NO_NETWORK"] ?: 0, duration["UNKNOWN"] ?: 0, longest, inRange.size,
-            if (latency.isEmpty()) -1 else latency.sum() / latency.size)
+            if (latency.isEmpty()) -1 else latency.sum() / latency.size,
+            outages, lastOutage, previous == "TG_DOWN", offlineCount)
+    }
+    /** Only a fresh OK closes a contiguous observed incident. Gaps are never outage time. */
+    fun recovery(samples: List<Observation>, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? {
+        val rows = current(samples)
+        val latest = rows.maxByOrNull { it.at } ?: return null
+        if (latest.at != checkedAt || latest.kind != "OK") return null
+        val before = rows.filter { it.at < checkedAt }
+        val previous = before.maxByOrNull { it.at } ?: return null
+        val incidentKinds = setOf("TG_DOWN", "NO_NETWORK", "PARTIAL")
+        if (previous.kind !in incidentKinds || previous.until < checkedAt) return null
+        var elapsed = 0L
+        var hardFailure = false
+        for (segment in segments(before, before.minOf { it.at }, checkedAt).asReversed()) {
+            if (segment.kind !in incidentKinds) break
+            elapsed += segment.until - segment.at
+            if (segment.kind != "PARTIAL") hardFailure = true
+        }
+        return if (elapsed > 0 && (hardFailure || partialEnabled)) RecoveryEvent(elapsed) else null
     }
     fun csv(samples: List<Observation>, from: Long, until: Long): String {
         val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }

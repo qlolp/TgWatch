@@ -25,9 +25,7 @@ import java.net.HttpURLConnection
 import java.util.concurrent.ExecutorService
 
 /**
- * Фоновая служба: раз в N секунд стучится на https://api.telegram.org/,
- * показывает результат значком в строке состояния и вибрирует,
- * если связи нет (не чаще одного раза в 5 минут).
+ * Bounded parallel MTProto/HTTPS monitoring with a persistent status and optional event alerts.
  */
 class MonitorService : Service() {
 
@@ -121,6 +119,8 @@ class MonitorService : Service() {
     private lateinit var cm: ConnectivityManager
     private lateinit var pm: PowerManager
     private lateinit var am: AlarmManager
+    private lateinit var eventNotifications: EventNotifications
+    private val offlineBackoff = OfflineBackoff()
 
     /**
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
@@ -159,10 +159,11 @@ class MonitorService : Service() {
     private val checkRunnable = Runnable { runCheck() }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { networkRevision++; scheduleCheck(1_500L) }
-        override fun onLost(network: Network) { networkRevision++; scheduleCheck(500L) }
+        override fun onAvailable(network: Network) { networkRevision++; offlineBackoff.reset(); scheduleCheck(1_500L) }
+        override fun onLost(network: Network) { networkRevision++; offlineBackoff.reset(); scheduleCheck(500L) }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                offlineBackoff.reset()
                 scheduleCheck(800L)
             }
         }
@@ -177,6 +178,7 @@ class MonitorService : Service() {
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         createChannels()
+        eventNotifications = EventNotifications(this, nm)
         restorePersistedState(this)
         seedVibrationCooldown()
 
@@ -202,6 +204,7 @@ class MonitorService : Service() {
         }
 
         val action = intent?.action
+        if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (action == ACTION_STOP) Prefs.setEnabled(this, false)
         if (!Prefs.isEnabled(this)) {
             stopSelf()
@@ -332,7 +335,7 @@ class MonitorService : Service() {
             checkStartedMono = 0L
             releaseWakeLock()
         }
-        scheduleCheck(if (revision != networkRevision) 1_000L else Prefs.effectiveIntervalSec(this, state.bad, !pm.isInteractive) * 1000L)
+        scheduleCheck(if (revision != networkRevision) 1_000L else state.expectedIntervalSec * 1000L)
     }
 
     private fun performCheck(): Probe {
@@ -376,23 +379,18 @@ class MonitorService : Service() {
         val partialAlert = Prefs.vibratePartial(this)
         val mono = SystemClock.elapsedRealtime()
         val alertsAllowed = Prefs.alertsAllowed(this, now)
-        if (AlertRules.shouldAlarm(p.status.name, Prefs.vibrateEnabled(this), Prefs.vibrateOffline(this),
-                partialAlert, alertsAllowed, mono, lastVibrationMono)) {
+        val vibrate = AlertRules.shouldAlarm(p.status.name, Prefs.vibrateEnabled(this), Prefs.vibrateOffline(this),
+            partialAlert, alertsAllowed, mono, lastVibrationMono)
+        val sound = AlertRules.shouldAlarm(p.status.name, Prefs.eventSound(this), false, false,
+            alertsAllowed, mono, lastVibrationMono)
+        if (vibrate || sound) {
             lastVibrationMono = mono
             lastVibration = now
             try {
-                Vibe.alarm(this)
+                if (vibrate) Vibe.alarm(this)
+                if (sound) eventNotifications.outage(p.reason, sound = true, allowed = alertsAllowed)
             } catch (e: Exception) {
                 Log.w(TAG, "vibrate", e)
-            }
-        }
-
-        val recovered = AlertRules.recovered(prev.status.name, p.status.name, partialAlert)
-        if (recovered && Prefs.vibrateOnRecovery(this) && alertsAllowed) {
-            try {
-                Vibe.recovery(this)
-            } catch (e: Exception) {
-                Log.w(TAG, "vibrate recovery", e)
             }
         }
 
@@ -405,7 +403,8 @@ class MonitorService : Service() {
             reason = p.reason,
             lastVibrationAt = lastVibration,
             diagnostics = p.diagnostics,
-            expectedIntervalSec = Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive),
+            expectedIntervalSec = offlineBackoff.next(p.status.name,
+                Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive)),
         )
         state = newState
         Prefs.saveLastState(
@@ -425,8 +424,18 @@ class MonitorService : Service() {
             p.latencyMs, newState.expectedIntervalSec,
         )
 
+        val recovery = if (p.status == Status.OK) History.recovery(this, now, partialAlert) else null
+        try {
+            if (p.status == Status.OK) eventNotifications.clearOutage()
+            else if (changed) eventNotifications.clearRecovery()
+            if (recovery != null) {
+                if (Prefs.notifyRecovery(this)) eventNotifications.recovered(recovery, Prefs.eventSound(this), alertsAllowed)
+                if (Prefs.vibrateOnRecovery(this) && alertsAllowed) Vibe.recovery(this)
+            }
+        } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
+
         if (changed) {
-            val downFor = if (prev.bad && prev.checkedAt > 0L) " (не было ${durationStr(now - prev.since)})" else ""
+            val downFor = recovery?.let { " (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})" }.orEmpty()
             EventLog.add(
                 this,
                 when (p.status) {

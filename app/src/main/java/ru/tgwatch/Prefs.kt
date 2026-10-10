@@ -21,6 +21,9 @@ object Prefs {
     private const val KEY_VIBRATE_PARTIAL = "vibrate_partial"
     private const val KEY_VIBRATE_OFFLINE = "vibrate_offline"
     private const val KEY_VIBRATE_RECOVERY = "vibrate_recovery"
+    private const val KEY_NOTIFY_RECOVERY = "notify_recovery"
+    private const val KEY_EVENT_SOUND = "event_sound"
+    private const val KEY_ALARM_PATTERN = "vibration_pattern"
     private const val KEY_QUIET_HOURS = "quiet_hours"
     private const val KEY_QUIET_START = "quiet_start_hour"
     private const val KEY_QUIET_END = "quiet_end_hour"
@@ -139,6 +142,15 @@ object Prefs {
     fun setVibrateOnRecovery(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_VIBRATE_RECOVERY, value).apply()
     }
+
+    fun notifyRecovery(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_NOTIFY_RECOVERY, true)
+    fun setNotifyRecovery(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_NOTIFY_RECOVERY, value).apply() }
+    fun eventSound(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EVENT_SOUND, false)
+    fun setEventSound(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EVENT_SOUND, value).apply() }
+    fun alarmPattern(ctx: Context): AlarmPattern = AlarmPattern.entries.firstOrNull {
+        it.name == sp(ctx).getString(KEY_ALARM_PATTERN, AlarmPattern.STANDARD.name)
+    } ?: AlarmPattern.STANDARD
+    fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN, pattern.name).apply() }
 
     /** Не вибрировать ночью. */
     fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)
