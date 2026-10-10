@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private lateinit var rgInterval: RadioGroup
     private lateinit var swKeepAwake: Switch
     private lateinit var swVibrate: Switch
+    private lateinit var swVibratePartial: Switch
     private lateinit var swVibrateOffline: Switch
     private lateinit var swVibrateRecovery: Switch
     private lateinit var swQuietHours: Switch
@@ -92,12 +93,23 @@ class MainActivity : Activity() {
     private lateinit var btnProfile: Button
     private lateinit var tvDiagnostics: TextView
     private var changingProfile = false
+    private var advancedExpanded = false
+    private lateinit var advancedSettings: View
+    private lateinit var btnAdvanced: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
         exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
+        advancedExpanded = savedInstanceState?.getBoolean("advanced_expanded", false) ?: false
+        advancedSettings = findViewById(R.id.advancedSettings)
+        btnAdvanced = findViewById(R.id.btnAdvanced)
+        updateAdvancedSettings()
+        btnAdvanced.setOnClickListener {
+            advancedExpanded = !advancedExpanded
+            updateAdvancedSettings()
+        }
         btnPeriod = findViewById(R.id.btnPeriod)
         btnProfile = findViewById(R.id.btnProfile)
         tvDiagnostics = findViewById(R.id.tvDiagnostics)
@@ -153,6 +165,7 @@ class MainActivity : Activity() {
         rgInterval = findViewById(R.id.rgInterval)
         swKeepAwake = findViewById(R.id.swKeepAwake)
         swVibrate = findViewById(R.id.swVibrate)
+        swVibratePartial = findViewById(R.id.swVibratePartial)
         swVibrateOffline = findViewById(R.id.swVibrateOffline)
         swVibrateRecovery = findViewById(R.id.swVibrateRecovery)
         swQuietHours = findViewById(R.id.swQuietHours)
@@ -217,6 +230,9 @@ class MainActivity : Activity() {
         swVibrate.isChecked = Prefs.vibrateEnabled(this)
         swVibrate.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateEnabled(this, checked) }
 
+        swVibratePartial.isChecked = Prefs.vibratePartial(this)
+        swVibratePartial.setOnCheckedChangeListener { _, checked -> Prefs.setVibratePartial(this, checked) }
+
         swVibrateOffline.isChecked = Prefs.vibrateOffline(this)
         swVibrateOffline.setOnCheckedChangeListener { _, checked -> Prefs.setVibrateOffline(this, checked) }
 
@@ -251,6 +267,11 @@ class MainActivity : Activity() {
         }
 
         if (savedInstanceState == null) requestNotificationPermissionIfNeeded()
+    }
+
+    private fun updateAdvancedSettings() {
+        advancedSettings.visibility = if (advancedExpanded) View.VISIBLE else View.GONE
+        btnAdvanced.text = if (advancedExpanded) "Скрыть дополнительные настройки ▴" else "Дополнительные настройки ▾"
     }
 
     override fun onResume() {
@@ -518,6 +539,7 @@ class MainActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("history_days", historyDays)
+        outState.putBoolean("advanced_expanded", advancedExpanded)
         outState.putInt("export_days", exportDays)
         super.onSaveInstanceState(outState)
     }

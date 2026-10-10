@@ -18,6 +18,7 @@ object Prefs {
     private const val KEY_INTERVAL = "interval_sec"
     private const val KEY_KEEP_AWAKE = "keep_awake"
     private const val KEY_VIBRATE = "vibrate"
+    private const val KEY_VIBRATE_PARTIAL = "vibrate_partial"
     private const val KEY_VIBRATE_OFFLINE = "vibrate_offline"
     private const val KEY_VIBRATE_RECOVERY = "vibrate_recovery"
     private const val KEY_QUIET_HOURS = "quiet_hours"
@@ -116,6 +117,13 @@ object Prefs {
 
     fun setVibrateEnabled(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_VIBRATE, value).apply()
+    }
+
+    /** Separate opt-in: an upgrade must not enable a new category of alerts. */
+    fun vibratePartial(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_VIBRATE_PARTIAL, false)
+
+    fun setVibratePartial(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_VIBRATE_PARTIAL, value).apply()
     }
 
     /** Вибрировать также при полной потере интернета (по умолчанию выкл.). */

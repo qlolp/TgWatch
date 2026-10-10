@@ -148,9 +148,7 @@ class NetworkProbe(
             ProbeEndpoint("api.telegram.org", ProbeGroup.WEB, "https://api.telegram.org/"),
             ProbeEndpoint("web.telegram.org", ProbeGroup.WEB, "https://web.telegram.org/"),
             ProbeEndpoint("core.telegram.org", ProbeGroup.WEB, "https://core.telegram.org/"),
-            ProbeEndpoint("MTProto DC2", ProbeGroup.MTPROTO, "149.154.167.51"),
-            ProbeEndpoint("MTProto DC4", ProbeGroup.MTPROTO, "149.154.167.91"),
-        )
+        ) + MtProtoEndpoints.all
         val results = ProbeBatch(pool).run(telegram, ::probe).toMutableList()
         // Controls are unnecessary when Telegram itself proves internet connectivity.
         if (results.none { it.reachable }) {
@@ -179,7 +177,7 @@ class NetworkProbe(
                 connection.requestMethod = method
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
-                connection.setRequestProperty("User-Agent", "TgWatch/1.7 (Android)")
+                connection.setRequestProperty("User-Agent", "TgWatch/1.8 (Android)")
                 connection.responseCode
             } finally { connection.disconnect() }
         }

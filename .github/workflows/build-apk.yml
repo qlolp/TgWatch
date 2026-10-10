@@ -90,13 +90,49 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
+      - name: Verify signing continuity with published 1.7.28
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download v1.7.28 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
+          python3 - <<'PY'
+          import hashlib, pathlib
+          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'c724e03df52143568b4ac030890a48cd9ed9932285946dd2dd0de178868f3e4f'
+          PY
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
+          "$signer" verify --print-certs TgWatch.apk > release-signature.txt
+          diff <(grep 'Signer #1 certificate SHA-256 digest:' previous-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
+      - name: Enable KVM for signed upgrade
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Upgrade the real signed release without clearing data
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          disable-animations: true
+          script: bash scripts/signed-upgrade-smoke.sh previous/TgWatch.apk TgWatch.apk
+      - name: Signed upgrade reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-upgrade-reports
+          path: |
+            signed-upgrade-logcat.txt
+            upgrade-*.xml
+            upgrade-*.csv
+            release-screen.png
       - name: Publish versioned release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.7.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
-            --target "$GITHUB_SHA" --title "TG Монитор 1.7.${GITHUB_RUN_NUMBER}" \
-            --notes 'Подписанная сборка с постоянным ключом. Перед переходом со старой debug-подписи прочтите раздел установки в README: несовпадение подписей блокирует обновление, удаление приложения стирает его данные.' --latest
+          gh release create "v1.8.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
+            --target "$GITHUB_SHA" --title "TG Монитор 1.8.${GITHUB_RUN_NUMBER}" \
+            --notes-file docs/releases/1.8.md --latest
   android:
     runs-on: ubuntu-latest
     strategy:
