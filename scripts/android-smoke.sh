@@ -26,6 +26,8 @@ await_observation() {
     sleep 2
   done
   echo "No new foreground-service observation after $after" >&2
+  adb shell dumpsys activity services ru.tgwatch
+  adb logcat -d -s TgWatch AndroidRuntime
   return 1
 }
 bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
@@ -35,7 +37,7 @@ legacy_dir=$(mktemp -d)
 git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
 (cd "$legacy_dir" && bash ./gradlew assembleDebug --no-daemon)
 if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
-adb install "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
+adb install -g "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
 adb root
 adb wait-for-device
 adb shell am start -W -n ru.tgwatch/.MainActivity
@@ -45,7 +47,7 @@ printf '%s,3,0,0,150\n' "$minute" > legacy-history.csv
 adb push legacy-history.csv /data/local/tmp/tgwatch-history.csv
 adb shell run-as ru.tgwatch cp /data/local/tmp/tgwatch-history.csv files/history.csv
 adb shell run-as ru.tgwatch sh -c "'echo preserved > files/upgrade-sentinel'"
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r -g app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation 0
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved

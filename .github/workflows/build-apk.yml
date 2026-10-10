@@ -49,9 +49,9 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
       - name: Signing readiness
         env:
-          SIGNING_KEY: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
+          SIGNING_READY: ${{ secrets.TGWATCH_KEYSTORE_BASE64 != '' && secrets.TGWATCH_KEYSTORE_PASSWORD != '' && secrets.TGWATCH_KEY_ALIAS != '' && secrets.TGWATCH_KEY_PASSWORD != '' }}
         run: |
-          if [ -n "$SIGNING_KEY" ]; then
+          if [ "$SIGNING_READY" = true ]; then
             echo 'Production signing key configured.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'Production signing is not configured. Run scripts/configure-signing.sh on a trusted machine; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"

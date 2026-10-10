@@ -38,11 +38,12 @@ Interfaces: Observation(at, until, kind, latencyMs); Timeline.stats(observations
 Files: PowerProfile.kt, Prefs.kt, MainActivity.kt, ChartView.kt, StatusTileService.kt, StatusWidget.kt, activity_main.xml.
 - [x] Test 60/300/60, 30/120/30, 15/60/10 profile intervals.
 - [x] Add profile selector, diagnostics, day/week history, ACTION_CREATE_DOCUMENT CSV export; render PARTIAL/UNKNOWN consistently.
-- [ ] Run tests and lint; require no errors.
+- [x] Run tests and lint; require no errors.
 
 ### Task 4: Release and end-to-end checks
 Files: build.gradle.kts, .github/workflows/build-apk.yml, androidTest, scripts/android-smoke.sh, README.md.
-- [ ] Configure persistent signing, version increments, immutable release tags and read-only PR checks.
+- [x] Implement persistent signing, version increments, immutable release tags and read-only PR checks.
+- [ ] Provision production signing Secrets (owner operation; see release dependency below).
 - [x] Add emulator lifecycle/network/upgrade checks and unit/lint artifacts.
 - [ ] Run CI, inspect logs and fix failures.
 - [ ] Run fresh-context branch review; resolve important findings and rerun affected checks.
