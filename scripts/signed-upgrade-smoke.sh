@@ -14,7 +14,13 @@ await_observation() {
   local after=$1 value
   for attempt in $(seq 1 45); do
     value=$(last_check || true)
-    if [[ -n "$value" && "$value" -gt "$after" ]]; then return 0; fi
+    if [[ -n "$value" && "$value" -gt "$after" ]]; then
+      # Preferences are persisted before History.record; wait for its matching row too.
+      if adb shell cat "$history" 2>/dev/null | tr -d '\r' |
+          awk -F, -v checked="$value" '$1 == checked && NF == 5 && $5 ~ /^[0-9]+$/ {found=1} END {exit !found}'; then
+        return 0
+      fi
+    fi
     sleep 2
   done
   echo "No fresh observation after $after" >&2
