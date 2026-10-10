@@ -45,8 +45,9 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
 class ProbeCancellation : Closeable {
     private var cancelled = false
     private val actions = mutableListOf<() -> Unit>()
-    @Synchronized fun register(action: () -> Unit) {
-        if (cancelled) action() else actions.add(action)
+    fun register(action: () -> Unit) {
+        val closeNow = synchronized(this) { if (cancelled) true else { actions.add(action); false } }
+        if (closeNow) clean(action)
     }
     @Synchronized fun check() {
         if (cancelled || Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
@@ -56,27 +57,57 @@ class ProbeCancellation : Closeable {
             cancelled = true
             actions.toList().also { actions.clear() }
         }
-        copy.forEach { try { it() } catch (_: Exception) {} }
+        copy.forEach(::clean)
+    }
+    companion object {
+        // A broken platform disconnect must not block the batch coordinator or grow a queue.
+        private val cleanup = ThreadPoolExecutor(0, 4, 30, TimeUnit.SECONDS, SynchronousQueue(),
+            { r -> Thread(r, "tg-probe-close").apply { isDaemon = true } })
+        private fun clean(action: () -> Unit) {
+            try { cleanup.execute { try { action() } catch (_: Exception) {} } }
+            catch (_: RejectedExecutionException) { /* Worker finally/transport timeout still owns cleanup. */ }
+        }
     }
 }
 
 class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long = 6_000L) {
+    private class Lease(private val release: () -> Unit) {
+        private val state = java.util.concurrent.atomic.AtomicInteger(0)
+        fun start() = state.compareAndSet(0, 1)
+        fun cancelBeforeStart() { if (state.compareAndSet(0, 2)) release() }
+        fun finish() { if (state.compareAndSet(1, 2)) release() }
+    }
+    companion object {
+        private val occupied = java.util.WeakHashMap<ExecutorService, MutableSet<String>>()
+        private fun acquire(pool: ExecutorService, endpoint: ProbeEndpoint): Lease? = synchronized(occupied) {
+            val key = "${endpoint.group}:${endpoint.name}:${endpoint.address}"
+            val active = occupied.getOrPut(pool) { mutableSetOf() }
+            if (!active.add(key)) null else Lease { synchronized(occupied) { active.remove(key); Unit } }
+        }
+    }
     fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         val queue = ExecutorCompletionService<ProbeOutcome>(pool)
-        val handles = mutableListOf<Pair<Future<ProbeOutcome>, ProbeCancellation>>()
+        val handles = mutableListOf<Triple<Future<ProbeOutcome>, ProbeCancellation, Lease>>()
         val results = mutableListOf<ProbeOutcome>()
         try {
             endpoints.forEach { endpoint ->
+                val lease = acquire(pool, endpoint)
+                if (lease == null) {
+                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
+                    return@forEach
+                }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
+                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Проверка отменена")
                         try { cancellation.check(); operation(endpoint, cancellation) }
                         catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }
-                        finally { cancellation.close() }
+                        finally { cancellation.close(); lease.finish() }
                     })
-                    handles += future to cancellation
+                    handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
+                    lease.cancelBeforeStart()
                     results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
                 }
             }
@@ -89,7 +120,9 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         } finally {
-            handles.forEach { (future, cancellation) -> future.cancel(true); cancellation.close() }
+            handles.forEach { (future, cancellation, lease) ->
+                future.cancel(true); lease.cancelBeforeStart(); cancellation.close()
+            }
         }
         return endpoints.map { ep -> results.firstOrNull { it.endpoint == ep.name }
             ?: ProbeOutcome(ep.name, ep.group, false, -1, "Общий срок ожидания истёк") }

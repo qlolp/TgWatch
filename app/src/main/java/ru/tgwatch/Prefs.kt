@@ -30,7 +30,7 @@ object Prefs {
     private const val KEY_LAST_REASON = "last_reason"
     private const val KEY_LAST_VIBE = "last_vibe"
 
-    const val DEFAULT_INTERVAL_SEC = 15
+    const val DEFAULT_INTERVAL_SEC = 30
     const val DEFAULT_QUIET_START = 23
     const val DEFAULT_QUIET_END = 8
 

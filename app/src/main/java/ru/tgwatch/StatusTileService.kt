@@ -78,6 +78,7 @@ class StatusTileService : TileService() {
         }
     }
 
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated") // Intent overload is required on API 26–33.
     private fun openApp() {
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= 34) {
@@ -97,6 +98,8 @@ class StatusTileService : TileService() {
         val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
         val (tileState, icon, subtitle) = when {
             !MonitorService.running -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, "Выключен")
+            stale && s.status == MonitorService.Status.PARTIAL ->
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, "Устарело · частично")
             stale && s.status == MonitorService.Status.OK ->
                 Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, "Устарело · ${agoStr(s.checkedAt, now)}")
             stale && s.status == MonitorService.Status.TG_DOWN ->

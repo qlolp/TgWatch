@@ -53,11 +53,14 @@ class MonitorService : Service() {
         val lastVibrationAt: Long = 0L,
         val diagnostics: String = "",
         val expectedIntervalSec: Int = 30,
+        val checkedElapsed: Long = 0L,
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
 
         fun isStale(now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean =
-            checkedAt > 0L && ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false)
+            checkedAt > 0L && (now < checkedAt || if (checkedElapsed > 0L)
+                ProbeRules.isStale(checkedElapsed, SystemClock.elapsedRealtime(), expectedIntervalSec, false)
+                else ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false))
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "")
@@ -430,6 +433,7 @@ class MonitorService : Service() {
         val newState = State(
             status = p.status,
             checkedAt = now,
+            checkedElapsed = SystemClock.elapsedRealtime(),
             since = if (changed) now else prev.since,
             latencyMs = p.latencyMs,
             reason = p.reason,

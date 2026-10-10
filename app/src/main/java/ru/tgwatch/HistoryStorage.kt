@@ -8,27 +8,42 @@ import java.nio.file.AtomicMoveNotSupportedException
 
 /** File I/O is separate from Android so migration and crash-safe writes can be tested. */
 object HistoryStorage {
+    data class Migration(val samples: List<Observation>, val complete: Boolean)
+    fun migrateLegacy(legacy: File, destination: File, marker: File, current: List<Observation>): Migration {
+        if (marker.exists()) return Migration(current, true)
+        return try {
+            val merged = merge(readLegacy(legacy), current)
+            write(destination, merged)
+            marker.writeText("legacy minute estimates imported")
+            Migration(merged, true)
+        } catch (_: Exception) {
+            // The healthy destination remains usable; retry migration after the next load.
+            Migration(current, false)
+        }
+    }
     fun read(file: File): List<Observation> {
         if (!file.exists()) return emptyList()
         // I/O errors propagate: an unreadable file must never be treated as empty.
         return file.readLines().mapNotNull { line ->
             val p = line.split(',')
-            if (p.size != 4) return@mapNotNull null
+            if (p.size !in 4..5) return@mapNotNull null
             val at = p[0].toLongOrNull() ?: return@mapNotNull null
             val until = p[1].toLongOrNull() ?: return@mapNotNull null
             val latency = p[3].toLongOrNull() ?: return@mapNotNull null
             if (at < 0 || until <= at || until - at > 600_000L || p[2] !in Timeline.kinds) return@mapNotNull null
-            Observation(at, until, p[2], latency)
+            val epoch = if (p.size == 5) p[4].toLongOrNull() ?: return@mapNotNull null else 0L
+            if (epoch < 0) return@mapNotNull null
+            Observation(at, until, p[2], latency, epoch)
         }
     }
     fun merge(older: List<Observation>, newer: List<Observation>): List<Observation> =
-        (older + newer).associateBy { it.at }.values.sortedBy { it.at }
+        (older + newer).associateBy { it.clockEpoch to it.at }.values.sortedWith(compareBy({ it.clockEpoch }, { it.at }))
 
     fun write(file: File, samples: List<Observation>) {
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
         FileOutputStream(tmp).use { stream ->
-            stream.write(samples.joinToString("\n") { "${it.at},${it.until},${it.kind},${it.latencyMs}" }.toByteArray(Charsets.UTF_8))
+            stream.write(samples.joinToString("\n") { encode(it) }.toByteArray(Charsets.UTF_8))
             stream.fd.sync()
         }
         try {
@@ -41,9 +56,10 @@ object HistoryStorage {
     fun append(file: File, sample: Observation) {
         file.parentFile?.mkdirs()
         FileOutputStream(file, true).use { stream ->
-            stream.write("\n${sample.at},${sample.until},${sample.kind},${sample.latencyMs}\n".toByteArray(Charsets.UTF_8))
+            stream.write("\n${encode(sample)}\n".toByteArray(Charsets.UTF_8))
         }
     }
+    private fun encode(s: Observation) = "${s.at},${s.until},${s.kind},${s.latencyMs},${s.clockEpoch}"
     fun readLegacy(file: File): List<Observation> {
         if (!file.exists()) return emptyList()
         return file.readLines().mapNotNull { line ->

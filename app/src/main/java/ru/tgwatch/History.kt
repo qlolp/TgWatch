@@ -28,6 +28,7 @@ object History {
     private var loaded = false
     private var migrated = false
     private var lastCompacted = 0L
+    private val statsCache = mutableMapOf<String, TimeStats>()
     @Volatile var version = 0L
         private set
 
@@ -42,29 +43,37 @@ object History {
         if (!migrated && ctx.getSystemService(UserManager::class.java).isUserUnlocked) {
             val dp = ctx.applicationContext.createDeviceProtectedStorageContext().filesDir
             val marker = File(dp, "history-migrated-v2")
-            if (!marker.exists()) {
-                val legacy = File(ctx.applicationContext.filesDir, "history.csv")
-                val merged = HistoryStorage.merge(HistoryStorage.readLegacy(legacy), samples)
-                HistoryStorage.write(file(ctx), merged)
-                samples = merged.toMutableList()
-                marker.writeText("legacy minute estimates imported")
-            }
-            migrated = true
+            val legacy = File(ctx.applicationContext.filesDir, "history.csv")
+            val result = HistoryStorage.migrateLegacy(legacy, file(ctx), marker, samples)
+            samples = result.samples.toMutableList()
+            migrated = result.complete
         }
     }
     private fun prune(now: Long) {
-        samples.removeAll { it.until <= now - KEEP_MS || it.at > now }
+        samples.removeAll { it.until <= now - KEEP_MS }
+        // Also bound storage when a badly set clock leaves future-dated archived epochs.
+        if (samples.size > 65_000) samples = samples.takeLast(65_000).toMutableList()
+    }
+    private fun ensureClock(ctx: Context, now: Long) {
+        val current = Timeline.current(samples)
+        if (current.any { it.at > now }) {
+            val epoch = (current.firstOrNull()?.clockEpoch ?: 0L) + 1
+            samples.add(Observation(now, now + 1, "UNKNOWN", clockEpoch = epoch))
+            version++
+            flush(ctx)
+        }
     }
     private fun ready(ctx: Context): Boolean = try { load(ctx); true } catch (e: Exception) {
         Log.w("TgWatch", "history unavailable; preserving existing data", e); false
     }
     @Synchronized fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long, expectedSec: Int = 30) {
         if (!ready(ctx)) return
+        ensureClock(ctx, now)
         prune(now)
         // Bound inferred coverage to one expected interval plus the bounded network-check budget.
         val end = now + (expectedSec.coerceIn(10, 300) * 1000L + 15_000L)
         val status = when (kind) { Kind.FAIL -> "TG_DOWN"; Kind.OFFLINE -> "NO_NETWORK"; else -> kind.name }
-        samples.add(Observation(now, end, status, latencyMs))
+        samples.add(Observation(now, end, status, latencyMs, samples.maxOfOrNull { it.clockEpoch } ?: 0))
         version++
         try {
             if (now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
@@ -75,16 +84,23 @@ object History {
     }
     @Synchronized fun endSession(ctx: Context, now: Long = System.currentTimeMillis()) {
         if (!ready(ctx)) return
+        ensureClock(ctx, now)
+        val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
         samples = samples.mapNotNull { s ->
-            if (s.at >= now) null else s.copy(until = minOf(s.until, now))
+            if (s.clockEpoch != epoch) s else if (s.at >= now) s.copy(kind = "UNKNOWN")
+            else s.copy(until = minOf(s.until, now))
         }.toMutableList()
         version++
         flush(ctx)
     }
     @Synchronized fun stats(ctx: Context, days: Int = 1, now: Long = System.currentTimeMillis()): TimeStats {
         if (!ready(ctx)) return Timeline.stats(emptyList(), now - days.coerceIn(1,7) * 86_400_000L, now)
+        ensureClock(ctx, now)
         prune(now)
-        return Timeline.stats(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
+        val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1,7)}"
+        statsCache[cacheKey]?.let { return it }
+        if (statsCache.size > 4) statsCache.clear()
+        return Timeline.stats(samples, now - days.coerceIn(1,7) * 86_400_000L, now).also { statsCache[cacheKey] = it }
     }
     @Synchronized fun uptimePercent(ctx: Context): Double = stats(ctx).uptimePercent
     @Synchronized fun dayStats(ctx: Context): DayStats? {
@@ -95,10 +111,11 @@ object History {
     }
     @Synchronized fun lastMinutes(ctx: Context, count: Int, now: Long = System.currentTimeMillis()): List<Minute> {
         if (!ready(ctx)) return emptyList()
+        ensureClock(ctx, now)
         prune(now)
         val from = now / 60_000L - count + 1
         val bins = sortedMapOf<Long, Minute>()
-        for (s in samples.filter { it.at / 60_000L >= from && it.at <= now }) {
+        for (s in Timeline.current(samples).filter { it.at / 60_000L >= from && it.at <= now }) {
             val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
             when (s.kind) {
                 "OK" -> { m.ok++; m.latencySum += s.latencyMs.coerceAtLeast(0) }
@@ -113,6 +130,7 @@ object History {
     @Synchronized fun exportCsv(ctx: Context, days: Int = 7): String {
         check(ready(ctx)) { "История временно недоступна" }
         val now = System.currentTimeMillis()
+        ensureClock(ctx, now)
         prune(now)
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }

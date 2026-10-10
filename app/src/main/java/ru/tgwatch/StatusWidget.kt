@@ -106,6 +106,7 @@ class StatusWidget : AppWidgetProvider() {
                     title = when (s.status) {
                         MonitorService.Status.OK -> "Был доступен"
                         MonitorService.Status.TG_DOWN -> "Был недоступен"
+                        MonitorService.Status.PARTIAL -> "Был частично доступен"
                         else -> "Не было интернета"
                     }
                     subtitle = "Проверено ${agoStr(s.checkedAt, now)} · нажми"
