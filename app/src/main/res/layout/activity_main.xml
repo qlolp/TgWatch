@@ -66,6 +66,13 @@
                 android:text="Разрешить работу без ограничений" />
 
             <Button
+                android:id="@+id/btnSetupAlarm"
+                style="@style/ButtonFilled"
+                android:layout_width="match_parent"
+                android:layout_marginTop="8dp"
+                android:text="Разрешить точные будильники" />
+
+            <Button
                 android:id="@+id/btnSetupApp"
                 style="@style/ButtonOutlined"
                 android:layout_width="match_parent"
@@ -297,7 +304,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Системный будильник будит телефон к каждой проверке, а сразу после неё отпускает. В глубоком сне Android может проверять реже."
+                android:text="Системный будильник будит телефон к проверке. При выключенном экране, если Telegram доступен, проверяем не чаще раза в минуту — так меньше расход батареи."
                 android:textSize="12sp" />
 
             <Switch
@@ -377,6 +384,17 @@
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
                 android:text="Разрешить работу без ограничений" />
+
+            <TextView
+                android:id="@+id/tvAlarm"
+                style="@style/Body"
+                android:layout_marginTop="8dp" />
+
+            <Button
+                android:id="@+id/btnAlarm"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Разрешить точные будильники" />
 
             <TextView
                 android:id="@+id/tvOem"

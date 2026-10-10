@@ -54,8 +54,8 @@ class MonitorService : Service() {
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
 
-        fun isStale(now: Long, intervalSec: Int): Boolean =
-            status != Status.UNKNOWN && ProbeRules.isStale(checkedAt, now, intervalSec)
+        fun isStale(now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean =
+            status != Status.UNKNOWN && ProbeRules.isStale(checkedAt, now, intervalSec, slowExpected)
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String)
@@ -94,7 +94,6 @@ class MonitorService : Service() {
         private const val VIBRATION_GAP_MS = 5 * 60 * 1000L
         private const val TIMEOUT_MS = 5_000
         private const val RETRY_DELAY_MS = 1_500L
-        private const val BAD_INTERVAL_SEC = 10
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
 
@@ -151,7 +150,7 @@ class MonitorService : Service() {
      * Потоки для параллельных проверок. Блокирующий сетевой запрос нельзя прервать,
      * поэтому потоков с запасом: «зависший» запрос не задержит следующую проверку.
      */
-    private val probeExecutor: ExecutorService = Executors.newCachedThreadPool()
+    private val probeExecutor: ExecutorService = Executors.newFixedThreadPool(6)
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -189,6 +188,7 @@ class MonitorService : Service() {
         worker = Handler(workerThread.looper)
 
         running = true
+        WatchdogReceiver.schedule(this)
         try {
             cm.registerDefaultNetworkCallback(networkCallback)
         } catch (e: Exception) {
@@ -240,7 +240,13 @@ class MonitorService : Service() {
         nm.cancel(NOTIFICATION_ID)
         if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
         History.flush(this)
-        if (!Prefs.isEnabled(this)) Prefs.clearLastState(this)
+        if (!Prefs.isEnabled(this)) {
+            Prefs.clearLastState(this)
+            WatchdogReceiver.cancel(this)
+        } else {
+            // Процесс умирает, а мониторинг всё ещё нужен — watchdog поднимет службу.
+            WatchdogReceiver.schedule(this)
+        }
         state = State()
         broadcastState()
         super.onDestroy()
@@ -268,11 +274,17 @@ class MonitorService : Service() {
         if (delayMs >= ALARM_MIN_DELAY_MS) scheduleAlarm(delayMs)
     }
 
-    private fun alarmIntent(): PendingIntent = PendingIntent.getService(
-        this, 3,
-        Intent(this, MonitorService::class.java).setAction(ACTION_ALARM),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-    )
+    private fun servicePending(requestCode: Int, action: String): PendingIntent {
+        val intent = Intent(this, MonitorService::class.java).setAction(action)
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        return if (Build.VERSION.SDK_INT >= 26) {
+            PendingIntent.getForegroundService(this, requestCode, intent, flags)
+        } else {
+            PendingIntent.getService(this, requestCode, intent, flags)
+        }
+    }
+
+    private fun alarmIntent(): PendingIntent = servicePending(3, ACTION_ALARM)
 
     private fun scheduleAlarm(delayMs: Long) {
         if (!Prefs.keepAwake(this)) {
@@ -309,8 +321,11 @@ class MonitorService : Service() {
         } finally {
             releaseWakeLock()
         }
-        val interval = Prefs.intervalSec(this)
-        val next = if (state.bad) minOf(interval, BAD_INTERVAL_SEC) else interval
+        val next = ProbeRules.nextIntervalSec(
+            Prefs.intervalSec(this),
+            state.bad,
+            Prefs.keepAwake(this) && !pm.isInteractive,
+        )
         scheduleCheck(next * 1000L)
     }
 
@@ -464,7 +479,7 @@ class MonitorService : Service() {
             c.requestMethod = method
             c.instanceFollowRedirects = false
             c.useCaches = false
-            c.setRequestProperty("User-Agent", "TgWatch/1.5 (Android)")
+            c.setRequestProperty("User-Agent", "TgWatch/1.6 (Android)")
             c.setRequestProperty("Accept", "*/*")
             c.setRequestProperty("Connection", "keep-alive")
             val code = c.responseCode
@@ -514,7 +529,7 @@ class MonitorService : Service() {
             Status.NO_NETWORK -> Prefs.vibrateOffline(this)
             else -> false
         }
-        if (shouldAlarm && !Prefs.inQuietHoursNow(this, now)) {
+        if (shouldAlarm && Prefs.alertsAllowed(this, now)) {
             val mono = SystemClock.elapsedRealtime()
             if (lastVibrationMono < 0L || mono - lastVibrationMono >= VIBRATION_GAP_MS) {
                 lastVibrationMono = mono
@@ -528,7 +543,7 @@ class MonitorService : Service() {
         }
 
         val recovered = changed && p.status == Status.OK && prev.bad
-        if (recovered && Prefs.vibrateOnRecovery(this) && !Prefs.inQuietHoursNow(this, now)) {
+        if (recovered && Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this, now)) {
             try {
                 Vibe.recovery(this)
             } catch (e: Exception) {
@@ -648,15 +663,11 @@ class MonitorService : Service() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             piFlags
         )
-        val checkNow = PendingIntent.getService(
-            this, 1, Intent(this, MonitorService::class.java).setAction(ACTION_CHECK_NOW), piFlags
-        )
-        val stop = PendingIntent.getService(
-            this, 2, Intent(this, MonitorService::class.java).setAction(ACTION_STOP), piFlags
-        )
+        val checkNow = servicePending(1, ACTION_CHECK_NOW)
+        val stop = servicePending(2, ACTION_STOP)
 
         val now = System.currentTimeMillis()
-        val stale = s.isStale(now, Prefs.intervalSec(this))
+        val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
         val uptime = History.uptimePercent(this)
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
 
