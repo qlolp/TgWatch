@@ -19,9 +19,12 @@ await_observation() {
   for attempt in $(seq 1 45); do
     value=$(last_check || true)
     if [[ -n "$value" && "$value" -gt "$after" ]]; then
-      adb shell dumpsys activity services ru.tgwatch | grep -q 'isForeground=true'
-      adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q ',[A-Z_]*,'
-      return 0
+      # Preferences precede History.record: the fresh timestamp must have its own row.
+      if adb shell dumpsys activity services ru.tgwatch | grep -q 'isForeground=true' &&
+          adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | tr -d '\r' |
+          awk -F, -v checked="$value" '$1 == checked && NF == 5 && $5 ~ /^[0-9]+$/ {found=1} END {exit !found}'; then
+        return 0
+      fi
     fi
     sleep 2
   done

@@ -11,12 +11,13 @@ on:
         default: false
 permissions:
   contents: read
-concurrency:
-  group: tgwatch-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      # A push may cancel older push checks, never a manual publication's checks.
+      group: tgwatch-check-build-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,13 +25,40 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease :app:dependencyInventory --no-daemon --stacktrace
-      - name: Audit exact resolved dependencies against OSV
+      - name: Release policy regression tests
         run: |
+          python3 -m pip install -r scripts/requirements-release.txt
+          python3 -m unittest discover -s scripts/tests -v
           python3 scripts/test_dependency_audit.py
           python3 scripts/test_signing_keychain.py
-          python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
+      - name: Unit tests, Android lint and APKs
+        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
+      - name: Audit all exact resolved runtime and test dependencies against OSV
+        run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.75.0
+      - name: Gate release runtime SBOM on HIGH and CRITICAL vulnerabilities
+        run: bash scripts/scan-sbom.sh app/build/reports/sbom/TgWatch.sbom.cdx.json app/build/reports/sbom/TgWatch.trivy.json
+      - name: SBOM and vulnerability scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            app/build/reports/sbom/TgWatch.sbom.cdx.json
+            app/build/reports/sbom/TgWatch.trivy.json
+            app/build/reports/sbom/TgWatch.trivy.status.json
+            app/build/reports/sbom/TgWatch.trivy.log
+      - name: Resolved dependency graphs and OSV audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-reports
+          path: |
+            app/build/reports/dependencies/resolved.json
+            app/build/reports/dependencies/osv-report.json
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,12 +88,16 @@ jobs:
           if [ "$SIGNING_READY" = true ]; then
             echo 'Production signing key configured.' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'Production signing is not configured. Run scripts/configure-signing.sh on a trusted machine; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Production signing is not configured. Use scripts/configure-signing.sh with the existing production backup on a trusted Mac. It never creates a replacement key; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
           fi
   release:
     needs: [build, android]
     if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      # Serial across branches/run numbers; checks have separate cancellable groups.
+      group: tgwatch-publication-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -75,6 +107,23 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Download this run's successful SBOM scan
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-reports
+          path: release-evidence
+      - name: Download this run's full dependency audit
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-reports
+          path: release-dependencies
+      - name: Validate scan evidence
+        run: |
+          python3 -m pip install -r scripts/requirements-release.txt
+          python3 scripts/verify-audit-evidence.py \
+            --sbom release-evidence/TgWatch.sbom.cdx.json --trivy release-evidence/TgWatch.trivy.json \
+            --status release-evidence/TgWatch.trivy.status.json \
+            --inventory release-dependencies/resolved.json --osv release-dependencies/osv-report.json
       - name: Build with persistent signing key
         env:
           TGWATCH_KEYSTORE_BASE64: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
@@ -91,24 +140,37 @@ jobs:
           trap 'rm -f "$TGWATCH_KEYSTORE_PATH"' EXIT
           umask 077
           printf '%s' "$TGWATCH_KEYSTORE_BASE64" | base64 --decode > "$TGWATCH_KEYSTORE_PATH"
-          bash ./gradlew assembleRelease --no-daemon
+          bash ./gradlew assembleRelease generateReleaseSbom --no-daemon
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
-      - name: Verify signing continuity with published 1.9.40
+          cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json
+          cmp app/build/reports/dependencies/resolved.json release-dependencies/resolved.json
+          cp release-evidence/TgWatch.sbom.cdx.json TgWatch.sbom.cdx.json
+          cp release-evidence/TgWatch.trivy.json TgWatch.trivy.json
+          cp release-dependencies/resolved.json TgWatch.dependencies.json
+          cp release-dependencies/osv-report.json TgWatch.osv.json
+      - name: Verify signing continuity with immutable published 1.10.47
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download v1.9.40 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
+          gh release download v1.10.47 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
           python3 - <<'PY'
           import hashlib, pathlib
-          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'dd3d017d9cc4a9f8a37a202c70520e8ecd4e30646e32c5effb841b08b6c8036e'
+          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1'
           PY
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
           "$signer" verify --print-certs TgWatch.apk > release-signature.txt
           diff <(grep 'Signer #1 certificate SHA-256 digest:' previous-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
+          python3 - <<'PY'
+          import pathlib, re
+          expected = 'ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1'
+          for name in ('previous-signature.txt', 'release-signature.txt'):
+              digests = re.findall(r'^Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})$', pathlib.Path(name).read_text(), re.M)
+              assert [digest.lower() for digest in digests] == [expected], 'Production signing identity mismatch'
+          PY
       - name: Enable KVM for signed upgrade
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -131,24 +193,21 @@ jobs:
             upgrade-*.xml
             upgrade-*.csv
             release-screen.png
-      - name: Download audited dependency reports
-        uses: actions/download-artifact@v4
-        with:
-          name: quality-reports
-          path: release-quality
       - name: Publish versioned release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version=$(sed -n 's/^[[:space:]]*versionName = "\([0-9.]*\)".*/\1/p' app/build.gradle.kts)
-          [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]
-          gh release create "v${version}.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
-            release-quality/dependencies/runtime.cdx.json release-quality/dependencies/osv-report.json \
-            --target "$GITHUB_SHA" --title "TG Монитор ${version}.${GITHUB_RUN_NUMBER}" \
-            --notes-file "docs/releases/${version}.md" --latest
+          python3 scripts/release-policy.py --repo "$GITHUB_REPOSITORY" \
+            --version "$version" --run-number "$GITHUB_RUN_NUMBER" --sha "$GITHUB_SHA" \
+            --notes "docs/releases/${version}.md" \
+            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json TgWatch.dependencies.json TgWatch.osv.json
   android:
     runs-on: ubuntu-latest
+    concurrency:
+      group: tgwatch-check-android-${{ matrix.api }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:

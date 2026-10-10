@@ -2,107 +2,152 @@ package ru.tgwatch
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
+import android.app.ProgressDialog
 import android.content.Intent
 import android.net.Uri
-import android.text.InputFilter
 import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
-import java.util.concurrent.atomic.AtomicBoolean
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.text.DateFormat
+import java.util.Date
 
-/** Passwords stay in transient dialog/worker memory; file IO and PBKDF2 run off the UI thread. */
+/** SAF documents and password entry; expensive crypto/storage work never runs on the UI thread. */
 class BackupUi(private val activity: Activity) {
-    private val busy = AtomicBoolean(false)
-    fun selectFile(restore: Boolean) {
-        if (busy.get()) { message("Операция ещё выполняется"); return }
-        if (restore && !stopped()) return
-        val intent = Intent(if (restore) Intent.ACTION_OPEN_DOCUMENT else Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = if (restore) "*/*" else "application/octet-stream"
-            if (!restore) putExtra(Intent.EXTRA_TITLE,"tgwatch-backup.tgwatch")
+    private var busy = false
+    private val dialogs = mutableListOf<Dialog>()
+
+    fun close() { dialogs.forEach { it.dismiss() }; dialogs.clear() }
+
+    fun export() = document(Intent.ACTION_CREATE_DOCUMENT, EXPORT, "application/octet-stream", "tgwatch.tgwb")
+    fun restore() {
+        if (BackupManager.hasPending(activity)) {
+            AlertDialog.Builder(activity).setTitle("Завершить восстановление?")
+                .setMessage("Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения.")
+                .setPositiveButton("Продолжить") { _, _ -> work("Восстановление…", {
+                    BackupManager.recoverPending(activity.applicationContext)
+                }, { activity.recreate() }, "Не удалось завершить восстановление. Повторите попытку.") }
+                .setNegativeButton("Отмена", null).show().also { dialogs.add(it) }
+            return
         }
-        try { activity.startActivityForResult(intent,if (restore) 22 else 21) }
-        catch (_: Exception) { message("Не удалось открыть выбор файла") }
+        document(Intent.ACTION_OPEN_DOCUMENT, RESTORE, "*/*")
     }
-    fun result(request: Int, result: Int, intent: Intent?): Boolean {
-        if (request !in 21..22) return false
+    fun importCsv() = document(Intent.ACTION_OPEN_DOCUMENT, CSV, "*/*")
+
+    @Suppress("DEPRECATION")
+    private fun document(action: String, code: Int, type: String, name: String? = null) {
+        if (busy) return
+        try {
+            activity.startActivityForResult(Intent(action).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                this.type = type
+                if (name != null) putExtra(Intent.EXTRA_TITLE, name)
+            }, code)
+        } catch (_: Exception) { message("Не удалось открыть выбор файла") }
+    }
+
+    fun onResult(code: Int, result: Int, data: Intent?): Boolean {
+        if (code !in EXPORT..CSV) return false
         if (result != Activity.RESULT_OK) return true
-        val uri = intent?.data ?: return true
-        if (request == 22 && !stopped()) return true
-        passwordDialog(uri,request == 22)
+        val uri = data?.data ?: return true
+        when (code) {
+            EXPORT -> password(true) { pass -> work("Создание копии…", {
+                try {
+                    val archive = BackupManager.export(activity.applicationContext, pass)
+                    activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(archive) }
+                        ?: error("No output")
+                } finally { pass.fill('\u0000') }
+            }, { message("Зашифрованная копия сохранена. Для восстановления потребуется пароль.") },
+                "Не удалось сохранить копию") }
+            RESTORE -> password(false) { pass -> work("Проверка копии…", {
+                try { BackupManager.decrypt(read(uri, BackupCrypto.MAX_ENVELOPE_BYTES), pass) }
+                finally { pass.fill('\u0000') }
+            }, { preview(it, "Восстановить копию?") }, "Неверный пароль или повреждённая копия") }
+            CSV -> work("Проверка CSV…", {
+                val bytes = read(uri, BackupCodec.MAX_PLAINTEXT_BYTES)
+                val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
+                BackupSnapshot(System.currentTimeMillis(), emptyMap(), CsvImport.parse(text), emptyList())
+            }, { preview(it, "Импортировать CSV?", true) }, "CSV повреждён или имеет неподдерживаемый формат")
+        }
         return true
     }
-    private fun stopped(): Boolean {
-        if (!MonitorService.running && !Prefs.isEnabled(activity)) return true
-        message("Для восстановления сначала нажмите «Остановить»")
-        return false
-    }
-    private fun passwordDialog(uri: Uri, restore: Boolean) {
-        val fields = LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; setPadding(32,8,32,8) }
-        fun field(hintText: String) = EditText(activity).apply {
-            hint=hintText; inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            filters=arrayOf(InputFilter.LengthFilter(256)); setSaveEnabled(false); fields.addView(this)
+
+    private fun read(uri: Uri, maxBytes: Int): ByteArray = activity.contentResolver.openInputStream(uri)
+        ?.use { BoundedInput.read(it, maxBytes) } ?: error("No input")
+
+    private fun password(confirm: Boolean, action: (CharArray) -> Unit) {
+        if (busy) return
+        val layout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, 0, pad, 0)
         }
-        val password = field("Пароль бэкапа")
-        val confirmation = if (restore) null else field("Повторите пароль (минимум 12 символов)")
-        val dialog = AlertDialog.Builder(activity).setTitle(if (restore) "Открыть бэкап" else "Зашифровать бэкап")
-            .setMessage(if (restore) "Введите пароль, заданный при сохранении файла."
-                else "Сохраните пароль отдельно. Без него восстановить этот файл нельзя.")
-            .setView(fields).setPositiveButton("Продолжить",null).setNegativeButton("Отмена",null).create()
+        fun field(hint: String) = EditText(activity).apply {
+            this.hint = hint
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            isSaveEnabled = false
+            importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
+            layout.addView(this)
+        }
+        val first = field(if (confirm) "Пароль: от 12 до 256 символов" else "Пароль этой копии")
+        val second = if (confirm) field("Повторите пароль") else null
+        val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) "Пароль копии" else "Открыть копию")
+            .setMessage(if (confirm) "Запомните пароль: восстановить его невозможно." else "Введите пароль этой копии.")
+            .setView(layout).setPositiveButton("Продолжить", null).setNegativeButton("Отмена", null).create()
+        dialog.setOnDismissListener { first.text.clear(); second?.text?.clear() }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val chars = CharArray(password.length()) { password.text[it] }
-                if (!restore && (chars.size < 12 || password.text.toString() != confirmation!!.text.toString())) {
-                    chars.fill('\u0000'); password.error="Пароли должны совпадать и содержать минимум 12 символов"
-                    return@setOnClickListener
-                }
-                password.text.clear(); confirmation?.text?.clear(); dialog.dismiss()
-                operation(uri,restore,chars)
+                val pass = first.text.toString().toCharArray()
+                val repeated = second?.text?.toString()?.toCharArray()
+                val valid = pass.size in (if (confirm) 12..256 else 1..1024) &&
+                    (repeated == null || pass.contentEquals(repeated))
+                repeated?.fill('\u0000')
+                if (!valid) { pass.fill('\u0000'); first.error = "Проверьте длину и совпадение паролей" }
+                else { dialog.dismiss(); action(pass) }
             }
         }
-        dialog.setOnDismissListener { password.text.clear(); confirmation?.text?.clear() }
         dialog.show()
+        dialogs.add(dialog)
     }
-    private fun operation(uri: Uri, restore: Boolean, password: CharArray) {
-        if (!busy.compareAndSet(false,true)) { password.fill('\u0000'); message("Операция ещё выполняется"); return }
-        message(if (restore) "Расшифровываю…" else "Сохраняю бэкап…")
-        val app = activity.applicationContext
+
+    private fun preview(snapshot: BackupSnapshot, title: String, csv: Boolean = false) {
+        val date = DateFormat.getDateTimeInstance().format(Date(snapshot.createdAt))
+        AlertDialog.Builder(activity).setTitle(title)
+            .setMessage("Дата: $date\nЗаписей истории: ${snapshot.observations.size}\n" +
+                (if (csv) "Настройки и журнал сохранятся. Текущая история будет заменена.\n\n" else
+                    "Записей журнала: ${snapshot.log.size}\n\nТекущие данные будут заменены. ") +
+                "Мониторинг будет остановлен; включите его вручную после восстановления.")
+            .setPositiveButton("Заменить данные") { _, _ -> work("Восстановление…", {
+                if (csv) BackupManager.importHistory(activity.applicationContext, snapshot.observations)
+                else BackupManager.restore(activity.applicationContext, snapshot)
+            }, { message("Данные восстановлены. Мониторинг выключен."); activity.recreate() },
+                "Восстановление прервано. Нажмите «Восстановить резервную копию» для повторной попытки.") }
+            .setNegativeButton("Отмена", null).show().also { dialogs.add(it) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun <T> work(title: String, block: () -> T, success: (T) -> Unit, failure: String) {
+        if (busy) return
+        busy = true
+        val progress = ProgressDialog(activity).apply { setMessage(title); setCancelable(false); show() }
+        dialogs.add(progress)
         Thread({
-            try {
-                if (restore) {
-                    val bytes = app.contentResolver.openInputStream(uri)?.use(BackupCodec::readBounded) ?: error("Нет файла")
-                    val data = BackupCodec.decrypt(bytes,password)
-                    activity.runOnUiThread { if (alive()) confirmRestore(data) }
-                } else {
-                    val bytes = BackupCodec.encrypt(BackupStore.snapshot(app),password)
-                    app.contentResolver.openOutputStream(uri,"wt")?.use { it.write(bytes) } ?: error("Нет файла")
-                    activity.runOnUiThread { if (alive()) message("Зашифрованный бэкап сохранён") }
+            val result = runCatching(block)
+            activity.runOnUiThread {
+                busy = false
+                progress.dismiss()
+                dialogs.remove(progress)
+                if (!activity.isFinishing && !activity.isDestroyed) {
+                    result.fold(success) { message(failure) }
                 }
-            } catch (_: Exception) {
-                activity.runOnUiThread { if (alive()) message(if (restore)
-                    "Не удалось открыть бэкап: проверьте пароль, формат и целостность файла. Данные не изменены."
-                    else "Не удалось сохранить бэкап") }
-            } finally { password.fill('\u0000'); busy.set(false) }
-        },"tg-backup").start()
+            }
+        }, "tg-backup").start()
     }
-    private fun confirmRestore(data: BackupData) {
-        if (!stopped()) return
-        AlertDialog.Builder(activity).setTitle("Заменить данные приложения?")
-            .setMessage("В бэкапе: ${data.samples.size} проверок, ${data.log.size} событий. Текущие история, журнал и настройки будут заменены. Мониторинг останется остановленным; хранится история за последние 7 дней.")
-            .setNegativeButton("Отмена",null).setPositiveButton("Восстановить") { _,_ ->
-                if (!stopped() || !busy.compareAndSet(false,true)) return@setPositiveButton
-                Thread({
-                    val success = try { BackupStore.restore(activity.applicationContext,data); true } catch (_: Exception) { false }
-                    activity.runOnUiThread { if (alive()) {
-                        message(if (success) "Данные восстановлены. Нажмите «Запустить», когда будете готовы."
-                            else "Не удалось завершить восстановление. При следующем запуске оно будет повторено.")
-                        if (success) activity.recreate()
-                    } }
-                    busy.set(false)
-                },"tg-restore").start()
-            }.show()
-    }
-    private fun alive() = !activity.isFinishing && !activity.isDestroyed
-    private fun message(text: String) { Toast.makeText(activity,text,Toast.LENGTH_LONG).show() }
+
+    private fun message(text: String) = Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+    companion object { private const val EXPORT = 30; private const val RESTORE = 31; private const val CSV = 32 }
 }

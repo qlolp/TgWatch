@@ -10,6 +10,13 @@ import shutil
 import subprocess
 import sys
 
+PRODUCTION_CERTIFICATE = 'AB74727A44F59684045E7DB4C820BE309F886433A18A3C06F3439417F3ACBEF1'
+PRODUCTION_REPOSITORY = 'qlolp/TgWatch'
+
+
+class KeychainItemMissing(RuntimeError):
+    pass
+
 
 class Keychain:
     def __init__(self):
@@ -62,6 +69,7 @@ class Keychain:
         result = C.c_void_p()
         try:
             status = self.sec.SecItemCopyMatching(query, C.byref(result))
+            if status == -25300: raise KeychainItemMissing('Signing password is not yet in Keychain')
             if status: raise RuntimeError(f'Keychain read failed ({status})')
             return C.string_at(self.cf.CFDataGetBytePtr(result), self.cf.CFDataGetLength(result)).decode()
         finally:
@@ -89,19 +97,25 @@ class Keychain:
 def certificate(store, password):
     executable = Path(os.environ['JAVA_HOME']) / 'bin/keytool' if os.environ.get('JAVA_HOME') else Path(shutil.which('keytool') or 'keytool')
     env = {**os.environ, 'TGWATCH_SIGNING_PASSWORD': password}
-    output = subprocess.run([str(executable), '-list', '-v', '-keystore', str(store),
+    output = subprocess.run([str(executable), '-J-Duser.language=en', '-J-Duser.country=US',
+        '-list', '-v', '-storetype', 'PKCS12', '-keystore', str(store),
         '-storepass:env', 'TGWATCH_SIGNING_PASSWORD', '-alias', 'tgwatch'],
         env=env, capture_output=True, text=True, check=True).stdout
+    if 'Entry type: PrivateKeyEntry' not in output:
+        raise RuntimeError('Backup alias is not a private signing key')
     match = re.search(r'SHA256:\s*([0-9A-Fa-f:]+)', output)
     if not match: raise RuntimeError('Signing certificate not found')
-    return match.group(1).replace(':', '').upper()
+    fingerprint = match.group(1).replace(':', '').upper()
+    if not re.fullmatch(r'[0-9A-F]{64}', fingerprint): raise RuntimeError('Malformed signing certificate digest')
+    return fingerprint
 
 
 def protect(store, keychain, expected=None, verify=None):
+    if not expected: raise RuntimeError('Expected signing certificate is required')
     sidecar = store.with_name('tgwatch-signing-password.txt')
     password = sidecar.read_text().strip()
     before = certificate(store, password)
-    if expected and before != expected.upper():
+    if before != expected.upper():
         raise RuntimeError('Certificate does not match the published signing identity')
     keychain.save(str(store.resolve()), password)
     if verify is None:
@@ -118,8 +132,14 @@ def main():
     parser.add_argument('directory', type=Path)
     parser.add_argument('--expected-certificate')
     args = parser.parse_args()
+    if not args.expected_certificate:
+        raise RuntimeError('Expected signing certificate is required for every operation')
+    if args.command == 'configure' and args.expected_certificate.upper() != PRODUCTION_CERTIFICATE:
+        raise RuntimeError('Configuration requires the immutable published production certificate')
     store = args.directory.resolve() / 'tgwatch-release.p12'
     account = str(store)
+    if not store.is_file():
+        raise RuntimeError('Restore the permanent keystore first. This command never generates a replacement key.')
     keychain = Keychain()
     if args.command == 'protect':
         protect(store,keychain,args.expected_certificate)
@@ -129,23 +149,25 @@ def main():
             raise RuntimeError('Recovered signing identity mismatch')
         print(f'Signing certificate SHA256: {fingerprint}')
     else:
-        if not store.is_file():
-            raise RuntimeError('Restore the permanent keystore first. This command never generates a replacement key.')
         needs_save = False
         try: password = keychain.load(account)
-        except RuntimeError:
+        except KeychainItemMissing:
             password = getpass.getpass('Existing keystore password: ')
             needs_save = True
         fingerprint = certificate(store, password)
-        if args.expected_certificate and fingerprint != args.expected_certificate.upper():
+        if fingerprint != PRODUCTION_CERTIFICATE:
             raise RuntimeError('Certificate does not match the published signing identity')
+        # Git access does not establish GitHub Secrets API access. Check this
+        # read-only operation before any Keychain save or Secret upload.
+        subprocess.run(['gh', 'secret', 'list', '--repo', PRODUCTION_REPOSITORY,
+            '--json', 'name', '--jq', '.[].name'], capture_output=True, text=True, check=True)
         if needs_save: keychain.save(account, password)
         import base64
         secrets = {'TGWATCH_KEYSTORE_BASE64': base64.b64encode(store.read_bytes()),
             'TGWATCH_KEYSTORE_PASSWORD': password.encode(), 'TGWATCH_KEY_PASSWORD': password.encode(),
             'TGWATCH_KEY_ALIAS': b'tgwatch'}
         for name, value in secrets.items():
-            subprocess.run(['gh', 'secret', 'set', name, '--repo', 'qlolp/TgWatch'], input=value, check=True)
+            subprocess.run(['gh', 'secret', 'set', name, '--repo', PRODUCTION_REPOSITORY], input=value, check=True)
         print(f'Signing secrets configured with existing certificate {fingerprint}.')
 
 
