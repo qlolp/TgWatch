@@ -90,15 +90,15 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
-      - name: Verify signing continuity with published 1.7.28
+      - name: Verify signing continuity with published 1.8.33
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download v1.7.28 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
+          gh release download v1.8.33 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
           python3 - <<'PY'
           import hashlib, pathlib
-          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'c724e03df52143568b4ac030890a48cd9ed9932285946dd2dd0de178868f3e4f'
+          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == '381a03c38afa42c31c595d3e3606c218d8839874470ba51c49b186bfae6748ba'
           PY
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
@@ -130,9 +130,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.8.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
-            --target "$GITHUB_SHA" --title "TG Монитор 1.8.${GITHUB_RUN_NUMBER}" \
-            --notes-file docs/releases/1.8.md --latest
+          set -euo pipefail
+          version=$(sed -n 's/^[[:space:]]*versionName = "\([0-9.]*\)".*/\1/p' app/build.gradle.kts)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]
+          gh release create "v${version}.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
+            --target "$GITHUB_SHA" --title "TG Монитор ${version}.${GITHUB_RUN_NUMBER}" \
+            --notes-file "docs/releases/${version}.md" --latest
   android:
     runs-on: ubuntu-latest
     strategy:

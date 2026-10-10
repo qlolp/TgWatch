@@ -53,7 +53,7 @@ class EventSettingsTest {
                     // Capture real UI after assertions; documentation images come from the emulator.
                     activity.findViewById<Switch>(soundId).performClick()
                     activity.findViewById<Switch>(recoveryId).performClick()
-                    val anchor = activity.findViewById<View>(recoveryId)
+                    val anchor = activity.findViewById<View>(patternId)
                     anchor.requestRectangleOnScreen(android.graphics.Rect(0, 0, anchor.width, anchor.height), true)
                 }
                 instrumentation.waitForIdleSync()

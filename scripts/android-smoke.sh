@@ -98,13 +98,22 @@ adb shell input text 1234
 adb shell input keyevent 66
 sleep 3
 adb shell locksettings clear --old 1234
+adb shell wm dismiss-keyguard
+for attempt in $(seq 1 10); do
+  if adb shell dumpsys user | grep -q RUNNING_UNLOCKED; then break; fi
+  sleep 1
+done
+adb shell dumpsys user | grep -q RUNNING_UNLOCKED
 adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q "^$((minute * 60000)),"
 check_crashes
 # After all assertions, capture the real main screen for documentation.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
 adb shell am start -W -n ru.tgwatch/.MainActivity
 sleep 1
+adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
 adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
 rm -rf "$legacy_dir"
