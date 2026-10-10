@@ -7,6 +7,18 @@ import java.nio.file.Files
 
 class HistoryDurabilityTest {
     private fun replace(file: File, rows: List<Observation>, cutoff: Long): List<Observation> = HistoryStorage.replace(file, rows, cutoff)
+    @Test fun replacementKeepsExpiredCurrentEpochMetadataInsteadOfRevivingArchivedChecks() {
+        val dir = Files.createTempDirectory("history-epoch-restore").toFile()
+        try {
+            val file = File(dir,"history.csv")
+            val rows = listOf(Observation(10000,20000,"OK",11,0),Observation(0,1000,"OK",22,1))
+            val retained = replace(file,rows,10000)
+            assertEquals(1L,Timeline.current(retained).single().clockEpoch)
+            assertEquals("UNKNOWN",Timeline.current(retained).single().kind)
+            assertEquals(0,Timeline.stats(retained,10000,20000).checks)
+            assertEquals(retained,HistoryStorage.read(file))
+        } finally { dir.deleteRecursively() }
+    }
     @Test fun replacementPrunesExpiredRowsAndRoundTripsBeforeReturning() {
         val dir = Files.createTempDirectory("history-restore").toFile()
         try {

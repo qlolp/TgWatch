@@ -37,9 +37,20 @@ class EventNotificationTest {
             assertTrue(awaitNotification(manager, EventNotifications.RECOVERY_ID)
                 .extras.getString(Notification.EXTRA_TEXT)!!.contains("2 с"))
             awaitAbsent(manager, EventNotifications.OUTAGE_ID)
+            events.partial("MTProto не отвечает",sound=true,allowed=true)
+            assertEquals(EventNotifications.PARTIAL_CHANNEL,awaitNotification(manager,EventNotifications.PARTIAL_ID).channelId)
+            awaitAbsent(manager,EventNotifications.RECOVERY_ID)
+            events.recovered(RecoveryEvent(3000),sound=true,allowed=true)
+            assertEquals(EventNotifications.RECOVERY_CHANNEL,awaitNotification(manager,EventNotifications.RECOVERY_ID).channelId)
+            awaitAbsent(manager,EventNotifications.PARTIAL_ID)
+            events.partial("В тихие часы",sound=true,allowed=false)
+            val quietPartial = awaitNotification(manager,EventNotifications.PARTIAL_ID)
+            assertEquals(EventNotifications.SILENT_CHANNEL,quietPartial.channelId)
+            assertEquals(Notification.GROUP_ALERT_SUMMARY,quietPartial.groupAlertBehavior)
         } finally {
             manager.cancel(EventNotifications.RECOVERY_ID)
             manager.cancel(EventNotifications.OUTAGE_ID)
+            manager.cancel(EventNotifications.PARTIAL_ID)
         }
     }
     private fun awaitNotification(manager: NotificationManager, id: Int): Notification {

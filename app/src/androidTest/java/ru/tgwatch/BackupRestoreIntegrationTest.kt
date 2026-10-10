@@ -35,6 +35,8 @@ class BackupRestoreIntegrationTest {
         "vibration_pattern" to "SHORT", "quiet_hours" to true,
         "quiet_start_hour" to 23, "quiet_end_hour" to 8,
         "quiet_start_minute" to 1395, "quiet_end_minute" to 525,
+        "notify_outage" to false, "notify_partial" to true,
+        "sound_outage" to false, "sound_partial" to true, "sound_recovery" to true,
     )
 
     @Before fun saveCurrentDataAndStopMonitoring() {
@@ -315,6 +317,39 @@ class BackupRestoreIntegrationTest {
         }
         assertTrue(BackupManager.recoverPending(ctx))
         assertPortableData(restored)
+        assertMonitoringDisabledAndDiagnosticsCleared()
+    }
+
+    @Test fun historyImportBlocksRestartBeforeJournalIsStaged() {
+        val current = snapshot()
+        seed(current)
+        val mainEntered = CountDownLatch(1)
+        val releaseMain = CountDownLatch(1)
+        val completed = CountDownLatch(1)
+        val failure = java.util.concurrent.atomic.AtomicReference<Throwable?>()
+        android.os.Handler(Looper.getMainLooper()).post {
+            mainEntered.countDown()
+            releaseMain.await(10, TimeUnit.SECONDS)
+        }
+        try {
+            assertTrue(mainEntered.await(5, TimeUnit.SECONDS))
+            Thread {
+                try { BackupManager.importHistory(ctx, current.observations) }
+                catch (error: Throwable) { failure.set(error) }
+                finally { completed.countDown() }
+            }.start()
+            val deadline = SystemClock.elapsedRealtime() + 5000
+            while (!BackupManager.hasPending(ctx) && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(10)
+            assertTrue("CSV must guard restarts even before durable staging", BackupManager.hasPending(ctx))
+            assertFalse(File(ctx.createDeviceProtectedStorageContext().filesDir, "restore-pending-v1.json").exists())
+            Prefs.setEnabled(ctx, true)
+            MonitorService.start(ctx)
+            assertFalse("A tile or activity cannot restart during CSV teardown", Prefs.isEnabled(ctx))
+        } finally { releaseMain.countDown() }
+        assertTrue(completed.await(15, TimeUnit.SECONDS))
+        failure.get()?.let { throw AssertionError("CSV import failed", it) }
+        assertFalse(BackupManager.hasPending(ctx))
+        assertPortableData(current)
         assertMonitoringDisabledAndDiagnosticsCleared()
     }
 

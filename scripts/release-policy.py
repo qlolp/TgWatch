@@ -15,6 +15,8 @@ import sys
 import tempfile
 
 from scan_report import verify_report
+from audit_report import verify_osv, verify_runtime_inventory
+from jsonschema.exceptions import ValidationError
 
 MAX_RUN_NUMBER = 2147483547  # Android signed-int versionCode minus the CI offset.
 
@@ -83,7 +85,7 @@ def verify_existing(repo, tag, release, sha, assets):
     for path in assets:
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         old = published[path.name]
-        if path.name == "TgWatch.trivy.json":
+        if path.name in ("TgWatch.trivy.json", "TgWatch.osv.json"):
             # Scan timestamps/database contents vary across reruns. Preserve the
             # original clean report, verify its bytes instead of replacing it.
             with tempfile.TemporaryDirectory() as directory:
@@ -92,10 +94,14 @@ def verify_existing(repo, tag, release, sha, assets):
             digest = "sha256:" + hashlib.sha256(content).hexdigest()
             if len(content) != old.get("size") or old.get("digest") not in (None, digest):
                 raise ValueError("Published scan evidence failed integrity verification; it remains unchanged")
-            scan = json.loads(content)
-            bom_file = next(asset for asset in assets if asset.name == "TgWatch.sbom.cdx.json")
-            if verify_report(scan, "app/build/reports/sbom/TgWatch.sbom.cdx.json", json.loads(bom_file.read_text())):
-                raise ValueError("Published scan evidence failed the severity gate; it remains unchanged")
+            evidence = json.loads(content)
+            if path.name == "TgWatch.trivy.json":
+                bom_file = next(asset for asset in assets if asset.name == "TgWatch.sbom.cdx.json")
+                if verify_report(evidence, "app/build/reports/sbom/TgWatch.sbom.cdx.json", json.loads(bom_file.read_text())):
+                    raise ValueError("Published scan evidence failed the severity gate; it remains unchanged")
+            else:
+                inventory_file = next(asset for asset in assets if asset.name == "TgWatch.dependencies.json")
+                verify_osv(evidence, json.loads(inventory_file.read_text()))
             continue
         if old.get("size") != path.stat().st_size:
             raise ValueError(f"Published asset {path.name} has different size; it remains unchanged")
@@ -118,6 +124,16 @@ def publish(args):
     assets = [Path(path) for path in args.assets]
     if len({path.name for path in assets}) != len(assets) or not all(path.is_file() and path.stat().st_size for path in assets):
         raise ValueError("Release assets must be nonempty files with unique names")
+    by_name = {path.name: path for path in assets}
+    required = {"TgWatch.apk", "TgWatch.apk.sha256", "TgWatch.osv.json", "TgWatch.dependencies.json", "TgWatch.sbom.cdx.json", "TgWatch.trivy.json"}
+    if set(by_name) != required:
+        raise ValueError("Unified release needs complete APK/checksum, SBOM, Trivy and full dependency/OSV evidence")
+    inventory = json.loads(by_name["TgWatch.dependencies.json"].read_text())
+    bom = json.loads(by_name["TgWatch.sbom.cdx.json"].read_text())
+    verify_osv(json.loads(by_name["TgWatch.osv.json"].read_text()), inventory)
+    verify_runtime_inventory(bom, inventory)
+    if verify_report(json.loads(by_name["TgWatch.trivy.json"].read_text()), "app/build/reports/sbom/TgWatch.sbom.cdx.json", bom):
+        raise ValueError("Trivy HIGH/CRITICAL findings block release publication")
     tag = f"v{args.version}.{args.run_number}"
     pages = api(f"repos/{args.repo}/releases", "--paginate", "--slurp")
     releases = [release for page in pages for release in page]
@@ -152,7 +168,7 @@ def main():
     parser.add_argument("--assets", nargs="+", required=True)
     try:
         publish(parser.parse_args())
-    except (ValueError, RuntimeError, KeyError, TypeError, OSError) as error:
+    except (ValueError, RuntimeError, KeyError, TypeError, OSError, ValidationError) as error:
         print(f"Release policy refused publication: {error}", file=sys.stderr)
         return 1
     return 0

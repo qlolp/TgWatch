@@ -93,7 +93,7 @@ class BackupUi(private val activity: Activity) {
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             layout.addView(this)
         }
-        val first = field("Пароль: от 8 до 1024 символов")
+        val first = field(if (confirm) "Пароль: от 12 до 256 символов" else "Пароль этой копии")
         val second = if (confirm) field("Повторите пароль") else null
         val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) "Пароль копии" else "Открыть копию")
             .setMessage(if (confirm) "Запомните пароль: восстановить его невозможно." else "Введите пароль этой копии.")
@@ -103,7 +103,8 @@ class BackupUi(private val activity: Activity) {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val pass = first.text.toString().toCharArray()
                 val repeated = second?.text?.toString()?.toCharArray()
-                val valid = pass.size in 8..1024 && (repeated == null || pass.contentEquals(repeated))
+                val valid = pass.size in (if (confirm) 12..256 else 1..1024) &&
+                    (repeated == null || pass.contentEquals(repeated))
                 repeated?.fill('\u0000')
                 if (!valid) { pass.fill('\u0000'); first.error = "Проверьте длину и совпадение паролей" }
                 else { dialog.dismiss(); action(pass) }

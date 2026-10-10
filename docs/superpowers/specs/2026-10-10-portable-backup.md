@@ -1,0 +1,16 @@
+# TgWatch 1.10: portable backup and event controls
+
+Approved scope: encrypted backup/restore, resolved dependency audit, protection of the existing signing backup, separate event notification controls, completed-outage MTTR. Existing authorization includes implementation, merge and signed publication.
+
+## Behavior and invariants
+
+- A `.tgwatch` file contains the retained observations, event log and an allowlist of user preferences. Password encryption uses AES-256-GCM, random salt and nonce, PBKDF2-HMAC-SHA256 (600,000 iterations). No account, network credentials, signing key, permissions, running/enabled flag, last live status or alarm cooldown is backed up. Password is never persisted. File size/count/string limits and format version are validated before any replacement. Wrong password, corruption and unsupported version leave current data untouched.
+- Backup uses the Android document picker and background IO. Restore decrypts first, presents a replacement confirmation, and requires monitoring stopped. It replaces history/settings/log through one authoritative atomic restore file; startup finishes an interrupted restore before monitoring. Restore clips observation validity at backup time so reinstall downtime remains unknown. Retention remains seven days. Monitoring stays stopped until the user starts it. Device-specific notification channel customizations must be configured again on another phone.
+- Full outage, partial availability and recovery have independent notification enable/sound choices and separate audible Android channels, with links to system channel settings for sound/importance. Silent events remain silent during quiet hours/DND. Existing `event_sound` and `notify_recovery` choices migrate by fallback; PARTIAL notification defaults off. Existing vibration opt-ins and cooldown remain.
+- MTTR includes only TG_DOWN runs wholly inside the requested window, immediately preceded and followed by continuously observed OK. UNKNOWN, missing coverage, PARTIAL, NO_NETWORK, clock-epoch changes and ongoing/window-clipped runs are excluded. Display the completed count beside the average; show no value with no qualifying incident.
+- CI inventories resolved Gradle modules (including transitives), emits a runtime CycloneDX SBOM, and queries OSV for exact versions. Empty graphs, unresolved artifacts, API failure and vulnerability findings fail the gate; reports are retained. This checks known published vulnerabilities, not absence of all vulnerabilities.
+- The permanent APK signing key remains unchanged. Move its local password from the plaintext sidecar into macOS login Keychain only after independent readback and successful keystore identity verification. Keep encrypted PKCS12. New configuration accepts a password through secure terminal input and does not persist a password sidecar. Document recovery and Keychain backup requirements. Never print secrets or upload them as reports.
+
+## Release gate
+
+Unit/crypto/parser/failure tests; Android API 29/35 backup roundtrip, rejected restore and event-channel tests; existing network/Doze/Direct Boot smoke; resolved dependency audit; independent whole-branch review; real signed 1.9.40 update preserving history/settings; identical signing certificate. Do not rotate the key or change the unrelated network concurrency architecture.

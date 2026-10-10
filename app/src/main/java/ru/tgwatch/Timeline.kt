@@ -13,6 +13,9 @@ data class TimeStats(val okMs: Long, val downMs: Long, val partialMs: Long, val 
     val offlineCount: Int = 0, val okChecks: Int = 0, val downChecks: Int = 0,
     val partialChecks: Int = 0, val offlineChecks: Int = 0, val unknownChecks: Int = 0,
     val completedOutageCount: Int = 0, val mttrMs: Long = -1L) {
+    // Published 1.10 callers retain the same values under their existing property names.
+    val completedOutages: Int get() = completedOutageCount
+    val meanRecoveryMs: Long get() = mttrMs
     val uptimePercent: Double get() = if (okMs + downMs + partialMs == 0L) -1.0
         else okMs * 100.0 / (okMs + downMs + partialMs)
 }
@@ -47,6 +50,17 @@ object Timeline {
             nextEpoch = epoch + 1
         }
         return archived + Observation(now, now + 1, "UNKNOWN", clockEpoch = nextEpoch)
+    }
+    /** Retain the epoch boundary even when its final observation expires. */
+    fun retained(samples: List<Observation>, from: Long, limit: Int = 65_000): List<Observation> {
+        require(limit > 0)
+        val unique = samples.associateBy { it.clockEpoch to it.at }.values
+        val latest = unique.maxWithOrNull(compareBy<Observation> { it.clockEpoch }.thenBy { it.at })
+            ?: return emptyList()
+        val retained = unique.filter { it.until > from }.toMutableList()
+        if (retained.none { it.clockEpoch == latest.clockEpoch })
+            retained += latest.copy(kind="UNKNOWN",latencyMs=-1)
+        return retained.sortedWith(compareBy<Observation> { it.clockEpoch }.thenBy { it.at }).takeLast(limit)
     }
     fun current(samples: List<Observation>): List<Observation> {
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L

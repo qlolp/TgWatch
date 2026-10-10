@@ -45,7 +45,9 @@ object Prefs {
      * (LOCKED_BOOT_COMPLETED). Старый файл из обычного хранилища переносим
      * при первой разблокировке.
      */
-    fun sp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    /** Startup recovery belongs to Application; settings reads never replay a transaction. */
+    fun sp(ctx: Context): android.content.SharedPreferences = rawSp(ctx)
+    internal fun rawSp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     private fun store(ctx: Context): Context {
         val app = ctx.applicationContext
@@ -150,6 +152,16 @@ object Prefs {
     fun setNotifyRecovery(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_NOTIFY_RECOVERY, value).apply() }
     fun eventSound(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EVENT_SOUND, false)
     fun setEventSound(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EVENT_SOUND, value).apply() }
+    fun soundFor(ctx: Context, event: String): Boolean = EventPreferences.sound(event,
+        sp(ctx).all.mapValues { it.value.toString() })
+    fun setSoundFor(ctx: Context, event: String, value: Boolean) {
+        sp(ctx).edit().putBoolean(EventPreferences.soundKey(event),value).apply()
+    }
+    fun notifyFor(ctx: Context, event: String): Boolean =
+        sp(ctx).getBoolean(EventPreferences.notifyKey(event),event != "PARTIAL")
+    fun setNotifyFor(ctx: Context, event: String, value: Boolean) {
+        sp(ctx).edit().putBoolean(EventPreferences.notifyKey(event),value).apply()
+    }
     fun alarmPattern(ctx: Context): AlarmPattern = AlarmPattern.entries.firstOrNull {
         it.name == sp(ctx).getString(KEY_ALARM_PATTERN, AlarmPattern.STANDARD.name)
     } ?: AlarmPattern.STANDARD

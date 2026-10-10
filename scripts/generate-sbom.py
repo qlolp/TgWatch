@@ -16,6 +16,7 @@ from sbom_schema import validate
 def generate(inventory):
     root_ref = "ru.tgwatch:releaseRuntimeClasspath"
     components = {}
+    module_refs = {}
     for artifact in inventory["artifacts"]:
         group, name, version, kind = (artifact[field] for field in ("group", "name", "version", "type"))
         if not all(isinstance(value, str) and value for value in (group, name, version, kind)):
@@ -30,11 +31,37 @@ def generate(inventory):
         if purl in components and components[purl] != component:
             raise ValueError(f"Conflicting resolved artifact bytes for {purl}")
         components[purl] = component
+        module_refs.setdefault(f"{group}:{name}:{version}", set()).add(purl)
+    graph = inventory.get("runtimeGraph")
+    dependencies = [{"ref": root_ref, "dependsOn": sorted(components)}]
+    if graph is not None:
+        graph_nodes = {}
+        for node in graph:
+            if node["ref"] in graph_nodes or not isinstance(node["dependsOn"], list):
+                raise ValueError("Malformed or duplicate resolved runtime graph node")
+            graph_nodes[node["ref"]] = node["dependsOn"]
+        if root_ref not in graph_nodes or not module_refs.keys() <= graph_nodes.keys():
+            raise ValueError("Resolved runtime graph does not cover its artifacts/root")
+        if any(target not in graph_nodes for targets in graph_nodes.values() for target in targets):
+            raise ValueError("Resolved runtime graph contains a dangling dependency")
+        def artifact_targets(node, seen):
+            if node in module_refs:
+                return module_refs[node]
+            if node in seen:
+                return set()
+            # Platform/BOM nodes have no JAR/AAR to hash. Preserve their resolved
+            # edges by following them to the actual runtime artifacts.
+            return set().union(*(artifact_targets(child, seen | {node}) for child in graph_nodes[node]))
+        def children(node):
+            return sorted(set().union(*(artifact_targets(child, {node}) for child in graph_nodes[node])))
+        dependencies = [{"ref": root_ref, "dependsOn": children(root_ref)}]
+        for module in sorted(module_refs):
+            dependencies.extend({"ref": ref, "dependsOn": children(module)} for ref in sorted(module_refs[module]))
     bom = {"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
            "metadata": {"component": {"type": "application", "name": "TgWatch",
                         "version": inventory["applicationVersion"], "bom-ref": root_ref}},
            "components": [components[key] for key in sorted(components)],
-           "dependencies": [{"ref": root_ref, "dependsOn": sorted(components)}]}
+           "dependencies": dependencies}
     validate(bom)
     return bom
 

@@ -13,11 +13,13 @@ object BackupCodec {
     private val rootKeys = setOf("formatVersion", "createdAt", "settings", "observations", "log")
     private val rowKeys = setOf("at", "until", "kind", "latencyMs", "clockEpoch")
     private val booleanKeys = setOf("keep_awake", "vibrate", "vibrate_partial", "vibrate_offline",
-        "vibrate_recovery", "notify_recovery", "event_sound", "quiet_hours")
+        "vibrate_recovery", "notify_recovery", "event_sound", "quiet_hours", "notify_outage",
+        "notify_partial", "sound_outage", "sound_partial", "sound_recovery")
     private val integerRanges = mapOf("interval_sec" to 10..120, "quiet_start_hour" to 0..23,
         "quiet_end_hour" to 0..23, "quiet_start_minute" to 0..1439, "quiet_end_minute" to 0..1439)
     private val profiles = setOf("ECONOMY", "BALANCED", "FREQUENT", "CUSTOM")
     private val patterns = setOf("STANDARD", "SHORT", "LONG")
+    private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size, booleanKeys.size + integerRanges.size + 2)
 
     fun encode(snapshot: BackupSnapshot): ByteArray = checked {
         validate(snapshot)
@@ -133,7 +135,7 @@ object BackupCodec {
                     val names = HashSet<String>()
                     if (!take('}')) do {
                         whitespace()
-                        require(names.add(string()) && names.size <= 15 && take(':'))
+                        require(names.add(string()) && names.size <= maxObjectKeys && take(':'))
                         value(depth + 1)
                         if (take('}')) return
                         require(take(','))

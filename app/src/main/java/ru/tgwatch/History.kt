@@ -66,9 +66,12 @@ object History {
         }
     }
     private fun prune(now: Long) {
-        samples.removeAll { it.until <= now - KEEP_MS }
-        // Also bound storage when a badly set clock leaves future-dated archived epochs.
-        if (samples.size > 65_000) samples = samples.takeLast(65_000).toMutableList()
+        val retained = Timeline.retained(samples,now-KEEP_MS)
+        if (retained != samples) {
+            samples = retained.toMutableList()
+            version++
+            statsCache.clear()
+        }
     }
     private fun ensureClock(ctx: Context, now: Long) {
         val rolled = Timeline.clockRollback(samples, now)
@@ -180,6 +183,22 @@ object History {
         version++
     }
     fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
+    @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
+        check(ready(ctx)) { "История временно недоступна" }
+        ensureClock(ctx,now)
+        prune(now)
+        val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
+        val result = samples.mapNotNull { if (it.clockEpoch != epoch) it else
+            if (it.at >= now) null else it.copy(until=minOf(it.until,now)) }
+        // A rollback marker may have just been created at now and then clipped away.
+        // Preserve its epoch as expired metadata, never as a fresh check.
+        return if (samples.isNotEmpty() && result.none { it.clockEpoch == epoch }) result +
+            Observation((now-KEEP_MS-1).coerceAtLeast(0),(now-KEEP_MS).coerceAtLeast(1),"UNKNOWN",clockEpoch=epoch)
+            else result
+    }
+    @Synchronized internal fun replace(ctx: Context, replacement: List<Observation>) {
+        replaceSnapshot(ctx, replacement)
+    }
     fun describeStats(s: TimeStats, days: Int): String = buildString {
         append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
         if (s.uptimePercent >= 0) append("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n")
@@ -193,6 +212,7 @@ object History {
         append("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n")
         if (s.mttrMs >= 0) append("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n")
         append("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n")
+        append("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n")
         append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
     }
     @Synchronized fun flush(ctx: Context) {
@@ -211,6 +231,7 @@ object EventLog {
 
     @Volatile
     private var items: List<String>? = null
+    internal fun invalidate() { items = null }
 
     fun all(ctx: Context): List<String> {
         items?.let { return it }

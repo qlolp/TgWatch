@@ -96,4 +96,14 @@ class BackupCodecTest {
         rejected { decode(base.replace("\"log\":[]", "\"log\":[\"\\ud800\"]")) }
         rejected { BackupCodec.encode(snapshot.copy(log = listOf("\ud800"))) }
     }
+    @Test fun allTwentySettingsIncludingIndependentEventsRoundTripWithStrictTypes() {
+        val snapshot = sample().copy(settings = sample().settings + mapOf("notify_outage" to true,
+            "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false))
+        assertEquals(20, snapshot.settings.size)
+        assertEquals(snapshot, BackupCodec.decode(BackupCodec.encode(snapshot)))
+        for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery")) {
+            rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + (key to "true"))) }
+            rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":1}")) }
+        }
+    }
 }

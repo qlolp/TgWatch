@@ -38,7 +38,7 @@ object BackupCrypto {
         crypt(Cipher.DECRYPT_MODE, envelope, HEADER_BYTES, envelope.size - HEADER_BYTES, password, salt, nonce, header)
     }
 
-    private fun crypt(mode: Int, bytes: ByteArray, offset: Int, length: Int, password: CharArray,
+    internal fun crypt(mode: Int, bytes: ByteArray, offset: Int, length: Int, password: CharArray,
         salt: ByteArray, nonce: ByteArray, header: ByteArray): ByteArray {
         val spec = PBEKeySpec(password, salt, ITERATIONS, 256)
         val key = try { SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded }

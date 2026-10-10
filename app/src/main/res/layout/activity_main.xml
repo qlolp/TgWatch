@@ -227,8 +227,8 @@
                 android:text="Поделиться сводкой" />
             <Button android:id="@+id/btnExportCsv" style="@style/ButtonText" android:text="Сохранить CSV" />
             <Button android:id="@+id/btnImportCsv" style="@style/ButtonText" android:text="Импортировать CSV" />
-            <Button android:id="@+id/btnBackup" style="@style/ButtonText" android:text="Зашифрованная резервная копия" />
-            <Button android:id="@+id/btnRestore" style="@style/ButtonText" android:text="Восстановить резервную копию" />
+            <Button android:id="@+id/btnBackup" style="@style/ButtonText" android:text="Зашифрованный бэкап" />
+            <Button android:id="@+id/btnRestoreBackup" style="@style/ButtonText" android:text="Восстановить бэкап" />
             <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="Диагностика подключения" />
             <TextView android:id="@+id/tvDiagnostics" style="@style/Body" android:visibility="gone" android:textIsSelectable="true" />
         </LinearLayout>
@@ -372,6 +372,12 @@
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
+            <Switch android:id="@+id/swNotifyOutage" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="Уведомление о полном сбое Telegram" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swNotifyPartial" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="Уведомление о частичной доступности (PARTIAL)" android:textColor="@color/text_primary" android:textSize="15sp" />
             <Switch
                 android:id="@+id/swNotifyRecovery"
                 android:layout_width="match_parent"
@@ -388,10 +394,19 @@
                 android:layout_height="wrap_content"
                 android:minHeight="48dp"
                 android:layout_marginTop="8dp"
-                android:text="Звук при сбое Telegram и восстановлении"
+                android:text="Звук при полном сбое Telegram"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
+            <Switch android:id="@+id/swSoundPartial" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="Звук при частичной доступности" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swSoundRecovery" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="Звук при восстановлении связи" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Button android:id="@+id/btnChannelOutage" style="@style/ButtonText" android:text="Звук и важность: полный сбой" />
+            <Button android:id="@+id/btnChannelPartial" style="@style/ButtonText" android:text="Звук и важность: частичная доступность" />
+            <Button android:id="@+id/btnChannelRecovery" style="@style/ButtonText" android:text="Звук и важность: восстановление" />
             <TextView
                 style="@style/Body"
                 android:text="Звук по умолчанию выключен. Сигнал сбоя — не чаще раза в 5 минут. В тихие часы и в режиме «Не беспокоить» события остаются без звука и вибрации."

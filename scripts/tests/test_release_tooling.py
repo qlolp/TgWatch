@@ -39,9 +39,15 @@ class ToolFixture:
         self.state = self.work / "state.json"
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
                         MOCK_LOG=str(self.log), MOCK_STATE=str(self.state))
+        packages = [{"group": "org.example", "name": "library", "version": "1.0", "scopes": ["releaseRuntimeClasspath"]},
+                    {"group": "junit", "name": "junit", "version": "4.13.2", "scopes": ["debugUnitTestRuntimeClasspath"]}]
+        audit = {"checked_at": "2026-10-10T00:00:00+00:00", "source": "https://api.osv.dev/v1/query",
+                 "packages": [dict(package, vulnerabilities=[]) for package in packages]}
         self.files = []
         for name, data in (("TgWatch.apk", b"apk"), ("TgWatch.apk.sha256", b"checksum"),
                            ("TgWatch.sbom.cdx.json", json.dumps(BOM).encode()),
+                           ("TgWatch.dependencies.json", json.dumps({"packages": packages}).encode()),
+                           ("TgWatch.osv.json", json.dumps(audit).encode()),
                            ("TgWatch.trivy.json", json.dumps(scan_fixture()).encode())):
             path = self.work / name
             path.write_bytes(data)
@@ -257,7 +263,7 @@ else: print('Entry type: PrivateKeyEntry')
         (self.directory / "tgwatch-release.p12").write_bytes(b"restored-store")
         (self.directory / "tgwatch-signing-password.txt").write_text("mock-password\n")
 
-    def test_mode_required_does_not_create_key(self):
+    def test_missing_existing_backup_does_not_create_key(self):
         result = self.run_signing(str(self.directory))
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(self.calls())
@@ -267,12 +273,12 @@ else: print('Entry type: PrivateKeyEntry')
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(any("-genkeypair" in call or call[0] == "openssl" for call in self.calls()))
 
-    def test_restore_validates_and_uploads_existing_identity(self):
+    def test_legacy_restore_mode_cannot_bypass_existing_keychain_interface(self):
         self.backup()
         result = self.run_signing("restore", str(self.directory))
-        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotEqual(0, result.returncode)
         self.assertFalse(any("-genkeypair" in call or call[0] == "openssl" for call in self.calls()))
-        self.assertEqual(4, sum(call[1:3] == ["secret", "set"] for call in self.calls()))
+        self.assertEqual(0, sum(call[1:3] == ["secret", "set"] for call in self.calls()))
         self.assertNotIn("mock-password", result.stdout + result.stderr)
 
     def test_restore_wrong_password_never_writes_secrets(self):
@@ -295,11 +301,11 @@ else: print('Entry type: PrivateKeyEntry')
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(any("-genkeypair" in call or call[1:3] == ["secret", "set"] for call in self.calls()))
 
-    def test_first_init_with_no_existing_secrets_creates_one_backup(self):
+    def test_init_never_creates_a_new_key_even_without_existing_secrets(self):
         result = self.run_signing("init", str(self.directory))
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(1, sum("-genkeypair" in call for call in self.calls()))
-        self.assertEqual(4, sum(call[1:3] == ["secret", "set"] for call in self.calls()))
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual(0, sum("-genkeypair" in call for call in self.calls()))
+        self.assertEqual(0, sum(call[1:3] == ["secret", "set"] for call in self.calls()))
 
     def test_init_existing_secrets_refuses_before_generation(self):
         self.fixture["secrets"] = ["TGWATCH_KEYSTORE_BASE64"]
@@ -307,11 +313,22 @@ else: print('Entry type: PrivateKeyEntry')
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(any("-genkeypair" in call or call[1:3] == ["secret", "set"] for call in self.calls()))
 
-    def test_init_allow_replace_flag_is_explicit(self):
+    def test_init_replacement_flag_cannot_rotate_a_key(self):
         self.fixture["secrets"] = ["TGWATCH_KEYSTORE_BASE64"]
         result = self.run_signing("init", str(self.directory), "--allow-replace-existing-secrets")
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(any("-genkeypair" in call for call in self.calls()))
+
+    def test_wrapper_delegates_existing_directory_with_pinned_certificate(self):
+        self.backup()
+        interpreter = self.bin / "python3"
+        interpreter.write_text("#!" + sys.executable + "\nimport os,json,sys\n" +
+                               "with open(os.environ['MOCK_LOG'],'a') as f: f.write(json.dumps(['python3']+sys.argv[1:])+'\\n')\n")
+        interpreter.chmod(0o755)
+        result = self.run_signing(str(self.directory))
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertTrue(any("-genkeypair" in call for call in self.calls()))
+        self.assertEqual([["python3", str(SCRIPTS / "signing-keychain.py"), "configure", str(self.directory),
+                           "--expected-certificate", "AB74727A44F59684045E7DB4C820BE309F886433A18A3C06F3439417F3ACBEF1"]], self.calls())
 
     def test_init_existing_backup_refuses_to_overwrite(self):
         self.backup()
@@ -471,7 +488,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('$1 == checked', smoke)
         workflow = (ROOT / ".github/workflows/build-apk.yml").read_text()
         self.assertIn("signed-upgrade-smoke.sh previous/TgWatch.apk TgWatch.apk", workflow)
-        self.assertIn("381a03c38afa42c31c595d3e3606c218d8839874470ba51c49b186bfae6748ba", workflow)
+        self.assertIn("efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1", workflow)
 
     def test_ci_scans_sbom_and_keeps_failed_scan_reports(self):
         text = (ROOT / ".github/workflows/build-apk.yml").read_text()
@@ -482,8 +499,8 @@ class WorkflowTests(unittest.TestCase):
 
     def test_version_code_is_validated_instead_of_falling_back(self):
         text = (ROOT / "app/build.gradle.kts").read_text()
-        self.assertIn('versionName = "1.10"', text)
-        self.assertIn("?: 11", text)
+        self.assertIn('versionName = "1.11"', text)
+        self.assertIn("?: 12", text)
         self.assertNotIn("toIntOrNull()?.plus(100)", text)
         self.assertIn("2147483547", text)
         self.assertIn('testImplementation("org.json:json:20240303")', text)

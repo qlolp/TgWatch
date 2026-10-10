@@ -29,8 +29,12 @@ jobs:
         run: |
           python3 -m pip install -r scripts/requirements-release.txt
           python3 -m unittest discover -s scripts/tests -v
+          python3 scripts/test_dependency_audit.py
+          python3 scripts/test_signing_keychain.py
       - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom --no-daemon --stacktrace
+        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
+      - name: Audit all exact resolved runtime and test dependencies against OSV
+        run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
       - name: Install pinned Trivy scanner
         uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
         with:
@@ -47,6 +51,14 @@ jobs:
             app/build/reports/sbom/TgWatch.trivy.json
             app/build/reports/sbom/TgWatch.trivy.status.json
             app/build/reports/sbom/TgWatch.trivy.log
+      - name: Resolved dependency graphs and OSV audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-reports
+          path: |
+            app/build/reports/dependencies/resolved.json
+            app/build/reports/dependencies/osv-report.json
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,7 +88,7 @@ jobs:
           if [ "$SIGNING_READY" = true ]; then
             echo 'Production signing key configured.' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'Production signing is not configured. Use scripts/configure-signing.sh restore with the backed-up key, or explicit init for a first key on a trusted machine; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Production signing is not configured. Use scripts/configure-signing.sh with the existing production backup on a trusted Mac. It never creates a replacement key; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
           fi
   release:
     needs: [build, android]
@@ -100,13 +112,18 @@ jobs:
         with:
           name: sbom-reports
           path: release-evidence
+      - name: Download this run's full dependency audit
+        uses: actions/download-artifact@v4
+        with:
+          name: dependency-reports
+          path: release-dependencies
       - name: Validate scan evidence
         run: |
           python3 -m pip install -r scripts/requirements-release.txt
-          python3 - <<'PY'
-          import json, pathlib
-          assert json.loads(pathlib.Path('release-evidence/TgWatch.trivy.status.json').read_text())['status'] == 'passed'
-          PY
+          python3 scripts/verify-audit-evidence.py \
+            --sbom release-evidence/TgWatch.sbom.cdx.json --trivy release-evidence/TgWatch.trivy.json \
+            --status release-evidence/TgWatch.trivy.status.json \
+            --inventory release-dependencies/resolved.json --osv release-dependencies/osv-report.json
       - name: Build with persistent signing key
         env:
           TGWATCH_KEYSTORE_BASE64: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
@@ -128,22 +145,32 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
           cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json
+          cmp app/build/reports/dependencies/resolved.json release-dependencies/resolved.json
           cp release-evidence/TgWatch.sbom.cdx.json TgWatch.sbom.cdx.json
           cp release-evidence/TgWatch.trivy.json TgWatch.trivy.json
-      - name: Verify signing continuity with published 1.8.33
+          cp release-dependencies/resolved.json TgWatch.dependencies.json
+          cp release-dependencies/osv-report.json TgWatch.osv.json
+      - name: Verify signing continuity with immutable published 1.10.47
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download v1.8.33 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
+          gh release download v1.10.47 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
           python3 - <<'PY'
           import hashlib, pathlib
-          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == '381a03c38afa42c31c595d3e3606c218d8839874470ba51c49b186bfae6748ba'
+          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1'
           PY
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
           "$signer" verify --print-certs TgWatch.apk > release-signature.txt
           diff <(grep 'Signer #1 certificate SHA-256 digest:' previous-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
+          python3 - <<'PY'
+          import pathlib, re
+          expected = 'ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1'
+          for name in ('previous-signature.txt', 'release-signature.txt'):
+              digests = re.findall(r'^Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})$', pathlib.Path(name).read_text(), re.M)
+              assert [digest.lower() for digest in digests] == [expected], 'Production signing identity mismatch'
+          PY
       - name: Enable KVM for signed upgrade
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -175,7 +202,7 @@ jobs:
           python3 scripts/release-policy.py --repo "$GITHUB_REPOSITORY" \
             --version "$version" --run-number "$GITHUB_RUN_NUMBER" --sha "$GITHUB_SHA" \
             --notes "docs/releases/${version}.md" \
-            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json
+            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json TgWatch.dependencies.json TgWatch.osv.json
   android:
     runs-on: ubuntu-latest
     concurrency:

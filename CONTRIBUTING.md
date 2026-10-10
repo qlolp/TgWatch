@@ -1,100 +1,129 @@
-# Разработка TgWatch
+# Разработка TgWatch 1.11
 
-TgWatch наблюдает доступность Telegram без аккаунта, телефона и доступа к переписке. Перед изменением поведения прочитайте [README](README.md), [карту архитектуры](docs/superpowers/architecture.md) и [проект 1.10](docs/superpowers/specs/2026-10-10-portability-and-release-design.md).
+Перед изменением поведения прочитайте [README](README.md), [архитектуру](docs/superpowers/architecture.md)
+и [unified 1.11 spec](docs/superpowers/specs/2026-10-10-unified-1.11-design.md). Приложение
+наблюдает доступность без аккаунта, телефона и доступа к переписке. Минимум Android API 26,
+target API 34; native UI, Direct Boot, настройки и seven-day history сохраняются.
 
-## Сборка и локальные проверки
+## Сборка и проверки
 
-Нужны JDK 17, Android SDK Platform 35, Build Tools 35.0.0 для CI-команд, Python 3 и принятые лицензии Android SDK. Kotlin/AGP и Gradle закреплены в репозитории: используйте Gradle Wrapper. Укажите SDK через `ANDROID_HOME` или локальный `local.properties` с `sdk.dir`; этот файл не коммитится.
+Нужны JDK 17, Android SDK Platform 35 и Build Tools 35.0.0, Python 3, принятые лицензии SDK.
+Используйте закреплённые Kotlin/AGP и Gradle Wrapper. SDK задаётся через `ANDROID_HOME` либо
+неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
 ```bash
 python3 -m pip install -r scripts/requirements-release.txt
 python3 -m unittest discover -s scripts/tests -v
-bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom
+python3 scripts/test_dependency_audit.py
+python3 scripts/test_signing_keychain.py
+bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`assembleRelease` без signing environment создаёт неподписанный APK для проверки сборки. Локальная 1.10 имеет versionCode 11; в CI код вычисляется как `GITHUB_RUN_NUMBER + 100` с проверкой диапазона. Для production signing нужны `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`, `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`. Передавайте значения через защищённое окружение, не через историю команд или git. Debug APK предназначен для тестов.
+Локальная 1.11 имеет versionCode 12; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
+silent fallback. `assembleRelease` без signing environment создаёт unsigned APK для проверки
+сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
+`TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.
+Debug APK — test-only.
 
-JVM-тесты JSON используют отдельную test dependency; Android использует системный `org.json`. Проверяйте строгие типы, границы, UTF-8/JSON и повреждённые данные, а не платформенные coercions. Изменение поведения должно иметь meaningful regression: RED с ожидаемым assertion failure, затем GREEN.
+Для changes в логике нужна meaningful regression с ожидаемым RED assertion и GREEN.
+Не заменяйте malformed-input/tamper/process-death/cancellation проверки тривиальными mocks.
+JVM JSON использует test dependency, Android — системный `org.json`; строгая проверка не
+должна зависеть от permissive platform coercions.
 
-## Проверки Android
-
-Instrumentation покрывает Android-хранилище, настройки, widget state и адаптеры восстановления. Полный сценарий запускайте только на отдельном root-capable эмуляторе API 29 или 35:
+Android scenarios выполняются только на отдельном disposable root-capable эмуляторе API 29/35:
 
 ```bash
 bash scripts/android-smoke.sh
 ```
 
-Сценарий устанавливает APK, заменяет тестовые данные, меняет подключение и режим сна, устанавливает PIN и перезагружает эмулятор. Не запускайте его на личном телефоне. Отчёты и скриншоты находятся в `app/build/reports/androidTests/`; журнал — в `smoke-logcat.txt`. Проверка свежести требует строку истории с timestamp новой опубликованной проверки, а не произвольную непустую историю.
+Сценарий устанавливает APK, заменяет тестовые данные, меняет сеть/Doze/PIN и перезагружает
+эмулятор. Отчёты — `app/build/reports/androidTests/`, logcat — `smoke-logcat.txt`. Свежий
+status timestamp должен иметь собственную строку history; непустая старая история этого не
+доказывает. Restoration, minute/widget и independent Android event-channel tests сохраняются.
 
-Перед публикацией `scripts/signed-upgrade-smoke.sh <previous.apk> <current.apk>` отдельно проверяет обновление настоящего опубликованного APK, настройки, историю и свежие наблюдения. Тестовая миграция со старой 1.6 с одной тестовой подписью не восстанавливает утраченный публичный debug-ключ. Физическая батарея, ограничения OEM и успешный живой MTProto-ответ требуют отдельных наблюдений; успешная сборка не подтверждает их.
+Upgrade baseline для CI — настоящий `v1.10.47` APK с фиксированным SHA-256
+`efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1`.
+`scripts/signed-upgrade-smoke.sh <previous.apk> <current.apk>` проверяет сохранение истории,
+legacy hour settings и independent event options без clearing data. Локальный upgrade с общей
+development-подписью проверяет миграцию, но не production certificate continuity. Батарея,
+OEM background restrictions и живой Telegram ответ требуют отдельных наблюдений.
 
-## Структура и правила данных
+## Код и совместимость данных
 
-- `NetworkProbe`/`ProbeBatch`/`MtProto` — bounded HTTP и unauthenticated req_pq_multi/resPQ, привязка к Android Network, параллельный общий deadline и отмена с закрытием транспорта. Не добавляйте аккаунт, Telegram RPC или TLS bypass.
-- `Timeline`/`HistoryStorage`/`History` — интервалы наблюдений, clock epochs, время без данных и статистика. MTTR требует OK→TG_DOWN→OK внутри окна; PARTIAL может продолжать эпизод. Пробелы, UNKNOWN/NO_NETWORK и обрезанные эпизоды не завершают MTTR.
-- `CsvImport` — строгий текущий/legacy UTC-формат. UNKNOWN-строки не превращаются в checks; при отсутствии текущих retained rows старые эпохи не становятся текущими.
-- `BackupSnapshot`/`BackupCodec`/`BackupCrypto` — переносимые whitelist-настройки, наблюдения и журнал. Format version 1: `TGWBKUP1`, big-endian iterations, salt16, nonce12, AES-256-GCM ciphertext/tag16; заголовок — AAD. KDF: PBKDF2-HMAC-SHA256, 600 000 iterations. Plaintext ≤8 МиБ, ≤65 000 observations, ≤150 log lines по ≤4096 символов; пароль 8–1024 символа.
-- `RestoreTransaction` и Android-адаптер — подтверждённая замена через durable pending journal. Дешифрование и полная валидация предшествуют изменению данных; pending replay завершается до мониторинга, после restore/import monitoring остаётся выключенным. Cache обновляется после durable записи. Неверный пароль не меняет состояние службы.
-- `Prefs`/`QuietHours` — минуты 0..1439 с fallback к legacy hour×60, локальный timezone и полуоткрытые интервалы. `LastSuccessStore` сохраняет только опубликованный OK; diagnostic/service state исключён из backup.
-- `MonitorService`/`CheckSchedule`/`OfflineBackoff` — существующая native-служба, планирование и паузы без сети; `EventNotifications` и `StatusWidget` — Android-представление результатов. Переписывание на coroutines, NTP и английская локализация в 1.10 не выполнены.
+- `NetworkProbe`/`ProbeBatch`/`MtProto` — bounded HTTP/unauthenticated req_pq_multi/resPQ, Android Network binding, shared deadlines и cancellation с закрытием socket/connection. Полная TL validation сохранена; не добавляйте account/RPC или TLS bypass.
+- `Timeline`/`HistoryStorage`/`History` — interval observations, clock epochs, unknown gaps, per-status counts и exact latency totals. Полностью наблюдённый TG_DOWN для MTTR продолжается через PARTIAL до свежего OK; offline/gaps/clipping/clock change разрывают покрытие. Устаревшая последняя эпоха не должна оживлять старую статистику.
+- `CsvImport` — strict current/legacy UTC history. UNKNOWN rows пропускаются, чтобы generated gaps не увеличивали checks; archived epochs не становятся текущими после удаления UNKNOWN.
+- `BackupSnapshot`/`BackupCodec` — local typed snapshot и strict JSON private journal; `PortableBackupCodec` пишет TGWB v2 и читает опубликованный binary TGWB v1 и локальный TGWBKUP1. Format versions portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
+- `BackupManager`/`RestoreTransaction`/`TgWatchApplication` — validation before changes, stop-and-await monitoring, durable journal и replay до компонентов. Оба старых private journals мигрируют. Cache меняется после durable write; monitoring после restore/import остаётся остановленным, transient status/last OK не переносятся.
+- `Prefs`/`QuietHours`/`EventPreferences` — minute boundaries с legacy hour fallback и independent outage/PARTIAL/recovery notify/sound. Отсутствующие legacy flags имеют прежний fallback; PARTIAL остаётся opt-in. `LastSuccessStore` сохраняет только published OK; Android channel overrides принадлежат устройству.
+- `MonitorService`/`CheckSchedule`/`OfflineBackoff` — existing native lifecycle/scheduling; `EventNotifications`/`StatusWidget`/`MainActivity`/`BackupUi` — Android adapters/UI. Full Telegram RPC, NTP, coroutine rewrite и English localization не реализованы.
 
-UNKNOWN не доказывает отсутствие интернета или блокировку. VPN не доказывает работоспособность туннеля. История хранится семь дней, старые clock epochs сохраняются отдельно от текущей статистики. Append синхронизируется при смене статуса или при очередной записи после 60 с с прошлого sync; несинхронизированное сохранение не объявляется гарантированным при потере питания.
+UNKNOWN не доказывает отсутствие интернета или блокировку; VPN не доказывает работоспособность
+туннеля. Append sync выполняется при смене статуса и на следующей записи после 60 с с прошлого
+sync. Unsynced append не гарантируется при power loss; stop/replace/compaction отдельно сохраняют
+историю. Семидневное хранение, observation bounds и Direct Boot сохраняются.
 
-## SBOM и release policy
+## Два аудита зависимостей
 
-`generateReleaseSbom` разрешает `releaseRuntimeClasspath` и передаёт фактические JAR/AAR, включая transitives, в `scripts/generate-sbom.py`. CycloneDX 1.6 содержит Maven purl, resolved version и SHA-256 точных artifact bytes; локальные официальные schemas проверяют JSON. Project/file dependencies не пропускаются молча: такой inventory останавливает генерацию. Test dependencies и Android platform APIs не являются release runtime artifacts; пустой runtime classpath даёт пустой список библиотек.
+`generateReleaseSbom` берёт resolved `releaseRuntimeClasspath` JAR/AAR, включая transitives.
+`scripts/generate-sbom.py` формирует schema-valid CycloneDX 1.6 с resolved version, Maven purl
+и SHA-256 точных artifact bytes. Неизвестные/project/file dependencies не пропускаются молча.
+Android platform APIs и test libraries не входят в production runtime SBOM.
 
-Используйте официальный Trivy 0.75.0 с проверкой SHA-256 скачанного архива по опубликованному
-checksum. CI закрепляет эту версию и setup action на commit SHA
-`e07451d2e059ed86c2870430ea286b3a9e0bf241`:
+С официальным checksum-verified Trivy 0.75.0:
 
 ```bash
 bash scripts/scan-sbom.sh app/build/reports/sbom/TgWatch.sbom.cdx.json app/build/reports/sbom/TgWatch.trivy.json
 ```
 
-Helper передаёт `--list-all-pkgs`, проверяет HIGH/CRITICAL и сохраняет отчёт, `.status.json`
-и `.log`. Перед каждым scan старые outputs удаляются. Gate проверяет CycloneDX artifact name,
-валидный scan timestamp и package inventory, покрывающий все runtime-библиотеки SBOM;
-пустой или подменённый отчёт не заменяет scan. Ошибка, недоступная vulnerability database
-или некорректный отчёт не считаются отсутствием уязвимостей. В CI артефакт `sbom-reports`
-сохраняется и при сбое; публикация требует статус `passed` этого запуска и совпадение SBOM
-повторной release-сборки.
-
-Если default database mirror недоступен, используйте официальный GHCR без изменения
-TLS-проверки или отключения gate:
+Helper использует `--list-all-pkgs`, очищает stale outputs и проверяет HIGH/CRITICAL, artifact
+identity, timestamp и coverage package inventory относительно runtime SBOM. Report, status и log
+сохраняются при ошибках. Недоступный scanner/database и malformed report не считаются clean.
+При недоступности default database mirror допустим официальный GHCR без TLS/gate bypass:
 
 ```bash
 TRIVY_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-db:2 \
 bash scripts/scan-sbom.sh app/build/reports/sbom/TgWatch.sbom.cdx.json app/build/reports/sbom/TgWatch.trivy.json
 ```
 
-Локальный scan 10 октября 2026 года использовал checksum-verified Trivy 0.75.0 и этот GHCR
-override, поскольку default mirror был заблокирован. Gate завершился `passed`, проверены
-`kotlin-stdlib:2.0.21` и `annotations:13.0`, HIGH/CRITICAL не найдены. Это результат локального
-запуска на соответствующем runtime SBOM, не подтверждение GitHub workflow или отсутствия
-любых уязвимостей Android/platform.
-
-Push в main и PR запускают проверки; публикация разрешена только ручным `Build APK` на `main` с `publish=true`. Группы build/Android checks отделены от repository-wide последовательной публикации с `cancel-in-progress=false`. Для версии измените `versionName`, локальный `versionCode`, [CHANGELOG](CHANGELOG.md) и `docs/releases/<versionName>.md`.
-
-`scripts/release-policy.py` публикует тег `v<versionName>.<run_number>` на точный commit SHA. Более старый код не продвигает `latest`. Существующий release не изменяется: полностью идентичные commit и assets дают no-op; draft, неполные файлы, другой commit или bytes останавливают публикацию. Если release отсутствует, но тег уже
-существует на другом commit, helper отказывается до `gh release create`. Не исправляйте это автоматическим удалением тега или заменой файлов.
-
-На доверенной машине с JDK 17+, OpenSSL и авторизованным `gh`:
+OSV дополнительно проверяет **точные resolved Maven versions runtime и test classpaths**:
 
 ```bash
-bash scripts/configure-signing.sh restore /secure/existing-backup
-# Только для первоначального нового ключа:
-bash scripts/configure-signing.sh init /secure/new-backup
+bash ./gradlew dependencyInventory
+python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
 ```
 
-`restore` требует `tgwatch-release.p12`, `tgwatch-signing-password.txt` и alias `tgwatch` типа `PrivateKeyEntry`; certificate-only entry отклоняется до изменения
-Secrets. Ключи не создаёт. `init` не перезаписывает локальную копию и по умолчанию отказывается заменять signing Secrets. `--allow-replace-existing-secrets` допускается только с `init` и означает явную смену production-подписи, нарушающую обновление установок. Для обычного релиза существующий ключ сохраняйте. Тесты release helper используют mocks и не должны менять реальные Secrets или публиковать releases.
+Audit включает transitives, пагинацию и withdrawn records. Пустой/incomplete inventory, missing
+runtime graph, неполный ответ, ошибка API и любая неотозванная OSV vulnerability останавливают
+audit; это отдельный gate от Trivy HIGH/CRITICAL. CI требует evidence обоих audits этого запуска. Инвентарь `resolved.json` содержит все
+три scope и dependency graphs; опубликованные audit assets — `TgWatch.dependencies.json`
+и `TgWatch.osv.json` рядом с `TgWatch.sbom.cdx.json` и `TgWatch.trivy.json`.
+Известные vulnerabilities проверяются по соответствующим базам; SDK/JDK/Gradle plugins и все
+возможные platform defects не покрываются runtime SBOM. Здесь нет fresh scan/audit результата 1.11.
+
+## Подпись и публикация
+
+Signing scripts используют только существующий ключ, приватный alias `tgwatch` и ожидаемый
+сертификат опубликованной линии. Пароль — macOS login Keychain или hidden terminal input;
+новый ключ/password sidecar не создаются. Команды protect/verify/configure и expected fingerprint:
+[signing backup](docs/signing-backup.md). Linux cloud не предоставляет login Keychain. Не меняйте
+реальные Secrets/ключи в тестах; helper regressions используют fixtures/mocks.
+
+Push/main и PR запускают checks. Публикация разрешена только ручным `Build APK` на `main` с
+`publish=true` после checks и двух audits. Build/Android cancellation отделена от последовательной
+repository-wide publication с `cancel-in-progress=false`. Для версии обновите `versionName`,
+локальный `versionCode`, [CHANGELOG](CHANGELOG.md) и `docs/releases/<versionName>.md`.
+
+Release policy сохраняет published tags/assets. Complete identical rerun — no-op; draft,
+incomplete/different assets, другой commit или conflicting orphan tag требуют явного разбора.
+Более старый code не заменяет latest. Не обходите это удалением тега или перезаписью assets.
+CI должен проверить production certificate и upgrade реального 1.10.47 до публикации.
 
 ## Как предложить изменение
 
-1. Опишите конкретную проблему, ожидаемое поведение и проверку в отдельной ветке.
-2. Сохраните Android 8.0/API 26, существующие настройки и наблюдения. Для часов, malformed input, process death и cancellation добавьте регрессию.
-3. Запустите unit/release-helper tests и lint; изменения Android-компонентов проверяйте на API 29/35. Запишите failed/skipped/unrun отдельно от passed.
-4. В PR объясните поведение пользователя, совместимость данных и ограничения; добавьте запись в CHANGELOG. Не коммитьте ключи, пароли, локальные пути или данные устройств.
+1. Опишите конкретный trigger, проблему, новое поведение и проверку в отдельной ветке.
+2. Сохраните настройки/данные старых версий; добавьте границы, invalid input и restart regressions.
+3. Запустите meaningful JVM/helper/lint и Android checks. Разделяйте passed, failed, skipped и unrun.
+4. В PR объясните поведение, совместимость и ограничения. Не коммитьте secrets/device data.
 
-Код распространяется под [MIT](LICENSE). Вклад в репозиторий принимается на тех же условиях.
+Код и вклад распространяются под [MIT](LICENSE).

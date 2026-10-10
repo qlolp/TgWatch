@@ -76,4 +76,123 @@ class RestoreTransactionTest {
         assertTrue(rejected)
         assertFalse(file.exists())
     }
+
+    @Test fun validLegacyMigrationStagesConvertedJournalBeforeRemovingLegacy() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        val converted = byteArrayOf(7, 8, 9)
+
+        assertTrue(RestoreTransaction(pending).migrateLegacy(legacy, { bytes ->
+            assertArrayEquals(byteArrayOf(1, 2), bytes)
+            converted
+        }, { bytes ->
+            assertArrayEquals(converted, bytes)
+            assertTrue(legacy.exists())
+            assertFalse(pending.exists())
+        }))
+
+        assertFalse(legacy.exists())
+        assertArrayEquals(converted, pending.readBytes())
+        assertFalse(File(pending.parentFile, pending.name + ".tmp").exists())
+        assertTrue(RestoreTransaction(pending).recover { assertArrayEquals(converted, it) })
+    }
+
+    @Test fun interruptedConversionRetainsLegacyWithoutStaging() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        assertThrows(IllegalStateException::class.java) {
+            RestoreTransaction(pending).migrateLegacy(legacy,
+                { throw IllegalStateException("interrupted conversion") }, { fail("No converted payload") })
+        }
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertFalse(pending.exists())
+    }
+
+    @Test fun existingValidatedJournalIsAuthoritativeOverLegacy() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        pending.writeBytes(byteArrayOf(9))
+        var validated = false
+
+        assertTrue(RestoreTransaction(pending).migrateLegacy(legacy,
+            { fail("Existing journal must not be replaced"); byteArrayOf() }, { bytes ->
+                assertArrayEquals(byteArrayOf(9), bytes)
+                validated = true
+            }))
+
+        assertTrue(validated)
+        assertFalse(legacy.exists())
+        assertArrayEquals(byteArrayOf(9), pending.readBytes())
+    }
+
+    @Test fun invalidExistingJournalRetainsLegacyAndPendingPayload() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        pending.writeBytes(byteArrayOf(9))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RestoreTransaction(pending).migrateLegacy(legacy,
+                { fail("Existing journal must remain authoritative"); byteArrayOf() },
+                { throw IllegalArgumentException("invalid pending payload") })
+        }
+
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertArrayEquals(byteArrayOf(9), pending.readBytes())
+    }
+
+    @Test fun absentLegacyDoesNotConvertOrValidate() = withPending { pending ->
+        val legacy = File(pending.parentFile, "absent.pending")
+        assertFalse(RestoreTransaction(pending).migrateLegacy(legacy,
+            { fail("No legacy payload"); byteArrayOf() }, { fail("No migration to validate") }))
+        assertFalse(pending.exists())
+    }
+
+    @Test fun invalidConvertedPayloadRetainsLegacyWithoutStaging() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            RestoreTransaction(pending).migrateLegacy(legacy, { byteArrayOf(7) },
+                { throw IllegalArgumentException("invalid converted payload") })
+        }
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertFalse(pending.exists())
+    }
+
+    @Test fun failedStagingRetainsLegacy() = withPending { file ->
+        val legacy = File(file.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        val blocker = File(file.parentFile, "not-a-directory").apply { writeBytes(byteArrayOf(3)) }
+        val pending = File(blocker, "pending.json")
+        assertThrows(IllegalStateException::class.java) {
+            RestoreTransaction(pending).migrateLegacy(legacy, { byteArrayOf(7) }, {})
+        }
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertFalse(pending.exists())
+    }
+
+    @Test fun oversizedLegacyIsRejectedBeforeConversion() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(ByteArray(5)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            RestoreTransaction(pending, 4).migrateLegacy(legacy,
+                { fail("Oversized legacy must not be converted"); byteArrayOf() }, {})
+        }
+        assertEquals(5L, legacy.length())
+        assertFalse(pending.exists())
+    }
+
+    @Test fun oversizedConvertedPayloadIsRejectedBeforeValidationOrStaging() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            RestoreTransaction(pending, 4).migrateLegacy(legacy, { ByteArray(5) },
+                { fail("Oversized conversion must not be decoded") })
+        }
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertFalse(pending.exists())
+    }
+
+    @Test fun oversizedExistingJournalRetainsLegacyWithoutValidation() = withPending { pending ->
+        val legacy = File(pending.parentFile, "legacy.pending").apply { writeBytes(byteArrayOf(1, 2)) }
+        pending.writeBytes(ByteArray(5))
+        assertThrows(IllegalArgumentException::class.java) {
+            RestoreTransaction(pending, 4).migrateLegacy(legacy,
+                { fail("Existing journal must not be converted"); byteArrayOf() },
+                { fail("Oversized pending must not be decoded") })
+        }
+        assertArrayEquals(byteArrayOf(1, 2), legacy.readBytes())
+        assertEquals(5L, pending.length())
+    }
 }

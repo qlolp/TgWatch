@@ -106,7 +106,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         backupUi = BackupUi(this)
         findViewById<Button>(R.id.btnBackup).setOnClickListener { backupUi.export() }
-        findViewById<Button>(R.id.btnRestore).setOnClickListener { backupUi.restore() }
+        findViewById<Button>(R.id.btnRestoreBackup).setOnClickListener { backupUi.restore() }
         findViewById<Button>(R.id.btnImportCsv).setOnClickListener { backupUi.importCsv() }
         historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
         exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
@@ -252,8 +252,32 @@ class MainActivity : Activity() {
 
         swNotifyRecovery.isChecked = Prefs.notifyRecovery(this)
         swNotifyRecovery.setOnCheckedChangeListener { _, checked -> Prefs.setNotifyRecovery(this, checked) }
-        swEventSound.isChecked = Prefs.eventSound(this)
-        swEventSound.setOnCheckedChangeListener { _, checked -> Prefs.setEventSound(this, checked) }
+        swEventSound.isChecked = Prefs.soundFor(this, "TG_DOWN")
+        swEventSound.setOnCheckedChangeListener { _, checked -> Prefs.setSoundFor(this, "TG_DOWN", checked) }
+        fun eventSwitch(id: Int, event: String, sound: Boolean) {
+            val toggle = findViewById<Switch>(id)
+            toggle.isChecked = if (sound) Prefs.soundFor(this, event) else Prefs.notifyFor(this, event)
+            toggle.setOnCheckedChangeListener { _, checked ->
+                if (sound) Prefs.setSoundFor(this, event, checked) else Prefs.setNotifyFor(this, event, checked)
+            }
+        }
+        eventSwitch(R.id.swNotifyOutage, "TG_DOWN", false)
+        eventSwitch(R.id.swNotifyPartial, "PARTIAL", false)
+        eventSwitch(R.id.swSoundPartial, "PARTIAL", true)
+        eventSwitch(R.id.swSoundRecovery, "RECOVERY", true)
+        fun channelButton(id: Int, event: String) {
+            findViewById<Button>(id).setOnClickListener {
+                EventNotifications(this, getSystemService(NotificationManager::class.java))
+                try {
+                    startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        .putExtra(Settings.EXTRA_CHANNEL_ID, EventNotifications.channel(event)))
+                } catch (_: Exception) { openNotificationSettings() }
+            }
+        }
+        channelButton(R.id.btnChannelOutage, "TG_DOWN")
+        channelButton(R.id.btnChannelPartial, "PARTIAL")
+        channelButton(R.id.btnChannelRecovery, "RECOVERY")
         updateAlarmPatternLabel()
         btnAlarmPattern.setOnClickListener {
             AlertDialog.Builder(this).setTitle("Сигнал вибрации при сбое")

@@ -32,7 +32,7 @@ object HistoryStorage {
     fun replace(file: File, samples: List<Observation>, cutoff: Long): List<Observation> {
         val snapshot = samples.toList()
         validateSnapshot(snapshot)
-        val retained = snapshot.filter { it.until > cutoff }
+        val retained = Timeline.retained(snapshot, cutoff)
         write(file, retained)
         return retained
     }
