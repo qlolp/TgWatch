@@ -10,7 +10,9 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 
 /** Event notifications are separate from the silent, ongoing foreground-service status. */
-class EventNotifications(private val ctx: Context, private val manager: NotificationManager) {
+class EventNotifications(private val ctx: Context, private val manager: NotificationManager,
+    private val outageChannel: String = SOUND_CHANNEL, private val partialChannel: String = PARTIAL_CHANNEL,
+    private val recoveryChannel: String = RECOVERY_CHANNEL) {
     companion object {
         const val SILENT_CHANNEL = "events_silent_v1"
         const val SOUND_CHANNEL = "events_sound_v1"
@@ -27,20 +29,20 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     init {
         manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, "События без звука",
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
-        manager.createNotificationChannel(NotificationChannel(SOUND_CHANNEL, "События со звуком",
+        manager.createNotificationChannel(NotificationChannel(outageChannel, "События со звуком",
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        val legacy = manager.getNotificationChannel(SOUND_CHANNEL)
-        manager.createNotificationChannel(NotificationChannel(PARTIAL_CHANNEL,"Частичная доступность",
+        val legacy = manager.getNotificationChannel(outageChannel)
+        manager.createNotificationChannel(NotificationChannel(partialChannel,"Частичная доступность",
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        manager.createNotificationChannel(NotificationChannel(RECOVERY_CHANNEL,"Восстановление связи",
+        manager.createNotificationChannel(NotificationChannel(recoveryChannel,"Восстановление связи",
             legacy.importance).apply { setSound(legacy.sound,legacy.audioAttributes); enableVibration(false) })
     }
     fun clearRecovery() { manager.cancel(RECOVERY_ID) }
@@ -48,17 +50,17 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
         manager.notify(RECOVERY_ID, notification("Telegram снова доступен",
-            "Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", sound && allowed, R.drawable.ic_stat_ok,RECOVERY_CHANNEL))
+            "Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(PARTIAL_ID)
-        manager.notify(OUTAGE_ID, notification("Telegram недоступен", reason, sound && allowed, R.drawable.ic_stat_fail,SOUND_CHANNEL))
+        manager.notify(OUTAGE_ID, notification("Telegram недоступен", reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(OUTAGE_ID)
         manager.notify(PARTIAL_ID,notification("Telegram частично доступен",reason,sound && allowed,
-            R.drawable.ic_stat_offline,PARTIAL_CHANNEL))
+            R.drawable.ic_stat_offline,partialChannel))
     }
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {
         val open = PendingIntent.getActivity(ctx, 4, Intent(ctx, MainActivity::class.java),

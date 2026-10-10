@@ -8,6 +8,36 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class BackupRestoreTest {
+    @Test fun expiredCurrentEpochNeverPromotesArchivedClockForwardRows() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        Prefs.setEnabled(ctx,false)
+        MonitorService.stop(ctx)
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        val original = BackupStore.snapshot(ctx)
+        val now = System.currentTimeMillis()
+        val old = now - 8 * 86_400_000L
+        val replacement = BackupData(old,listOf(
+            Observation(now-30_000,now-20_000,"OK",clockEpoch=0),
+            Observation(now-20_000,now-10_000,"TG_DOWN",clockEpoch=0),
+            Observation(now-10_000,now-1000,"OK",clockEpoch=0),
+            Observation(old-1000,old,"OK",clockEpoch=1)),emptyMap(),emptyList())
+        try {
+            BackupStore.restore(ctx,BackupCodec.decode(BackupCodec.encode(replacement)))
+            repeat(2) {
+                val stats = History.stats(ctx,7,now)
+                assertEquals("Archived failures must stay archived",0L,stats.downMs)
+                assertEquals(0,stats.completedOutages)
+                assertEquals(0,stats.checks)
+                val snapshot = BackupStore.snapshot(ctx,now)
+                assertEquals(1L,Timeline.current(snapshot.samples).single().clockEpoch)
+                assertEquals("UNKNOWN",Timeline.current(snapshot.samples).single().kind)
+                BackupCodec.validate(snapshot)
+                History.flush(ctx)
+                // Reload the persisted file as a newly started process would.
+                History::class.java.getDeclaredField("loaded").apply { isAccessible=true }.setBoolean(History,false)
+            }
+        } finally { BackupStore.restore(ctx,original) }
+    }
     @Test fun encryptedRestoreReplacesOnlyPortableDataAndSurvivesJournalReplay() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         Prefs.setEnabled(ctx,false)
