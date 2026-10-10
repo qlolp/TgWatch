@@ -46,8 +46,8 @@ Files: build.gradle.kts, .github/workflows/build-apk.yml, androidTest, scripts/a
 - [ ] Provision production signing Secrets (owner operation; see release dependency below).
 - [x] Add emulator lifecycle/network/upgrade checks and unit/lint artifacts.
 - [ ] Run CI, inspect logs and fix failures.
-- [ ] Run fresh-context branch review; resolve important findings and rerun affected checks.
-- [ ] Open PR with verification and signing readiness evidence.
+- [x] Run fresh-context branch review and resolve code findings; signing continuity is the explicit release dependency below.
+- [x] Open PR with verification and signing readiness evidence: https://github.com/qlolp/TgWatch/pull/6
 
 ## Release dependency
 The original published 1.6 debug signing key has not been recovered. CI checks an actual

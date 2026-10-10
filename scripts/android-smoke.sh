@@ -8,7 +8,7 @@ check_crashes() {
   if grep -A5 'FATAL EXCEPTION' smoke-logcat.txt | grep -q 'ru.tgwatch'; then
     echo 'TG Watch crashed during smoke test' >&2; exit 1
   fi
-  adb logcat -c
+  # Retain logs: some emulator builds cannot clear them reliably.
 }
 last_check() {
   adb shell cat /data/user_de/0/ru.tgwatch/shared_prefs/tgwatch.xml 2>/dev/null |
@@ -65,7 +65,9 @@ await_observation "$before"
 before=$(last_check)
 adb shell dumpsys battery unplug
 adb shell input keyevent KEYCODE_SLEEP
+adb shell dumpsys deviceidle enable
 adb shell dumpsys deviceidle force-idle
+adb shell dumpsys deviceidle get deep | tr -d '\r' | grep -qx IDLE
 adb shell dumpsys deviceidle unforce
 adb shell dumpsys battery reset
 adb shell input keyevent KEYCODE_WAKEUP
