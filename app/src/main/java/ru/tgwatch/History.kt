@@ -147,6 +147,9 @@ object History {
         if (s.outageCount > 0) append(if (s.lastOutageOngoing) "Текущий сбой: " else "Последний наблюдаемый сбой: ")
             .append(recoveryDurationStr(s.lastOutageMs)).append('\n')
         append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
+        append("Среднее восстановление: ").append(if (s.meanRecoveryMs < 0) "нет завершённых эпизодов"
+            else "${recoveryDurationStr(s.meanRecoveryMs)} (${s.completedOutages} эпиз.)").append('\n')
+        append("В среднее входят только непрерывные переходы OK → сбой Telegram → OK без пробелов.\n")
         append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
     }
     @Synchronized fun flush(ctx: Context) {
