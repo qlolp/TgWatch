@@ -7,6 +7,9 @@ package ru.tgwatch
  */
 object ProbeRules {
 
+    const val BAD_INTERVAL_SEC = 10
+    const val SCREEN_OFF_INTERVAL_SEC = 60
+
     fun isReachableHttpCode(code: Int): Boolean = code in 100..499
 
     fun describeHttpFailure(code: Int): String = when (code) {
@@ -14,11 +17,31 @@ object ProbeRules {
         else -> "некорректный ответ сервера (HTTP $code)"
     }
 
-    /** Проверка устарела, если с неё прошло больше двух интервалов мониторинга. */
-    fun isStale(checkedAt: Long, now: Long, intervalSec: Int): Boolean {
+    /**
+     * Какой интервал реально ждём до следующей проверки.
+     * При погашенном экране не чаще минуты (если Telegram доступен),
+     * чтобы ночной exact-alarm не ел батарею.
+     */
+    fun nextIntervalSec(intervalSec: Int, bad: Boolean, screenOffSlow: Boolean): Int {
+        if (bad) return minOf(intervalSec, BAD_INTERVAL_SEC)
+        return if (screenOffSlow) maxOf(intervalSec, SCREEN_OFF_INTERVAL_SEC) else intervalSec
+    }
+
+    /**
+     * Проверка устарела, если прошло больше трёх ожидаемых интервалов.
+     * [slowExpected] — экран может быть выключен, тогда ждём минимум минуту.
+     */
+    fun isStale(checkedAt: Long, now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean {
         if (checkedAt <= 0L) return true
-        val limit = maxOf(intervalSec, 10) * 2L * 1000L
-        return now - checkedAt > limit
+        val expected = maxOf(intervalSec, if (slowExpected) SCREEN_OFF_INTERVAL_SEC else BAD_INTERVAL_SEC)
+        return now - checkedAt > expected * 3L * 1000L
+    }
+
+    /** Минуты без проверок между первой и последней записанной. */
+    fun unmonitoredMinutes(recordedMinutes: LongArray): Int {
+        if (recordedMinutes.size < 2) return 0
+        val span = recordedMinutes.last() - recordedMinutes.first() + 1
+        return (span - recordedMinutes.size).toInt().coerceAtLeast(0)
     }
 
     /** «23:00–08:00» для подписи переключателя тихих часов. */

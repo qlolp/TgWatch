@@ -39,6 +39,7 @@
 
         <service
             android:name=".MonitorService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -60,11 +61,18 @@
 
         <!-- Виджет со статусом на рабочем столе -->
         <receiver
+            android:name=".WatchdogReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".StatusWidget"
+            android:directBootAware="true"
             android:exported="true"
             android:label="Статус Telegram">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="ru.tgwatch.action.WIDGET_CLICK" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -73,9 +81,11 @@
 
         <receiver
             android:name=".BootReceiver"
+            android:directBootAware="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <!-- Xiaomi / некоторые OEM будят иначе, чем обычный BOOT_COMPLETED -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />

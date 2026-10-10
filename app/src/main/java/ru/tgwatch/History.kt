@@ -40,6 +40,7 @@ object History {
         val offlineMinutes: Int,
         val longestOutageMin: Int,
         val avgLatencyMs: Long,
+        val unmonitoredMinutes: Int,
     )
 
     private const val FILE = "history.csv"
@@ -151,6 +152,7 @@ object History {
             offlineMinutes = offlineMinutes,
             longestOutageMin = longest,
             avgLatencyMs = if (latencyN > 0) latencySum / latencyN else -1L,
+            unmonitoredMinutes = ProbeRules.unmonitoredMinutes(minutes.map { it.minute }.toLongArray()),
         )
     }
 
@@ -165,6 +167,7 @@ object History {
         if (stats.failMinutes > 0) lines += "Минут без Telegram: ${stats.failMinutes}"
         if (stats.offlineMinutes > 0) lines += "Минут без интернета: ${stats.offlineMinutes}"
         if (stats.longestOutageMin > 0) lines += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
+        if (stats.unmonitoredMinutes > 0) lines += "Минут без проверки (служба спала): ${stats.unmonitoredMinutes}"
         if (stats.failMinutes == 0 && stats.offlineMinutes == 0) lines += "Сбоев не было"
         return lines.joinToString("\n")
     }

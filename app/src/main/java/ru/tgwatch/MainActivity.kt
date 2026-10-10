@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     private lateinit var tvSetup: TextView
     private lateinit var btnSetupNotif: Button
     private lateinit var btnSetupBattery: Button
+    private lateinit var btnSetupAlarm: Button
     private lateinit var btnSetupApp: Button
     private lateinit var statusCard: View
     private lateinit var ivStatus: ImageView
@@ -56,6 +57,8 @@ class MainActivity : Activity() {
     private lateinit var btnQuietHours: Button
     private lateinit var tvBattery: TextView
     private lateinit var btnBattery: Button
+    private lateinit var tvAlarm: TextView
+    private lateinit var btnAlarm: Button
     private lateinit var tvNotif: TextView
     private lateinit var btnNotif: Button
     private lateinit var tvOem: TextView
@@ -93,6 +96,7 @@ class MainActivity : Activity() {
         tvSetup = findViewById(R.id.tvSetup)
         btnSetupNotif = findViewById(R.id.btnSetupNotif)
         btnSetupBattery = findViewById(R.id.btnSetupBattery)
+        btnSetupAlarm = findViewById(R.id.btnSetupAlarm)
         btnSetupApp = findViewById(R.id.btnSetupApp)
         statusCard = findViewById(R.id.statusCard)
         ivStatus = findViewById(R.id.ivStatus)
@@ -116,6 +120,8 @@ class MainActivity : Activity() {
         btnQuietHours = findViewById(R.id.btnQuietHours)
         tvBattery = findViewById(R.id.tvBattery)
         btnBattery = findViewById(R.id.btnBattery)
+        tvAlarm = findViewById(R.id.tvAlarm)
+        btnAlarm = findViewById(R.id.btnAlarm)
         tvNotif = findViewById(R.id.tvNotif)
         btnNotif = findViewById(R.id.btnNotif)
         tvOem = findViewById(R.id.tvOem)
@@ -182,10 +188,13 @@ class MainActivity : Activity() {
 
         val openNotif = View.OnClickListener { openNotificationSettings() }
         val openBatt = View.OnClickListener { openBatterySettings() }
+        val openAlarm = View.OnClickListener { openExactAlarmSettings() }
         btnBattery.setOnClickListener(openBatt)
         btnNotif.setOnClickListener(openNotif)
+        btnAlarm.setOnClickListener(openAlarm)
         btnSetupNotif.setOnClickListener(openNotif)
         btnSetupBattery.setOnClickListener(openBatt)
+        btnSetupAlarm.setOnClickListener(openAlarm)
         btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
         btnAppDetails.setOnClickListener { OemTips.openAppDetails(this) }
         btnVibe.setOnClickListener { Vibe.alarm(this) }
@@ -205,6 +214,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
+        WatchdogReceiver.schedule(this)
         ui.removeCallbacks(ticker)
         ui.post(ticker)
     }
@@ -303,6 +313,14 @@ class MainActivity : Activity() {
         if (!safeStart(direct)) safeStart(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
     }
 
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                .setData(Uri.parse("package:$packageName"))
+            if (!safeStart(intent)) safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+        }
+    }
+
     private fun safeStart(intent: Intent): Boolean = try {
         startActivity(intent)
         true
@@ -314,11 +332,12 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         val running = MonitorService.running
         val s = MonitorService.state
-        val stale = running && s.isStale(now, Prefs.intervalSec(this))
+        val stale = running && s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
         val notifOk = notificationsAllowed()
         val batteryOk = ignoringBatteryOptimizations()
+        val alarmOk = Prefs.exactAlarmsAllowed(this)
 
-        renderSetup(notifOk, batteryOk)
+        renderSetup(notifOk, batteryOk, alarmOk)
 
         btnToggle.text = if (running) "Остановить" else "Запустить"
         btnCheck.isEnabled = running
@@ -412,10 +431,18 @@ class MainActivity : Activity() {
                 "и тогда проверки будут останавливаться."
             btnBattery.visibility = View.VISIBLE
         }
+
+        if (alarmOk) {
+            tvAlarm.text = "✓ Точные будильники разрешены — проверки идут и при выключенном экране."
+            btnAlarm.visibility = View.GONE
+        } else {
+            tvAlarm.text = "Без точных будильников Android откладывает проверки во сне, и статус устаревает."
+            btnAlarm.visibility = View.VISIBLE
+        }
     }
 
-    private fun renderSetup(notifOk: Boolean, batteryOk: Boolean) {
-        if (notifOk && batteryOk) {
+    private fun renderSetup(notifOk: Boolean, batteryOk: Boolean, alarmOk: Boolean) {
+        if (notifOk && batteryOk && alarmOk) {
             setupCard.visibility = View.GONE
             return
         }
@@ -423,10 +450,12 @@ class MainActivity : Activity() {
         val lines = mutableListOf("Без этих разрешений значок в строке состояния может пропасть или врать.")
         if (!notifOk) lines += "• Включи уведомления — иначе постоянного значка не будет."
         if (!batteryOk) lines += "• Разреши работу без ограничений — иначе Android усыпит проверки."
+        if (!alarmOk) lines += "• Разреши точные будильники — иначе проверки замирают при выключенном экране."
         OemTips.manufacturerHint()?.let { lines += "• $it" }
         tvSetup.text = lines.joinToString("\n")
         btnSetupNotif.visibility = if (notifOk) View.GONE else View.VISIBLE
         btnSetupBattery.visibility = if (batteryOk) View.GONE else View.VISIBLE
+        btnSetupAlarm.visibility = if (alarmOk) View.GONE else View.VISIBLE
     }
 
     private fun formatDayStats(stats: History.DayStats?): String {
@@ -449,6 +478,9 @@ class MainActivity : Activity() {
             if (stats.longestOutageMin > 0) {
                 parts += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
             }
+        }
+        if (stats.unmonitoredMinutes > 0) {
+            parts += "Без проверки ${stats.unmonitoredMinutes} мин (служба спала или была убита)"
         }
         return parts.joinToString("\n")
     }

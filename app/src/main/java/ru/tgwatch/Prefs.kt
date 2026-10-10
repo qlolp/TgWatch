@@ -1,6 +1,10 @@
 package ru.tgwatch
 
+import android.app.AlarmManager
+import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
+import android.os.UserManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -29,13 +33,56 @@ object Prefs {
     const val DEFAULT_QUIET_START = 23
     const val DEFAULT_QUIET_END = 8
 
-    fun sp(ctx: Context) = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    /**
+     * Настройки в device-protected хранилище: читаются до разблокировки PIN
+     * (LOCKED_BOOT_COMPLETED). Старый файл из обычного хранилища переносим
+     * при первой разблокировке.
+     */
+    fun sp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    private fun store(ctx: Context): Context {
+        val app = ctx.applicationContext
+        if (Build.VERSION.SDK_INT < 24) return app
+        val dp = app.createDeviceProtectedStorageContext()
+        try {
+            val um = app.getSystemService(UserManager::class.java)
+            if (um == null || um.isUserUnlocked) {
+                dp.moveSharedPreferencesFrom(app, FILE)
+            }
+        } catch (_: Exception) {
+        }
+        return dp
+    }
+
+    /** Можно ли ставить точный будильник (иначе проверки во сне замирают). */
+    fun exactAlarmsAllowed(ctx: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 31) return true
+        return try {
+            (ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    /** Не вибрировать в тихие часы и в системном «не беспокоить». */
+    fun alertsAllowed(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
+        if (inQuietHoursNow(ctx, now)) return false
+        return try {
+            val filter = (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .currentInterruptionFilter
+            filter == NotificationManager.INTERRUPTION_FILTER_ALL ||
+                filter == NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        } catch (_: Exception) {
+            true
+        }
+    }
 
     /** Включён ли мониторинг (пользователь не нажимал «Остановить»). */
     fun isEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(ctx: Context, value: Boolean) {
         sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
+        if (value) WatchdogReceiver.schedule(ctx) else WatchdogReceiver.cancel(ctx)
     }
 
     /** Как часто проверять Telegram, в секундах. */
