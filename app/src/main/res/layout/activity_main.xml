@@ -297,7 +297,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Будит процессор только на время проверки — экономнее, чем раньше."
+                android:text="Системный будильник будит телефон к каждой проверке, а сразу после неё отпускает. В глубоком сне Android может проверять реже."
                 android:textSize="12sp" />
 
             <Switch
