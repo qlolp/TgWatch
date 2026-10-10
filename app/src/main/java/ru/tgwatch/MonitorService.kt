@@ -111,6 +111,10 @@ class MonitorService : Service() {
             if (state.checkedAt > 0L) return
             Prefs.loadLastState(ctx)?.let { state = it }
         }
+        internal fun resetStoppedState() {
+            check(!running)
+            state = State()
+        }
     }
 
     private lateinit var workerThread: HandlerThread
@@ -172,6 +176,7 @@ class MonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        BackupStore.finishPending(this)
         nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager

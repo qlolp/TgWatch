@@ -73,6 +73,7 @@ class MainActivity : Activity() {
     private lateinit var btnClearLog: Button
 
     private val ui = Handler(Looper.getMainLooper())
+    private val backupUi by lazy { BackupUi(this) }
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -102,6 +103,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BackupStore.finishPending(this)
         setContentView(R.layout.activity_main)
         historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
         exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
@@ -127,6 +129,8 @@ class MainActivity : Activity() {
             exportDays = historyDays
             safeStartExport()
         }
+        findViewById<Button>(R.id.btnBackup).setOnClickListener { backupUi.selectFile(false) }
+        findViewById<Button>(R.id.btnRestoreBackup).setOnClickListener { backupUi.selectFile(true) }
         findViewById<Button>(R.id.btnDiagnostics).setOnClickListener {
             tvDiagnostics.visibility = if (tvDiagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
             render()
@@ -579,6 +583,7 @@ class MainActivity : Activity() {
     @Deprecated("Platform activity result API for dependency-free native UI")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (backupUi.result(requestCode,resultCode,data)) return
         if (requestCode != 20 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         val days = exportDays

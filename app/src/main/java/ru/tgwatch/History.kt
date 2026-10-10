@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.UserManager
 import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
 
 /** Seven-day bounded timeline in device-protected storage. */
 object History {
@@ -137,6 +138,27 @@ object History {
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }
     fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
+    @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
+        check(ready(ctx)) { "История временно недоступна" }
+        ensureClock(ctx,now)
+        prune(now)
+        val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
+        return samples.mapNotNull { if (it.clockEpoch != epoch) it else
+            if (it.at >= now) null else it.copy(until=minOf(it.until,now)) }
+    }
+    @Synchronized internal fun replace(ctx: Context, replacement: List<Observation>) {
+        val now = System.currentTimeMillis()
+        val retained = replacement.filter { it.until > now-KEEP_MS }.toMutableList()
+        HistoryStorage.write(file(ctx),retained)
+        val marker = File(file(ctx).parentFile,"history-migrated-v2")
+        FileOutputStream(marker).use { it.write("restored portable backup".toByteArray()); it.fd.sync() }
+        samples = retained
+        loaded = true
+        migrated = true
+        lastCompacted = now
+        statsCache.clear()
+        version++
+    }
     fun describeStats(s: TimeStats, days: Int): String = buildString {
         append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
         if (s.uptimePercent >= 0) append("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n")
@@ -165,6 +187,7 @@ object EventLog {
 
     @Volatile
     private var items: List<String>? = null
+    internal fun invalidate() { items = null }
 
     fun all(ctx: Context): List<String> {
         items?.let { return it }

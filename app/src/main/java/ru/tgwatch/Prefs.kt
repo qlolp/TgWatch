@@ -43,7 +43,11 @@ object Prefs {
      * (LOCKED_BOOT_COMPLETED). Старый файл из обычного хранилища переносим
      * при первой разблокировке.
      */
-    fun sp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    fun sp(ctx: Context): android.content.SharedPreferences {
+        BackupStore.finishPending(ctx)
+        return rawSp(ctx)
+    }
+    internal fun rawSp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     private fun store(ctx: Context): Context {
         val app = ctx.applicationContext
