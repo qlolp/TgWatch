@@ -4,6 +4,34 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecoveryAndStatsTest {
+    @Test fun expiredCurrentEpochRemainsArchivedAfterRepeatedRetentionAndStorageReload() {
+        val rows = listOf(Observation(10_000,20_000,"OK",clockEpoch=0),
+            Observation(20_000,30_000,"TG_DOWN",clockEpoch=0),
+            Observation(30_000,40_000,"OK",clockEpoch=0),Observation(0,1000,"OK",clockEpoch=1))
+        val retained = Timeline.retained(rows,10_000)
+        assertEquals(1L,Timeline.current(retained).single().clockEpoch)
+        assertEquals("UNKNOWN",Timeline.current(retained).single().kind)
+        assertEquals(0L,Timeline.stats(retained,10_000,40_000).downMs)
+        assertEquals(0,Timeline.stats(retained,10_000,40_000).completedOutages)
+        val file = java.io.File.createTempFile("retention",".csv")
+        try {
+            HistoryStorage.write(file,retained)
+            val reloaded = Timeline.retained(HistoryStorage.read(file),20_000)
+            assertEquals(1L,Timeline.current(reloaded).single().clockEpoch)
+            assertEquals(0,Timeline.stats(reloaded,20_000,40_000).checks)
+        } finally { file.delete() }
+    }
+    @Test fun storageLimitAndDuplicateTimestampsPreserveTheCurrentEpoch() {
+        val archived = (1..10).map { Observation(it*1000L,it*1000L+500,"TG_DOWN",clockEpoch=0) }
+        val rows = archived + Observation(0,100,"OK",clockEpoch=1) + Observation(0,100,"TG_DOWN",clockEpoch=1)
+        val retained = Timeline.retained(rows,200,3)
+        assertEquals(3,retained.size)
+        assertEquals(1L,Timeline.current(retained).single().clockEpoch)
+        assertEquals("UNKNOWN",Timeline.current(retained).single().kind)
+        assertEquals(0L,Timeline.stats(retained,200,20_000).downMs)
+        val fresh = Timeline.retained(retained + Observation(500,1000,"OK",clockEpoch=1),200,3)
+        assertEquals(listOf(Observation(500,1000,"OK",clockEpoch=1)),Timeline.current(fresh))
+    }
     @Test fun repeatedFailuresCountAsOneEpisodeAndLatestDurationIsSeparate() {
         val rows = listOf(Observation(0, 1000, "TG_DOWN"), Observation(1000, 2000, "TG_DOWN"),
             Observation(2000, 3000, "OK"), Observation(3000, 3500, "TG_DOWN"), Observation(3500, 4000, "OK"))

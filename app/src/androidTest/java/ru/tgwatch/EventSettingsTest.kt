@@ -17,10 +17,13 @@ class EventSettingsTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val ctx = instrumentation.targetContext
         val settings = Prefs.sp(ctx)
-        val keys = listOf("enabled", "event_sound", "notify_recovery", "vibration_pattern")
+        val keys = listOf("enabled", "event_sound", "notify_recovery", "vibration_pattern", "sound_outage",
+            "sound_recovery", "sound_partial", "notify_outage", "notify_partial")
         val previous = keys.associateWith { settings.all[it] }
         settings.edit().putBoolean("enabled", false).remove("event_sound").remove("notify_recovery")
             .remove("vibration_pattern").commit()
+        settings.edit().remove("sound_outage").remove("sound_partial").remove("sound_recovery")
+            .remove("notify_outage").remove("notify_partial").commit()
         if (Build.VERSION.SDK_INT >= 33) {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
                 .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")).use { it.readBytes() }
@@ -38,7 +41,14 @@ class EventSettingsTest {
                     val recovery = activity.findViewById<Switch>(recoveryId)
                     assertTrue(recovery.isChecked)
                     recovery.performClick()
-                    assertTrue(settings.getBoolean("event_sound", false))
+                    assertTrue(Prefs.soundFor(ctx,"TG_DOWN"))
+                    assertFalse(Prefs.soundFor(ctx,"RECOVERY"))
+                    assertFalse(Prefs.notifyFor(ctx,"PARTIAL"))
+                    activity.findViewById<Switch>(R.id.swSoundRecovery).performClick()
+                    activity.findViewById<Switch>(R.id.swNotifyPartial).performClick()
+                    assertTrue(Prefs.soundFor(ctx,"RECOVERY"))
+                    assertTrue(Prefs.notifyFor(ctx,"PARTIAL"))
+                    assertFalse(Prefs.soundFor(ctx,"PARTIAL"))
                     assertFalse(settings.getBoolean("notify_recovery", true))
                     settings.edit().putString("vibration_pattern", "SHORT").commit()
                 }
@@ -48,11 +58,15 @@ class EventSettingsTest {
                     assertTrue(activity.findViewById<Switch>(soundId).isChecked)
                     val recoveryId = activity.resources.getIdentifier("swNotifyRecovery", "id", ctx.packageName)
                     assertFalse(activity.findViewById<Switch>(recoveryId).isChecked)
+                    assertTrue(activity.findViewById<Switch>(R.id.swSoundRecovery).isChecked)
+                    assertTrue(activity.findViewById<Switch>(R.id.swNotifyPartial).isChecked)
                     val patternId = activity.resources.getIdentifier("btnAlarmPattern", "id", ctx.packageName)
                     assertTrue(activity.findViewById<Button>(patternId).text.contains("Короткий"))
                     // Capture real UI after assertions; documentation images come from the emulator.
                     activity.findViewById<Switch>(soundId).performClick()
                     activity.findViewById<Switch>(recoveryId).performClick()
+                    activity.findViewById<Switch>(R.id.swSoundRecovery).performClick()
+                    activity.findViewById<Switch>(R.id.swNotifyPartial).performClick()
                     val anchor = activity.findViewById<View>(patternId)
                     anchor.requestRectangleOnScreen(android.graphics.Rect(0, 0, anchor.width, anchor.height), true)
                 }

@@ -10,7 +10,7 @@ data class Observation(val at: Long, val until: Long, val kind: String, val late
 data class TimeStats(val okMs: Long, val downMs: Long, val partialMs: Long, val offlineMs: Long,
     val unknownMs: Long, val longestOutageMs: Long, val checks: Int, val avgLatencyMs: Long,
     val outageCount: Int = 0, val lastOutageMs: Long = 0, val lastOutageOngoing: Boolean = false,
-    val offlineCount: Int = 0) {
+    val offlineCount: Int = 0, val completedOutages: Int = 0, val meanRecoveryMs: Long = -1) {
     val uptimePercent: Double get() = if (okMs + downMs + partialMs == 0L) -1.0
         else okMs * 100.0 / (okMs + downMs + partialMs)
 }
@@ -29,6 +29,17 @@ fun recoveryDurationStr(ms: Long): String {
 /** Observations expire. Neither a dead service nor two distant failures fill a gap. */
 object Timeline {
     val kinds = setOf("OK", "TG_DOWN", "PARTIAL", "NO_NETWORK", "UNKNOWN")
+    /** Retain the epoch boundary even when its final observation expires. */
+    fun retained(samples: List<Observation>, from: Long, limit: Int = 65_000): List<Observation> {
+        require(limit > 0)
+        val unique = samples.associateBy { it.clockEpoch to it.at }.values
+        val latest = unique.maxWithOrNull(compareBy<Observation> { it.clockEpoch }.thenBy { it.at })
+            ?: return emptyList()
+        val retained = unique.filter { it.until > from }.toMutableList()
+        if (retained.none { it.clockEpoch == latest.clockEpoch })
+            retained += latest.copy(kind="UNKNOWN",latencyMs=-1)
+        return retained.sortedWith(compareBy<Observation> { it.clockEpoch }.thenBy { it.at }).takeLast(limit)
+    }
     fun current(samples: List<Observation>): List<Observation> {
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
         return samples.filter { it.clockEpoch == epoch }
@@ -60,6 +71,9 @@ object Timeline {
         var lastOutage = 0L
         var offlineCount = 0
         var previous = "UNKNOWN"
+        var completeStart: Long? = null
+        var completed = 0
+        var recoveryTotal = 0L
         for (segment in segments(samples, from, until)) {
             val length = segment.until - segment.at
             duration[segment.kind] = (duration[segment.kind] ?: 0) + length
@@ -68,6 +82,14 @@ object Timeline {
             streak = if (segment.kind == "TG_DOWN") streak + length else 0L
             if (segment.kind == "TG_DOWN") lastOutage = streak
             longest = maxOf(longest, streak)
+            if (segment.kind == "TG_DOWN" && previous == "OK") completeStart = segment.at
+            if (segment.kind != "TG_DOWN") {
+                if (segment.kind == "OK" && previous == "TG_DOWN" && completeStart != null) {
+                    recoveryTotal += segment.at - completeStart
+                    completed++
+                }
+                completeStart = null
+            }
             previous = segment.kind
         }
         val inRange = current(samples).filter { it.at >= from && it.at < until }
@@ -75,7 +97,8 @@ object Timeline {
         return TimeStats(duration["OK"] ?: 0, duration["TG_DOWN"] ?: 0, duration["PARTIAL"] ?: 0,
             duration["NO_NETWORK"] ?: 0, duration["UNKNOWN"] ?: 0, longest, inRange.size,
             if (latency.isEmpty()) -1 else latency.sum() / latency.size,
-            outages, lastOutage, previous == "TG_DOWN", offlineCount)
+            outages, lastOutage, previous == "TG_DOWN", offlineCount, completed,
+            if (completed == 0) -1 else recoveryTotal / completed)
     }
     /** Only a fresh OK closes a contiguous observed incident. Gaps are never outage time. */
     fun recovery(samples: List<Observation>, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? {

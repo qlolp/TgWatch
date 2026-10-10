@@ -35,6 +35,20 @@ bash scripts/android-smoke.sh
 
 Структура: `NetworkProbe`/`MtProto` — сеть; `Timeline`/`HistoryStorage`/`History` — наблюдения и статистика; `OfflineBackoff` — паузы без сети; `MonitorService` — жизненный цикл и планирование; `EventNotifications` — уведомления событий; `Prefs` — настройки; `MainActivity` — экран.
 
+`BackupCodec` — ограниченный аутентифицированный формат; `BackupStore` — атомарный журнал замены; `BackupUi` — document picker и парольные диалоги. Формат и правила переноса описаны в [docs/backup.md](docs/backup.md).
+
+## Аудит зависимостей
+
+```sh
+bash ./gradlew :app:dependencyInventory
+python3 scripts/test_dependency_audit.py
+python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
+```
+
+Инвентарь включает транзитивные Maven-модули production runtime, unit и instrumentation classpaths. `runtime.cdx.json` — CycloneDX 1.5 только для production runtime. Проверяются точные разрешённые версии через OSV с учётом пагинации и отозванных записей. Пустой runtime, неразрешённые зависимости, неполный ответ, недоступность API и неотозванная уязвимость блокируют CI. Это проверка известных уязвимостей, а не доказательство их отсутствия; инструменты JDK/SDK и Gradle-плагины не входят в runtime SBOM.
+
+Защита существующего signing backup и восстановление описаны в [docs/signing-backup.md](docs/signing-backup.md). Не удаляйте парольную копию до подтверждённого восстановления.
+
 ## Совместимость и выпуск
 
 - Минимум Android 8.0/API 26. Не добавляйте зависимости или новую архитектуру без конкретной необходимости.
