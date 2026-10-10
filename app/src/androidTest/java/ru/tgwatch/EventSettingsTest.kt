@@ -50,7 +50,19 @@ class EventSettingsTest {
                     assertFalse(activity.findViewById<Switch>(recoveryId).isChecked)
                     val patternId = activity.resources.getIdentifier("btnAlarmPattern", "id", ctx.packageName)
                     assertTrue(activity.findViewById<Button>(patternId).text.contains("Короткий"))
+                    // Capture real UI after assertions; documentation images come from the emulator.
+                    activity.findViewById<Switch>(soundId).performClick()
+                    activity.findViewById<Switch>(recoveryId).performClick()
+                    val anchor = activity.findViewById<View>(recoveryId)
+                    anchor.requestRectangleOnScreen(android.graphics.Rect(0, 0, anchor.width, anchor.height), true)
                 }
+                instrumentation.waitForIdleSync()
+                android.os.SystemClock.sleep(200)
+                val screenshot = instrumentation.uiAutomation.takeScreenshot()
+                assertNotNull(screenshot)
+                val file = java.io.File(ctx.getExternalFilesDir("screenshots"), "settings.png")
+                java.io.FileOutputStream(file).use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                screenshot.recycle()
             }
         } finally {
             settings.edit().apply {

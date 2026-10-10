@@ -32,9 +32,11 @@ class EventNotificationTest {
             val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
             assertEquals(EventNotifications.SOUND_CHANNEL, outage.channelId)
             assertNotNull(manager.getNotificationChannel(outage.channelId).sound)
-            assertTrue(manager.activeNotifications.none { it.id == EventNotifications.RECOVERY_ID })
+            awaitAbsent(manager, EventNotifications.RECOVERY_ID)
             events.recovered(RecoveryEvent(2000), sound = false, allowed = true)
-            assertTrue(manager.activeNotifications.none { it.id == EventNotifications.OUTAGE_ID })
+            assertTrue(awaitNotification(manager, EventNotifications.RECOVERY_ID)
+                .extras.getString(Notification.EXTRA_TEXT)!!.contains("2 с"))
+            awaitAbsent(manager, EventNotifications.OUTAGE_ID)
         } finally {
             manager.cancel(EventNotifications.RECOVERY_ID)
             manager.cancel(EventNotifications.OUTAGE_ID)
@@ -46,5 +48,12 @@ class EventNotificationTest {
             android.os.SystemClock.sleep(50)
         }
         throw AssertionError("Notification $id was not posted")
+    }
+    private fun awaitAbsent(manager: NotificationManager, id: Int) {
+        repeat(40) {
+            if (manager.activeNotifications.none { it.id == id }) return
+            android.os.SystemClock.sleep(50)
+        }
+        throw AssertionError("Notification $id was not cancelled")
     }
 }

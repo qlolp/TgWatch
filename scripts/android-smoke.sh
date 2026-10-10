@@ -31,6 +31,10 @@ await_observation() {
   return 1
 }
 bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
+adb root
+adb wait-for-device
+mkdir -p app/build/reports/androidTests/ui-screenshots
+adb pull /sdcard/Android/data/ru.tgwatch/files/screenshots/settings.png app/build/reports/androidTests/ui-screenshots/settings.png
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)
@@ -98,4 +102,9 @@ adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q "^$((minute * 60000)),"
 check_crashes
+# After all assertions, capture the real main screen for documentation.
+adb shell dumpsys deviceidle whitelist +ru.tgwatch
+adb shell am start -W -n ru.tgwatch/.MainActivity
+sleep 1
+adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
 rm -rf "$legacy_dir"
