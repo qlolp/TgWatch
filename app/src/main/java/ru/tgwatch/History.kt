@@ -1,224 +1,134 @@
 package ru.tgwatch
 
 import android.content.Context
+import android.os.UserManager
 import android.util.Log
 import java.io.File
 
-/**
- * Итоги проверок по минутам за последние сутки: для графика на экране
- * и для процента доступности. Хранится в файле, поэтому переживает
- * перезапуск приложения и телефона.
- */
+/** Seven-day bounded timeline in device-protected storage. */
 object History {
-
-    class Minute(
-        val minute: Long,       // номер минуты с 1970 года
-        var ok: Int = 0,        // проверок, когда Telegram ответил
-        var fail: Int = 0,      // проверок, когда интернет есть, а Telegram нет
-        var offline: Int = 0,   // проверок без интернета
-        var latencySum: Long = 0L,
-    ) {
-        val total get() = ok + fail + offline
+    class Minute(val minute: Long, var ok: Int = 0, var fail: Int = 0, var offline: Int = 0,
+        var latencySum: Long = 0L, var partial: Int = 0, var unknown: Int = 0) {
+        val total get() = ok + fail + offline + partial + unknown
         val avgLatency get() = if (ok > 0) latencySum / ok else -1L
-
-        /** Минута «красная», только если сбоев Telegram не меньше успешных. */
-        val isFailDominant get() = fail > 0 && fail >= ok && fail >= offline
-
-        /** Минута «оранжевая» — в основном без интернета. */
-        val isOfflineDominant get() = offline > 0 && offline >= ok && offline > fail
-
-        fun copy() = Minute(minute, ok, fail, offline, latencySum)
+        val isFailDominant get() = fail > 0 && fail >= ok && fail >= offline && fail >= partial && fail >= unknown
+        val isOfflineDominant get() = offline > 0 && offline >= ok && offline > fail && offline >= partial && offline >= unknown
+        val isPartialDominant get() = partial > 0 && partial >= ok && partial >= fail && partial >= offline
+        val isUnknownDominant get() = unknown > 0 && unknown >= ok && unknown >= fail && unknown >= offline && unknown >= partial
+        fun copy() = Minute(minute, ok, fail, offline, latencySum, partial, unknown)
     }
+    enum class Kind { OK, FAIL, OFFLINE, PARTIAL, UNKNOWN }
+    data class DayStats(val uptimePercent: Double, val checks: Long, val telegramChecks: Long,
+        val failMinutes: Int, val offlineMinutes: Int, val longestOutageMin: Int,
+        val avgLatencyMs: Long, val unmonitoredMinutes: Int)
 
-    enum class Kind { OK, FAIL, OFFLINE }
-
-    data class DayStats(
-        val uptimePercent: Double,      // Telegram: ok/(ok+fail), без offline
-        val checks: Long,
-        val telegramChecks: Long,
-        val failMinutes: Int,
-        val offlineMinutes: Int,
-        val longestOutageMin: Int,
-        val avgLatencyMs: Long,
-        val unmonitoredMinutes: Int,
-    )
-
-    private const val FILE = "history.csv"
-    private const val KEEP_MINUTES = 24 * 60
-    private const val FLUSH_EVERY = 8
-    private const val TAG = "TgWatch"
-
-    private val minutes = ArrayDeque<Minute>()
+    private const val FILE = "history-v2.csv"
+    private const val KEEP_MS = 7 * 24 * 60 * 60_000L
+    private var samples = mutableListOf<Observation>()
     private var loaded = false
-    private var unsaved = 0
-
-    /** Меняется после каждой записи: экран по нему понимает, что пора перерисовать график. */
-    @Volatile
-    var version = 0L
+    private var migrated = false
+    private var lastCompacted = 0L
+    @Volatile var version = 0L
         private set
 
-    @Synchronized
-    fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long) {
-        load(ctx)
-        val minute = now / 60_000L
-        val prev = minutes.lastOrNull()
-        val newMinute = prev == null || prev.minute != minute
-        val last: Minute = if (prev != null && !newMinute) prev else Minute(minute).also { minutes.addLast(it) }
-        when (kind) {
-            Kind.OK -> {
-                last.ok++
-                last.latencySum += latencyMs.coerceAtLeast(0L)
-            }
-            Kind.FAIL -> last.fail++
-            Kind.OFFLINE -> last.offline++
-        }
-        while (minutes.isNotEmpty() && minutes.first().minute <= minute - KEEP_MINUTES) minutes.removeFirst()
-        version++
-        unsaved++
-        // На диск: при новой минуте или каждые несколько проверок (защита от kill).
-        if (newMinute || unsaved >= FLUSH_EVERY) {
-            save(ctx)
-            unsaved = 0
-        }
-    }
-
-    /** Копия минут за последние [count] минут (старые сначала). */
-    @Synchronized
-    fun lastMinutes(ctx: Context, count: Int, now: Long = System.currentTimeMillis()): List<Minute> {
-        load(ctx)
-        val from = now / 60_000L - count + 1
-        return minutes.filter { it.minute >= from }.map { it.copy() }
-    }
-
-    /**
-     * Доступность Telegram за сутки: только проверки, когда интернет был.
-     * Offline минуты не портят процент.
-     */
-    @Synchronized
-    fun uptimePercent(ctx: Context): Double {
-        load(ctx)
-        var ok = 0L
-        var fail = 0L
-        for (m in minutes) {
-            ok += m.ok
-            fail += m.fail
-        }
-        val total = ok + fail
-        return if (total == 0L) -1.0 else ok * 100.0 / total
-    }
-
-    /** Сводка за сутки для экрана. */
-    @Synchronized
-    fun dayStats(ctx: Context): DayStats? {
-        load(ctx)
-        if (minutes.isEmpty()) return null
-        var ok = 0L
-        var fail = 0L
-        var offline = 0L
-        var latencySum = 0L
-        var latencyN = 0L
-        var failMinutes = 0
-        var offlineMinutes = 0
-        var longest = 0
-        var streak = 0
-        for (m in minutes) {
-            ok += m.ok
-            fail += m.fail
-            offline += m.offline
-            if (m.ok > 0) {
-                latencySum += m.latencySum
-                latencyN += m.ok
-            }
-            when {
-                m.isFailDominant -> {
-                    failMinutes++
-                    streak++
-                    if (streak > longest) longest = streak
-                }
-                m.isOfflineDominant -> {
-                    offlineMinutes++
-                    streak = 0
-                }
-                else -> streak = 0
-            }
-        }
-        val telegramChecks = ok + fail
-        if (ok + fail + offline == 0L) return null
-        return DayStats(
-            uptimePercent = if (telegramChecks == 0L) -1.0 else ok * 100.0 / telegramChecks,
-            checks = ok + fail + offline,
-            telegramChecks = telegramChecks,
-            failMinutes = failMinutes,
-            offlineMinutes = offlineMinutes,
-            longestOutageMin = longest,
-            avgLatencyMs = if (latencyN > 0) latencySum / latencyN else -1L,
-            unmonitoredMinutes = ProbeRules.unmonitoredMinutes(minutes.map { it.minute }.toLongArray()),
-        )
-    }
-
-    fun exportSummary(ctx: Context): String {
-        val stats = dayStats(ctx) ?: return "За сутки данных ещё нет."
-        val lines = mutableListOf("TG Монитор — сводка за сутки")
-        if (stats.uptimePercent >= 0) {
-            lines += "Доступность Telegram: ${formatPercent(stats.uptimePercent)} (${stats.telegramChecks} проверок с интернетом)"
-        }
-        lines += "Всего проверок: ${stats.checks}"
-        if (stats.avgLatencyMs >= 0) lines += "Среднее время ответа: ${stats.avgLatencyMs} мс"
-        if (stats.failMinutes > 0) lines += "Минут без Telegram: ${stats.failMinutes}"
-        if (stats.offlineMinutes > 0) lines += "Минут без интернета: ${stats.offlineMinutes}"
-        if (stats.longestOutageMin > 0) lines += "Самый долгий простой Telegram: ${stats.longestOutageMin} мин"
-        if (stats.unmonitoredMinutes > 0) lines += "Минут без проверки (служба спала): ${stats.unmonitoredMinutes}"
-        if (stats.failMinutes == 0 && stats.offlineMinutes == 0) lines += "Сбоев не было"
-        return lines.joinToString("\n")
-    }
-
-    @Synchronized
-    fun flush(ctx: Context) {
-        if (loaded) {
-            save(ctx)
-            unsaved = 0
-        }
-    }
-
+    private fun file(ctx: Context) = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, FILE)
     private fun load(ctx: Context) {
-        if (loaded) return
-        loaded = true
-        try {
-            val f = File(ctx.filesDir, FILE)
-            if (!f.exists()) return
-            val oldest = System.currentTimeMillis() / 60_000L - KEEP_MINUTES
-            f.forEachLine { line ->
-                val p = line.split(',')
-                if (p.size == 5) {
-                    val m = Minute(p[0].toLong(), p[1].toInt(), p[2].toInt(), p[3].toInt(), p[4].toLong())
-                    if (m.minute > oldest) minutes.addLast(m)
-                }
+        if (!loaded) {
+            samples = HistoryStorage.read(file(ctx)).toMutableList()
+            loaded = true
+            lastCompacted = System.currentTimeMillis()
+        }
+        // Retry after unlock. Do not mark migration complete or delete the source on failure.
+        if (!migrated && ctx.getSystemService(UserManager::class.java).isUserUnlocked) {
+            val dp = ctx.applicationContext.createDeviceProtectedStorageContext().filesDir
+            val marker = File(dp, "history-migrated-v2")
+            if (!marker.exists()) {
+                val legacy = File(ctx.applicationContext.filesDir, "history.csv")
+                val merged = HistoryStorage.merge(HistoryStorage.readLegacy(legacy), samples)
+                HistoryStorage.write(file(ctx), merged)
+                samples = merged.toMutableList()
+                marker.writeText("legacy minute estimates imported")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "history load", e)
-            minutes.clear()
+            migrated = true
         }
     }
-
-    private fun save(ctx: Context) {
+    private fun prune(now: Long) {
+        samples.removeAll { it.until <= now - KEEP_MS || it.at > now }
+    }
+    private fun ready(ctx: Context): Boolean = try { load(ctx); true } catch (e: Exception) {
+        Log.w("TgWatch", "history unavailable; preserving existing data", e); false
+    }
+    @Synchronized fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long, expectedSec: Int = 30) {
+        if (!ready(ctx)) return
+        prune(now)
+        // Bound inferred coverage to one expected interval plus the bounded network-check budget.
+        val end = now + (expectedSec.coerceIn(10, 300) * 1000L + 15_000L)
+        val status = when (kind) { Kind.FAIL -> "TG_DOWN"; Kind.OFFLINE -> "NO_NETWORK"; else -> kind.name }
+        samples.add(Observation(now, end, status, latencyMs))
+        version++
         try {
-            val text = minutes.joinToString("\n") {
-                "${it.minute},${it.ok},${it.fail},${it.offline},${it.latencySum}"
+            if (now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
+                HistoryStorage.write(file(ctx), samples)
+                lastCompacted = now
+            } else HistoryStorage.append(file(ctx), samples.last())
+        } catch (e: Exception) { Log.w("TgWatch", "history save", e) }
+    }
+    @Synchronized fun endSession(ctx: Context, now: Long = System.currentTimeMillis()) {
+        if (!ready(ctx)) return
+        samples = samples.mapNotNull { s ->
+            if (s.at >= now) null else s.copy(until = minOf(s.until, now))
+        }.toMutableList()
+        version++
+        flush(ctx)
+    }
+    @Synchronized fun stats(ctx: Context, days: Int = 1, now: Long = System.currentTimeMillis()): TimeStats {
+        if (!ready(ctx)) return Timeline.stats(emptyList(), now - days.coerceIn(1,7) * 86_400_000L, now)
+        prune(now)
+        return Timeline.stats(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
+    }
+    @Synchronized fun uptimePercent(ctx: Context): Double = stats(ctx).uptimePercent
+    @Synchronized fun dayStats(ctx: Context): DayStats? {
+        val s = stats(ctx)
+        if (s.checks == 0) return null
+        return DayStats(s.uptimePercent, s.checks.toLong(), s.checks.toLong(), (s.downMs / 60_000).toInt(),
+            (s.offlineMs / 60_000).toInt(), (s.longestOutageMs / 60_000).toInt(), s.avgLatencyMs, (s.unknownMs / 60_000).toInt())
+    }
+    @Synchronized fun lastMinutes(ctx: Context, count: Int, now: Long = System.currentTimeMillis()): List<Minute> {
+        if (!ready(ctx)) return emptyList()
+        prune(now)
+        val from = now / 60_000L - count + 1
+        val bins = sortedMapOf<Long, Minute>()
+        for (s in samples.filter { it.at / 60_000L >= from && it.at <= now }) {
+            val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
+            when (s.kind) {
+                "OK" -> { m.ok++; m.latencySum += s.latencyMs.coerceAtLeast(0) }
+                "TG_DOWN" -> m.fail++
+                "NO_NETWORK" -> m.offline++
+                "PARTIAL" -> m.partial++
+                else -> m.unknown++
             }
-            val dir = ctx.filesDir
-            val target = File(dir, FILE)
-            val tmp = File(dir, "$FILE.tmp")
-            tmp.writeText(text)
-            if (target.exists() && !target.delete()) {
-                Log.w(TAG, "history: could not delete old file")
-            }
-            if (!tmp.renameTo(target)) {
-                tmp.copyTo(target, overwrite = true)
-                tmp.delete()
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "history save", e)
         }
+        return bins.values.map { it.copy() }
+    }
+    @Synchronized fun exportCsv(ctx: Context, days: Int = 7): String {
+        check(ready(ctx)) { "История временно недоступна" }
+        val now = System.currentTimeMillis()
+        prune(now)
+        return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
+    }
+    fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
+    fun describeStats(s: TimeStats, days: Int): String = buildString {
+        append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
+        if (s.uptimePercent >= 0) append("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n")
+        append("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n")
+        append("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n")
+        append("Нет данных: ${durationStr(s.unknownMs)}\n")
+        append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
+        append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
+    }
+    @Synchronized fun flush(ctx: Context) {
+        if (!loaded) return
+        try { HistoryStorage.write(file(ctx), samples) } catch (e: Exception) { Log.w("TgWatch", "history flush", e) }
     }
 }
 
@@ -262,3 +172,4 @@ object EventLog {
         return if (log.isEmpty()) "Журнал пуст" else log.joinToString("\n")
     }
 }
+

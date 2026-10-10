@@ -42,7 +42,7 @@ import javax.net.ssl.SSLException
  */
 class MonitorService : Service() {
 
-    enum class Status { UNKNOWN, OK, TG_DOWN, NO_NETWORK }
+    enum class Status { UNKNOWN, OK, PARTIAL, TG_DOWN, NO_NETWORK }
 
     data class State(
         val status: Status = Status.UNKNOWN,
@@ -51,14 +51,16 @@ class MonitorService : Service() {
         val latencyMs: Long = -1L,
         val reason: String = "",
         val lastVibrationAt: Long = 0L,
+        val diagnostics: String = "",
+        val expectedIntervalSec: Int = 30,
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
 
         fun isStale(now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean =
-            status != Status.UNKNOWN && ProbeRules.isStale(checkedAt, now, intervalSec, slowExpected)
+            checkedAt > 0L && ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false)
     }
 
-    private data class Probe(val status: Status, val latencyMs: Long, val reason: String)
+    private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "")
 
     companion object {
         private const val TAG = "TgWatch"
@@ -66,6 +68,7 @@ class MonitorService : Service() {
         const val ACTION_START = "ru.tgwatch.action.START"
         const val ACTION_STOP = "ru.tgwatch.action.STOP"
         const val ACTION_CHECK_NOW = "ru.tgwatch.action.CHECK_NOW"
+        const val ACTION_HEALTH = "ru.tgwatch.action.HEALTH"
         const val ACTION_SETTINGS = "ru.tgwatch.action.SETTINGS"
         const val ACTION_STATE_CHANGED = "ru.tgwatch.action.STATE_CHANGED"
 
@@ -150,11 +153,33 @@ class MonitorService : Service() {
      * Потоки для параллельных проверок. Блокирующий сетевой запрос нельзя прервать,
      * поэтому потоков с запасом: «зависший» запрос не задержит следующую проверку.
      */
-    private val probeExecutor: ExecutorService = Executors.newFixedThreadPool(6)
+    private val probeExecutor: ExecutorService = NetworkProbe.executor()
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
     private var lastVibrationMono = -1L
+    @Volatile private var lastProgressMono = 0L
+    @Volatile private var checkStartedMono = 0L
+    @Volatile private var networkRevision = 0L
+    private val healthHandler = Handler(android.os.Looper.getMainLooper())
+    private val healthTick = object : Runnable {
+        override fun run() {
+            if (destroyed) return
+            postNotification(state)
+            StatusWidget.updateAll(this@MonitorService)
+            ensureProgress()
+            healthHandler.postDelayed(this, 15_000L)
+        }
+    }
+    private fun ensureProgress() {
+        val now = SystemClock.elapsedRealtime()
+        // Checks have a 12-second total network budget. If overdue, cancel wait and retry.
+        if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
+            workerThread.interrupt()
+        } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
+            scheduleCheck(0L)
+        }
+    }
 
     @Volatile
     private var destroyed = false
@@ -162,8 +187,8 @@ class MonitorService : Service() {
     private val checkRunnable = Runnable { runCheck() }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) = scheduleCheck(1_500L)
-        override fun onLost(network: Network) = scheduleCheck(500L)
+        override fun onAvailable(network: Network) { networkRevision++; scheduleCheck(1_500L) }
+        override fun onLost(network: Network) { networkRevision++; scheduleCheck(500L) }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
                 scheduleCheck(800L)
@@ -188,6 +213,8 @@ class MonitorService : Service() {
         worker = Handler(workerThread.looper)
 
         running = true
+        lastProgressMono = SystemClock.elapsedRealtime()
+        healthHandler.postDelayed(healthTick, 15_000L)
         WatchdogReceiver.schedule(this)
         try {
             cm.registerDefaultNetworkCallback(networkCallback)
@@ -209,6 +236,7 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
+        if (action == ACTION_HEALTH) ensureProgress()
         val first = !loopStarted
         loopStarted = true
         if (first) EventLog.add(this, "Мониторинг запущен")
@@ -225,6 +253,7 @@ class MonitorService : Service() {
 
     override fun onDestroy() {
         destroyed = true
+        healthHandler.removeCallbacksAndMessages(null)
         running = false
         worker.removeCallbacksAndMessages(null)
         workerThread.quitSafely()
@@ -239,7 +268,7 @@ class MonitorService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         nm.cancel(NOTIFICATION_ID)
         if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
-        History.flush(this)
+        History.endSession(this)
         if (!Prefs.isEnabled(this)) {
             Prefs.clearLastState(this)
             WatchdogReceiver.cancel(this)
@@ -313,209 +342,56 @@ class MonitorService : Service() {
 
     private fun runCheck() {
         if (destroyed) return
+        // An interrupt from the health monitor must not poison the following check.
+        Thread.interrupted()
+        checkStartedMono = SystemClock.elapsedRealtime()
+        val revision = networkRevision
         acquireWakeLockForCheck()
         try {
             val result = performCheck()
             if (destroyed) return
-            handleResult(result)
+            if (revision == networkRevision) handleResult(result)
+            else handleResult(Probe(Status.UNKNOWN, -1, "Сеть изменилась во время проверки", result.diagnostics))
+            lastProgressMono = SystemClock.elapsedRealtime()
+        } catch (e: Exception) {
+            if (!destroyed) handleResult(Probe(Status.UNKNOWN, -1, "Проверка не завершена: ${describeProbeError(e)}"))
+            lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
+            checkStartedMono = 0L
             releaseWakeLock()
         }
-        val next = ProbeRules.nextIntervalSec(
-            Prefs.intervalSec(this),
-            state.bad,
-            Prefs.keepAwake(this) && !pm.isInteractive,
-        )
-        scheduleCheck(next * 1000L)
+        scheduleCheck(if (revision != networkRevision) 1_000L else Prefs.effectiveIntervalSec(this, state.bad, !pm.isInteractive) * 1000L)
     }
 
     private fun performCheck(): Probe {
-        if (!waitForNetwork()) return noNetwork()
-
-        val first = probeTelegram()
-        if (first.status == Status.OK) return first
-
-        val control: Future<String?>? = try {
-            probeExecutor.submit(Callable { firstWorkingControl() })
-        } catch (_: Exception) {
-            null
-        }
-        try {
-            Thread.sleep(RETRY_DELAY_MS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
-        if (!waitForNetwork()) {
-            control?.cancel(true)
-            return noNetwork()
-        }
-        val second = probeTelegram()
-        if (second.status == Status.OK) {
-            control?.cancel(true)
-            return second
-        }
-
-        val controlHost = try {
-            control?.get(TIMEOUT_MS * 2L, TimeUnit.MILLISECONDS)
-        } catch (_: Exception) {
-            null
-        }
-        return if (controlHost != null) {
-            Probe(Status.TG_DOWN, -1L, "${second.reason}; интернет есть ($controlHost)")
-        } else {
-            Probe(Status.NO_NETWORK, -1L, "сеть подключена, но интернет не отвечает")
-        }
-    }
-
-    private fun noNetwork() = Probe(Status.NO_NETWORK, -1L, "нет активного подключения к сети")
-
-    private fun firstWorkingControl(): String? {
-        for (url in CONTROL_URLS) {
-            if (probe(url).status == Status.OK) {
-                return try {
-                    URL(url).host
-                } catch (_: Exception) {
-                    url
-                }
-            }
-        }
-        return null
-    }
-
-    /**
-     * Сначала стучимся только в api.telegram.org. Если он не ответил успехом за
-     * [HEDGE_DELAY_MS], параллельно пробуем резервные адреса и берём первый успешный ответ.
-     * Обычно хватает одного запроса на проверку — меньше трафика и расхода батареи.
-     */
-    private fun probeTelegram(): Probe {
-        val results = LinkedBlockingQueue<Pair<String, Probe>>()
-        val futures = mutableListOf<Future<*>>()
-        fun launch(url: String) {
-            futures += probeExecutor.submit(Runnable { results.put(url to probe(url)) })
-        }
-
-        val started = SystemClock.elapsedRealtime()
-        val deadline = started + HEDGE_DELAY_MS + TIMEOUT_MS * 2L + 500L
-        val fallbacks = TG_URLS.filter { it != CHECK_URL }
-        launch(CHECK_URL)
-        var pending = 1
-        var hedged = false
-        var lastFail: Probe? = null
-
-        while (pending > 0 || !hedged) {
-            val now = SystemClock.elapsedRealtime()
-            if (now >= deadline) break
-            val until = if (hedged) deadline else minOf(deadline, started + HEDGE_DELAY_MS)
-            val next: Pair<String, Probe>? = try {
-                results.poll((until - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                break
-            }
-            if (next == null) {
-                if (hedged) break
-                // Главный адрес молчит дольше обычного — подключаем резервные.
-                fallbacks.forEach { launch(it) }
-                pending += fallbacks.size
-                hedged = true
-                continue
-            }
-            pending--
-            val (url, p) = next
-            if (p.status == Status.OK) {
-                futures.forEach { it.cancel(true) }
-                if (url == CHECK_URL) return p
-                val host = try {
-                    URL(url).host
-                } catch (_: Exception) {
-                    url
-                }
-                return Probe(Status.OK, p.latencyMs, "HTTP через $host")
-            }
-            // Причину берём от главного адреса, если он уже ответил.
-            if (url == CHECK_URL || lastFail == null) lastFail = p
-            if (!hedged) {
-                fallbacks.forEach { launch(it) }
-                pending += fallbacks.size
-                hedged = true
-            }
-        }
-        futures.forEach { it.cancel(true) }
-        return lastFail ?: Probe(Status.TG_DOWN, -1L, "нет ответа от серверов Telegram")
-    }
-
-    private fun waitForNetwork(): Boolean {
-        if (hasInternet()) return true
-        try {
+        var network = cm.activeNetwork
+        if (network == null) {
             Thread.sleep(NETWORK_GRACE_MS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+            network = cm.activeNetwork
         }
-        return hasInternet()
-    }
-
-    private fun probe(url: String): Probe {
-        val head = probeOnce(url, "HEAD")
-        if (head.status == Status.OK) return head
-        // 405/501 и обрыв на HEAD — частая история; GET надёжнее.
-        if (head.reason.contains("HTTP 405") ||
-            head.reason.contains("HTTP 501") ||
-            head.reason.contains("соединение оборвано") ||
-            head.reason.contains("SocketException")
-        ) {
-            return probeOnce(url, "GET")
+        val selected = network ?: return Probe(Status.NO_NETWORK, -1, "Нет активной сети", "Сеть: отсутствует")
+        val caps = cm.getNetworkCapabilities(selected)
+            ?: return Probe(Status.UNKNOWN, -1, "Сеть переключается")
+        val transport = buildList {
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("Wi-Fi")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("Мобильная")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) add("VPN")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("Ethernet")
+        }.joinToString(" + ").ifEmpty { "Другая" }
+        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) {
+            return Probe(Status.NO_NETWORK, -1, "Требуется вход в сеть Wi-Fi", "Сеть: $transport; captive portal")
         }
-        return head
-    }
-
-    private fun probeOnce(url: String, method: String): Probe {
-        var conn: HttpURLConnection? = null
-        val started = SystemClock.elapsedRealtime()
-        return try {
-            val c = URL(url).openConnection() as HttpURLConnection
-            conn = c
-            c.connectTimeout = TIMEOUT_MS
-            c.readTimeout = TIMEOUT_MS
-            c.requestMethod = method
-            c.instanceFollowRedirects = false
-            c.useCaches = false
-            c.setRequestProperty("User-Agent", "TgWatch/1.6 (Android)")
-            c.setRequestProperty("Accept", "*/*")
-            c.setRequestProperty("Connection", "keep-alive")
-            val code = c.responseCode
-            val ms = SystemClock.elapsedRealtime() - started
-            try {
-                (if (code >= 400) c.errorStream else c.inputStream)?.close()
-            } catch (_: Exception) {
-            }
-            conn = null
-            if (ProbeRules.isReachableHttpCode(code)) {
-                Probe(Status.OK, ms, "HTTP $code")
-            } else {
-                Probe(Status.TG_DOWN, -1L, ProbeRules.describeHttpFailure(code))
-            }
-        } catch (e: Exception) {
-            Probe(Status.TG_DOWN, -1L, describe(e))
-        } finally {
-            conn?.disconnect()
-        }
-    }
-
-    private fun describe(e: Exception): String = when (e) {
-        is SocketTimeoutException -> "сервер не ответил за ${TIMEOUT_MS / 1000} с"
-        is UnknownHostException -> "не удалось найти адрес (DNS)"
-        is ConnectException -> "в соединении отказано"
-        is SSLException -> "ошибка защищённого соединения (TLS)"
-        is SocketException -> "соединение оборвано" + (e.message?.let { " ($it)" } ?: "")
-        else -> e.javaClass.simpleName + (e.message?.let { ": $it" } ?: "")
-    }
-
-    private fun hasInternet(): Boolean {
-        val network = cm.activeNetwork ?: return false
-        val caps = cm.getNetworkCapabilities(network) ?: return false
-        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
-        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) return false
-        return true
+        val report = NetworkProbe(probeExecutor,
+            { url -> selected.openConnection(url) as HttpURLConnection },
+            { selected.socketFactory.createSocket() }).check()
+        val details = "Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n" +
+            report.results.joinToString("\n") { r ->
+                "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
+                    if (r.latencyMs >= 0) " · ${r.latencyMs} мс" else ""
+            } + "\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. " +
+            "Прокси, настроенный внутри Telegram, здесь не используется."
+        if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1, "Сеть изменилась во время проверки", details)
+        return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details)
     }
 
     private fun handleResult(p: Probe) {
@@ -558,11 +434,13 @@ class MonitorService : Service() {
             latencyMs = p.latencyMs,
             reason = p.reason,
             lastVibrationAt = lastVibration,
+            diagnostics = p.diagnostics,
+            expectedIntervalSec = Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive),
         )
         state = newState
         Prefs.saveLastState(
             this, newState.status, newState.checkedAt, newState.since,
-            newState.latencyMs, newState.reason, newState.lastVibrationAt,
+            newState.latencyMs, newState.reason, newState.lastVibrationAt, newState.diagnostics, newState.expectedIntervalSec,
         )
 
         History.record(
@@ -570,9 +448,11 @@ class MonitorService : Service() {
             when (p.status) {
                 Status.OK -> History.Kind.OK
                 Status.NO_NETWORK -> History.Kind.OFFLINE
-                Status.TG_DOWN, Status.UNKNOWN -> History.Kind.FAIL
+                Status.TG_DOWN -> History.Kind.FAIL
+                Status.PARTIAL -> History.Kind.PARTIAL
+                Status.UNKNOWN -> History.Kind.UNKNOWN
             },
-            p.latencyMs,
+            p.latencyMs, newState.expectedIntervalSec,
         )
 
         if (changed) {
@@ -580,7 +460,8 @@ class MonitorService : Service() {
             EventLog.add(
                 this,
                 when (p.status) {
-                    Status.OK -> "Telegram доступен, ответ за ${p.latencyMs} мс$downFor"
+                    Status.OK -> "MTProto и веб отвечают, ${p.latencyMs} мс$downFor"
+                    Status.PARTIAL -> "Telegram частично доступен: ${p.reason}"
                     Status.TG_DOWN -> "Telegram НЕДОСТУПЕН: ${p.reason}"
                     Status.NO_NETWORK -> "Нет интернета: ${p.reason}"
                     Status.UNKNOWN -> "Статус неизвестен"
@@ -673,26 +554,21 @@ class MonitorService : Service() {
 
         val (title, text, channel, icon, color, colorized) = when {
             s.status == Status.UNKNOWN -> Notif(
-                "Проверяю связь с Telegram…", CHECK_URL, CHANNEL_OK,
+                if (s.checkedAt > 0) "Доступность не определена" else "Проверяю связь с Telegram…",
+                s.reason.ifEmpty { CHECK_URL }, CHANNEL_OK,
                 R.drawable.ic_stat_wait, COLOR_OK, false
             )
-            stale && s.status == Status.OK -> Notif(
-                "Последний раз: доступен · ${s.latencyMs} мс",
-                "Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку$uptimeText",
+            stale -> Notif(
+                "Мониторинг задерживается",
+                "Последняя проверка ${agoStr(s.checkedAt, now)}; нужен свежий результат",
                 CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_STALE, false
             )
-            stale && s.status == Status.TG_DOWN -> Notif(
-                "Последний раз: НЕДОСТУПЕН",
-                "Проверено ${agoStr(s.checkedAt, now)} · ${s.reason}",
-                CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true
-            )
-            stale && s.status == Status.NO_NETWORK -> Notif(
-                "Последний раз: нет интернета",
-                "Проверено ${agoStr(s.checkedAt, now)} · ${s.reason}",
-                CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true
+            s.status == Status.PARTIAL -> Notif(
+                "Telegram частично доступен", s.reason, CHANNEL_OK,
+                R.drawable.ic_stat_wait, COLOR_OFFLINE, false
             )
             s.status == Status.OK -> Notif(
-                "Telegram доступен · ${s.latencyMs} мс",
+                "Telegram отвечает · ${s.latencyMs} мс",
                 "Проверено в ${timeStr(s.checkedAt)}$uptimeText",
                 CHANNEL_OK, R.drawable.ic_stat_ok, COLOR_OK, false
             )
@@ -778,3 +654,4 @@ class MonitorService : Service() {
 fun formatPercent(p: Double): String =
     if (p >= 99.95 && p < 100.0) "99,9 %"
     else String.format(java.util.Locale("ru"), "%.1f %%", p).replace(",0 %", " %")
+

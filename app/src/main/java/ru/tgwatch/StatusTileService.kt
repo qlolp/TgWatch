@@ -103,13 +103,15 @@ class StatusTileService : TileService() {
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, "Недоступен?")
             stale && s.status == MonitorService.Status.NO_NETWORK ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_offline, "Без сети?")
+            s.status == MonitorService.Status.PARTIAL ->
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, "Частично доступен")
             s.status == MonitorService.Status.OK ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_ok, "Доступен · ${s.latencyMs} мс")
             s.status == MonitorService.Status.TG_DOWN ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, "Недоступен")
             s.status == MonitorService.Status.NO_NETWORK ->
                 Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_offline, "Нет интернета")
-            else -> Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_wait, "Проверяю…")
+            else -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, if (s.checkedAt > 0) "Не определено" else "Проверяю…")
         }
         tile.state = tileState
         tile.icon = Icon.createWithResource(this, icon)
@@ -122,3 +124,4 @@ class StatusTileService : TileService() {
         tile.updateTile()
     }
 }
+

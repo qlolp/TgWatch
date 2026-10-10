@@ -97,7 +97,7 @@ class StatusWidget : AppWidgetProvider() {
                 s.status == MonitorService.Status.UNKNOWN -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_wait
-                    title = "Проверяю…"
+                    title = if (s.checkedAt > 0) "Нет свежего подтверждения" else "Проверяю…"
                     subtitle = "Telegram"
                 }
                 stale -> {
@@ -109,6 +109,12 @@ class StatusWidget : AppWidgetProvider() {
                         else -> "Не было интернета"
                     }
                     subtitle = "Проверено ${agoStr(s.checkedAt, now)} · нажми"
+                }
+                s.status == MonitorService.Status.PARTIAL -> {
+                    bg = R.drawable.bg_widget_offline
+                    icon = R.drawable.ic_stat_wait
+                    title = "Частично доступен"
+                    subtitle = "Нажми проверить"
                 }
                 s.status == MonitorService.Status.OK -> {
                     bg = R.drawable.bg_widget_ok
@@ -145,3 +151,4 @@ class StatusWidget : AppWidgetProvider() {
         }
     }
 }
+

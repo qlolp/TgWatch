@@ -14,6 +14,7 @@ import java.util.Locale
 object Prefs {
     private const val FILE = "tgwatch"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_PROFILE = "power_profile"
     private const val KEY_INTERVAL = "interval_sec"
     private const val KEY_KEEP_AWAKE = "keep_awake"
     private const val KEY_VIBRATE = "vibrate"
@@ -89,8 +90,19 @@ object Prefs {
     fun intervalSec(ctx: Context): Int = sp(ctx).getInt(KEY_INTERVAL, DEFAULT_INTERVAL_SEC)
 
     fun setIntervalSec(ctx: Context, value: Int) {
-        sp(ctx).edit().putInt(KEY_INTERVAL, value).apply()
+        sp(ctx).edit().putInt(KEY_INTERVAL, value.coerceIn(10, 120)).putString(KEY_PROFILE, "CUSTOM").apply()
     }
+
+    fun profile(ctx: Context): PowerProfile? {
+        val settings = sp(ctx)
+        val value = settings.getString(KEY_PROFILE, if (settings.contains(KEY_INTERVAL)) "CUSTOM" else "BALANCED")
+        return PowerProfile.entries.firstOrNull { it.name == value }
+    }
+    fun setProfile(ctx: Context, profile: PowerProfile) {
+        sp(ctx).edit().putString(KEY_PROFILE, profile.name).putInt(KEY_INTERVAL, profile.awake).apply()
+    }
+    fun effectiveIntervalSec(ctx: Context, bad: Boolean, screenOff: Boolean): Int =
+        profile(ctx)?.interval(bad, screenOff) ?: ProbeRules.nextIntervalSec(intervalSec(ctx).coerceIn(10, 120), bad, screenOff)
 
     /** Будить процессор на время каждой проверки при выключенном экране. */
     fun keepAwake(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_KEEP_AWAKE, true)
@@ -157,6 +169,8 @@ object Prefs {
         latencyMs: Long,
         reason: String,
         lastVibrationAt: Long,
+        diagnostics: String = "",
+        expectedIntervalSec: Int = 30,
     ) {
         sp(ctx).edit()
             .putString(KEY_LAST_STATUS, status.name)
@@ -165,6 +179,8 @@ object Prefs {
             .putLong(KEY_LAST_LATENCY, latencyMs)
             .putString(KEY_LAST_REASON, reason)
             .putLong(KEY_LAST_VIBE, lastVibrationAt)
+            .putString("last_diagnostics", diagnostics)
+            .putInt("last_expected_sec", expectedIntervalSec)
             .apply()
     }
 
@@ -183,6 +199,8 @@ object Prefs {
             latencyMs = sp(ctx).getLong(KEY_LAST_LATENCY, -1L),
             reason = sp(ctx).getString(KEY_LAST_REASON, "") ?: "",
             lastVibrationAt = sp(ctx).getLong(KEY_LAST_VIBE, 0L),
+            diagnostics = sp(ctx).getString("last_diagnostics", "") ?: "",
+            expectedIntervalSec = sp(ctx).getInt("last_expected_sec", 30),
         )
     }
 
@@ -194,6 +212,8 @@ object Prefs {
             .remove(KEY_LAST_LATENCY)
             .remove(KEY_LAST_REASON)
             .remove(KEY_LAST_VIBE)
+            .remove("last_diagnostics")
+            .remove("last_expected_sec")
             .apply()
     }
 }
@@ -219,3 +239,4 @@ fun durationStr(ms: Long): String {
 /** «5 с назад» или прочерк, если события ещё не было. */
 fun agoStr(millis: Long, now: Long = System.currentTimeMillis()): String =
     if (millis <= 0L) "—" else if (now - millis < 2000L) "только что" else durationStr(now - millis) + " назад"
+
