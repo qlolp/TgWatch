@@ -297,7 +297,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Будит процессор только на время проверки — экономнее, чем раньше."
+                android:text="Системный будильник будит телефон к каждой проверке, а сразу после неё отпускает. В глубоком сне Android может проверять реже."
                 android:textSize="12sp" />
 
             <Switch
@@ -335,6 +335,12 @@
                 android:text="Тихие часы 23:00–08:00 (без вибрации)"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/btnQuietHours"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Изменить тихие часы" />
 
             <Button
                 android:id="@+id/btnVibe"

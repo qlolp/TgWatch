@@ -21,6 +21,10 @@ object ProbeRules {
         return now - checkedAt > limit
     }
 
+    /** «23:00–08:00» для подписи переключателя тихих часов. */
+    fun quietHoursLabel(startHour: Int, endHour: Int): String =
+        String.format(java.util.Locale.ROOT, "%02d:00–%02d:00", startHour.coerceIn(0, 23), endHour.coerceIn(0, 23))
+
     /** Тихие часы: например 23→8 пересекает полночь. */
     fun inQuietHours(hourOfDay: Int, startHour: Int, endHour: Int): Boolean {
         val h = hourOfDay.coerceIn(0, 23)

@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">TG Монитор</string>
     <string name="status_icon">Значок статуса Telegram</string>
+    <string name="widget_description">Статус Telegram на рабочем столе. Нажми, чтобы открыть приложение.</string>
 </resources>

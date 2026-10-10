@@ -1,5 +1,6 @@
 package ru.tgwatch
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -30,8 +31,8 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLException
 
 /**
@@ -68,6 +69,9 @@ class MonitorService : Service() {
         const val ACTION_SETTINGS = "ru.tgwatch.action.SETTINGS"
         const val ACTION_STATE_CHANGED = "ru.tgwatch.action.STATE_CHANGED"
 
+        /** Будильник системы: пора проверять, даже если телефон спит. */
+        private const val ACTION_ALARM = "ru.tgwatch.action.ALARM"
+
         const val CHECK_URL = "https://api.telegram.org/"
 
         private val TG_URLS = listOf(
@@ -93,6 +97,12 @@ class MonitorService : Service() {
         private const val BAD_INTERVAL_SEC = 10
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
+
+        /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
+        private const val ALARM_MIN_DELAY_MS = 5_000L
+
+        /** Сколько ждём главный адрес, прежде чем подключить резервные. */
+        private const val HEDGE_DELAY_MS = 1_500L
 
         private val COLOR_OK = Color.rgb(0x22, 0x9E, 0xD9)
         private val COLOR_FAIL = Color.rgb(0xE5, 0x39, 0x35)
@@ -135,8 +145,13 @@ class MonitorService : Service() {
     private lateinit var nm: NotificationManager
     private lateinit var cm: ConnectivityManager
     private lateinit var pm: PowerManager
+    private lateinit var am: AlarmManager
 
-    private val probeExecutor: ExecutorService = Executors.newFixedThreadPool(4)
+    /**
+     * Потоки для параллельных проверок. Блокирующий сетевой запрос нельзя прервать,
+     * поэтому потоков с запасом: «зависший» запрос не задержит следующую проверку.
+     */
+    private val probeExecutor: ExecutorService = Executors.newCachedThreadPool()
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -164,6 +179,7 @@ class MonitorService : Service() {
         nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         createChannels()
         restorePersistedState(this)
         seedVibrationCooldown()
@@ -196,7 +212,13 @@ class MonitorService : Service() {
         val first = !loopStarted
         loopStarted = true
         if (first) EventLog.add(this, "Мониторинг запущен")
-        if (first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS) scheduleCheck(0L)
+        if (action == ACTION_ALARM) {
+            // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
+            acquireWakeLockForCheck(force = true)
+        }
+        if (first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS || action == ACTION_ALARM) {
+            scheduleCheck(0L)
+        }
 
         return START_STICKY
     }
@@ -206,6 +228,7 @@ class MonitorService : Service() {
         running = false
         worker.removeCallbacksAndMessages(null)
         workerThread.quitSafely()
+        cancelAlarm()
         probeExecutor.shutdownNow()
         try {
             cm.unregisterNetworkCallback(networkCallback)
@@ -238,6 +261,42 @@ class MonitorService : Service() {
         if (destroyed) return
         worker.removeCallbacks(checkRunnable)
         worker.postDelayed(checkRunnable, delayMs)
+        // Обычный таймер замирает, когда телефон засыпает с выключенным экраном.
+        // Поэтому дублируем его системным будильником, который будит процессор.
+        // Короткие перепроверки будильник не трогают: если телефон уснёт раньше,
+        // уже поставленный будильник всё равно разбудит его к следующей проверке.
+        if (delayMs >= ALARM_MIN_DELAY_MS) scheduleAlarm(delayMs)
+    }
+
+    private fun alarmIntent(): PendingIntent = PendingIntent.getService(
+        this, 3,
+        Intent(this, MonitorService::class.java).setAction(ACTION_ALARM),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    private fun scheduleAlarm(delayMs: Long) {
+        if (!Prefs.keepAwake(this)) {
+            cancelAlarm()
+            return
+        }
+        val at = SystemClock.elapsedRealtime() + delayMs
+        try {
+            if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, alarmIntent())
+            } else {
+                am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, alarmIntent())
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "alarm", e)
+        }
+    }
+
+    private fun cancelAlarm() {
+        try {
+            am.cancel(alarmIntent())
+        } catch (e: Exception) {
+            Log.w(TAG, "cancel alarm", e)
+        }
     }
 
     private fun runCheck() {
@@ -308,43 +367,64 @@ class MonitorService : Service() {
         return null
     }
 
-    /** Параллельно стучимся во все адреса Telegram; берём первый успешный. */
+    /**
+     * Сначала стучимся только в api.telegram.org. Если он не ответил успехом за
+     * [HEDGE_DELAY_MS], параллельно пробуем резервные адреса и берём первый успешный ответ.
+     * Обычно хватает одного запроса на проверку — меньше трафика и расхода батареи.
+     */
     private fun probeTelegram(): Probe {
-        val winner = AtomicReference<Probe?>(null)
-        val futures = TG_URLS.map { url ->
-            probeExecutor.submit(Callable {
-                if (winner.get() != null) return@Callable null
-                val p = probe(url)
-                if (p.status == Status.OK) {
-                    val host = try {
-                        URL(url).host
-                    } catch (_: Exception) {
-                        url
-                    }
-                    val ok = if (url == CHECK_URL) p else Probe(Status.OK, p.latencyMs, "HTTP через $host")
-                    winner.compareAndSet(null, ok)
-                    // Отменяем остальных через общий флаг winner.
-                }
-                p
-            })
+        val results = LinkedBlockingQueue<Pair<String, Probe>>()
+        val futures = mutableListOf<Future<*>>()
+        fun launch(url: String) {
+            futures += probeExecutor.submit(Runnable { results.put(url to probe(url)) })
         }
-        val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MS * 2L + 500L
+
+        val started = SystemClock.elapsedRealtime()
+        val deadline = started + HEDGE_DELAY_MS + TIMEOUT_MS * 2L + 500L
+        val fallbacks = TG_URLS.filter { it != CHECK_URL }
+        launch(CHECK_URL)
+        var pending = 1
+        var hedged = false
         var lastFail: Probe? = null
-        for (f in futures) {
-            val left = deadline - SystemClock.elapsedRealtime()
-            if (left <= 0L) break
-            val done = winner.get()
-            if (done != null) {
-                futures.forEach { it.cancel(true) }
-                return done
+
+        while (pending > 0 || !hedged) {
+            val now = SystemClock.elapsedRealtime()
+            if (now >= deadline) break
+            val until = if (hedged) deadline else minOf(deadline, started + HEDGE_DELAY_MS)
+            val next: Pair<String, Probe>? = try {
+                results.poll((until - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
             }
-            try {
-                val p = f.get(left, TimeUnit.MILLISECONDS) ?: continue
-                if (p.status != Status.OK) lastFail = p
-            } catch (_: Exception) {
+            if (next == null) {
+                if (hedged) break
+                // Главный адрес молчит дольше обычного — подключаем резервные.
+                fallbacks.forEach { launch(it) }
+                pending += fallbacks.size
+                hedged = true
+                continue
+            }
+            pending--
+            val (url, p) = next
+            if (p.status == Status.OK) {
+                futures.forEach { it.cancel(true) }
+                if (url == CHECK_URL) return p
+                val host = try {
+                    URL(url).host
+                } catch (_: Exception) {
+                    url
+                }
+                return Probe(Status.OK, p.latencyMs, "HTTP через $host")
+            }
+            // Причину берём от главного адреса, если он уже ответил.
+            if (url == CHECK_URL || lastFail == null) lastFail = p
+            if (!hedged) {
+                fallbacks.forEach { launch(it) }
+                pending += fallbacks.size
+                hedged = true
             }
         }
-        winner.get()?.let { return it }
         futures.forEach { it.cancel(true) }
         return lastFail ?: Probe(Status.TG_DOWN, -1L, "нет ответа от серверов Telegram")
     }
@@ -384,7 +464,7 @@ class MonitorService : Service() {
             c.requestMethod = method
             c.instanceFollowRedirects = false
             c.useCaches = false
-            c.setRequestProperty("User-Agent", "TgWatch/1.3 (Android)")
+            c.setRequestProperty("User-Agent", "TgWatch/1.5 (Android)")
             c.setRequestProperty("Accept", "*/*")
             c.setRequestProperty("Connection", "keep-alive")
             val code = c.responseCode
@@ -497,6 +577,7 @@ class MonitorService : Service() {
     }
 
     private fun broadcastState() {
+        StatusWidget.updateAll(this)
         try {
             sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
         } catch (e: Exception) {
@@ -660,8 +741,8 @@ class MonitorService : Service() {
     // --------------------------------------------------------------- wake lock
 
     /** Держим wake lock только на время одной проверки, а не весь день. */
-    private fun acquireWakeLockForCheck() {
-        if (!Prefs.keepAwake(this)) return
+    private fun acquireWakeLockForCheck(force: Boolean = false) {
+        if (!force && !Prefs.keepAwake(this)) return
         try {
             if (wakeLock == null) {
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TgWatch:check").apply {

@@ -43,6 +43,13 @@ class ProbeRulesTest {
     }
 
     @Test
+    fun quietHoursLabel_padsHours() {
+        assertEquals("23:00–08:00", ProbeRules.quietHoursLabel(23, 8))
+        assertEquals("00:00–07:00", ProbeRules.quietHoursLabel(0, 7))
+        assertEquals("23:00–00:00", ProbeRules.quietHoursLabel(25, -1))
+    }
+
+    @Test
     fun describeHttpFailure_mentionsCode() {
         assertEquals("сервер вернул ошибку HTTP 503", ProbeRules.describeHttpFailure(503))
     }
