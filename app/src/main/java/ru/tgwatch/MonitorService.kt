@@ -101,6 +101,9 @@ class MonitorService : Service() {
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
         private const val ALARM_MIN_DELAY_MS = 5_000L
 
+        /** Сколько ждём главный адрес, прежде чем подключить резервные. */
+        private const val HEDGE_DELAY_MS = 1_500L
+
         private val COLOR_OK = Color.rgb(0x22, 0x9E, 0xD9)
         private val COLOR_FAIL = Color.rgb(0xE5, 0x39, 0x35)
         private val COLOR_OFFLINE = Color.rgb(0xF5, 0x7C, 0x00)
@@ -365,28 +368,45 @@ class MonitorService : Service() {
     }
 
     /**
-     * Параллельно стучимся во все адреса Telegram и возвращаемся, как только
-     * ответил любой из них, не дожидаясь медленных.
+     * Сначала стучимся только в api.telegram.org. Если он не ответил успехом за
+     * [HEDGE_DELAY_MS], параллельно пробуем резервные адреса и берём первый успешный ответ.
+     * Обычно хватает одного запроса на проверку — меньше трафика и расхода батареи.
      */
     private fun probeTelegram(): Probe {
         val results = LinkedBlockingQueue<Pair<String, Probe>>()
-        val futures = TG_URLS.map { url ->
-            probeExecutor.submit(Runnable { results.put(url to probe(url)) })
+        val futures = mutableListOf<Future<*>>()
+        fun launch(url: String) {
+            futures += probeExecutor.submit(Runnable { results.put(url to probe(url)) })
         }
-        val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MS * 2L + 500L
+
+        val started = SystemClock.elapsedRealtime()
+        val deadline = started + HEDGE_DELAY_MS + TIMEOUT_MS * 2L + 500L
+        val fallbacks = TG_URLS.filter { it != CHECK_URL }
+        launch(CHECK_URL)
+        var pending = 1
+        var hedged = false
         var lastFail: Probe? = null
-        var received = 0
-        while (received < TG_URLS.size) {
-            val left = deadline - SystemClock.elapsedRealtime()
-            if (left <= 0L) break
+
+        while (pending > 0 || !hedged) {
+            val now = SystemClock.elapsedRealtime()
+            if (now >= deadline) break
+            val until = if (hedged) deadline else minOf(deadline, started + HEDGE_DELAY_MS)
             val next: Pair<String, Probe>? = try {
-                results.poll(left, TimeUnit.MILLISECONDS)
+                results.poll((until - now).coerceAtLeast(0L), TimeUnit.MILLISECONDS)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
-                null
+                break
             }
-            val (url, p) = next ?: break
-            received++
+            if (next == null) {
+                if (hedged) break
+                // Главный адрес молчит дольше обычного — подключаем резервные.
+                fallbacks.forEach { launch(it) }
+                pending += fallbacks.size
+                hedged = true
+                continue
+            }
+            pending--
+            val (url, p) = next
             if (p.status == Status.OK) {
                 futures.forEach { it.cancel(true) }
                 if (url == CHECK_URL) return p
@@ -399,6 +419,11 @@ class MonitorService : Service() {
             }
             // Причину берём от главного адреса, если он уже ответил.
             if (url == CHECK_URL || lastFail == null) lastFail = p
+            if (!hedged) {
+                fallbacks.forEach { launch(it) }
+                pending += fallbacks.size
+                hedged = true
+            }
         }
         futures.forEach { it.cancel(true) }
         return lastFail ?: Probe(Status.TG_DOWN, -1L, "нет ответа от серверов Telegram")
@@ -439,7 +464,7 @@ class MonitorService : Service() {
             c.requestMethod = method
             c.instanceFollowRedirects = false
             c.useCaches = false
-            c.setRequestProperty("User-Agent", "TgWatch/1.4 (Android)")
+            c.setRequestProperty("User-Agent", "TgWatch/1.5 (Android)")
             c.setRequestProperty("Accept", "*/*")
             c.setRequestProperty("Connection", "keep-alive")
             val code = c.responseCode

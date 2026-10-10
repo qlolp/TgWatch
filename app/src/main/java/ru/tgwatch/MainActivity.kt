@@ -5,6 +5,7 @@ import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.TimePickerDialog
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -52,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var swVibrateOffline: Switch
     private lateinit var swVibrateRecovery: Switch
     private lateinit var swQuietHours: Switch
+    private lateinit var btnQuietHours: Button
     private lateinit var tvBattery: TextView
     private lateinit var btnBattery: Button
     private lateinit var tvNotif: TextView
@@ -111,6 +113,7 @@ class MainActivity : Activity() {
         swVibrateOffline = findViewById(R.id.swVibrateOffline)
         swVibrateRecovery = findViewById(R.id.swVibrateRecovery)
         swQuietHours = findViewById(R.id.swQuietHours)
+        btnQuietHours = findViewById(R.id.btnQuietHours)
         tvBattery = findViewById(R.id.tvBattery)
         btnBattery = findViewById(R.id.btnBattery)
         tvNotif = findViewById(R.id.tvNotif)
@@ -174,6 +177,8 @@ class MainActivity : Activity() {
 
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
+        updateQuietHoursLabel()
+        btnQuietHours.setOnClickListener { pickQuietHours() }
 
         val openNotif = View.OnClickListener { openNotificationSettings() }
         val openBatt = View.OnClickListener { openBatterySettings() }
@@ -231,6 +236,29 @@ class MainActivity : Activity() {
             startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
             Toast.makeText(this, "Не удалось поделиться: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateQuietHoursLabel() {
+        val label = ProbeRules.quietHoursLabel(Prefs.quietStartHour(this), Prefs.quietEndHour(this))
+        swQuietHours.text = "Тихие часы $label (без вибрации)"
+    }
+
+    /** Два шага: сначала час начала тихих часов, затем час окончания. */
+    private fun pickQuietHours() {
+        TimePickerDialog(this, { _, startHour, _ ->
+            TimePickerDialog(this, { _, endHour, _ ->
+                Prefs.setQuietHours(this, startHour, endHour)
+                Prefs.setQuietHoursEnabled(this, true)
+                swQuietHours.isChecked = true
+                updateQuietHoursLabel()
+            }, Prefs.quietEndHour(this), 0, true).apply {
+                setTitle("Конец тихих часов")
+                show()
+            }
+        }, Prefs.quietStartHour(this), 0, true).apply {
+            setTitle("Начало тихих часов")
+            show()
         }
     }
 

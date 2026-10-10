@@ -84,6 +84,13 @@ object Prefs {
 
     fun quietEndHour(ctx: Context): Int = sp(ctx).getInt(KEY_QUIET_END, DEFAULT_QUIET_END)
 
+    fun setQuietHours(ctx: Context, startHour: Int, endHour: Int) {
+        sp(ctx).edit()
+            .putInt(KEY_QUIET_START, startHour.coerceIn(0, 23))
+            .putInt(KEY_QUIET_END, endHour.coerceIn(0, 23))
+            .apply()
+    }
+
     fun inQuietHoursNow(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
         if (!quietHoursEnabled(ctx)) return false
         val cal = Calendar.getInstance().apply { timeInMillis = now }

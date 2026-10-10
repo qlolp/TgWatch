@@ -337,6 +337,12 @@
                 android:textSize="15sp" />
 
             <Button
+                android:id="@+id/btnQuietHours"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="Изменить тихие часы" />
+
+            <Button
                 android:id="@+id/btnVibe"
                 style="@style/ButtonText"
                 android:layout_marginTop="8dp"
