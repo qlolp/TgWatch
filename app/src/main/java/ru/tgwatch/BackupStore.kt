@@ -1,6 +1,8 @@
 package ru.tgwatch
 
 import android.content.Context
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -31,6 +33,7 @@ object BackupStore {
         val temp = File(file.parentFile,file.name + ".tmp")
         FileOutputStream(temp).use { it.write(BackupCodec.encode(data)); it.fd.sync() }
         Files.move(temp.toPath(),file.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING)
+        syncDirectory(file.parentFile!!)
         finishPending(ctx)
     }
     @Synchronized fun finishPending(ctx: Context) {
@@ -50,8 +53,15 @@ object BackupStore {
         } }
         editor.putBoolean("enabled",false).putString("log",data.log.joinToString("\n"))
         check(editor.commit()) { "Не удалось сохранить настройки; восстановление будет повторено" }
+        syncDirectory(file.parentFile!!)
+        syncDirectory(File(ctx.applicationContext.createDeviceProtectedStorageContext().dataDir,"shared_prefs"))
         EventLog.invalidate()
         MonitorService.resetStoppedState()
         check(file.delete()) { "Не удалось завершить восстановление" }
+        syncDirectory(file.parentFile!!)
+    }
+    private fun syncDirectory(directory: File) {
+        val descriptor = Os.open(directory.absolutePath,OsConstants.O_RDONLY,0)
+        try { Os.fsync(descriptor) } finally { Os.close(descriptor) }
     }
 }

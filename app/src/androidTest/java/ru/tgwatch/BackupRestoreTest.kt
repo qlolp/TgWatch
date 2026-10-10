@@ -29,7 +29,7 @@ class BackupRestoreTest {
             BackupStore.restore(ctx,BackupCodec.decrypt(encrypted,"Пароль для теста!".toCharArray()))
             assertFalse(Prefs.isEnabled(ctx))
             assertNull(Prefs.loadLastState(ctx))
-            assertEquals(0,MonitorService.state.checkedAt)
+            assertEquals(0L,MonitorService.state.checkedAt)
             assertEquals(60,Prefs.intervalSec(ctx))
             assertTrue(Prefs.vibratePartial(ctx))
             assertEquals(listOf("Сохранённое событие"),EventLog.all(ctx))

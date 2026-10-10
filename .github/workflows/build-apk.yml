@@ -25,7 +25,12 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease --no-daemon --stacktrace
+        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease :app:dependencyInventory --no-daemon --stacktrace
+      - name: Audit exact resolved dependencies against OSV
+        run: |
+          python3 scripts/test_dependency_audit.py
+          python3 scripts/test_signing_keychain.py
+          python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -90,15 +95,15 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
-      - name: Verify signing continuity with published 1.8.33
+      - name: Verify signing continuity with published 1.9.40
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release download v1.8.33 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
+          gh release download v1.9.40 --repo "$GITHUB_REPOSITORY" --pattern TgWatch.apk --dir previous
           python3 - <<'PY'
           import hashlib, pathlib
-          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == '381a03c38afa42c31c595d3e3606c218d8839874470ba51c49b186bfae6748ba'
+          assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'dd3d017d9cc4a9f8a37a202c70520e8ecd4e30646e32c5effb841b08b6c8036e'
           PY
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
@@ -126,6 +131,11 @@ jobs:
             upgrade-*.xml
             upgrade-*.csv
             release-screen.png
+      - name: Download audited dependency reports
+        uses: actions/download-artifact@v4
+        with:
+          name: quality-reports
+          path: release-quality
       - name: Publish versioned release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -134,6 +144,7 @@ jobs:
           version=$(sed -n 's/^[[:space:]]*versionName = "\([0-9.]*\)".*/\1/p' app/build.gradle.kts)
           [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]
           gh release create "v${version}.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
+            release-quality/dependencies/runtime.cdx.json release-quality/dependencies/osv-report.json \
             --target "$GITHUB_SHA" --title "TG Монитор ${version}.${GITHUB_RUN_NUMBER}" \
             --notes-file "docs/releases/${version}.md" --latest
   android:

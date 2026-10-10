@@ -389,14 +389,15 @@ class MonitorService : Service() {
         val alertsAllowed = Prefs.alertsAllowed(this, now)
         val vibrate = AlertRules.shouldAlarm(p.status.name, Prefs.vibrateEnabled(this), Prefs.vibrateOffline(this),
             partialAlert, alertsAllowed, mono, lastVibrationMono)
-        val sound = AlertRules.shouldAlarm(p.status.name, Prefs.eventSound(this), false, false,
+        val sound = AlertRules.shouldAlarm(p.status.name,
+            Prefs.notifyFor(this,"TG_DOWN") && Prefs.soundFor(this,"TG_DOWN"), false,
+            Prefs.notifyFor(this,"PARTIAL") && Prefs.soundFor(this,"PARTIAL"),
             alertsAllowed, mono, lastVibrationMono)
         if (vibrate || sound) {
             lastVibrationMono = mono
             lastVibration = now
             try {
                 if (vibrate) Vibe.alarm(this)
-                if (sound) eventNotifications.outage(p.reason, sound = true, allowed = alertsAllowed)
             } catch (e: Exception) {
                 Log.w(TAG, "vibrate", e)
             }
@@ -432,12 +433,20 @@ class MonitorService : Service() {
             p.latencyMs, newState.expectedIntervalSec,
         )
 
-        val recovery = if (p.status == Status.OK) History.recovery(this, now, partialAlert) else null
+        val recovery = if (p.status == Status.OK) History.recovery(this, now,
+            partialAlert || Prefs.notifyFor(this,"PARTIAL")) else null
         try {
-            if (p.status == Status.OK) eventNotifications.clearOutage()
-            else if (changed) eventNotifications.clearRecovery()
+            if (p.status !in setOf(Status.TG_DOWN,Status.PARTIAL)) eventNotifications.clearOutage()
+            if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
+            if ((changed || sound) && p.status == Status.TG_DOWN && Prefs.notifyFor(this,"TG_DOWN"))
+                eventNotifications.outage(p.reason,sound,alertsAllowed)
+            if ((changed || sound) && p.status == Status.PARTIAL && Prefs.notifyFor(this,"PARTIAL"))
+                eventNotifications.partial(p.reason,sound,alertsAllowed)
+            if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this,"TG_DOWN")) eventNotifications.clearOutage()
+            if (p.status == Status.PARTIAL && !Prefs.notifyFor(this,"PARTIAL")) eventNotifications.clearOutage()
             if (recovery != null) {
-                if (Prefs.notifyRecovery(this)) eventNotifications.recovered(recovery, Prefs.eventSound(this), alertsAllowed)
+                if (Prefs.notifyFor(this,"RECOVERY")) eventNotifications.recovered(recovery,
+                    Prefs.soundFor(this,"RECOVERY"), alertsAllowed)
                 if (Prefs.vibrateOnRecovery(this) && alertsAllowed) Vibe.recovery(this)
             }
         } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
