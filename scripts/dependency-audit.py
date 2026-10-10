@@ -4,6 +4,7 @@ import concurrent.futures
 import datetime
 import json
 import pathlib
+import re
 import sys
 import time
 import urllib.error
@@ -43,9 +44,17 @@ def audit(packages, query=query_osv):
             for record in records:
                 if not isinstance(record, dict) or not isinstance(record.get('id'), str) or not record['id']:
                     raise ValueError('OSV record missing its ID')
-                if not record.get('withdrawn'):
+                if 'withdrawn' in record:
+                    withdrawn = record['withdrawn']
+                    if not isinstance(withdrawn,str) or not re.fullmatch(
+                        r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})',withdrawn):
+                        raise ValueError('Invalid OSV withdrawal timestamp')
+                    datetime.datetime.fromisoformat(withdrawn.replace('Z','+00:00'))
+                else:
                     vulnerabilities.add(record['id'])
-            token = response.get('next_page_token')
+            token = response.get('next_page_token','')
+            if not isinstance(token,str):
+                raise ValueError('Invalid OSV pagination')
             if not token:
                 return {**package, 'vulnerabilities': sorted(vulnerabilities)}
             if not isinstance(token, str) or token in tokens:

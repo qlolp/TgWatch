@@ -42,26 +42,31 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        manager.createNotificationChannel(NotificationChannel(recoveryChannel,"Восстановление связи",
-            legacy.importance).apply { setSound(legacy.sound,legacy.audioAttributes); enableVibration(false) })
+        if (manager.getNotificationChannel(recoveryChannel) == null)
+            manager.createNotificationChannel(NotificationChannel(recoveryChannel,"Восстановление связи",
+                legacy.importance).apply { setSound(legacy.sound,legacy.audioAttributes); enableVibration(false) })
     }
     fun clearRecovery() { manager.cancel(RECOVERY_ID) }
     fun clearOutage() { manager.cancel(OUTAGE_ID); manager.cancel(PARTIAL_ID) }
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
+        if (blocked(recoveryChannel)) { clearRecovery(); return }
         manager.notify(RECOVERY_ID, notification("Telegram снова доступен",
             "Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(PARTIAL_ID)
+        if (blocked(outageChannel)) { manager.cancel(OUTAGE_ID); return }
         manager.notify(OUTAGE_ID, notification("Telegram недоступен", reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(OUTAGE_ID)
+        if (blocked(partialChannel)) { manager.cancel(PARTIAL_ID); return }
         manager.notify(PARTIAL_ID,notification("Telegram частично доступен",reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
     }
+    private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {
         val open = PendingIntent.getActivity(ctx, 4, Intent(ctx, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

@@ -29,6 +29,17 @@ fun recoveryDurationStr(ms: Long): String {
 /** Observations expire. Neither a dead service nor two distant failures fill a gap. */
 object Timeline {
     val kinds = setOf("OK", "TG_DOWN", "PARTIAL", "NO_NETWORK", "UNKNOWN")
+    /** Retain the epoch boundary even when its final observation expires. */
+    fun retained(samples: List<Observation>, from: Long, limit: Int = 65_000): List<Observation> {
+        require(limit > 0)
+        val unique = samples.associateBy { it.clockEpoch to it.at }.values
+        val latest = unique.maxWithOrNull(compareBy<Observation> { it.clockEpoch }.thenBy { it.at })
+            ?: return emptyList()
+        val retained = unique.filter { it.until > from }.toMutableList()
+        if (retained.none { it.clockEpoch == latest.clockEpoch })
+            retained += latest.copy(kind="UNKNOWN",latencyMs=-1)
+        return retained.sortedWith(compareBy<Observation> { it.clockEpoch }.thenBy { it.at }).takeLast(limit)
+    }
     fun current(samples: List<Observation>): List<Observation> {
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
         return samples.filter { it.clockEpoch == epoch }

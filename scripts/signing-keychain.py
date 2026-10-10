@@ -131,12 +131,15 @@ def main():
     else:
         if not store.is_file():
             raise RuntimeError('Restore the permanent keystore first. This command never generates a replacement key.')
+        needs_save = False
         try: password = keychain.load(account)
         except RuntimeError:
             password = getpass.getpass('Existing keystore password: ')
-            certificate(store, password)
-            keychain.save(account, password)
+            needs_save = True
         fingerprint = certificate(store, password)
+        if args.expected_certificate and fingerprint != args.expected_certificate.upper():
+            raise RuntimeError('Certificate does not match the published signing identity')
+        if needs_save: keychain.save(account, password)
         import base64
         secrets = {'TGWATCH_KEYSTORE_BASE64': base64.b64encode(store.read_bytes()),
             'TGWATCH_KEYSTORE_PASSWORD': password.encode(), 'TGWATCH_KEY_PASSWORD': password.encode(),

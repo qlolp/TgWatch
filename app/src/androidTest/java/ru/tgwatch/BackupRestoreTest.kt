@@ -36,6 +36,14 @@ class BackupRestoreTest {
                 // Reload the persisted file as a newly started process would.
                 History::class.java.getDeclaredField("loaded").apply { isAccessible=true }.setBoolean(History,false)
             }
+            BackupStore.restore(ctx,BackupData(now+2000,listOf(
+                Observation(now-20_000,now-10_000,"TG_DOWN",clockEpoch=0),
+                Observation(now+1000,now+2000,"OK",clockEpoch=1)),emptyMap(),emptyList()))
+            val clipped = History.snapshot(ctx,now)
+            assertEquals("Clipping a newly created rollback marker must preserve its epoch",2L,
+                Timeline.current(clipped).single().clockEpoch)
+            assertEquals(0,Timeline.stats(clipped,now-86_400_000L,now).checks)
+            assertEquals(0L,Timeline.stats(clipped,now-86_400_000L,now).downMs)
         } finally { BackupStore.restore(ctx,original) }
     }
     @Test fun encryptedRestoreReplacesOnlyPortableDataAndSurvivesJournalReplay() {

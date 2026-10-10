@@ -51,9 +51,12 @@ object History {
         }
     }
     private fun prune(now: Long) {
-        samples.removeAll { it.until <= now - KEEP_MS }
-        // Also bound storage when a badly set clock leaves future-dated archived epochs.
-        if (samples.size > 65_000) samples = samples.takeLast(65_000).toMutableList()
+        val retained = Timeline.retained(samples,now-KEEP_MS)
+        if (retained != samples) {
+            samples = retained.toMutableList()
+            version++
+            statsCache.clear()
+        }
     }
     private fun ensureClock(ctx: Context, now: Long) {
         val current = Timeline.current(samples)
@@ -143,12 +146,17 @@ object History {
         ensureClock(ctx,now)
         prune(now)
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
-        return samples.mapNotNull { if (it.clockEpoch != epoch) it else
+        val result = samples.mapNotNull { if (it.clockEpoch != epoch) it else
             if (it.at >= now) null else it.copy(until=minOf(it.until,now)) }
+        // A rollback marker may have just been created at now and then clipped away.
+        // Preserve its epoch as expired metadata, never as a fresh check.
+        return if (samples.isNotEmpty() && result.none { it.clockEpoch == epoch }) result +
+            Observation((now-KEEP_MS-1).coerceAtLeast(0),(now-KEEP_MS).coerceAtLeast(1),"UNKNOWN",clockEpoch=epoch)
+            else result
     }
     @Synchronized internal fun replace(ctx: Context, replacement: List<Observation>) {
         val now = System.currentTimeMillis()
-        val retained = replacement.filter { it.until > now-KEEP_MS }.toMutableList()
+        val retained = Timeline.retained(replacement,now-KEEP_MS).toMutableList()
         HistoryStorage.write(file(ctx),retained)
         val marker = File(file(ctx).parentFile,"history-migrated-v2")
         FileOutputStream(marker).use { it.write("restored portable backup".toByteArray()); it.fd.sync() }
