@@ -177,7 +177,7 @@ class NetworkProbe(
                 connection.requestMethod = method
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
-                connection.setRequestProperty("User-Agent", "TgWatch/1.8 (Android)")
+                connection.setRequestProperty("User-Agent", "TgWatch/1.9 (Android)")
                 connection.responseCode
             } finally { connection.disconnect() }
         }

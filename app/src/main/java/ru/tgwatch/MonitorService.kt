@@ -163,6 +163,7 @@ class MonitorService : Service() {
         override fun onLost(network: Network) { networkRevision++; offlineBackoff.reset(); scheduleCheck(500L) }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                networkRevision++
                 offlineBackoff.reset()
                 scheduleCheck(800L)
             }

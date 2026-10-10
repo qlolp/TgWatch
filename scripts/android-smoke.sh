@@ -34,7 +34,7 @@ bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
 adb root
 adb wait-for-device
 mkdir -p app/build/reports/androidTests/ui-screenshots
-adb pull /sdcard/Android/data/ru.tgwatch/files/screenshots/settings.png app/build/reports/androidTests/ui-screenshots/settings.png
+adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)

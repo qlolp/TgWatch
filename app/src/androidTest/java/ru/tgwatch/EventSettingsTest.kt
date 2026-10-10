@@ -58,11 +58,9 @@ class EventSettingsTest {
                 }
                 instrumentation.waitForIdleSync()
                 android.os.SystemClock.sleep(200)
-                val screenshot = instrumentation.uiAutomation.takeScreenshot()
-                assertNotNull(screenshot)
-                val file = java.io.File(ctx.getExternalFilesDir("screenshots"), "settings.png")
-                java.io.FileOutputStream(file).use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-                screenshot.recycle()
+                // UTP removes the app/data after tests; preserve the image in the emulator's shell-owned directory.
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
+                    .executeShellCommand("screencap -p /data/local/tmp/tgwatch-settings.png")).use { it.readBytes() }
             }
         } finally {
             settings.edit().apply {
