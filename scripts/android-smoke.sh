@@ -34,7 +34,7 @@ bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
 legacy_dir=$(mktemp -d)
 git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
 (cd "$legacy_dir" && bash ./gradlew assembleDebug --no-daemon)
-adb uninstall ru.tgwatch
+if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
 adb install "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
 adb root
 adb wait-for-device
@@ -55,6 +55,8 @@ before=$(last_check)
 adb shell svc wifi disable
 adb shell svc data disable
 sleep 6
+await_observation "$before"
+before=$(last_check)
 adb shell svc wifi enable
 adb shell svc data enable
 await_observation "$before"

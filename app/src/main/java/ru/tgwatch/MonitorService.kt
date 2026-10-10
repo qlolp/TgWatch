@@ -21,19 +21,8 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
-import java.net.ConnectException
 import java.net.HttpURLConnection
-import java.net.SocketException
-import java.net.SocketTimeoutException
-import java.net.URL
-import java.net.UnknownHostException
-import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLException
 
 /**
  * Фоновая служба: раз в N секунд стучится на https://api.telegram.org/,
@@ -80,34 +69,15 @@ class MonitorService : Service() {
 
         const val CHECK_URL = "https://api.telegram.org/"
 
-        private val TG_URLS = listOf(
-            CHECK_URL,
-            "https://web.telegram.org/",
-            "https://core.telegram.org/",
-        )
-
-        private val CONTROL_URLS = listOf(
-            "https://ya.ru/",
-            "https://mail.ru/",
-            "https://vk.com/favicon.ico",
-            "https://www.gstatic.com/generate_204",
-            "https://connectivitycheck.gstatic.com/generate_204",
-        )
-
         private const val CHANNEL_OK = "status_ok_v2"
         private const val CHANNEL_ALERT = "status_alert_v2"
         private const val NOTIFICATION_ID = 1
         private const val VIBRATION_GAP_MS = 5 * 60 * 1000L
-        private const val TIMEOUT_MS = 5_000
-        private const val RETRY_DELAY_MS = 1_500L
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
 
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
         private const val ALARM_MIN_DELAY_MS = 5_000L
-
-        /** Сколько ждём главный адрес, прежде чем подключить резервные. */
-        private const val HEDGE_DELAY_MS = 1_500L
 
         private val COLOR_OK = Color.rgb(0x22, 0x9E, 0xD9)
         private val COLOR_FAIL = Color.rgb(0xE5, 0x39, 0x35)
@@ -140,7 +110,7 @@ class MonitorService : Service() {
         }
 
         fun restorePersistedState(ctx: Context) {
-            if (state.status != Status.UNKNOWN) return
+            if (state.checkedAt > 0L) return
             Prefs.loadLastState(ctx)?.let { state = it }
         }
     }
@@ -153,8 +123,7 @@ class MonitorService : Service() {
     private lateinit var am: AlarmManager
 
     /**
-     * Потоки для параллельных проверок. Блокирующий сетевой запрос нельзя прервать,
-     * поэтому потоков с запасом: «зависший» запрос не задержит следующую проверку.
+     * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
      */
     private val probeExecutor: ExecutorService = NetworkProbe.executor()
 
@@ -254,7 +223,7 @@ class MonitorService : Service() {
         return START_STICKY
     }
 
-    override fun onDestroy() {
+    @Synchronized override fun onDestroy() {
         destroyed = true
         healthHandler.removeCallbacksAndMessages(null)
         running = false
@@ -397,7 +366,8 @@ class MonitorService : Service() {
         return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details)
     }
 
-    private fun handleResult(p: Probe) {
+    @Synchronized private fun handleResult(p: Probe) {
+        if (destroyed) return
         val now = System.currentTimeMillis()
         val prev = state
         val changed = prev.status != p.status

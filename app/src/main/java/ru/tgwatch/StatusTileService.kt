@@ -35,6 +35,7 @@ class StatusTileService : TileService() {
         }
     }
 
+    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag") // API < 33 compatibility branch; newer Android uses NOT_EXPORTED below.
     override fun onStartListening() {
         super.onStartListening()
         listening = true

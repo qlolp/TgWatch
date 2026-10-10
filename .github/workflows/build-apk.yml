@@ -34,6 +34,15 @@ jobs:
       - name: Print lint diagnostics
         if: always()
         run: cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt 2>/dev/null || true
+      - name: Unit test summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          suites = [ET.parse(p).getroot() for p in pathlib.Path('app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')]
+          for key in ('tests', 'failures', 'errors', 'skipped'):
+              print(f'{key}: {sum(int(s.get(key, 0)) for s in suites)}')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: TgWatch-debug-test-only
@@ -86,7 +95,7 @@ jobs:
         run: |
           gh release create "v1.7.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
             --target "$GITHUB_SHA" --title "TG Монитор 1.7.${GITHUB_RUN_NUMBER}" \
-            --notes 'Подписанная сборка. При переходе со старого APK с другой debug-подписью потребуется один раз переустановить приложение. Сначала экспортируйте историю.' --latest
+            --notes 'Подписанная сборка с постоянным ключом. Перед переходом со старой debug-подписи прочтите раздел установки в README: несовпадение подписей блокирует обновление, удаление приложения стирает его данные.' --latest
   android:
     runs-on: ubuntu-latest
     strategy:
