@@ -44,5 +44,15 @@
             android:maxLines="1"
             android:textColor="@color/on_status"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widgetLastSuccess"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:alpha="0.9"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/on_status"
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

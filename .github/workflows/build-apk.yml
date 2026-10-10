@@ -11,12 +11,13 @@ on:
         default: false
 permissions:
   contents: read
-concurrency:
-  group: tgwatch-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      # A push may cancel older push checks, never a manual publication's checks.
+      group: tgwatch-check-build-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,8 +25,28 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Release policy regression tests
+        run: |
+          python3 -m pip install -r scripts/requirements-release.txt
+          python3 -m unittest discover -s scripts/tests -v
       - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease --no-daemon --stacktrace
+        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom --no-daemon --stacktrace
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.75.0
+      - name: Gate release runtime SBOM on HIGH and CRITICAL vulnerabilities
+        run: bash scripts/scan-sbom.sh app/build/reports/sbom/TgWatch.sbom.cdx.json app/build/reports/sbom/TgWatch.trivy.json
+      - name: SBOM and vulnerability scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            app/build/reports/sbom/TgWatch.sbom.cdx.json
+            app/build/reports/sbom/TgWatch.trivy.json
+            app/build/reports/sbom/TgWatch.trivy.status.json
+            app/build/reports/sbom/TgWatch.trivy.log
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,12 +76,16 @@ jobs:
           if [ "$SIGNING_READY" = true ]; then
             echo 'Production signing key configured.' >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'Production signing is not configured. Run scripts/configure-signing.sh on a trusted machine; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Production signing is not configured. Use scripts/configure-signing.sh restore with the backed-up key, or explicit init for a first key on a trusted machine; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
           fi
   release:
     needs: [build, android]
     if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      # Serial across branches/run numbers; checks have separate cancellable groups.
+      group: tgwatch-publication-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -70,6 +95,18 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Download this run's successful SBOM scan
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-reports
+          path: release-evidence
+      - name: Validate scan evidence
+        run: |
+          python3 -m pip install -r scripts/requirements-release.txt
+          python3 - <<'PY'
+          import json, pathlib
+          assert json.loads(pathlib.Path('release-evidence/TgWatch.trivy.status.json').read_text())['status'] == 'passed'
+          PY
       - name: Build with persistent signing key
         env:
           TGWATCH_KEYSTORE_BASE64: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
@@ -86,10 +123,13 @@ jobs:
           trap 'rm -f "$TGWATCH_KEYSTORE_PATH"' EXIT
           umask 077
           printf '%s' "$TGWATCH_KEYSTORE_BASE64" | base64 --decode > "$TGWATCH_KEYSTORE_PATH"
-          bash ./gradlew assembleRelease --no-daemon
+          bash ./gradlew assembleRelease generateReleaseSbom --no-daemon
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
+          cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json
+          cp release-evidence/TgWatch.sbom.cdx.json TgWatch.sbom.cdx.json
+          cp release-evidence/TgWatch.trivy.json TgWatch.trivy.json
       - name: Verify signing continuity with published 1.8.33
         env:
           GH_TOKEN: ${{ github.token }}
@@ -132,12 +172,15 @@ jobs:
         run: |
           set -euo pipefail
           version=$(sed -n 's/^[[:space:]]*versionName = "\([0-9.]*\)".*/\1/p' app/build.gradle.kts)
-          [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]
-          gh release create "v${version}.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
-            --target "$GITHUB_SHA" --title "TG Монитор ${version}.${GITHUB_RUN_NUMBER}" \
-            --notes-file "docs/releases/${version}.md" --latest
+          python3 scripts/release-policy.py --repo "$GITHUB_REPOSITORY" \
+            --version "$version" --run-number "$GITHUB_RUN_NUMBER" --sha "$GITHUB_SHA" \
+            --notes "docs/releases/${version}.md" \
+            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json
   android:
     runs-on: ubuntu-latest
+    concurrency:
+      group: tgwatch-check-android-${{ matrix.api }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:

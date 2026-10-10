@@ -18,11 +18,15 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import java.net.HttpURLConnection
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Bounded parallel MTProto/HTTPS monitoring with a persistent status and optional event alerts.
@@ -90,11 +94,15 @@ class MonitorService : Service() {
         var state = State()
             private set
 
+        @Volatile private var activeService: MonitorService? = null
+
         fun start(ctx: Context) {
+            if (BackupManager.hasPending(ctx)) return
             ctx.startForegroundService(Intent(ctx, MonitorService::class.java).setAction(ACTION_START))
         }
 
         fun send(ctx: Context, action: String) {
+            if (BackupManager.hasPending(ctx)) return
             val intent = Intent(ctx, MonitorService::class.java).setAction(action)
             if (running) {
                 ctx.startService(intent)
@@ -107,6 +115,29 @@ class MonitorService : Service() {
             ctx.stopService(Intent(ctx, MonitorService::class.java))
         }
 
+        /** Wait for history/log teardown, not merely the early running=false publication. */
+        fun stopAndAwait(ctx: Context, timeoutMs: Long = 10_000L) {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                check(activeService == null) { "Cannot await a live service on the main thread" }
+                return // Application startup, before service creation.
+            }
+            val captured = AtomicReference<MonitorService?>()
+            val requested = CountDownLatch(1)
+            val deadline = SystemClock.elapsedRealtime() + timeoutMs
+            Handler(Looper.getMainLooper()).post {
+                captured.set(activeService)
+                stop(ctx)
+                requested.countDown()
+            }
+            check(requested.await(timeoutMs, TimeUnit.MILLISECONDS)) { "Service stop request timed out" }
+            captured.get()?.let {
+                check(it.stopped.await((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0),
+                    TimeUnit.MILLISECONDS)) { "Service teardown timed out" }
+            }
+        }
+
+        fun clearRestoredState() { state = State() }
+
         fun restorePersistedState(ctx: Context) {
             if (state.checkedAt > 0L) return
             Prefs.loadLastState(ctx)?.let { state = it }
@@ -114,6 +145,7 @@ class MonitorService : Service() {
     }
 
     private lateinit var workerThread: HandlerThread
+    private val stopped = CountDownLatch(1)
     private lateinit var worker: Handler
     private lateinit var nm: NotificationManager
     private lateinit var cm: ConnectivityManager
@@ -172,6 +204,7 @@ class MonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        activeService = this
         nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -205,7 +238,7 @@ class MonitorService : Service() {
         val action = intent?.action
         if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (action == ACTION_STOP) Prefs.setEnabled(this, false)
-        if (!Prefs.isEnabled(this)) {
+        if (!Prefs.isEnabled(this) || BackupManager.hasPending(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -226,6 +259,7 @@ class MonitorService : Service() {
     }
 
     @Synchronized override fun onDestroy() {
+        try {
         destroyed = true
         healthHandler.removeCallbacksAndMessages(null)
         running = false
@@ -242,7 +276,7 @@ class MonitorService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         nm.cancel(NOTIFICATION_ID)
         if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
-        History.endSession(this)
+        if (loopStarted) History.endSession(this)
         if (!Prefs.isEnabled(this)) {
             Prefs.clearLastState(this)
             WatchdogReceiver.cancel(this)
@@ -253,6 +287,10 @@ class MonitorService : Service() {
         state = State()
         broadcastState()
         super.onDestroy()
+        } finally {
+            if (activeService === this) activeService = null
+            stopped.countDown()
+        }
     }
 
     private fun seedVibrationCooldown() {
@@ -409,6 +447,7 @@ class MonitorService : Service() {
             expectedIntervalSec = offlineBackoff.next(p.status.name,
                 Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive)),
         )
+        LastSuccessStore.record(this, newState.status.name, newState.checkedAt)
         state = newState
         Prefs.saveLastState(
             this, newState.status, newState.checkedAt, newState.since,

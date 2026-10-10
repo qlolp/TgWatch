@@ -14,3 +14,5 @@ local.properties
 *.keystore
 *.p12
 *signing-password*.txt
+__pycache__/
+*.py[cod]

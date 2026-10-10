@@ -7,6 +7,10 @@ package ru.tgwatch
  */
 object ProbeRules {
 
+    fun quietHoursMinutesLabel(startMinute: Int, endMinute: Int): String = QuietHours.label(startMinute, endMinute)
+    fun inQuietHoursMinutes(minuteOfDay: Int, startMinute: Int, endMinute: Int): Boolean =
+        QuietHours.contains(minuteOfDay, startMinute, endMinute)
+
     const val BAD_INTERVAL_SEC = 10
     const val SCREEN_OFF_INTERVAL_SEC = 60
 
@@ -46,15 +50,11 @@ object ProbeRules {
 
     /** «23:00–08:00» для подписи переключателя тихих часов. */
     fun quietHoursLabel(startHour: Int, endHour: Int): String =
-        String.format(java.util.Locale.ROOT, "%02d:00–%02d:00", startHour.coerceIn(0, 23), endHour.coerceIn(0, 23))
+        QuietHours.label(startHour.coerceIn(0, 23) * 60, endHour.coerceIn(0, 23) * 60)
 
     /** Тихие часы: например 23→8 пересекает полночь. */
-    fun inQuietHours(hourOfDay: Int, startHour: Int, endHour: Int): Boolean {
-        val h = hourOfDay.coerceIn(0, 23)
-        val start = startHour.coerceIn(0, 23)
-        val end = endHour.coerceIn(0, 23)
-        if (start == end) return false
-        return if (start < end) h in start until end else h >= start || h < end
-    }
+    fun inQuietHours(hourOfDay: Int, startHour: Int, endHour: Int): Boolean =
+        QuietHours.contains(hourOfDay.coerceIn(0, 23) * 60,
+            startHour.coerceIn(0, 23) * 60, endHour.coerceIn(0, 23) * 60)
 }
 

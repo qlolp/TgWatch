@@ -2,20 +2,35 @@ package ru.tgwatch
 
 import android.content.Context
 import android.os.UserManager
+import android.os.SystemClock
 import android.util.Log
 import java.io.File
 
 /** Seven-day bounded timeline in device-protected storage. */
 object History {
     class Minute(val minute: Long, var ok: Int = 0, var fail: Int = 0, var offline: Int = 0,
-        var latencySum: Long = 0L, var partial: Int = 0, var unknown: Int = 0) {
+        latencySum: Long = 0L, var partial: Int = 0, var unknown: Int = 0) {
+        private var latencyTotal = LatencyTotal(latencySum)
+        var latencySum: Long
+            get() = latencyTotal.saturatedSum
+            set(value) { latencyTotal = LatencyTotal(value) }
         val total get() = ok + fail + offline + partial + unknown
-        val avgLatency get() = if (ok > 0) latencySum / ok else -1L
+        val avgLatency get() = latencyTotal.average(ok)
         val isFailDominant get() = fail > 0 && fail >= ok && fail >= offline && fail >= partial && fail >= unknown
         val isOfflineDominant get() = offline > 0 && offline >= ok && offline > fail && offline >= partial && offline >= unknown
         val isPartialDominant get() = partial > 0 && partial >= ok && partial >= fail && partial >= offline
         val isUnknownDominant get() = unknown > 0 && unknown >= ok && unknown >= fail && unknown >= offline && unknown >= partial
-        fun copy() = Minute(minute, ok, fail, offline, latencySum, partial, unknown)
+        fun addLatency(latency: Long) { ok++; latencyTotal.add(latency) }
+        fun copy() = Minute(minute, ok, fail, offline, 0L, partial, unknown).also {
+            it.latencyTotal = latencyTotal.copy()
+        }
+        companion object {
+            fun merge(minute: Long, values: List<Minute>): Minute = Minute(minute,
+                values.sumOf { it.ok }, values.sumOf { it.fail }, values.sumOf { it.offline },
+                0L, values.sumOf { it.partial }, values.sumOf { it.unknown }).also { merged ->
+                    values.forEach { merged.latencyTotal.merge(it.latencyTotal) }
+                }
+        }
     }
     enum class Kind { OK, FAIL, OFFLINE, PARTIAL, UNKNOWN }
     data class DayStats(val uptimePercent: Double, val checks: Long, val telegramChecks: Long,
@@ -29,6 +44,7 @@ object History {
     private var migrated = false
     private var lastCompacted = 0L
     private val statsCache = mutableMapOf<String, TimeStats>()
+    private val appendSync = HistoryStorage.AppendSyncPolicy()
     @Volatile var version = 0L
         private set
 
@@ -55,10 +71,9 @@ object History {
         if (samples.size > 65_000) samples = samples.takeLast(65_000).toMutableList()
     }
     private fun ensureClock(ctx: Context, now: Long) {
-        val current = Timeline.current(samples)
-        if (current.any { it.at > now }) {
-            val epoch = (current.firstOrNull()?.clockEpoch ?: 0L) + 1
-            samples.add(Observation(now, now + 1, "UNKNOWN", clockEpoch = epoch))
+        val rolled = Timeline.clockRollback(samples, now)
+        if (rolled !== samples) {
+            samples = rolled.toMutableList()
             version++
             flush(ctx)
         }
@@ -79,7 +94,13 @@ object History {
             if (now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
                 HistoryStorage.write(file(ctx), samples)
                 lastCompacted = now
-            } else HistoryStorage.append(file(ctx), samples.last())
+                appendSync.saved(status, SystemClock.elapsedRealtime(), true)
+            } else {
+                val elapsed = SystemClock.elapsedRealtime()
+                val sync = appendSync.needsSync(status, elapsed)
+                HistoryStorage.append(file(ctx), samples.last(), sync)
+                appendSync.saved(status, elapsed, sync)
+            }
         } catch (e: Exception) { Log.w("TgWatch", "history save", e) }
     }
     @Synchronized fun endSession(ctx: Context, now: Long = System.currentTimeMillis()) {
@@ -120,7 +141,7 @@ object History {
         for (s in Timeline.current(samples).filter { it.at / 60_000L >= from && it.at <= now }) {
             val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
             when (s.kind) {
-                "OK" -> { m.ok++; m.latencySum += s.latencyMs.coerceAtLeast(0) }
+                "OK" -> m.addLatency(s.latencyMs)
                 "TG_DOWN" -> m.fail++
                 "NO_NETWORK" -> m.offline++
                 "PARTIAL" -> m.partial++
@@ -136,6 +157,28 @@ object History {
         prune(now)
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }
+    @Synchronized fun snapshot(ctx: Context): List<Observation> {
+        check(ready(ctx)) { "История временно недоступна" }
+        prune(System.currentTimeMillis())
+        return samples.toList()
+    }
+    @Synchronized fun replaceSnapshot(ctx: Context, rows: List<Observation>) {
+        val now = System.currentTimeMillis()
+        val retained = HistoryStorage.replace(file(ctx), rows, now - KEEP_MS)
+        // A restored snapshot supersedes legacy history on subsequent process starts too.
+        val marker = File(file(ctx).parentFile, "history-migrated-v2")
+        if (!marker.exists()) java.io.FileOutputStream(marker).use {
+            it.write("restored snapshot supersedes legacy history".toByteArray(Charsets.UTF_8))
+            it.fd.sync()
+        }
+        samples = retained.toMutableList()
+        loaded = true
+        migrated = true
+        lastCompacted = now
+        appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
+        statsCache.clear()
+        version++
+    }
     fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
     fun describeStats(s: TimeStats, days: Int): String = buildString {
         append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
@@ -147,11 +190,17 @@ object History {
         if (s.outageCount > 0) append(if (s.lastOutageOngoing) "Текущий сбой: " else "Последний наблюдаемый сбой: ")
             .append(recoveryDurationStr(s.lastOutageMs)).append('\n')
         append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
+        append("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n")
+        if (s.mttrMs >= 0) append("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n")
+        append("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n")
         append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
     }
     @Synchronized fun flush(ctx: Context) {
         if (!loaded) return
-        try { HistoryStorage.write(file(ctx), samples) } catch (e: Exception) { Log.w("TgWatch", "history flush", e) }
+        try {
+            HistoryStorage.write(file(ctx), samples)
+            appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
+        } catch (e: Exception) { Log.w("TgWatch", "history flush", e) }
     }
 }
 
@@ -167,8 +216,7 @@ object EventLog {
         items?.let { return it }
         synchronized(this) {
             val loaded = Prefs.sp(ctx).getString(KEY, null)
-                ?.split('\n')
-                ?.filter { it.isNotBlank() }
+                ?.let { EventLogStorage.decode(it) }
                 ?: emptyList()
             if (items == null) items = loaded
             return items!!
@@ -181,13 +229,21 @@ object EventLog {
             .format(java.util.Date())
         val updated = (listOf("$time  $message") + all(ctx)).take(MAX)
         items = updated
-        Prefs.sp(ctx).edit().putString(KEY, updated.joinToString("\n")).apply()
+        Prefs.sp(ctx).edit().putString(KEY, EventLogStorage.encode(updated)).apply()
     }
 
     @Synchronized
     fun clear(ctx: Context) {
         items = emptyList()
         Prefs.sp(ctx).edit().remove(KEY).apply()
+    }
+
+    @Synchronized
+    fun replace(ctx: Context, restored: List<String>) {
+        val replacement = restored.toList()
+        val encoded = EventLogStorage.encode(replacement)
+        check(Prefs.sp(ctx).edit().putString(KEY, encoded).commit()) { "Cannot save event log" }
+        items = replacement
     }
 
     fun exportText(ctx: Context): String {

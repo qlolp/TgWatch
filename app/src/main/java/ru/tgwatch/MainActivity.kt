@@ -99,10 +99,15 @@ class MainActivity : Activity() {
     private var advancedExpanded = false
     private lateinit var advancedSettings: View
     private lateinit var btnAdvanced: Button
+    private lateinit var backupUi: BackupUi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        backupUi = BackupUi(this)
+        findViewById<Button>(R.id.btnBackup).setOnClickListener { backupUi.export() }
+        findViewById<Button>(R.id.btnRestore).setOnClickListener { backupUi.restore() }
+        findViewById<Button>(R.id.btnImportCsv).setOnClickListener { backupUi.importCsv() }
         historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
         exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
         advancedExpanded = savedInstanceState?.getBoolean("advanced_expanded", false) ?: false
@@ -309,6 +314,12 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    override fun onDestroy() {
+        backupUi.close()
+        colorAnimator?.cancel()
+        super.onDestroy()
+    }
+
     private fun startMonitor() {
         try {
             MonitorService.start(this)
@@ -335,23 +346,23 @@ class MainActivity : Activity() {
     }
 
     private fun updateQuietHoursLabel() {
-        val label = ProbeRules.quietHoursLabel(Prefs.quietStartHour(this), Prefs.quietEndHour(this))
+        val label = ProbeRules.quietHoursMinutesLabel(Prefs.quietStartMinute(this), Prefs.quietEndMinute(this))
         swQuietHours.text = "Тихие часы $label (без вибрации)"
     }
 
-    /** Два шага: сначала час начала тихих часов, затем час окончания. */
+    /** Сначала время начала тихих часов, затем время окончания. */
     private fun pickQuietHours() {
-        TimePickerDialog(this, { _, startHour, _ ->
-            TimePickerDialog(this, { _, endHour, _ ->
-                Prefs.setQuietHours(this, startHour, endHour)
+        TimePickerDialog(this, { _, startHour, startMinute ->
+            TimePickerDialog(this, { _, endHour, endMinute ->
+                Prefs.setQuietHoursMinutes(this, startHour * 60 + startMinute, endHour * 60 + endMinute)
                 Prefs.setQuietHoursEnabled(this, true)
                 swQuietHours.isChecked = true
                 updateQuietHoursLabel()
-            }, Prefs.quietEndHour(this), 0, true).apply {
+            }, Prefs.quietEndMinute(this) / 60, Prefs.quietEndMinute(this) % 60, true).apply {
                 setTitle("Конец тихих часов")
                 show()
             }
-        }, Prefs.quietStartHour(this), 0, true).apply {
+        }, Prefs.quietStartMinute(this) / 60, Prefs.quietStartMinute(this) % 60, true).apply {
             setTitle("Начало тихих часов")
             show()
         }
@@ -414,6 +425,15 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
+        if (BackupManager.hasPending(this)) {
+            btnToggle.isEnabled = false
+            btnCheck.isEnabled = false
+            tvTitle.text = "Незавершённое восстановление"
+            tvSince.text = "Мониторинг выключен"
+            tvReason.text = "Нажмите «Восстановить резервную копию», чтобы завершить замену данных."
+            return
+        }
+        btnToggle.isEnabled = true
         val now = System.currentTimeMillis()
         val running = MonitorService.running
         val s = MonitorService.state
@@ -579,6 +599,7 @@ class MainActivity : Activity() {
     @Deprecated("Platform activity result API for dependency-free native UI")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (backupUi.onResult(requestCode, resultCode, data)) return
         if (requestCode != 20 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         val days = exportDays

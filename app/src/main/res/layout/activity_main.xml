@@ -226,6 +226,9 @@
                 android:layout_marginTop="4dp"
                 android:text="Поделиться сводкой" />
             <Button android:id="@+id/btnExportCsv" style="@style/ButtonText" android:text="Сохранить CSV" />
+            <Button android:id="@+id/btnImportCsv" style="@style/ButtonText" android:text="Импортировать CSV" />
+            <Button android:id="@+id/btnBackup" style="@style/ButtonText" android:text="Зашифрованная резервная копия" />
+            <Button android:id="@+id/btnRestore" style="@style/ButtonText" android:text="Восстановить резервную копию" />
             <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="Диагностика подключения" />
             <TextView android:id="@+id/tvDiagnostics" style="@style/Body" android:visibility="gone" android:textIsSelectable="true" />
         </LinearLayout>

@@ -22,10 +22,28 @@ object MtProto {
         if (payload.size < 76 || payload.size > 4096 || nonce.size != 16) return false
         val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
         if (buffer.long != 0L) return false
-        buffer.long
+        val messageId = buffer.long
+        // Server messages have low bits 01 (response) or 11 (notification).
+        if (messageId <= 0 || messageId and 1L != 1L) return false
         val bodySize = buffer.int
-        if (bodySize != payload.size - 20 || bodySize < 56 || buffer.int != 0x05162463) return false
-        return payload.copyOfRange(24, 40).contentEquals(nonce)
+        if (bodySize != payload.size - 20 || bodySize < 56 || bodySize % 4 != 0 ||
+            buffer.int != 0x05162463) return false
+        for (expected in nonce) if (buffer.get() != expected) return false
+        // server_nonce is an opaque int128: presence, rather than its value, is validated.
+        buffer.position(buffer.position() + 16)
+        // pq is a big-endian unsigned 64-bit integer encoded as TL bytes. Its bounded
+        // size uses the canonical one-byte length; 254/255 encodings cannot be valid.
+        val pqSize = buffer.get().toInt() and 0xff
+        if (pqSize !in 1..8) return false
+        val padding = (4 - (pqSize + 1) % 4) % 4
+        if (buffer.remaining() < pqSize + padding + 8) return false
+        buffer.position(buffer.position() + pqSize)
+        repeat(padding) { if (buffer.get() != 0.toByte()) return false }
+        if (buffer.int != 0x1cb5c415) return false
+        val fingerprints = buffer.int
+        // Exact remaining length prevents overflow, truncated vectors and trailing data.
+        return fingerprints > 0 && buffer.remaining() % 8 == 0 &&
+            fingerprints == buffer.remaining() / 8
     }
     fun probe(host: String, socketFactory: () -> Socket, cancellation: ProbeCancellation): Boolean {
         val nonce = ByteArray(16).also { SecureRandom().nextBytes(it) }
@@ -43,8 +61,16 @@ object MtProto {
             output.flush()
             val input = DataInputStream(socket.getInputStream())
             val first = input.readUnsignedByte()
-            val words = if (first == 0x7f) input.readUnsignedByte() or (input.readUnsignedByte() shl 8) or
-                (input.readUnsignedByte() shl 16) else first
+            val words = if (first == 0x7f) {
+                val extended = input.readUnsignedByte() or (input.readUnsignedByte() shl 8) or
+                    (input.readUnsignedByte() shl 16)
+                if (extended < 0x7f) return false
+                extended
+            } else {
+                // No quick-ack flag or reserved byte is valid in this greeting response.
+                if (first >= 0x7f) return false
+                first
+            }
             if (words !in 19..1024) return false
             val response = ByteArray(words * 4)
             input.readFully(response)

@@ -50,8 +50,7 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         nowMinute = now / 60_000L
         val first = nowMinute - window + 1
         minutes = data.groupBy { first + ((it.minute - first) / bucketMinutes) * bucketMinutes }.map { (key, values) ->
-            History.Minute(key, values.sumOf { it.ok }, values.sumOf { it.fail }, values.sumOf { it.offline },
-                values.sumOf { it.latencySum }, values.sumOf { it.partial }, values.sumOf { it.unknown })
+            History.Minute.merge(key, values)
         }
         contentDescription = describe()
         invalidate()
@@ -151,9 +150,9 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         canvas.drawText("${scale.toLong()} мс", 0f, top - 4f * dp, textPaint)
         canvas.drawText(if (windowMinutes > 60) "7 дней назад" else "60 мин назад", 0f, height - 2f * dp, textPaint)
         textPaint.textAlign = Paint.Align.RIGHT
-        val avg = minutes.mapNotNull { m -> m.avgLatency.takeIf { it >= 0 } }.average().takeIf { !it.isNaN() }
+        val avg = History.Minute.merge(0L, minutes).avgLatency
         canvas.drawText(
-            if (avg != null) "сейчас · ср. ${avg.toLong()} мс" else "сейчас",
+            if (avg >= 0) "сейчас · ср. $avg мс" else "сейчас",
             w, height - 2f * dp, textPaint
         )
     }
@@ -162,7 +161,9 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val ok = minutes.sumOf { it.ok }
         val fail = minutes.sumOf { it.fail }
         val offline = minutes.sumOf { it.offline }
-        return "За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline. Нажми столбик, чтобы увидеть детали."
+        val avg = History.Minute.merge(0L, minutes).avgLatency
+        return "За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline." +
+            (if (avg >= 0) " Среднее время ответа: $avg мс." else "") + " Нажми столбик, чтобы увидеть детали."
     }
 }
 

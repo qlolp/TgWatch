@@ -10,8 +10,6 @@ import java.net.Socket
 import java.net.SocketAddress
 import java.net.SocketTimeoutException
 import java.net.URL
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class EndpointFallbackTest {
     @Test fun backupDcCanConfirmMtprotoWhenOriginalTwoDcsFail() {
@@ -50,9 +48,8 @@ class EndpointFallbackTest {
             // Abridged header (2 bytes), unencrypted header + constructor (24), then nonce.
             val nonce = request.toByteArray().copyOfRange(26, 42)
             if (wrongNonce) nonce[0] = (nonce[0].toInt() xor 1).toByte()
-            val response = ByteBuffer.allocate(76).order(ByteOrder.LITTLE_ENDIAN)
-                .putLong(0).putLong(1).putInt(56).putInt(0x05162463).put(nonce).array()
-            return ByteArrayInputStream(byteArrayOf(19) + response)
+            val response = MtProtoFixtures.response(nonce)
+            return ByteArrayInputStream(byteArrayOf((response.size / 4).toByte()) + response)
         }
     }
 }
