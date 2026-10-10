@@ -72,7 +72,7 @@ class MonitorService : Service() {
         private const val CHANNEL_OK = "status_ok_v2"
         private const val CHANNEL_ALERT = "status_alert_v2"
         private const val NOTIFICATION_ID = 1
-        private const val VIBRATION_GAP_MS = 5 * 60 * 1000L
+        private const val VIBRATION_GAP_MS = AlertRules.GAP_MS
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
 
@@ -373,26 +373,22 @@ class MonitorService : Service() {
         val changed = prev.status != p.status
         var lastVibration = prev.lastVibrationAt
 
-        val shouldAlarm = when (p.status) {
-            Status.TG_DOWN -> Prefs.vibrateEnabled(this)
-            Status.NO_NETWORK -> Prefs.vibrateOffline(this)
-            else -> false
-        }
-        if (shouldAlarm && Prefs.alertsAllowed(this, now)) {
-            val mono = SystemClock.elapsedRealtime()
-            if (lastVibrationMono < 0L || mono - lastVibrationMono >= VIBRATION_GAP_MS) {
-                lastVibrationMono = mono
-                lastVibration = now
-                try {
-                    Vibe.alarm(this)
-                } catch (e: Exception) {
-                    Log.w(TAG, "vibrate", e)
-                }
+        val partialAlert = Prefs.vibratePartial(this)
+        val mono = SystemClock.elapsedRealtime()
+        val alertsAllowed = Prefs.alertsAllowed(this, now)
+        if (AlertRules.shouldAlarm(p.status.name, Prefs.vibrateEnabled(this), Prefs.vibrateOffline(this),
+                partialAlert, alertsAllowed, mono, lastVibrationMono)) {
+            lastVibrationMono = mono
+            lastVibration = now
+            try {
+                Vibe.alarm(this)
+            } catch (e: Exception) {
+                Log.w(TAG, "vibrate", e)
             }
         }
 
-        val recovered = changed && p.status == Status.OK && prev.bad
-        if (recovered && Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this, now)) {
+        val recovered = AlertRules.recovered(prev.status.name, p.status.name, partialAlert)
+        if (recovered && Prefs.vibrateOnRecovery(this) && alertsAllowed) {
             try {
                 Vibe.recovery(this)
             } catch (e: Exception) {

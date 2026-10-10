@@ -251,12 +251,26 @@
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
-
-            <TextView
-                style="@style/CardTitle"
-                android:text="Как часто проверять" />
-
+            <TextView style="@style/CardTitle" android:text="Расход батареи" />
             <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="Профиль: Обычный" />
+            <Button
+                android:id="@+id/btnAdvanced"
+                style="@style/ButtonText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="Дополнительные настройки ▾" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/advancedSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="Интервалы и оповещения" />
             <RadioGroup
                 android:id="@+id/rgInterval"
                 android:layout_width="match_parent"
@@ -321,6 +335,21 @@
                 android:text="Вибрация, если недоступен Telegram"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
+
+            <Switch
+                android:id="@+id/swVibratePartial"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="Вибрация при частичной доступности"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Сигнал, если отвечает только MTProto или только веб. Все сигналы сбоев учитывают тихие часы и срабатывают не чаще раза в 5 минут."
+                android:textSize="12sp" />
 
             <Switch
                 android:id="@+id/swVibrateOffline"
@@ -448,6 +477,8 @@
                     style="@style/ButtonText"
                     android:text="Очистить" />
             </LinearLayout>
+        </LinearLayout>
+
         </LinearLayout>
 
         <TextView
