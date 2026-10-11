@@ -6,8 +6,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.drawable.Icon
@@ -244,6 +246,16 @@ class MonitorService : Service() {
         }
     }
 
+    /** Unlocking after sleep should not show a result from the long screen-off interval. */
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (checkStartedMono == 0L &&
+                ProbeRules.refreshOnScreenOn(state.checkedElapsed, SystemClock.elapsedRealtime())) {
+                scheduleCheck(0L)
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -271,6 +283,8 @@ class MonitorService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "registerDefaultNetworkCallback", e)
         }
+        // SCREEN_ON is a protected system broadcast, so no export flag is needed.
+        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -326,6 +340,11 @@ class MonitorService : Service() {
             cm.unregisterNetworkCallback(networkCallback)
         } catch (e: Exception) {
             Log.w(TAG, "unregisterNetworkCallback", e)
+        }
+        try {
+            unregisterReceiver(screenOnReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "unregisterReceiver", e)
         }
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)

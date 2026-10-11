@@ -41,6 +41,13 @@ object ProbeRules {
         return now - checkedAt > expected * 3L * 1000L
     }
 
+    /** Screen-on refreshes only a result older than this; quick glances reuse the last check. */
+    const val SCREEN_ON_REFRESH_MS = 30_000L
+
+    /** [checkedElapsed] 0 means no check in this process yet: its first check is already queued. */
+    fun refreshOnScreenOn(checkedElapsed: Long, nowElapsed: Long): Boolean =
+        checkedElapsed > 0L && nowElapsed - checkedElapsed > SCREEN_ON_REFRESH_MS
+
     /** Минуты без проверок между первой и последней записанной. */
     fun unmonitoredMinutes(recordedMinutes: LongArray): Int {
         if (recordedMinutes.size < 2) return 0
