@@ -154,14 +154,14 @@ object History {
         return bins.values.map { it.copy() }
     }
     @Synchronized fun exportCsv(ctx: Context, days: Int = 7): String {
-        check(ready(ctx)) { "История временно недоступна" }
+        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
         val now = System.currentTimeMillis()
         ensureClock(ctx, now)
         prune(now)
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }
     @Synchronized fun snapshot(ctx: Context): List<Observation> {
-        check(ready(ctx)) { "История временно недоступна" }
+        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
         prune(System.currentTimeMillis())
         return samples.toList()
     }
@@ -184,7 +184,7 @@ object History {
     }
     fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
     @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
-        check(ready(ctx)) { "История временно недоступна" }
+        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
         ensureClock(ctx,now)
         prune(now)
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
@@ -200,20 +200,20 @@ object History {
         replaceSnapshot(ctx, replacement)
     }
     fun describeStats(s: TimeStats, days: Int): String = buildString {
-        append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
-        if (s.uptimePercent >= 0) append("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n")
-        append("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n")
-        append("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n")
-        append("Нет данных: ${durationStr(s.unknownMs)}\n")
-        append("Подтверждённых эпизодов сбоя Telegram: ${s.outageCount}; потерь сети: ${s.offlineCount}\n")
-        if (s.outageCount > 0) append(if (s.lastOutageOngoing) "Текущий сбой: " else "Последний наблюдаемый сбой: ")
+        append(Lang.t("TG Монитор — ", "TG Monitor — ")).append(if (days == 1) Lang.t("за сутки", "last 24 hours") else Lang.t("за неделю", "last week")).append('\n')
+        if (s.uptimePercent >= 0) append(Lang.t("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n", "Time-based availability estimate: ${formatPercent(s.uptimePercent)}\n"))
+        append(Lang.t("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n", "Reachable: ${durationStr(s.okMs)}; partially: ${durationStr(s.partialMs)}\n"))
+        append(Lang.t("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n", "Telegram outage: ${durationStr(s.downMs)}; no internet: ${durationStr(s.offlineMs)}\n"))
+        append(Lang.t("Нет данных: ${durationStr(s.unknownMs)}\n", "No data: ${durationStr(s.unknownMs)}\n"))
+        append(Lang.t("Подтверждённых эпизодов сбоя Telegram: ${s.outageCount}; потерь сети: ${s.offlineCount}\n", "Confirmed Telegram outages: ${s.outageCount}; internet losses: ${s.offlineCount}\n"))
+        if (s.outageCount > 0) append(if (s.lastOutageOngoing) Lang.t("Текущий сбой: ", "Current outage: ") else Lang.t("Последний наблюдаемый сбой: ", "Last observed outage: "))
             .append(recoveryDurationStr(s.lastOutageMs)).append('\n')
-        append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
-        append("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n")
-        if (s.mttrMs >= 0) append("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n")
-        append("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n")
-        append("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n")
-        append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
+        append(Lang.t("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n", "Longest confirmed outage: ${durationStr(s.longestOutageMs)}\n"))
+        append(Lang.t("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n", "Completed fully observed outages: ${s.completedOutageCount}\n"))
+        if (s.mttrMs >= 0) append(Lang.t("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n", "Mean time to recovery (MTTR): ${recoveryDurationStr(s.mttrMs)}\n"))
+        append(Lang.t("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n", "Checks: OK ${s.okChecks}; outage ${s.downChecks}; partial ${s.partialChecks}; no internet ${s.offlineChecks}; no data ${s.unknownChecks}\n"))
+        append(Lang.t("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n", "MTTR covers fully observed Telegram outages between OK checks; PARTIAL can extend an outage, while gaps and lost internet are excluded.\n"))
+        append(Lang.t("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.", "Checks: ${s.checks}. Time between checks is estimated; gaps are excluded from the percentage."))
     }
     @Synchronized fun flush(ctx: Context) {
         if (!loaded) return
@@ -269,7 +269,7 @@ object EventLog {
 
     fun exportText(ctx: Context): String {
         val log = all(ctx)
-        return if (log.isEmpty()) "Журнал пуст" else log.joinToString("\n")
+        return if (log.isEmpty()) Lang.t("Журнал пуст", "The log is empty") else log.joinToString("\n")
     }
 }
 

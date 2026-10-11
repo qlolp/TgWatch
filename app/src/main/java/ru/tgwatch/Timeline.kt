@@ -25,9 +25,9 @@ data class RecoveryEvent(val durationMs: Long)
 fun recoveryDurationStr(ms: Long): String {
     val seconds = (ms / 1000).coerceAtLeast(0)
     return buildList {
-        if (seconds >= 3600) add("${seconds / 3600} ч")
-        if (seconds >= 60) add("${seconds / 60 % 60} мин")
-        add("${seconds % 60} с")
+        if (seconds >= 3600) add(Lang.t("${seconds / 3600} ч", "${seconds / 3600} h"))
+        if (seconds >= 60) add(Lang.t("${seconds / 60 % 60} мин", "${seconds / 60 % 60} min"))
+        add(Lang.t("${seconds % 60} с", "${seconds % 60} s"))
     }.joinToString(" ")
 }
 

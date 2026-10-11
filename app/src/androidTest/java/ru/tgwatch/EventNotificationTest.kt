@@ -23,8 +23,9 @@ class EventNotificationTest {
         try {
             events.recovered(RecoveryEvent(1_044_000), sound = true, allowed = false)
             val recovery = awaitNotification(manager, EventNotifications.RECOVERY_ID)
-            assertEquals("Telegram снова доступен", recovery.extras.getString(Notification.EXTRA_TITLE))
-            assertTrue(recovery.extras.getString(Notification.EXTRA_TEXT)!!.contains("17 мин 24 с"))
+            // Event text follows the app language (Lang is set from resources, so en-US emulators see English).
+            assertEquals(Lang.t("Telegram снова доступен", "Telegram is back"), recovery.extras.getString(Notification.EXTRA_TITLE))
+            assertTrue(recovery.extras.getString(Notification.EXTRA_TEXT)!!.contains(recoveryDurationStr(1_044_000)))
             assertEquals(EventNotifications.SILENT_CHANNEL, recovery.channelId)
             assertEquals(Notification.GROUP_ALERT_SUMMARY, recovery.groupAlertBehavior)
             assertNull(manager.getNotificationChannel(recovery.channelId).sound)
@@ -35,7 +36,7 @@ class EventNotificationTest {
             awaitAbsent(manager, EventNotifications.RECOVERY_ID)
             events.recovered(RecoveryEvent(2000), sound = false, allowed = true)
             assertTrue(awaitNotification(manager, EventNotifications.RECOVERY_ID)
-                .extras.getString(Notification.EXTRA_TEXT)!!.contains("2 с"))
+                .extras.getString(Notification.EXTRA_TEXT)!!.contains(recoveryDurationStr(2000)))
             awaitAbsent(manager, EventNotifications.OUTAGE_ID)
             events.partial("MTProto не отвечает",sound=true,allowed=true)
             assertEquals(EventNotifications.PARTIAL_CHANNEL,awaitNotification(manager,EventNotifications.PARTIAL_ID).channelId)

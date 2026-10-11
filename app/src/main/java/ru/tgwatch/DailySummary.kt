@@ -13,20 +13,20 @@ object DailySummary {
     /** null when the day has no checks: an empty summary is only noise. */
     fun text(s: TimeStats): Text? {
         if (s.checks == 0) return null
-        val title = if (s.uptimePercent >= 0) "Telegram за сутки: ${formatPercent(s.uptimePercent)}"
-            else "Telegram за сутки"
+        val title = if (s.uptimePercent >= 0) Lang.t("Telegram за сутки: ${formatPercent(s.uptimePercent)}", "Telegram in the last 24 h: ${formatPercent(s.uptimePercent)}")
+            else Lang.t("Telegram за сутки", "Telegram in the last 24 h")
         val body = buildList {
             add(when {
-                s.outageCount == 0 -> "Сбоев Telegram не было"
-                s.lastOutageOngoing -> "Сбоев Telegram: ${s.outageCount}, сбой продолжается " +
+                s.outageCount == 0 -> Lang.t("Сбоев Telegram не было", "No Telegram outages")
+                s.lastOutageOngoing -> Lang.t("Сбоев Telegram: ${s.outageCount}, сбой продолжается ", "Telegram outages: ${s.outageCount}, ongoing for ") +
                     recoveryDurationStr(s.lastOutageMs)
-                else -> "Сбоев Telegram: ${s.outageCount}, самый долгий ${durationStr(s.longestOutageMs)}"
+                else -> Lang.t("Сбоев Telegram: ${s.outageCount}, самый долгий ${durationStr(s.longestOutageMs)}", "Telegram outages: ${s.outageCount}, longest ${durationStr(s.longestOutageMs)}")
             })
-            if (s.partialMs >= 60_000L) add("Частично доступен: ${durationStr(s.partialMs)}")
-            if (s.offlineCount > 0) add("Без интернета: ${durationStr(s.offlineMs)}")
-            if (s.avgLatencyMs >= 0) add("Средний отклик: ${s.avgLatencyMs} мс")
-            if (s.unknownMs >= 60_000L) add("Без наблюдения: ${durationStr(s.unknownMs)}")
-            add("Проверок: ${s.checks}")
+            if (s.partialMs >= 60_000L) add(Lang.t("Частично доступен: ${durationStr(s.partialMs)}", "Partially reachable: ${durationStr(s.partialMs)}"))
+            if (s.offlineCount > 0) add(Lang.t("Без интернета: ${durationStr(s.offlineMs)}", "No internet: ${durationStr(s.offlineMs)}"))
+            if (s.avgLatencyMs >= 0) add(Lang.t("Средний отклик: ${s.avgLatencyMs} мс", "Average response: ${s.avgLatencyMs} ms"))
+            if (s.unknownMs >= 60_000L) add(Lang.t("Без наблюдения: ${durationStr(s.unknownMs)}", "Not monitored: ${durationStr(s.unknownMs)}"))
+            add(Lang.t("Проверок: ${s.checks}", "Checks: ${s.checks}"))
         }.joinToString("\n")
         return Text(title, body)
     }

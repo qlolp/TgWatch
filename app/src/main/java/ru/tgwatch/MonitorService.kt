@@ -246,7 +246,7 @@ class MonitorService : Service() {
         if (action == ACTION_HEALTH) ensureProgress()
         val first = !loopStarted
         loopStarted = true
-        if (first) EventLog.add(this, "Мониторинг запущен")
+        if (first) EventLog.add(this, Lang.t("Мониторинг запущен", "Monitoring started"))
         if (action == ACTION_ALARM) {
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
             acquireWakeLockForCheck(force = true)
@@ -275,7 +275,7 @@ class MonitorService : Service() {
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         nm.cancel(NOTIFICATION_ID)
-        if (loopStarted) EventLog.add(this, "Мониторинг остановлен")
+        if (loopStarted) EventLog.add(this, Lang.t("Мониторинг остановлен", "Monitoring stopped"))
         if (loopStarted) History.endSession(this)
         if (!Prefs.isEnabled(this)) {
             Prefs.clearLastState(this)
@@ -367,10 +367,10 @@ class MonitorService : Service() {
             val result = performCheck()
             if (destroyed) return
             if (revision == checkSchedule.revision) handleResult(result)
-            else handleResult(Probe(Status.UNKNOWN, -1, "Сеть изменилась во время проверки", result.diagnostics))
+            else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics))
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
-            if (!destroyed) handleResult(Probe(Status.UNKNOWN, -1, "Проверка не завершена: ${describeProbeError(e)}"))
+            if (!destroyed) handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Проверка не завершена: ${describeProbeError(e)}", "Check did not finish: ${describeProbeError(e)}")))
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
             checkStartedMono = 0L
@@ -385,28 +385,28 @@ class MonitorService : Service() {
             Thread.sleep(NETWORK_GRACE_MS)
             network = cm.activeNetwork
         }
-        val selected = network ?: return Probe(Status.NO_NETWORK, -1, "Нет активной сети", "Сеть: отсутствует")
+        val selected = network ?: return Probe(Status.NO_NETWORK, -1, Lang.t("Нет активной сети", "No active network"), Lang.t("Сеть: отсутствует", "Network: none"))
         val caps = cm.getNetworkCapabilities(selected)
-            ?: return Probe(Status.UNKNOWN, -1, "Сеть переключается")
+            ?: return Probe(Status.UNKNOWN, -1, Lang.t("Сеть переключается", "Network is switching"))
         val transport = buildList {
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("Wi-Fi")
-            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("Мобильная")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add(Lang.t("Мобильная", "Mobile"))
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) add("VPN")
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("Ethernet")
-        }.joinToString(" + ").ifEmpty { "Другая" }
+        }.joinToString(" + ").ifEmpty { Lang.t("Другая", "Other") }
         if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) {
-            return Probe(Status.NO_NETWORK, -1, "Требуется вход в сеть Wi-Fi", "Сеть: $transport; captive portal")
+            return Probe(Status.NO_NETWORK, -1, Lang.t("Требуется вход в сеть Wi-Fi", "Wi-Fi sign-in required"), Lang.t("Сеть: $transport; captive portal", "Network: $transport; captive portal"))
         }
         val report = NetworkProbe(probeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
             { selected.socketFactory.createSocket() }).check()
-        val details = "Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n" +
+        val details = Lang.t("Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n", "Network: $transport\nCheck: ${timeStr(System.currentTimeMillis())}\n") +
             report.results.joinToString("\n") { r ->
                 "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
-                    if (r.latencyMs >= 0) " · ${r.latencyMs} мс" else ""
-            } + "\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. " +
-            "Прокси, настроенный внутри Telegram, здесь не используется."
-        if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1, "Сеть изменилась во время проверки", details)
+                    if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
+            } + Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ", "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
+            Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.", "A proxy configured inside Telegram is not used here.")
+        if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details)
         return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details)
     }
 
@@ -486,15 +486,15 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
 
         if (changed) {
-            val downFor = recovery?.let { " (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})" }.orEmpty()
+            val downFor = recovery?.let { Lang.t(" (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})", " (observed outage ${recoveryDurationStr(it.durationMs)})") }.orEmpty()
             EventLog.add(
                 this,
                 when (p.status) {
-                    Status.OK -> "MTProto и веб отвечают, ${p.latencyMs} мс$downFor"
-                    Status.PARTIAL -> "Telegram частично доступен: ${p.reason}"
-                    Status.TG_DOWN -> "Telegram НЕДОСТУПЕН: ${p.reason}"
-                    Status.NO_NETWORK -> "Нет интернета: ${p.reason}"
-                    Status.UNKNOWN -> "Статус неизвестен"
+                    Status.OK -> Lang.t("MTProto и веб отвечают, ${p.latencyMs} мс$downFor", "MTProto and web are responding, ${p.latencyMs} ms$downFor")
+                    Status.PARTIAL -> Lang.t("Telegram частично доступен: ${p.reason}", "Telegram is partially reachable: ${p.reason}")
+                    Status.TG_DOWN -> Lang.t("Telegram НЕДОСТУПЕН: ${p.reason}", "Telegram is UNREACHABLE: ${p.reason}")
+                    Status.NO_NETWORK -> Lang.t("Нет интернета: ${p.reason}", "No internet: ${p.reason}")
+                    Status.UNKNOWN -> Lang.t("Статус неизвестен", "Status unknown")
                 }
             )
         }
@@ -515,18 +515,18 @@ class MonitorService : Service() {
 
     private fun createChannels() {
         val ok = NotificationChannel(
-            CHANNEL_OK, "Telegram доступен", NotificationManager.IMPORTANCE_LOW
+            CHANNEL_OK, Lang.t("Telegram доступен", "Telegram is reachable"), NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Постоянный значок, когда Telegram отвечает"
+            description = Lang.t("Постоянный значок, когда Telegram отвечает", "Persistent icon while Telegram is responding")
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         val alert = NotificationChannel(
-            CHANNEL_ALERT, "Telegram недоступен", NotificationManager.IMPORTANCE_DEFAULT
+            CHANNEL_ALERT, Lang.t("Telegram недоступен", "Telegram is unreachable"), NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Тревожный значок, когда связи нет"
+            description = Lang.t("Тревожный значок, когда связи нет", "Alert icon when there is no connection")
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
@@ -584,32 +584,32 @@ class MonitorService : Service() {
 
         val (title, text, channel, icon, color, colorized) = when {
             s.status == Status.UNKNOWN -> Notif(
-                if (s.checkedAt > 0) "Доступность не определена" else "Проверяю связь с Telegram…",
+                if (s.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю связь с Telegram…", "Checking the connection to Telegram…"),
                 s.reason.ifEmpty { CHECK_URL }, CHANNEL_OK,
                 R.drawable.ic_stat_wait, COLOR_OK, false
             )
             stale -> Notif(
-                "Мониторинг задерживается",
-                "Последняя проверка ${agoStr(s.checkedAt, now)}; нужен свежий результат",
+                Lang.t("Мониторинг задерживается", "Monitoring is delayed"),
+                Lang.t("Последняя проверка ${agoStr(s.checkedAt, now)}; нужен свежий результат", "Last check ${agoStr(s.checkedAt, now)}; a fresh result is needed"),
                 CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_STALE, false
             )
             s.status == Status.PARTIAL -> Notif(
-                "Telegram частично доступен", s.reason, CHANNEL_OK,
+                Lang.t("Telegram частично доступен", "Telegram is partially reachable"), s.reason, CHANNEL_OK,
                 R.drawable.ic_stat_wait, COLOR_OFFLINE, false
             )
             s.status == Status.OK -> Notif(
-                "Telegram отвечает · ${s.latencyMs} мс",
-                "Проверено в ${timeStr(s.checkedAt)}$uptimeText",
+                Lang.t("Telegram отвечает · ${s.latencyMs} мс", "Telegram is responding · ${s.latencyMs} ms"),
+                Lang.t("Проверено в ${timeStr(s.checkedAt)}$uptimeText", "Checked at ${timeStr(s.checkedAt)}$uptimeText"),
                 CHANNEL_OK, R.drawable.ic_stat_ok, COLOR_OK, false
             )
             s.status == Status.TG_DOWN -> Notif(
-                "Telegram НЕДОСТУПЕН",
-                "Нет связи с ${timeStr(s.since)} · ${s.reason}",
+                Lang.t("Telegram НЕДОСТУПЕН", "Telegram is UNREACHABLE"),
+                Lang.t("Нет связи с ${timeStr(s.since)} · ${s.reason}", "No connection since ${timeStr(s.since)} · ${s.reason}"),
                 CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true
             )
             else -> Notif(
-                "Нет подключения к интернету",
-                "С ${timeStr(s.since)} · ${s.reason}",
+                Lang.t("Нет подключения к интернету", "No internet connection"),
+                Lang.t("С ${timeStr(s.since)} · ${s.reason}", "Since ${timeStr(s.since)} · ${s.reason}"),
                 CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true
             )
         }
@@ -632,12 +632,12 @@ class MonitorService : Service() {
             .setDeleteIntent(checkNow)
             .addAction(
                 Notification.Action.Builder(
-                    Icon.createWithResource(this, R.drawable.ic_stat_ok), "Проверить", checkNow
+                    Icon.createWithResource(this, R.drawable.ic_stat_ok), Lang.t("Проверить", "Check"), checkNow
                 ).build()
             )
             .addAction(
                 Notification.Action.Builder(
-                    Icon.createWithResource(this, R.drawable.ic_stat_pause), "Остановить", stop
+                    Icon.createWithResource(this, R.drawable.ic_stat_pause), Lang.t("Остановить", "Stop"), stop
                 ).build()
             )
         if (Build.VERSION.SDK_INT >= 31) {
@@ -680,8 +680,13 @@ class MonitorService : Service() {
     }
 }
 
-/** 99,8 % */
+/** 99,8 % in Russian, 99.8% in English. */
 fun formatPercent(p: Double): String =
-    if (p >= 99.95 && p < 100.0) "99,9 %"
-    else String.format(java.util.Locale("ru"), "%.1f %%", p).replace(",0 %", " %")
+    if (Lang.ru) {
+        if (p >= 99.95 && p < 100.0) "99,9 %"
+        else String.format(java.util.Locale("ru"), "%.1f %%", p).replace(",0 %", " %")
+    } else {
+        if (p >= 99.95 && p < 100.0) "99.9%"
+        else String.format(java.util.Locale.US, "%.1f%%", p).replace(".0%", "%")
+    }
 

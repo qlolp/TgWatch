@@ -238,11 +238,11 @@ class BackupRestoreIntegrationTest {
             }
             val startupDeadline = SystemClock.elapsedRealtime() + 10_000
             while (SystemClock.elapsedRealtime() < startupDeadline &&
-                (!MonitorService.running || EventLog.all(ctx).none { it.contains("Мониторинг запущен") })) {
+                (!MonitorService.running || EventLog.all(ctx).none { it.contains(Lang.t("Мониторинг запущен", "Monitoring started")) })) {
                 SystemClock.sleep(25)
             }
             assertTrue("Test must exercise an actual running service", MonitorService.running)
-            assertTrue(EventLog.all(ctx).any { it.contains("Мониторинг запущен") })
+            assertTrue(EventLog.all(ctx).any { it.contains(Lang.t("Мониторинг запущен", "Monitoring started")) })
             BackupManager.restore(ctx, restored)
             instrumentation.waitForIdleSync()
             assertPortableData(restored)
@@ -372,11 +372,11 @@ class BackupRestoreIntegrationTest {
             }
             val startupDeadline = SystemClock.elapsedRealtime() + 10_000
             while (SystemClock.elapsedRealtime() < startupDeadline &&
-                (!MonitorService.running || EventLog.all(ctx).none { it.contains("Мониторинг запущен") })) {
+                (!MonitorService.running || EventLog.all(ctx).none { it.contains(Lang.t("Мониторинг запущен", "Monitoring started")) })) {
                 SystemClock.sleep(25)
             }
             assertTrue("Import must exercise an active monitor", MonitorService.running)
-            assertTrue(EventLog.all(ctx).any { it.contains("Мониторинг запущен") })
+            assertTrue(EventLog.all(ctx).any { it.contains(Lang.t("Мониторинг запущен", "Monitoring started")) })
             val beforeSettings = Prefs.sp(ctx).all.filterKeys { it in portableSettings }
             val beforeLog = EventLog.all(ctx).toList()
             BackupManager.importHistory(ctx, imported)
@@ -387,8 +387,8 @@ class BackupRestoreIntegrationTest {
             // A real check can finish between the capture and stop request. Keep its legitimate
             // transition too; require exactly one shutdown event without assuming an idle probe.
             val additions = afterLog.dropLast(beforeLog.size)
-            assertEquals(1, additions.count { it.endsWith("Мониторинг остановлен") })
-            assertTrue(afterLog.first().endsWith("Мониторинг остановлен"))
+            assertEquals(1, additions.count { it.endsWith(Lang.t("Мониторинг остановлен", "Monitoring stopped")) })
+            assertTrue(afterLog.first().endsWith(Lang.t("Мониторинг остановлен", "Monitoring stopped")))
             assertEquals(beforeSettings, Prefs.sp(ctx).all.filterKeys { it in portableSettings })
             assertPortableData(current.copy(observations = imported, log = afterLog))
             assertMonitoringDisabledAndDiagnosticsCleared()

@@ -156,9 +156,9 @@ class MinuteQuietHoursAndWidgetTest {
         }
         assertEquals(LastSuccessPolicy.label(now - 60_000, now), lastSuccessText())
         LastSuccessStore.record(ctx, "OK", now + 86_400_000)
-        assertTrue(lastSuccessText().contains("Часы изменились · OK"))
+        assertTrue(lastSuccessText().contains(Lang.t("Часы изменились · OK", "Clock changed · OK")))
         LastSuccessStore.clear(ctx)
-        assertEquals("Последний OK: —", lastSuccessText())
+        assertEquals(LastSuccessPolicy.label(0, now), lastSuccessText())
     }
 
     @Test fun narrowWidgetShowsCompleteDateTimeAndClockMarkerWithoutClipping() = withSavedSettings {
@@ -169,7 +169,8 @@ class MinuteQuietHoursAndWidgetTest {
                 val timestamp = SimpleDateFormat("dd.MM HH:mm:ss", Locale.getDefault()).format(Date(checkedAt))
                 val text = lastSuccess.text.toString()
                 assertTrue("Full date and time must be present", text.contains(timestamp))
-                assertTrue(text.contains(if (checkedAt > now) "Часы изменились · OK" else "Последний OK:"))
+                assertTrue(text.contains(if (checkedAt > now) Lang.t("Часы изменились · OK", "Clock changed · OK")
+                    else Lang.t("Последний OK:", "Last OK:")))
                 val layout = lastSuccess.layout
                     ?: throw AssertionError("Text must be laid out at exactly 200dp × 72dp")
                 assertTrue(layout.lineCount in 1..2)

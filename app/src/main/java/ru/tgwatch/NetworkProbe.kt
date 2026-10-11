@@ -18,13 +18,13 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
     val latencyMs get() = results.filter { it.reachable && it.group == ProbeGroup.MTPROTO }
         .minOfOrNull { it.latencyMs } ?: -1L
     val reason get() = when (status) {
-        "OK" -> "MTProto и веб-ресурсы отвечают; доставка сообщений не проверяется"
+        "OK" -> Lang.t("MTProto и веб-ресурсы отвечают; доставка сообщений не проверяется", "MTProto and web resources are responding; message delivery is not checked")
         "PARTIAL" -> if (results.any { it.group == ProbeGroup.MTPROTO && it.reachable })
-            "MTProto отвечает, веб-ресурсы не подтвердили доступность" else
-            "Веб-ресурсы отвечают, MTProto не подтвердил доступность"
-        "TG_DOWN" -> "Контрольные сайты отвечают, Telegram не отвечает"
-        "NO_NETWORK" -> "Нет активной сети или требуется вход в Wi-Fi"
-        else -> "Доступность не определена: ни один адрес не подтвердил связь"
+            Lang.t("MTProto отвечает, веб-ресурсы не подтвердили доступность", "MTProto is responding; web resources did not confirm reachability") else
+            Lang.t("Веб-ресурсы отвечают, MTProto не подтвердил доступность", "Web resources are responding; MTProto did not confirm reachability")
+        "TG_DOWN" -> Lang.t("Контрольные сайты отвечают, Telegram не отвечает", "Control sites are responding; Telegram is not")
+        "NO_NETWORK" -> Lang.t("Нет активной сети или требуется вход в Wi-Fi", "No active network, or Wi-Fi sign-in is required")
+        else -> Lang.t("Доступность не определена: ни один адрес не подтвердил связь", "Reachability unknown: no address confirmed a connection")
     }
     companion object {
         fun classify(results: List<ProbeOutcome>, connected: Boolean): String {
@@ -94,13 +94,13 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             endpoints.forEach { endpoint ->
                 val lease = acquire(pool, endpoint)
                 if (lease == null) {
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
+                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                     return@forEach
                 }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Проверка отменена")
+                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Проверка отменена", "Check cancelled"))
                         try { cancellation.check(); operation(endpoint, cancellation) }
                         catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }
                         finally { cancellation.close(); lease.finish() }
@@ -108,7 +108,7 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
                     handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
                     lease.cancelBeforeStart()
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
+                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                 }
             }
             repeat(handles.size) {
@@ -125,15 +125,15 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             }
         }
         return endpoints.map { ep -> results.firstOrNull { it.endpoint == ep.name }
-            ?: ProbeOutcome(ep.name, ep.group, false, -1, "Общий срок ожидания истёк") }
+            ?: ProbeOutcome(ep.name, ep.group, false, -1, Lang.t("Общий срок ожидания истёк", "Overall time limit expired")) }
     }
 }
 
 fun describeProbeError(e: Exception): String = when (e) {
-    is UnknownHostException -> "DNS: адрес не найден"
-    is SSLException -> "TLS: защищённое соединение не установлено"
-    is SocketTimeoutException, is TimeoutException -> "Таймаут"
-    is InterruptedException -> "Проверка отменена"
+    is UnknownHostException -> Lang.t("DNS: адрес не найден", "DNS: address not found")
+    is SSLException -> Lang.t("TLS: защищённое соединение не установлено", "TLS: secure connection not established")
+    is SocketTimeoutException, is TimeoutException -> Lang.t("Таймаут", "Timeout")
+    is InterruptedException -> Lang.t("Проверка отменена", "Check cancelled")
     else -> "${e.javaClass.simpleName}: ${e.message.orEmpty().take(120)}"
 }
 
@@ -153,7 +153,7 @@ class NetworkProbe(
         // Controls are unnecessary when Telegram itself proves internet connectivity.
         if (results.none { it.reachable }) {
             val controls = listOf(
-                ProbeEndpoint("Яндекс", ProbeGroup.CONTROL, "https://ya.ru/"),
+                ProbeEndpoint(Lang.t("Яндекс", "Yandex"), ProbeGroup.CONTROL, "https://ya.ru/"),
                 ProbeEndpoint("Mail.ru", ProbeGroup.CONTROL, "https://mail.ru/"),
                 ProbeEndpoint("Google 204", ProbeGroup.CONTROL, "https://www.gstatic.com/generate_204"),
             )
@@ -165,7 +165,7 @@ class NetworkProbe(
         val start = System.nanoTime()
         if (ep.group == ProbeGroup.MTPROTO) {
             val ok = MtProto.probe(ep.address, openSocket, cancellation)
-            return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), if (ok) "MTProto resPQ; nonce совпал" else "Ответ MTProto не подтверждён")
+            return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), if (ok) Lang.t("MTProto resPQ; nonce совпал", "MTProto resPQ; nonce matched") else Lang.t("Ответ MTProto не подтверждён", "MTProto response not confirmed"))
         }
         fun request(method: String): Int {
             cancellation.check()
