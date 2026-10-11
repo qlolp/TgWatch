@@ -246,6 +246,8 @@ TG Монитор → Язык». Разметка использует
 Инструкция для разработчиков: [CONTRIBUTING](CONTRIBUTING.md). Выпуски: [CHANGELOG](CHANGELOG.md).
 Лицензия: [MIT](LICENSE).
 
+Аудит кода и предложения по улучшению: [docs/review/improvements-2026-10-11.md](docs/review/improvements-2026-10-11.md).
+
 ## Скриншоты
 
 Снимки предыдущего интерфейса из CI на эмуляторе Android 15. Они пока не иллюстрируют
