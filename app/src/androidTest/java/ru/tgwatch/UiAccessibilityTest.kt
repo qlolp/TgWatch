@@ -11,10 +11,12 @@ import android.view.WindowInsets
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.RequiresApi
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
@@ -63,30 +65,9 @@ class UiAccessibilityTest {
     }
 
     @Test fun mainUiFollowsSelectedAppLanguageAfterRecreation() {
-        if (Build.VERSION.SDK_INT < 33) return
-        val manager = ctx.getSystemService(android.app.LocaleManager::class.java)
-        val previous = manager.applicationLocales
-        val wasEnabled = Prefs.isEnabled(ctx)
-        Prefs.setEnabled(ctx, false)
-        try {
-            for ((locale, title) in listOf("en" to "Monitoring is off", "ru" to "Мониторинг выключен")) {
-                InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                    manager.applicationLocales = LocaleList.forLanguageTags(locale)
-                }
-                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-                ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                    scenario.recreate()
-                    scenario.onActivity { activity ->
-                        assertEquals(title, activity.findViewById<TextView>(R.id.tvTitle).text.toString())
-                        assertEquals(activity.getString(R.string.check_now), activity.findViewById<TextView>(R.id.btnCheck).text.toString())
-                    }
-                }
-            }
-        } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { manager.applicationLocales = previous }
-            Prefs.setEnabled(ctx, wasEnabled)
-            Lang.update(ctx)
-        }
+        assumeTrue("Per-app language selection requires API 33",
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+        Api33LocaleChecks.verify(ctx)
     }
 
     @Test fun controlsKeepTouchTargetsAndTextAtDoubleFontSize() {
@@ -115,7 +96,8 @@ class UiAccessibilityTest {
     }
 
     @Test fun repeatedInsetsKeepContentClearOfBarsAndCutout() {
-        if (Build.VERSION.SDK_INT < 30) return
+        assumeTrue("System-bar and display-cutout inset types require API 30",
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
         try {
@@ -157,6 +139,36 @@ class UiAccessibilityTest {
                 val contrast = (maxOf(white, shade) + .05) / (minOf(white, shade) + .05)
                 assertTrue("${theme.resources.getResourceEntryName(background)} contrast $contrast", contrast >= 4.5)
             }
+        }
+    }
+}
+
+/** Keep API 33 types out of JUnit's reflection over the test class on older devices. */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private object Api33LocaleChecks {
+    fun verify(ctx: android.content.Context) {
+        val manager = ctx.getSystemService(android.app.LocaleManager::class.java)
+        val previous = manager.applicationLocales
+        val wasEnabled = Prefs.isEnabled(ctx)
+        Prefs.setEnabled(ctx, false)
+        try {
+            for ((locale, title) in listOf("en" to "Monitoring is off", "ru" to "Мониторинг выключен")) {
+                InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                    manager.applicationLocales = LocaleList.forLanguageTags(locale)
+                }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                    scenario.recreate()
+                    scenario.onActivity { activity ->
+                        assertEquals(title, activity.findViewById<TextView>(R.id.tvTitle).text.toString())
+                        assertEquals(activity.getString(R.string.check_now), activity.findViewById<TextView>(R.id.btnCheck).text.toString())
+                    }
+                }
+            }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { manager.applicationLocales = previous }
+            Prefs.setEnabled(ctx, wasEnabled)
+            Lang.update(ctx)
         }
     }
 }

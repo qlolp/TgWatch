@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Dedicated disposable emulator only: changes PIN/network and reboots.
-set -euo pipefail
+set -Eeuo pipefail
+smoke_failure() {
+  local status=$1 line=$2
+  # Numeric location/status only: BASH_COMMAND can contain credentials or tokens.
+  printf '::error file=scripts/android-smoke.sh,line=%s,title=Android smoke command failed::Smoke failed at line %s with exit status %s\n' "$line" "$line" "$status" >&2
+  exit "$status"
+}
+trap 'smoke_failure "$?" "$LINENO"' ERR
 trap 'adb logcat -d >> smoke-logcat.txt 2>/dev/null || true' EXIT
 : > smoke-logcat.txt
 check_crashes() {
@@ -33,6 +40,8 @@ await_observation() {
   adb logcat -d -s TgWatch AndroidRuntime
   return 1
 }
+# The always-run reporter must never mistake a previous run for fresh results.
+rm -rf -- app/build/outputs/androidTest-results/connected
 bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
 adb root
 adb wait-for-device
