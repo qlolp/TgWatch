@@ -62,17 +62,18 @@ class UnifiedReleaseTests(ToolFixture, unittest.TestCase):
     def publish_existing(self, report):
         old = json.dumps(report)
         import hashlib
-        self.fixture["releases"] = [{"tag_name": "v1.11.40", "draft": False, "assets": [
+        self.fixture["releases"] = [{"tag_name": "v1.13.0", "draft": False, "assets": [
             {"name": path.name, "size": len(old) if path == self.audit else path.stat().st_size,
              "digest": "sha256:" + hashlib.sha256(old.encode() if path == self.audit else path.read_bytes()).hexdigest()}
             for path in self.files]}]
         self.fixture["download"] = {self.audit.name: old}
-        return self.run_release(version="1.11")
+        return self.run_release()
 
     def test_osv_timestamp_change_keeps_original_published_report(self):
         historical = dict(self.report, checked_at="2026-10-09T00:00:00+00:00")
         result = self.publish_existing(historical)
-        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("immutable", result.stderr)
         self.assertFalse(self.created())
 
     def test_published_osv_report_cannot_omit_test_scope_package(self):
@@ -84,13 +85,13 @@ class UnifiedReleaseTests(ToolFixture, unittest.TestCase):
     def test_new_release_cannot_publish_an_osv_finding(self):
         self.report["packages"][1]["vulnerabilities"] = ["OSV-regression"]
         self.audit.write_text(json.dumps(self.report))
-        result = self.run_release(version="1.11")
+        result = self.run_release()
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(self.created())
 
     def test_new_release_requires_both_audits_and_the_full_inventory(self):
         self.files = [path for path in self.files if path.name not in ("TgWatch.dependencies.json", "TgWatch.osv.json")]
-        result = self.run_release(version="1.11")
+        result = self.run_release()
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(self.created())
 
@@ -175,8 +176,8 @@ class UnifiedWorkflowTests(unittest.TestCase):
     def test_new_version_and_keychain_wrapper_are_safe(self):
         gradle = (ROOT / "app/build.gradle.kts").read_text()
         self.assertNotIn("<<<<<<<", gradle)
-        self.assertIn('versionName = "1.12"', gradle)
-        self.assertIn("?: 13", gradle)
+        self.assertIn('versionName = sourceVersion', gradle)
+        self.assertIn('versionCode = sourceVersionCode.toInt()', gradle)
         wrapper = (SCRIPTS / "configure-signing.sh").read_text()
         self.assertNotIn("<<<<<<<", wrapper)
         self.assertIn("signing-keychain.py", wrapper)

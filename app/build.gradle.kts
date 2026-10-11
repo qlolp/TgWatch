@@ -6,29 +6,35 @@ import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 val releaseStore = providers.environmentVariable("TGWATCH_KEYSTORE_PATH").orNull
-val ciRunNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull
-val ciVersionCode = ciRunNumber?.let { value ->
-    require(value.matches(Regex("[1-9][0-9]*"))) {
-        "GITHUB_RUN_NUMBER must be a positive decimal integer"
-    }
-    val run = value.toLongOrNull()
-    require(run != null && run <= 2147483547L) {
-        "GITHUB_RUN_NUMBER + 100 exceeds the Android versionCode range"
-    }
-    (run + 100L).toInt()
+val versionLines = rootProject.file("version.properties").readLines()
+    .map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+require(versionLines.size == 1 && versionLines.single().startsWith("version=")) {
+    "version.properties requires exactly one version key and no overrides"
 }
+val sourceVersion = versionLines.single().removePrefix("version=")
+require(sourceVersion.matches(Regex("(0|[1-9][0-9]{0,3})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})"))) {
+    "Version must be canonical major.minor.patch with minor/patch in 0..999"
+}
+val versionParts = sourceVersion.split(".").map { it.toLong() }
+val sourceVersionCode = versionParts[0] * 1_000_000L + versionParts[1] * 1_000L + versionParts[2]
+require(sourceVersionCode in 1L..2147483647L) { "Version exceeds Android versionCode range" }
+require(!providers.gradleProperty("versionCode").isPresent && !providers.gradleProperty("versionName").isPresent &&
+    !providers.environmentVariable("TGWATCH_VERSION_CODE").isPresent &&
+    !providers.environmentVariable("TGWATCH_VERSION_NAME").isPresent) { "Version overrides are unsupported" }
 android {
     namespace = "ru.tgwatch"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
     defaultConfig {
         applicationId = "ru.tgwatch"
         minSdk = 26
-        targetSdk = 34
-        versionCode = ciVersionCode ?: 13
-        versionName = "1.12"
+        targetSdk = 35
+        versionCode = sourceVersionCode.toInt()
+        versionName = sourceVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -56,8 +62,8 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
     lint {
         abortOnError = true
-        // Existing native Russian UI intentionally targets API 34 and has inline copy.
-        disable += setOf("OldTargetApi", "GradleDependency", "HardcodedText")
+        // Existing native UI still has inline copy; new Android target is checked in source.
+        disable += setOf("GradleDependency", "HardcodedText")
     }
 }
 dependencies {
@@ -138,4 +144,14 @@ tasks.register("generateReleaseSbom") {
             commandLine("python3", rootProject.file("scripts/generate-sbom.py"), inventory.get().asFile, sbom.get().asFile)
         }
     }
+}
+
+// Existing findings are recorded, not silently disabled or reformatted wholesale.
+// Run detekt on new changes; regenerate the baseline only after reviewing its diff.
+detekt {
+    toolVersion = "1.23.8"
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/baseline.xml")
+    source.setFrom(files("src/main/java"))
 }

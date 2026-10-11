@@ -41,7 +41,13 @@ object DailySummary {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        if (cal.timeInMillis <= now) cal.add(Calendar.DAY_OF_MONTH, 1)
+        if (cal.timeInMillis <= now) {
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+            // A nonexistent DST-gap time may have normalized today's target
+            // to a different hour. Reapply the user's time for tomorrow.
+            cal.set(Calendar.HOUR_OF_DAY, minute / 60)
+            cal.set(Calendar.MINUTE, minute % 60)
+        }
         return cal.timeInMillis
     }
 

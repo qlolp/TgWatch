@@ -31,6 +31,10 @@ object Prefs {
     private const val KEY_QUIET_END_MINUTE = "quiet_end_minute"
     private const val KEY_DAILY_SUMMARY = "daily_summary"
     private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
+    private const val KEY_EXTRA_MATRIX = "extra_probe_matrix"
+    private const val KEY_EXTRA_WHATSAPP = "extra_probe_whatsapp"
+    private const val KEY_EXTRA_CUSTOM = "extra_probe_custom"
+    private const val KEY_EXTRA_CUSTOM_URL = "extra_probe_custom_url"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -181,6 +185,32 @@ object Prefs {
         sp(ctx).edit().putInt(KEY_DAILY_SUMMARY_MINUTE, minute.coerceIn(0, 1439)).apply()
         DailySummaryReceiver.schedule(ctx)
     }
+
+    /** Informational probes of other services; off by default, never part of Telegram status. */
+    fun extraMatrix(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EXTRA_MATRIX, false)
+    fun setExtraMatrix(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EXTRA_MATRIX, value).apply() }
+    fun extraWhatsapp(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EXTRA_WHATSAPP, false)
+    fun setExtraWhatsapp(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EXTRA_WHATSAPP, value).apply() }
+    fun extraCustom(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EXTRA_CUSTOM, false)
+    fun setExtraCustom(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EXTRA_CUSTOM, value).apply() }
+
+    /** Validated public HTTPS address, or an empty string. Not a credential: no user info or query. */
+    fun extraCustomUrl(ctx: Context): String =
+        ExtraProbes.normalizeCustomUrl(sp(ctx).getString(KEY_EXTRA_CUSTOM_URL, null)).orEmpty()
+
+    /** Empty input clears the address and disables the probe; invalid input changes nothing. */
+    fun setExtraCustomUrl(ctx: Context, value: String): Boolean {
+        val url = if (value.isBlank()) "" else ExtraProbes.normalizeCustomUrl(value)
+        if (url != null) {
+            val edit = sp(ctx).edit().putString(KEY_EXTRA_CUSTOM_URL, url)
+            if (url.isEmpty()) edit.putBoolean(KEY_EXTRA_CUSTOM, false)
+            edit.apply()
+        }
+        return url != null
+    }
+
+    fun extraProbeEndpoints(ctx: Context): List<ProbeEndpoint> =
+        ExtraProbes.endpoints(extraMatrix(ctx), extraWhatsapp(ctx), extraCustom(ctx), extraCustomUrl(ctx))
 
     /** Не вибрировать ночью. */
     fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)

@@ -54,7 +54,8 @@ class MonitorService : Service() {
                 else ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false))
     }
 
-    private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "")
+    private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
+        val outcomes: List<ProbeOutcome> = emptyList())
 
     companion object {
         private const val TAG = "TgWatch"
@@ -95,6 +96,31 @@ class MonitorService : Service() {
             private set
 
         @Volatile private var activeService: MonitorService? = null
+        @Volatile private var lastEndpoints: List<ProbeOutcome> = emptyList()
+        @Volatile private var lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
+
+        fun endpointOutcomes(): List<ProbeOutcome> = lastEndpoints
+        fun schedulingDiagnostics(): ScheduleDiagnostics.Snapshot =
+            activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
+
+        /** Queue against this service instance only; never create or resurrect a service. */
+        fun requestRunningCheck(ctx: Context): Boolean {
+            val service = activeService ?: return false
+            return synchronized(service) {
+                if (service.acceptsRunningCheck(ctx)) {
+                    val queued = service.worker.post {
+                        synchronized(service) {
+                            if (service.acceptsRunningCheck(ctx)) {
+                                service.offlineBackoff.reset()
+                                service.scheduleCheck(0L)
+                            }
+                        }
+                    }
+                    if (queued) service.scheduleDiagnostics.manual(service.checkStartedMono > 0L)
+                    queued
+                } else false
+            }
+        }
 
         fun start(ctx: Context) {
             if (BackupManager.hasPending(ctx)) return
@@ -112,6 +138,7 @@ class MonitorService : Service() {
         }
 
         fun stop(ctx: Context) {
+            activeService?.let { synchronized(it) { it.stopping = true } }
             ctx.stopService(Intent(ctx, MonitorService::class.java))
         }
 
@@ -136,7 +163,11 @@ class MonitorService : Service() {
             }
         }
 
-        fun clearRestoredState() { state = State() }
+        fun clearRestoredState() {
+            state = State()
+            lastEndpoints = emptyList()
+            lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
+        }
 
         fun restorePersistedState(ctx: Context) {
             if (state.checkedAt > 0L) return
@@ -154,6 +185,12 @@ class MonitorService : Service() {
     private lateinit var eventNotifications: EventNotifications
     private val offlineBackoff = OfflineBackoff()
     private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
+    private val scheduleDiagnostics = ScheduleDiagnostics()
+    @Volatile private var stopping = false
+    private val notificationStats = DailyStatsCache()
+
+    private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
+        !destroyed && !stopping && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
 
     /**
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
@@ -177,7 +214,7 @@ class MonitorService : Service() {
     }
     private fun ensureProgress() {
         val now = SystemClock.elapsedRealtime()
-        // Checks have a 12-second total network budget. If overdue, cancel wait and retry.
+        // Checks have a 12-second network budget (+5 s for opt-in extra probes). If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
         } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
@@ -188,7 +225,10 @@ class MonitorService : Service() {
     @Volatile
     private var destroyed = false
 
-    private val checkRunnable = Runnable { runCheck() }
+    private val checkRunnable = Runnable {
+        scheduleDiagnostics.arrived(SystemClock.elapsedRealtime(), pm.isDeviceIdleMode)
+        runCheck()
+    }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { checkSchedule.networkChanged(1_500L) }
@@ -236,6 +276,7 @@ class MonitorService : Service() {
         }
 
         val action = intent?.action
+        recordRequestedTrigger(action)
         if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (action == ACTION_STOP) Prefs.setEnabled(this, false)
         if (!Prefs.isEnabled(this) || BackupManager.hasPending(this)) {
@@ -248,6 +289,7 @@ class MonitorService : Service() {
         loopStarted = true
         if (first) EventLog.add(this, Lang.t("Мониторинг запущен", "Monitoring started"))
         if (action == ACTION_ALARM) {
+            scheduleDiagnostics.arrived(SystemClock.elapsedRealtime(), pm.isDeviceIdleMode, checkStartedMono > 0L)
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
             acquireWakeLockForCheck(force = true)
         }
@@ -258,9 +300,18 @@ class MonitorService : Service() {
         return START_STICKY
     }
 
+    private fun recordRequestedTrigger(action: String?) {
+        if (action == ACTION_STOP) stopping = true
+        if (action == ACTION_CHECK_NOW) scheduleDiagnostics.manual(checkStartedMono > 0L)
+    }
+
     @Synchronized override fun onDestroy() {
         try {
         destroyed = true
+        stopping = true
+        scheduleDiagnostics.canceled()
+        lastScheduleDiagnostics = scheduleDiagnostics.snapshot()
+        lastEndpoints = emptyList()
         healthHandler.removeCallbacksAndMessages(null)
         running = false
         worker.removeCallbacksAndMessages(null)
@@ -309,7 +360,9 @@ class MonitorService : Service() {
     }
 
     private fun enqueueCheck(delayMs: Long) {
-        if (destroyed) return
+        if (destroyed || stopping) return
+        if (delayMs >= ALARM_MIN_DELAY_MS) scheduleDiagnostics.scheduled(SystemClock.elapsedRealtime(), delayMs)
+        else scheduleDiagnostics.canceled()
         worker.removeCallbacks(checkRunnable)
         worker.postDelayed(checkRunnable, delayMs)
         // Обычный таймер замирает, когда телефон засыпает с выключенным экраном.
@@ -357,7 +410,7 @@ class MonitorService : Service() {
     }
 
     private fun runCheck() {
-        if (destroyed) return
+        if (!acceptsRunningCheck(this)) return
         // An interrupt from the health monitor must not poison the following check.
         Thread.interrupted()
         checkStartedMono = SystemClock.elapsedRealtime()
@@ -365,18 +418,20 @@ class MonitorService : Service() {
         acquireWakeLockForCheck()
         try {
             val result = performCheck()
-            if (destroyed) return
+            if (!acceptsRunningCheck(this)) return
             if (revision == checkSchedule.revision) handleResult(result)
-            else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics))
+            else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics, result.outcomes))
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
-            if (!destroyed) handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Проверка не завершена: ${describeProbeError(e)}", "Check did not finish: ${describeProbeError(e)}")))
+            if (acceptsRunningCheck(this)) handleResult(Probe(Status.UNKNOWN, -1,
+                Lang.t("Проверка не завершена: ${describeProbeError(e)}",
+                    "Check did not finish: ${describeProbeError(e)}")))
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
             checkStartedMono = 0L
             releaseWakeLock()
         }
-        checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+        if (acceptsRunningCheck(this)) checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
     }
 
     private fun performCheck(): Probe {
@@ -399,19 +454,29 @@ class MonitorService : Service() {
         }
         val report = NetworkProbe(probeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
-            { selected.socketFactory.createSocket() }).check()
-        val details = Lang.t("Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n", "Network: $transport\nCheck: ${timeStr(System.currentTimeMillis())}\n") +
-            report.results.joinToString("\n") { r ->
-                "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
-                    if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
-            } + Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ", "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
-            Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.", "A proxy configured inside Telegram is not used here.")
-        if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details)
-        return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details)
+            { selected.socketFactory.createSocket() }).check(Prefs.extraProbeEndpoints(this))
+        fun line(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
+            if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
+        val (extraResults, telegramResults) = report.results.partition { it.group == ProbeGroup.EXTRA }
+        val extraDetails = if (extraResults.isEmpty()) "" else
+            Lang.t("\nДругие сервисы (не влияют на статус Telegram):\n",
+                "\nOther services (do not affect Telegram status):\n") +
+                extraResults.joinToString("\n", transform = ::line)
+        val checkedAt = timeStr(System.currentTimeMillis())
+        val details = Lang.t("Сеть: $transport\nПроверка: $checkedAt\n", "Network: $transport\nCheck: $checkedAt\n") +
+            telegramResults.joinToString("\n", transform = ::line) + extraDetails +
+            Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ",
+                "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
+            Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.",
+                "A proxy configured inside Telegram is not used here.")
+        if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1,
+            Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details, report.results)
+        return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details, report.results)
     }
 
     @Synchronized private fun handleResult(p: Probe) {
-        if (destroyed) return
+        if (!acceptsRunningCheck(this)) return
+        lastEndpoints = p.outcomes.toList()
         val now = System.currentTimeMillis()
         val prev = state
         val changed = prev.status != p.status
@@ -500,6 +565,8 @@ class MonitorService : Service() {
         }
         postNotification(newState)
         broadcastState()
+        // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
+        WebhookNotifier.onPublished(this, newState.status)
     }
 
     private fun broadcastState() {
@@ -579,7 +646,8 @@ class MonitorService : Service() {
 
         val now = System.currentTimeMillis()
         val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
-        val uptime = History.uptimePercent(this)
+        val dailyStats = notificationStats.get(History.version, now) { History.stats(this, now = now) }
+        val uptime = dailyStats.uptimePercent
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
 
         val (title, text, channel, icon, color, colorized) = when {
@@ -640,10 +708,17 @@ class MonitorService : Service() {
                     Icon.createWithResource(this, R.drawable.ic_stat_pause), Lang.t("Остановить", "Stop"), stop
                 ).build()
             )
+        applyNotificationProgress(builder, dailyStats)
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }
         return builder.build()
+    }
+
+    private fun applyNotificationProgress(builder: Notification.Builder, stats: TimeStats) {
+        NotificationProgress.percent(stats)?.let {
+            builder.setProgress(NotificationProgress.MAX_PERCENT, it, false)
+        }
     }
 
     private data class Notif(

@@ -1,0 +1,418 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:HistoryStorage.kt$HistoryStorage$at &lt; 0 || until &lt;= at || until - at &gt; 600_000L || p[2] !in Timeline.kinds</ID>
+    <ID>ComplexCondition:MonitorService.kt$MonitorService$(changed || sound) &amp;&amp; p.status == Status.PARTIAL &amp;&amp; Prefs.notifyFor(this, "PARTIAL")</ID>
+    <ID>ComplexCondition:MonitorService.kt$MonitorService$(changed || sound) &amp;&amp; p.status == Status.TG_DOWN &amp;&amp; Prefs.notifyFor(this, "TG_DOWN")</ID>
+    <ID>ComplexCondition:MonitorService.kt$MonitorService$first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS || action == ACTION_ALARM</ID>
+    <ID>ComplexCondition:MtProto.kt$MtProto$bodySize != payload.size - 20 || bodySize &lt; 56 || bodySize % 4 != 0 || buffer.int != 0x05162463</ID>
+    <ID>CyclomaticComplexMethod:BackupCodec.kt$BackupCodec.JsonPreflight$private fun string(): String</ID>
+    <ID>CyclomaticComplexMethod:BackupCodec.kt$BackupCodec.JsonPreflight$private fun value(depth: Int)</ID>
+    <ID>CyclomaticComplexMethod:ChartView.kt$ChartView$override fun onDraw(canvas: Canvas)</ID>
+    <ID>CyclomaticComplexMethod:CsvImport.kt$CsvImport$fun parse(text: String): List&lt;Observation&gt;</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun render()</ID>
+    <ID>CyclomaticComplexMethod:MonitorService.kt$MonitorService$@Synchronized private fun handleResult(p: Probe)</ID>
+    <ID>CyclomaticComplexMethod:MtProto.kt$MtProto$fun validResponse(payload: ByteArray, nonce: ByteArray): Boolean</ID>
+    <ID>CyclomaticComplexMethod:PortableBackupCodec.kt$PortableBackupCodec$fun decodePublishedPayload(bytes: ByteArray): BackupSnapshot</ID>
+    <ID>CyclomaticComplexMethod:StatusTileService.kt$StatusTileService$private fun refresh()</ID>
+    <ID>CyclomaticComplexMethod:StatusWidget.kt$StatusWidget.Companion$private fun build(ctx: Context): RemoteViews</ID>
+    <ID>CyclomaticComplexMethod:Timeline.kt$Timeline$fun stats(samples: List&lt;Observation&gt;, from: Long, until: Long): TimeStats</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:MonitorService.kt$MonitorService$val (title, text, channel, icon, color, colorized) = when { s.status == Status.UNKNOWN -&gt; Notif( if (s.checkedAt &gt; 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю связь с Telegram…", "Checking the connection to Telegram…"), s.reason.ifEmpty { CHECK_URL }, CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_OK, false ) stale -&gt; Notif( Lang.t("Мониторинг задерживается", "Monitoring is delayed"), Lang.t("Последняя проверка ${agoStr(s.checkedAt, now)}; нужен свежий результат", "Last check ${agoStr(s.checkedAt, now)}; a fresh result is needed"), CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_STALE, false ) s.status == Status.PARTIAL -&gt; Notif( Lang.t("Telegram частично доступен", "Telegram is partially reachable"), s.reason, CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_OFFLINE, false ) s.status == Status.OK -&gt; Notif( Lang.t("Telegram отвечает · ${s.latencyMs} мс", "Telegram is responding · ${s.latencyMs} ms"), Lang.t("Проверено в ${timeStr(s.checkedAt)}$uptimeText", "Checked at ${timeStr(s.checkedAt)}$uptimeText"), CHANNEL_OK, R.drawable.ic_stat_ok, COLOR_OK, false ) s.status == Status.TG_DOWN -&gt; Notif( Lang.t("Telegram НЕДОСТУПЕН", "Telegram is UNREACHABLE"), Lang.t("Нет связи с ${timeStr(s.since)} · ${s.reason}", "No connection since ${timeStr(s.since)} · ${s.reason}"), CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true ) else -&gt; Notif( Lang.t("Нет подключения к интернету", "No internet connection"), Lang.t("С ${timeStr(s.since)} · ${s.reason}", "Since ${timeStr(s.since)} · ${s.reason}"), CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true ) }</ID>
+    <ID>LongMethod:ChartView.kt$ChartView$override fun onDraw(canvas: Canvas)</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$private fun render()</ID>
+    <ID>LongMethod:MonitorService.kt$MonitorService$@Synchronized private fun handleResult(p: Probe)</ID>
+    <ID>LongMethod:MonitorService.kt$MonitorService$private fun buildNotification(s: State): Notification</ID>
+    <ID>LongMethod:StatusWidget.kt$StatusWidget.Companion$private fun build(ctx: Context): RemoteViews</ID>
+    <ID>LongParameterList:AlertRules.kt$AlertRules$(status: String, tgDown: Boolean, offline: Boolean, partial: Boolean, allowed: Boolean, nowElapsedMs: Long, lastElapsedMs: Long)</ID>
+    <ID>LongParameterList:BackupCrypto.kt$BackupCrypto$(mode: Int, bytes: ByteArray, offset: Int, length: Int, password: CharArray, salt: ByteArray, nonce: ByteArray, header: ByteArray)</ID>
+    <ID>LongParameterList:History.kt$History.Minute$(val minute: Long, var ok: Int = 0, var fail: Int = 0, var offline: Int = 0, latencySum: Long = 0L, var partial: Int = 0, var unknown: Int = 0)</ID>
+    <ID>LongParameterList:Prefs.kt$Prefs$( ctx: Context, status: MonitorService.Status, checkedAt: Long, since: Long, latencyMs: Long, reason: String, lastVibrationAt: Long, diagnostics: String = "", expectedIntervalSec: Int = 30, )</ID>
+    <ID>MagicNumber:AlarmPattern.kt$AlarmPattern.LONG$1200</ID>
+    <ID>MagicNumber:AlarmPattern.kt$AlarmPattern.SHORT$100</ID>
+    <ID>MagicNumber:AlarmPattern.kt$AlarmPattern.SHORT$200</ID>
+    <ID>MagicNumber:AlarmPattern.kt$AlarmPattern.STANDARD$300</ID>
+    <ID>MagicNumber:AlarmPattern.kt$AlarmPattern.STANDARD$700</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec$10</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec$120</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec$1439</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec$23</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec$600_000L</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$100</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$16</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$20</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$4</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$6</ID>
+    <ID>MagicNumber:BackupCodec.kt$BackupCodec.JsonPreflight$8</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$1024</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$12</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$16</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$256</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$28</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$4</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$40</ID>
+    <ID>MagicNumber:BackupCrypto.kt$BackupCrypto$8</ID>
+    <ID>MagicNumber:BackupUi.kt$BackupUi$1024</ID>
+    <ID>MagicNumber:BackupUi.kt$BackupUi$12</ID>
+    <ID>MagicNumber:BackupUi.kt$BackupUi$20</ID>
+    <ID>MagicNumber:BackupUi.kt$BackupUi$256</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$0.25f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$0.5f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$1.15</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$11f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$16f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$300L</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$3f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$4f</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$60</ID>
+    <ID>MagicNumber:ChartView.kt$ChartView$60_000L</ID>
+    <ID>MagicNumber:CheckSchedule.kt$CheckSchedule$1_000L</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$3</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$4</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$4096</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$5</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$6</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$600_000L</ID>
+    <ID>MagicNumber:CsvImport.kt$CsvImport$7</ID>
+    <ID>MagicNumber:DailySummary.kt$DailySummary$1439</ID>
+    <ID>MagicNumber:DailySummary.kt$DailySummary$60</ID>
+    <ID>MagicNumber:DailySummary.kt$DailySummary$60_000L</ID>
+    <ID>MagicNumber:DailySummaryReceiver.kt$DailySummaryReceiver.Companion$31</ID>
+    <ID>MagicNumber:DailySummaryReceiver.kt$DailySummaryReceiver.Companion$41</ID>
+    <ID>MagicNumber:EventNotifications.kt$EventNotifications$4</ID>
+    <ID>MagicNumber:History.kt$History$10</ID>
+    <ID>MagicNumber:History.kt$History$1000L</ID>
+    <ID>MagicNumber:History.kt$History$15_000L</ID>
+    <ID>MagicNumber:History.kt$History$300</ID>
+    <ID>MagicNumber:History.kt$History$4</ID>
+    <ID>MagicNumber:History.kt$History$6</ID>
+    <ID>MagicNumber:History.kt$History$60</ID>
+    <ID>MagicNumber:History.kt$History$60_000</ID>
+    <ID>MagicNumber:History.kt$History$60_000L</ID>
+    <ID>MagicNumber:History.kt$History$7</ID>
+    <ID>MagicNumber:History.kt$History$86_400_000L</ID>
+    <ID>MagicNumber:HistoryStorage.kt$EventLogStorage$150</ID>
+    <ID>MagicNumber:HistoryStorage.kt$EventLogStorage$4</ID>
+    <ID>MagicNumber:HistoryStorage.kt$EventLogStorage$4096</ID>
+    <ID>MagicNumber:HistoryStorage.kt$EventLogStorage$5</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$3</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$4</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$5</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$600_000L</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$60_000L</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage$65_000</ID>
+    <ID>MagicNumber:HistoryStorage.kt$HistoryStorage.AppendSyncPolicy$60_000L</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$10</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$120</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$15</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$20</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$24</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$300L</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$31</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$33</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$350L</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$60</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$60_000L</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$7</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity.&lt;no name provided&gt;$1000L</ID>
+    <ID>MagicNumber:MonitorService.kt$100.0</ID>
+    <ID>MagicNumber:MonitorService.kt$99.95</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$1000L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$15_000L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$26</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$3</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$30_000L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$31</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService$34</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService.&lt;no name provided&gt;$15_000L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService.&lt;no name provided&gt;$1_500L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService.&lt;no name provided&gt;$500L</ID>
+    <ID>MagicNumber:MonitorService.kt$MonitorService.&lt;no name provided&gt;$800L</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$0x05162463</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$0x1cb5c415</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$0x7f</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$0xef</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$0xff</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$1000</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$1024</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$16</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$19</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$20</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$32</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$3_000</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$4</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$40</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$4096</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$443</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$4L</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$56</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$76</ID>
+    <ID>MagicNumber:MtProto.kt$MtProto$8</ID>
+    <ID>MagicNumber:NetworkProbe.kt$120</ID>
+    <ID>MagicNumber:NetworkProbe.kt$NetworkProbe$3_000</ID>
+    <ID>MagicNumber:NetworkProbe.kt$NetworkProbe$405</ID>
+    <ID>MagicNumber:NetworkProbe.kt$NetworkProbe$501</ID>
+    <ID>MagicNumber:NetworkProbe.kt$NetworkProbe.Companion$30L</ID>
+    <ID>MagicNumber:NetworkProbe.kt$NetworkProbe.Companion$8</ID>
+    <ID>MagicNumber:OfflineBackoff.kt$OfflineBackoff$120</ID>
+    <ID>MagicNumber:OfflineBackoff.kt$OfflineBackoff$30</ID>
+    <ID>MagicNumber:OfflineBackoff.kt$OfflineBackoff$300</ID>
+    <ID>MagicNumber:OfflineBackoff.kt$OfflineBackoff$60</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$0x54474431</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$0xff</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$12</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$16</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$1_000_000_000</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$21</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$23</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$24</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$253402300799999L</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$256</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$30</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$33</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$34</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$4</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$5</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$512</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$60</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$600_000</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$66</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$71</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$8</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$84</ID>
+    <ID>MagicNumber:PortableBackupCodec.kt$PortableBackupCodec$87</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.BALANCED$120</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.BALANCED$30</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.ECONOMY$300</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.ECONOMY$60</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.FREQUENT$10</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.FREQUENT$15</ID>
+    <ID>MagicNumber:PowerProfile.kt$PowerProfile.FREQUENT$60</ID>
+    <ID>MagicNumber:PowerProfile.kt$ServiceHealth$10</ID>
+    <ID>MagicNumber:PowerProfile.kt$ServiceHealth$30_000L</ID>
+    <ID>MagicNumber:PowerProfile.kt$ServiceHealth$3_000L</ID>
+    <ID>MagicNumber:Prefs.kt$1000L</ID>
+    <ID>MagicNumber:Prefs.kt$2000L</ID>
+    <ID>MagicNumber:Prefs.kt$24</ID>
+    <ID>MagicNumber:Prefs.kt$60</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$10</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$120</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$1439</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$23</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$24</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$30</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$31</ID>
+    <ID>MagicNumber:Prefs.kt$Prefs$60</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$100</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$1000L</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$23</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$3L</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$499</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$500</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$599</ID>
+    <ID>MagicNumber:ProbeRules.kt$ProbeRules$60</ID>
+    <ID>MagicNumber:QuietHours.kt$QuietHours$1439</ID>
+    <ID>MagicNumber:QuietHours.kt$QuietHours$23</ID>
+    <ID>MagicNumber:QuietHours.kt$QuietHours$60</ID>
+    <ID>MagicNumber:RestoreTransaction.kt$BoundedInput$8192</ID>
+    <ID>MagicNumber:RestoreTransaction.kt$RestoreTransaction$1024</ID>
+    <ID>MagicNumber:RestoreTransaction.kt$RestoreTransaction$8</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService$29</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService$2_000L</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService$33</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService$34</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService$400L</ID>
+    <ID>MagicNumber:StatusTileService.kt$StatusTileService.&lt;no name provided&gt;$2_000L</ID>
+    <ID>MagicNumber:StatusWidget.kt$StatusWidget.Companion$10</ID>
+    <ID>MagicNumber:Timeline.kt$1000</ID>
+    <ID>MagicNumber:Timeline.kt$3600</ID>
+    <ID>MagicNumber:Timeline.kt$60</ID>
+    <ID>MagicNumber:Timeline.kt$TimeStats$100.0</ID>
+    <ID>MagicNumber:Vibe.kt$Vibe$120</ID>
+    <ID>MagicNumber:Vibe.kt$Vibe$31</ID>
+    <ID>MagicNumber:Vibe.kt$Vibe$33</ID>
+    <ID>MagicNumber:Vibe.kt$Vibe$80</ID>
+    <ID>MagicNumber:WatchdogReceiver.kt$WatchdogReceiver.Companion$31</ID>
+    <ID>MagicNumber:WatchdogReceiver.kt$WatchdogReceiver.Companion$40</ID>
+    <ID>MaxLineLength:BackupCodec.kt$BackupCodec$row.get("kind") as? String ?: invalid()</ID>
+    <ID>MaxLineLength:BackupCodec.kt$BackupCodec.JsonPreflight$private fun take(c: Char): Boolean</ID>
+    <ID>MaxLineLength:BackupManager.kt$BackupManager$val validated = BackupCodec.decode(BackupCodec.encode(BackupSnapshot(0L, emptyMap(), observations, emptyList())))</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$(</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$.</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$Lang.t("Восстановление прервано. Нажмите «Восстановить резервную копию» для повторной попытки.", "Restore interrupted. Tap “Restore backup” to try again.")</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$Lang.t("Записей журнала: ${snapshot.log.size}\n\nТекущие данные будут заменены. ", "Log records: ${snapshot.log.size}\n\nThe current data will be replaced. ")</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$Lang.t("Мониторинг будет остановлен; включите его вручную после восстановления.", "Monitoring will be stopped; turn it back on manually after restoring.")</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$if</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$val</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$val first = field(if (confirm) Lang.t("Пароль: от 12 до 256 символов", "Password: 12 to 256 characters") else Lang.t("Пароль этой копии", "Password for this backup"))</ID>
+    <ID>MaxLineLength:BackupUi.kt$BackupUi$}</ID>
+    <ID>MaxLineLength:ChartView.kt$ChartView$(if (avg &gt;= 0) Lang.t(" Среднее время ответа: $avg мс.", " Average response time: $avg ms.") else "")</ID>
+    <ID>MaxLineLength:ChartView.kt$ChartView$canvas.drawText(if (windowMinutes &gt; 60) Lang.t("7 дней назад", "7 days ago") else Lang.t("60 мин назад", "60 min ago"), 0f, height - 2f * dp, textPaint)</ID>
+    <ID>MaxLineLength:ChartView.kt$ChartView$return</ID>
+    <ID>MaxLineLength:ChartView.kt$ChartView$val whenText = (if (windowMinutes &gt; 60) SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) else timeFmt).format(Date(minute * 60_000L))</ID>
+    <ID>MaxLineLength:CsvImport.kt$CsvImport$require(rows.all { (row, active) -&gt; active == (row.clockEpoch == maxEpoch) }) { "Inconsistent clock epoch flag" }</ID>
+    <ID>MaxLineLength:CsvImport.kt$CsvImport$require(value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z"))) { "Invalid UTC timestamp" }</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$else -&gt; Lang.t("Сбоев Telegram: ${s.outageCount}, самый долгий ${durationStr(s.longestOutageMs)}", "Telegram outages: ${s.outageCount}, longest ${durationStr(s.longestOutageMs)}")</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$fun timeLabel(minuteOfDay: Int): String</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$if (s.avgLatencyMs &gt;= 0) add(Lang.t("Средний отклик: ${s.avgLatencyMs} мс", "Average response: ${s.avgLatencyMs} ms"))</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$if (s.offlineCount &gt; 0) add(Lang.t("Без интернета: ${durationStr(s.offlineMs)}", "No internet: ${durationStr(s.offlineMs)}"))</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$if (s.partialMs &gt;= 60_000L) add(Lang.t("Частично доступен: ${durationStr(s.partialMs)}", "Partially reachable: ${durationStr(s.partialMs)}"))</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$if (s.unknownMs &gt;= 60_000L) add(Lang.t("Без наблюдения: ${durationStr(s.unknownMs)}", "Not monitored: ${durationStr(s.unknownMs)}"))</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$s.lastOutageOngoing</ID>
+    <ID>MaxLineLength:DailySummary.kt$DailySummary$val</ID>
+    <ID>MaxLineLength:EventNotifications.kt$EventNotifications$Lang.t("Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", "The observed outage lasted ${recoveryDurationStr(event.durationMs)}")</ID>
+    <ID>MaxLineLength:EventNotifications.kt$EventNotifications$manager</ID>
+    <ID>MaxLineLength:EventNotifications.kt$EventNotifications$manager.createNotificationChannel(NotificationChannel(recoveryChannel,recoveryName,existingRecovery.importance))</ID>
+    <ID>MaxLineLength:EventNotifications.kt$EventNotifications$manager.notify(OUTAGE_ID, notification(Lang.t("Telegram недоступен", "Telegram is unreachable"), reason, sound &amp;&amp; allowed, R.drawable.ic_stat_fail,outageChannel))</ID>
+    <ID>MaxLineLength:EventNotifications.kt$EventNotifications$private fun blocked(channel: String)</ID>
+    <ID>MaxLineLength:History.kt$History$(s.offlineMs / 60_000).toInt()</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("TG Монитор — ", "TG Monitor — ")).append(if (days == 1) Lang.t("за сутки", "last 24 hours") else Lang.t("за неделю", "last week")).append('\n')</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n", "MTTR covers fully observed Telegram outages between OK checks; PARTIAL can extend an outage, while gaps and lost internet are excluded.\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n", "Reachable: ${durationStr(s.okMs)}; partially: ${durationStr(s.partialMs)}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n", "Completed fully observed outages: ${s.completedOutageCount}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Подтверждённых эпизодов сбоя Telegram: ${s.outageCount}; потерь сети: ${s.offlineCount}\n", "Confirmed Telegram outages: ${s.outageCount}; internet losses: ${s.offlineCount}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n", "Checks: OK ${s.okChecks}; outage ${s.downChecks}; partial ${s.partialChecks}; no internet ${s.offlineChecks}; no data ${s.unknownChecks}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.", "Checks: ${s.checks}. Time between checks is estimated; gaps are excluded from the percentage."))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n", "Longest confirmed outage: ${durationStr(s.longestOutageMs)}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$append(Lang.t("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n", "Telegram outage: ${durationStr(s.downMs)}; no internet: ${durationStr(s.offlineMs)}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$if</ID>
+    <ID>MaxLineLength:History.kt$History$if (s.mttrMs &gt;= 0) append(Lang.t("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n", "Mean time to recovery (MTTR): ${recoveryDurationStr(s.mttrMs)}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History$if (s.uptimePercent &gt;= 0) append(Lang.t("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n", "Time-based availability estimate: ${formatPercent(s.uptimePercent)}\n"))</ID>
+    <ID>MaxLineLength:History.kt$History.Minute$val isOfflineDominant get() = offline &gt; 0 &amp;&amp; offline &gt;= ok &amp;&amp; offline &gt; fail &amp;&amp; offline &gt;= partial &amp;&amp; offline &gt;= unknown</ID>
+    <ID>MaxLineLength:History.kt$History.Minute$val isUnknownDominant get() = unknown &gt; 0 &amp;&amp; unknown &gt;= ok &amp;&amp; unknown &gt;= fail &amp;&amp; unknown &gt;= offline &amp;&amp; unknown &gt;= partial</ID>
+    <ID>MaxLineLength:HistoryStorage.kt$EventLogStorage$require(length in 0..4096 &amp;&amp; length &lt;= text.length - colon - 1 &amp;&amp; rows.size &lt; 150) { "Invalid event log entry" }</ID>
+    <ID>MaxLineLength:HistoryStorage.kt$HistoryStorage$(older + newer).associateBy { it.clockEpoch to it.at }.values.sortedWith(compareBy({ it.clockEpoch }, { it.at }))</ID>
+    <ID>MaxLineLength:Lang.kt$Lang$/** UI language for text built in code. Set from resources (R.string.lang) so it matches Android's own resource resolution; JVM tests keep the Russian default. */</ID>
+    <ID>MaxLineLength:LastSuccessPolicy.kt$LastSuccessPolicy$return</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$.</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Lang.t("Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}", "For ${durationStr(now - s.since)} · since ${timeStr(s.since)}")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$MonitorService.Status.OK -&gt; Lang.t("MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется.", "MTProto and web resources are responding. Message delivery is not checked.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$MonitorService.Status.PARTIAL -&gt; Lang.t("Последний раз: частично доступен", "Last known: partially reachable")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$MonitorService.Status.UNKNOWN -&gt; s.reason.ifEmpty { Lang.t("Проверяю веб-ресурсы и MTProto", "Checking web resources and MTProto") }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Toast.makeText(this, Lang.t("За последние сутки ещё нет проверок", "No checks in the last 24 hours yet"), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Toast.makeText(this, Lang.t("Не удалось запустить: ${e.message}", "Couldn’t start monitoring: ${e.message}"), Toast.LENGTH_LONG).show()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Toast.makeText(this, Lang.t("Не удалось поделиться: ${e.message}", "Couldn’t share: ${e.message}"), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$btnProfile.text = Lang.t("Профиль: ", "Profile: ") + (profile?.title ?: Lang.t("Свой интервал", "Custom interval"))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$btnShareStats.setOnClickListener { shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), History.exportSummary(this, historyDays)) }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$catch (e: Exception) { Toast.makeText(this, Lang.t("Не удалось открыть сохранение файла", "Couldn’t open the file save dialog"), Toast.LENGTH_LONG).show() }</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$findViewById&lt;TextView&gt;(R.id.tvChartTitle).text = getString(if (historyDays == 1) R.string.chart_last_hour else R.string.chart_last_week)</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!alarmOk) lines += Lang.t("• Разреши точные будильники — иначе проверки замирают при выключенном экране.", "• Allow exact alarms, or checks will stall while the screen is off.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!batteryOk) lines += Lang.t("• Разреши работу без ограничений — иначе Android усыпит проверки.", "• Allow unrestricted background use, or Android will put checks to sleep.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!notifOk) lines += Lang.t("• Включи уведомления — иначе постоянного значка не будет.", "• Turn on notifications, or there will be no persistent icon.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (!safeStart(intent)) safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (s.checkedAt &gt; 0) Lang.t("Проверено ${agoStr(s.checkedAt, now)}", "Checked ${agoStr(s.checkedAt, now)}") else Lang.t("Первая проверка идёт прямо сейчас", "First check in progress")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$private fun updateAlarmPatternLabel()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$swDailySummary.text = Lang.t("Сводка за день в ${DailySummary.timeLabel(Prefs.dailySummaryMinute(this))}", "Daily summary at ${DailySummary.timeLabel(Prefs.dailySummaryMinute(this))}")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvAlarm.text = Lang.t("Без точных будильников Android откладывает проверки во сне, и статус устаревает.", "Without exact alarms, Android postpones checks during sleep and the status goes stale.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvAlarm.text = Lang.t("✓ Точные будильники разрешены. Android всё равно может откладывать проверки в глубоком сне.", "✓ Exact alarms are allowed. Android may still postpone checks in deep sleep.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvBattery.text = Lang.t("✓ Работа в фоне без ограничений разрешена.", "✓ Unrestricted background use is allowed.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvDiagnostics.text</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvLatency.text = if (running &amp;&amp; !stale &amp;&amp; s.status == MonitorService.Status.OK) Lang.t("${s.latencyMs} мс", "${s.latencyMs} ms") else "—"</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvNotif.text = Lang.t("Уведомления выключены, поэтому значка в строке состояния не будет.", "Notifications are off, so there will be no status bar icon.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvNotif.text = Lang.t("✓ Уведомления включены, значок виден в строке состояния.", "✓ Notifications are on; the icon is visible in the status bar.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvReason.text = Lang.t("Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить».", "Monitoring is delayed. Android may have postponed the check; tap “Check now”.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvReason.text = Lang.t("Нажми «Запустить», и приложение начнёт следить за Telegram.", "Tap “Start” and the app will begin monitoring Telegram.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvReason.text = Lang.t("Нажмите «Восстановить резервную копию», чтобы завершить замену данных.", "Tap “Restore backup” to finish replacing the data.")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvSince.text = Lang.t("Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку", "Checked ${agoStr(s.checkedAt, now)} — waiting for a fresh check")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$tvTitle.text = if (s.checkedAt &gt; 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю…", "Checking…")</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val lines = mutableListOf(Lang.t("Без этих разрешений значок в строке состояния может пропасть или врать.", "Without these permissions, the status bar icon may disappear or show the wrong status."))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val output = app.contentResolver.openOutputStream(uri, "wt") ?: error(Lang.t("Файл недоступен", "File unavailable"))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$}</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$.</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$CHANNEL_ALERT</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Lang.t("Нет связи с ${timeStr(s.since)} · ${s.reason}", "No connection since ${timeStr(s.since)} · ${s.reason}")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Lang.t("Последняя проверка ${agoStr(s.checkedAt, now)}; нужен свежий результат", "Last check ${agoStr(s.checkedAt, now)}; a fresh result is needed")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Lang.t("Проверено в ${timeStr(s.checkedAt)}$uptimeText", "Checked at ${timeStr(s.checkedAt)}$uptimeText")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.", "A proxy configured inside Telegram is not used here.")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive)</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Status.OK -&gt; Lang.t("MTProto и веб отвечают, ${p.latencyMs} мс$downFor", "MTProto and web are responding, ${p.latencyMs} ms$downFor")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$Status.PARTIAL -&gt; Lang.t("Telegram частично доступен: ${p.reason}", "Telegram is partially reachable: ${p.reason}")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$description = Lang.t("Постоянный значок, когда Telegram отвечает", "Persistent icon while Telegram is responding")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$else</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$if (!destroyed) handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Проверка не завершена: ${describeProbeError(e)}", "Check did not finish: ${describeProbeError(e)}")))</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$if (s.checkedAt &gt; 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю связь с Telegram…", "Checking the connection to Telegram…")</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details)</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$newState.latencyMs</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$return Probe(Status.NO_NETWORK, -1, Lang.t("Требуется вход в сеть Wi-Fi", "Wi-Fi sign-in required"), Lang.t("Сеть: $transport; captive portal", "Network: $transport; captive portal"))</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$val</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$val downFor = recovery?.let { Lang.t(" (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})", " (observed outage ${recoveryDurationStr(it.durationMs)})") }.orEmpty()</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$val selected = network ?: return Probe(Status.NO_NETWORK, -1, Lang.t("Нет активной сети", "No active network"), Lang.t("Сеть: отсутствует", "Network: none"))</ID>
+    <ID>MaxLineLength:MonitorService.kt$MonitorService$}</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$NetworkProbe$return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), if (ok) Lang.t("MTProto resPQ; nonce совпал", "MTProto resPQ; nonce matched") else Lang.t("Ответ MTProto не подтверждён", "MTProto response not confirmed"))</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$NetworkProbe.Companion$SynchronousQueue()</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeBatch$?:</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeBatch$catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeBatch$fun</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeBatch$if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Проверка отменена", "Check cancelled"))</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeBatch$results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$"NO_NETWORK" -&gt; Lang.t("Нет активной сети или требуется вход в Wi-Fi", "No active network, or Wi-Fi sign-in is required")</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$"OK" -&gt; Lang.t("MTProto и веб-ресурсы отвечают; доставка сообщений не проверяется", "MTProto and web resources are responding; message delivery is not checked")</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$"TG_DOWN" -&gt; Lang.t("Контрольные сайты отвечают, Telegram не отвечает", "Control sites are responding; Telegram is not")</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$Lang.t("MTProto отвечает, веб-ресурсы не подтвердили доступность", "MTProto is responding; web resources did not confirm reachability")</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$Lang.t("Веб-ресурсы отвечают, MTProto не подтвердил доступность", "Web resources are responding; MTProto did not confirm reachability")</ID>
+    <ID>MaxLineLength:NetworkProbe.kt$ProbeReport$else -&gt; Lang.t("Доступность не определена: ни один адрес не подтвердил связь", "Reachability unknown: no address confirmed a connection")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("Huawei / Honor: Настройки → Батарея → Запуск приложений → TG Монитор → «Управлять вручную» и включи все переключатели.", "Huawei / Honor: Settings → Battery → App launch → TG Monitor → “Manage manually”, then turn on all switches.")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("Meizu: отключи энергосбережение для TG Монитор и разреши автозапуск.", "Meizu: turn off power saving for TG Monitor and allow auto-start.")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("OPPO / Realme / OnePlus: разреши автозапуск и отключи оптимизацию батареи для TG Монитор в настройках приложения.", "OPPO / Realme / OnePlus: allow auto-launch and turn off battery optimization for TG Monitor in the app settings.")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("Samsung: Настройки → Приложения → TG Монитор → Батарея → «Без ограничений». Убери приложение из «Спящих».", "Samsung: Settings → Apps → TG Monitor → Battery → “Unrestricted”. Remove the app from “Sleeping apps”.")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("Xiaomi / Redmi / POCO: в настройках приложения включи «Автозапуск» и в «Контроле активности» выбери «Нет ограничений».", "Xiaomi / Redmi / POCO: in the app settings, turn on “Autostart” and set “Battery saver” to “No restrictions”.")</ID>
+    <ID>MaxLineLength:OemTips.kt$OemTips$Lang.t("vivo / iQOO: в настройках батареи разреши работу в фоне и автозапуск для TG Монитор.", "vivo / iQOO: in the battery settings, allow background activity and auto-start for TG Monitor.")</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$"sound_outage" to legacySound</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$2 -&gt; require(password.size in 12..256 &amp;&amp; bytes.size in HEADER_BYTES + TAG_BYTES..BackupCodec.MAX_PLAINTEXT_BYTES + HEADER_BYTES + TAG_BYTES)</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$header + BackupCrypto.crypt(Cipher.ENCRYPT_MODE, plaintext, 0, plaintext.size, password, salt, nonce, header)</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$require(rows in 0..BackupCodec.MAX_OBSERVATIONS &amp;&amp; input.available() &gt;= 4 &amp;&amp; rows &lt;= (input.available() - 4) / 34)</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$val row = Observation(input.readLong(), input.readLong(), input.readUTF(), input.readLong(), input.readLong())</ID>
+    <ID>MaxLineLength:PortableBackupCodec.kt$PortableBackupCodec$val settings = publishedDefaults + mapOf("sound_outage" to eventSound, "sound_recovery" to eventSound) + supplied</ID>
+    <ID>MaxLineLength:PowerProfile.kt$ServiceHealth$lastProgress &lt;= 0L || now &lt; lastProgress || now - lastProgress &gt; expectedSec.coerceAtLeast(10) * 3_000L + 30_000L</ID>
+    <ID>MaxLineLength:Prefs.kt$Prefs$fun setAlarmPattern(ctx: Context, pattern: AlarmPattern)</ID>
+    <ID>MaxLineLength:Prefs.kt$Prefs$fun setNotifyRecovery(ctx: Context, value: Boolean)</ID>
+    <ID>MaxLineLength:Prefs.kt$Prefs$profile(ctx)?.interval(bad, screenOff) ?: ProbeRules.nextIntervalSec(intervalSec(ctx).coerceIn(10, 120), bad, screenOff)</ID>
+    <ID>MaxLineLength:Prefs.kt$else -&gt; if (hours % 24 == 0L) Lang.t("$days д", "$days d") else Lang.t("$days д ${hours % 24} ч", "$days d ${hours % 24} h")</ID>
+    <ID>MaxLineLength:Prefs.kt$hours &lt; 24 -&gt; if (min % 60 == 0L) Lang.t("$hours ч", "$hours h") else Lang.t("$hours ч ${min % 60} мин", "$hours h ${min % 60} min")</ID>
+    <ID>MaxLineLength:Prefs.kt$if (millis &lt;= 0L) "—" else if (now - millis &lt; 2000L) Lang.t("только что", "just now") else durationStr(now - millis) + Lang.t(" назад", " ago")</ID>
+    <ID>MaxLineLength:StatusTileService.kt$StatusTileService$@android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")</ID>
+    <ID>MaxLineLength:StatusTileService.kt$StatusTileService$Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_ok, Lang.t("Доступен · ${s.latencyMs} мс", "Reachable · ${s.latencyMs} ms"))</ID>
+    <ID>MaxLineLength:StatusTileService.kt$StatusTileService$Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, Lang.t("Устарело · ${agoStr(s.checkedAt, now)}", "Stale · ${agoStr(s.checkedAt, now)}"))</ID>
+    <ID>MaxLineLength:StatusTileService.kt$StatusTileService$else -&gt; Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, if (s.checkedAt &gt; 0) Lang.t("Не определено", "Unknown") else Lang.t("Проверяю…", "Checking…"))</ID>
+    <ID>MaxLineLength:StatusWidget.kt$StatusWidget.Companion$else</ID>
+    <ID>MaxLineLength:StatusWidget.kt$StatusWidget.Companion$subtitle</ID>
+    <ID>MaxLineLength:StatusWidget.kt$StatusWidget.Companion$title = if (s.checkedAt &gt; 0) Lang.t("Нет свежего подтверждения", "No fresh confirmation") else Lang.t("Проверяю…", "Checking…")</ID>
+    <ID>MaxLineLength:Timeline.kt$Timeline$if (latency.isEmpty()) -1 else latency.sumOf { it / latency.size } + latency.sumOf { it % latency.size } / latency.size</ID>
+    <ID>MaxLineLength:Timeline.kt$Timeline$val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }</ID>
+    <ID>NestedBlockDepth:BackupCodec.kt$BackupCodec.JsonPreflight$private fun value(depth: Int)</ID>
+    <ID>ReturnCount:BackupUi.kt$BackupUi$fun onResult(code: Int, result: Int, data: Intent?): Boolean</ID>
+    <ID>ReturnCount:BootReceiver.kt$BootReceiver$override fun onReceive(context: Context, intent: Intent)</ID>
+    <ID>ReturnCount:ChartView.kt$ChartView$override fun onTouchEvent(event: MotionEvent): Boolean</ID>
+    <ID>ReturnCount:DailySummaryReceiver.kt$DailySummaryReceiver.Companion$fun post(ctx: Context, force: Boolean): Boolean</ID>
+    <ID>ReturnCount:History.kt$History$@Synchronized fun stats(ctx: Context, days: Int = 1, now: Long = System.currentTimeMillis()): TimeStats</ID>
+    <ID>ReturnCount:MainActivity.kt$MainActivity$@Deprecated("Platform activity result API for dependency-free native UI") override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?)</ID>
+    <ID>ReturnCount:MonitorService.kt$MonitorService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
+    <ID>ReturnCount:MonitorService.kt$MonitorService$private fun performCheck(): Probe</ID>
+    <ID>ReturnCount:MtProto.kt$MtProto$fun probe(host: String, socketFactory: () -&gt; Socket, cancellation: ProbeCancellation): Boolean</ID>
+    <ID>ReturnCount:MtProto.kt$MtProto$fun validResponse(payload: ByteArray, nonce: ByteArray): Boolean</ID>
+    <ID>ReturnCount:Prefs.kt$Prefs$fun loadLastState(ctx: Context): MonitorService.State?</ID>
+    <ID>ReturnCount:Timeline.kt$Timeline$fun recovery(samples: List&lt;Observation&gt;, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent?</ID>
+    <ID>SwallowedException:MainActivity.kt$MainActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BootReceiver.kt$BootReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DailySummaryReceiver.kt$DailySummaryReceiver.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:History.kt$History$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MonitorService.kt$MonitorService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NetworkProbe.kt$ProbeBatch$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:StatusWidget.kt$StatusWidget.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WatchdogReceiver.kt$WatchdogReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WatchdogReceiver.kt$WatchdogReceiver.Companion$e: Exception</ID>
+    <ID>TooManyFunctions:BackupUi.kt$BackupUi</ID>
+    <ID>TooManyFunctions:History.kt$History</ID>
+    <ID>TooManyFunctions:MainActivity.kt$MainActivity : Activity</ID>
+    <ID>TooManyFunctions:MonitorService.kt$MonitorService : Service</ID>
+    <ID>TooManyFunctions:Prefs.kt$Prefs</ID>
+    <ID>UnusedParameter:MonitorService.kt$MonitorService.State$intervalSec: Int</ID>
+    <ID>UnusedParameter:MonitorService.kt$MonitorService.State$slowExpected: Boolean = false</ID>
+  </CurrentIssues>
+</SmellBaseline>

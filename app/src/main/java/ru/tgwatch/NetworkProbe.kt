@@ -8,7 +8,8 @@ import java.net.UnknownHostException
 import java.util.concurrent.*
 import javax.net.ssl.SSLException
 
-enum class ProbeGroup { WEB, MTPROTO, CONTROL }
+/** EXTRA results are informational only and never take part in Telegram classification. */
+enum class ProbeGroup { WEB, MTPROTO, CONTROL, EXTRA }
 data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: String)
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
     val latencyMs: Long = -1, val detail: String)
@@ -143,7 +144,8 @@ class NetworkProbe(
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
     private val openSocket: () -> java.net.Socket = { java.net.Socket() },
 ) {
-    fun check(): ProbeReport {
+    /** [extras] run after Telegram/control probes in their own bounded batch; see [ExtraProbes]. */
+    fun check(extras: List<ProbeEndpoint> = emptyList()): ProbeReport {
         val telegram = listOf(
             ProbeEndpoint("api.telegram.org", ProbeGroup.WEB, "https://api.telegram.org/"),
             ProbeEndpoint("web.telegram.org", ProbeGroup.WEB, "https://web.telegram.org/"),
@@ -158,6 +160,10 @@ class NetworkProbe(
                 ProbeEndpoint("Google 204", ProbeGroup.CONTROL, "https://www.gstatic.com/generate_204"),
             )
             results += ProbeBatch(pool).run(controls, ::probe)
+        }
+        val informational = extras.filter { it.group == ProbeGroup.EXTRA }
+        if (informational.isNotEmpty()) {
+            results += ProbeBatch(pool, ExtraProbes.BATCH_TIMEOUT_MS).run(informational, ::probe)
         }
         return ProbeReport(results)
     }
