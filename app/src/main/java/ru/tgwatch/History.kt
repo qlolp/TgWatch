@@ -128,21 +128,21 @@ object History {
         return bins.values.map { it.copy() }
     }
     @Synchronized fun exportCsv(ctx: Context, days: Int = 7): String {
-        check(ready(ctx)) { "История временно недоступна" }
+        check(ready(ctx)) { ctx.getString(R.string.history_unavailable) }
         val now = System.currentTimeMillis()
         ensureClock(ctx, now)
         prune(now)
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }
-    fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
-    fun describeStats(s: TimeStats, days: Int): String = buildString {
-        append("TG Монитор — ").append(if (days == 1) "за сутки" else "за неделю").append('\n')
-        if (s.uptimePercent >= 0) append("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n")
-        append("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n")
-        append("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n")
-        append("Нет данных: ${durationStr(s.unknownMs)}\n")
-        append("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n")
-        append("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.")
+    fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(ctx, stats(ctx, days), days)
+    fun describeStats(ctx: Context, s: TimeStats, days: Int): String = buildString {
+        append(ctx.getString(if (days == 1) R.string.summary_title_day else R.string.summary_title_week)).append('\n')
+        if (s.uptimePercent >= 0) append(ctx.getString(R.string.summary_uptime, formatPercent(s.uptimePercent))).append('\n')
+        append(ctx.getString(R.string.summary_ok_partial, durationStr(s.okMs), durationStr(s.partialMs))).append('\n')
+        append(ctx.getString(R.string.summary_down_offline, durationStr(s.downMs), durationStr(s.offlineMs))).append('\n')
+        append(ctx.getString(R.string.summary_unknown, durationStr(s.unknownMs))).append('\n')
+        append(ctx.getString(R.string.summary_longest, durationStr(s.longestOutageMs))).append('\n')
+        append(ctx.getString(R.string.summary_checks, s.checks))
     }
     @Synchronized fun flush(ctx: Context) {
         if (!loaded) return
@@ -187,7 +187,7 @@ object EventLog {
 
     fun exportText(ctx: Context): String {
         val log = all(ctx)
-        return if (log.isEmpty()) "Журнал пуст" else log.joinToString("\n")
+        return if (log.isEmpty()) ctx.getString(R.string.log_empty_export) else log.joinToString("\n")
     }
 }
 

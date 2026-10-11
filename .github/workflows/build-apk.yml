@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -65,11 +67,26 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Next release version from git tags
+        id: version
+        run: |
+          set -euo pipefail
+          latest=$(git tag -l 'v*.*.*' | sort -V | tail -1)
+          if [ -z "$latest" ]; then latest='v1.7.0'; fi
+          IFS=. read -r maj min pat <<EOF
+          ${latest#v}
+          EOF
+          pat=$((pat + 1))
+          echo "name=${maj}.${min}.${pat}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${maj}.${min}.${pat}" >> "$GITHUB_OUTPUT"
+          echo "code=$((maj * 10000 + min * 100 + pat))" >> "$GITHUB_OUTPUT"
       - name: Build with persistent signing key
         env:
           TGWATCH_KEYSTORE_BASE64: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
@@ -77,6 +94,8 @@ jobs:
           TGWATCH_KEY_ALIAS: ${{ secrets.TGWATCH_KEY_ALIAS }}
           TGWATCH_KEY_PASSWORD: ${{ secrets.TGWATCH_KEY_PASSWORD }}
           TGWATCH_KEYSTORE_PATH: ${{ runner.temp }}/tgwatch-release.p12
+          TGWATCH_VERSION_NAME: ${{ steps.version.outputs.name }}
+          TGWATCH_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
           : "${TGWATCH_KEYSTORE_BASE64:?Missing signing key}"
@@ -93,9 +112,11 @@ jobs:
       - name: Publish versioned release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_NAME: ${{ steps.version.outputs.name }}
         run: |
-          gh release create "v1.7.${GITHUB_RUN_NUMBER}" TgWatch.apk TgWatch.apk.sha256 \
-            --target "$GITHUB_SHA" --title "TG Монитор 1.7.${GITHUB_RUN_NUMBER}" \
+          gh release create "$RELEASE_TAG" TgWatch.apk TgWatch.apk.sha256 \
+            --target "$GITHUB_SHA" --title "TG Монитор ${RELEASE_NAME}" \
             --notes 'Подписанная сборка с постоянным ключом. Перед переходом со старой debug-подписи прочтите раздел установки в README: несовпадение подписей блокирует обновление, удаление приложения стирает его данные.' --latest
   android:
     runs-on: ubuntu-latest

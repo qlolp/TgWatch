@@ -1,0 +1,27 @@
+Categories:
+  - Internet
+  - Connectivity
+License: MIT
+AuthorName: TgWatch contributors
+SourceCode: https://github.com/qlolp/TgWatch
+IssueTracker: https://github.com/qlolp/TgWatch/issues
+Changelog: https://github.com/qlolp/TgWatch/releases
+
+AutoName: TG Monitor
+Name: TG Monitor
+
+RepoType: git
+Repo: https://github.com/qlolp/TgWatch.git
+
+Builds:
+  - versionName: 1.7.28
+    versionCode: 10728
+    commit: v1.7.28
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v\d+\.\d+\.\d+$
+CurrentVersion: 1.7.28
+CurrentVersionCode: 10728

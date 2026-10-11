@@ -1,9 +1,13 @@
 package ru.tgwatch
 
-enum class PowerProfile(val title: String, val awake: Int, val asleep: Int, val failure: Int) {
-    ECONOMY("Экономичный", 60, 300, 60),
-    BALANCED("Обычный", 30, 120, 30),
-    FREQUENT("Частый", 15, 60, 10);
+import android.content.Context
+
+enum class PowerProfile(val titleRes: Int, val awake: Int, val asleep: Int, val failure: Int) {
+    ECONOMY(R.string.profile_economy, 60, 300, 60),
+    BALANCED(R.string.profile_balanced, 30, 120, 30),
+    FREQUENT(R.string.profile_frequent, 15, 60, 10);
+
+    fun title(ctx: Context): String = ctx.getString(titleRes)
 
     fun interval(bad: Boolean, screenOff: Boolean): Int =
         if (bad) failure else if (screenOff) asleep else awake

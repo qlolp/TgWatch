@@ -91,49 +91,49 @@ class StatusWidget : AppWidgetProvider() {
                 !running -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_pause
-                    title = "Мониторинг выключен"
-                    subtitle = "Нажми, чтобы открыть"
+                    title = ctx.getString(R.string.monitoring_off_title)
+                    subtitle = ctx.getString(R.string.widget_open)
                 }
                 s.status == MonitorService.Status.UNKNOWN -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_wait
-                    title = if (s.checkedAt > 0) "Нет свежего подтверждения" else "Проверяю…"
-                    subtitle = "Telegram"
+                    title = if (s.checkedAt > 0) ctx.getString(R.string.widget_no_fresh) else ctx.getString(R.string.checking)
+                    subtitle = ctx.getString(R.string.tile_label)
                 }
                 stale -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_wait
                     title = when (s.status) {
-                        MonitorService.Status.OK -> "Был доступен"
-                        MonitorService.Status.TG_DOWN -> "Был недоступен"
-                        MonitorService.Status.PARTIAL -> "Был частично доступен"
-                        else -> "Не было интернета"
+                        MonitorService.Status.OK -> ctx.getString(R.string.widget_was_ok)
+                        MonitorService.Status.TG_DOWN -> ctx.getString(R.string.widget_was_down)
+                        MonitorService.Status.PARTIAL -> ctx.getString(R.string.widget_was_partial)
+                        else -> ctx.getString(R.string.widget_was_offline)
                     }
-                    subtitle = "Проверено ${agoStr(s.checkedAt, now)} · нажми"
+                    subtitle = ctx.getString(R.string.widget_checked_tap, agoStr(s.checkedAt, now))
                 }
                 s.status == MonitorService.Status.PARTIAL -> {
                     bg = R.drawable.bg_widget_offline
                     icon = R.drawable.ic_stat_wait
-                    title = "Частично доступен"
-                    subtitle = "Нажми проверить"
+                    title = ctx.getString(R.string.tile_partial)
+                    subtitle = ctx.getString(R.string.widget_tap_check)
                 }
                 s.status == MonitorService.Status.OK -> {
                     bg = R.drawable.bg_widget_ok
                     icon = R.drawable.ic_stat_ok
-                    title = "Telegram доступен"
-                    subtitle = "${s.latencyMs} мс · нажми проверить"
+                    title = ctx.getString(R.string.widget_ok_title)
+                    subtitle = ctx.getString(R.string.widget_ok_subtitle, s.latencyMs)
                 }
                 s.status == MonitorService.Status.TG_DOWN -> {
                     bg = R.drawable.bg_widget_fail
                     icon = R.drawable.ic_stat_fail
-                    title = "Telegram недоступен"
-                    subtitle = "С ${timeStr(s.since)} · нажми"
+                    title = ctx.getString(R.string.status_down_title)
+                    subtitle = ctx.getString(R.string.widget_since_tap, timeStr(s.since))
                 }
                 else -> {
                     bg = R.drawable.bg_widget_offline
                     icon = R.drawable.ic_stat_offline
-                    title = "Нет интернета"
-                    subtitle = "С ${timeStr(s.since)} · нажми"
+                    title = ctx.getString(R.string.status_offline_title)
+                    subtitle = ctx.getString(R.string.widget_since_tap, timeStr(s.since))
                 }
             }
 

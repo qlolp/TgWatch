@@ -222,21 +222,36 @@ object Prefs {
 fun timeStr(millis: Long): String =
     if (millis <= 0L) "—" else SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(millis))
 
-/** Длительность словами: «12 с», «5 мин», «2 ч 15 мин», «3 д 4 ч». */
-fun durationStr(ms: Long): String {
+/** Длительность словами: «12 с» / «12s», в зависимости от [locale]. */
+fun durationStr(ms: Long, locale: Locale = Locale.getDefault()): String {
     val sec = (ms / 1000L).coerceAtLeast(0L)
     val min = sec / 60
     val hours = min / 60
     val days = hours / 24
+    val ru = locale.language in setOf("ru", "be", "uk")
     return when {
-        sec < 60 -> "$sec с"
-        min < 60 -> "$min мин"
-        hours < 24 -> if (min % 60 == 0L) "$hours ч" else "$hours ч ${min % 60} мин"
-        else -> if (hours % 24 == 0L) "$days д" else "$days д ${hours % 24} ч"
+        sec < 60 -> if (ru) "$sec с" else "${sec}s"
+        min < 60 -> if (ru) "$min мин" else "${min}m"
+        hours < 24 -> when {
+            min % 60 == 0L -> if (ru) "$hours ч" else "${hours}h"
+            ru -> "$hours ч ${min % 60} мин"
+            else -> "${hours}h ${min % 60}m"
+        }
+        else -> when {
+            hours % 24 == 0L -> if (ru) "$days д" else "${days}d"
+            ru -> "$days д ${hours % 24} ч"
+            else -> "${days}d ${hours % 24}h"
+        }
     }
 }
 
-/** «5 с назад» или прочерк, если события ещё не было. */
-fun agoStr(millis: Long, now: Long = System.currentTimeMillis()): String =
-    if (millis <= 0L) "—" else if (now - millis < 2000L) "только что" else durationStr(now - millis) + " назад"
+/** «5 с назад» / «5s ago», либо прочерк, если события ещё не было. */
+fun agoStr(millis: Long, now: Long = System.currentTimeMillis(), locale: Locale = Locale.getDefault()): String {
+    if (millis <= 0L) return "—"
+    if (now - millis < 2000L) {
+        return if (locale.language in setOf("ru", "be", "uk")) "только что" else "just now"
+    }
+    val body = durationStr(now - millis, locale)
+    return if (locale.language in setOf("ru", "be", "uk")) "$body назад" else "$body ago"
+}
 

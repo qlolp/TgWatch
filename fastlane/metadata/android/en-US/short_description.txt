@@ -1,0 +1,1 @@
+Local Telegram reachability monitor. No account, no message access.

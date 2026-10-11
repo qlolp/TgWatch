@@ -3,6 +3,9 @@
 Android-приложение для локального наблюдения за доступностью Telegram. Android 8.0+.
 Аккаунт Telegram, номер телефона и доступ к переписке не нужны. Приложение не отправляет сообщения.
 
+UI follows the device language: Russian by default (`values/`), English in `values-en/`.
+F-Droid packaging notes live in [`docs/fdroid.md`](docs/fdroid.md); store copy is under `fastlane/metadata/android/`.
+
 ## Что показывает
 
 - **Telegram отвечает:** получены ответ MTProto с совпавшим случайным nonce и HTTP-ответ одного из веб-ресурсов Telegram.
@@ -82,7 +85,8 @@ APK из артефакта `TgWatch-debug-test-only` предназначен �
    не выводит их значения и повторно использует существующий ключ. Сохраните защищённую резервную копию.
 2. После объединения PR откройте **Actions → Build APK → Run workflow**, выберите `main` и `publish`.
 3. Выпуск возможен только после unit tests, lint и проверок Android. При отсутствии ключа публикация останавливается.
-4. Каждый выпуск получает собственный тег, растущий `versionCode` и SHA-256 APK; предыдущие выпуски сохраняются.
+4. Каждый выпуск получает следующий git-тег `vMAJOR.MINOR.PATCH` (не номер прогона CI), `versionCode = MAJOR*10000 + MINOR*100 + PATCH` и SHA-256 APK; предыдущие выпуски сохраняются.
+5. Локально и в CI `versionName`/`versionCode` берутся из последнего тега `v*` (или из `TGWATCH_VERSION_NAME` / `TGWATCH_VERSION_CODE`).
 
 **Переход со старой debug-подписи — отдельный нерешённый шаг выпуска.** Если новый ключ отличается,
 Android не установит APK поверх старого. Удаление приложения удаляет приватную историю и настройки;

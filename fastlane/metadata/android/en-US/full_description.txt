@@ -1,0 +1,10 @@
+TG Monitor watches whether Telegram is reachable from your device.
+
+• No Telegram account, phone number, or chat access
+• MTProto handshake plus Telegram web endpoints
+• Foreground service with status bar icon, quick settings tile, and home-screen widget
+• Local seven-day history with time-weighted availability and CSV export
+• Optional vibration on outage, offline, or recovery, with quiet hours
+• Works offline for history; network probes stay on-device
+
+Privacy first: the app does not send telemetry and does not use a Telegram login.

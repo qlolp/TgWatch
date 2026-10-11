@@ -1,10 +1,12 @@
 package ru.tgwatch
 
+import android.content.Context
 import java.io.Closeable
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.Locale
 import java.util.concurrent.*
 import javax.net.ssl.SSLException
 
@@ -13,18 +15,21 @@ data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: S
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
     val latencyMs: Long = -1, val detail: String)
 
+private fun cisLocale(locale: Locale = Locale.getDefault()) =
+    locale.language in setOf("ru", "be", "uk")
+
 data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean = true) {
     val status get() = classify(results, connected)
     val latencyMs get() = results.filter { it.reachable && it.group == ProbeGroup.MTPROTO }
         .minOfOrNull { it.latencyMs } ?: -1L
-    val reason get() = when (status) {
-        "OK" -> "MTProto и веб-ресурсы отвечают; доставка сообщений не проверяется"
+    fun reason(ctx: Context): String = when (status) {
+        "OK" -> ctx.getString(R.string.reason_ok_short)
         "PARTIAL" -> if (results.any { it.group == ProbeGroup.MTPROTO && it.reachable })
-            "MTProto отвечает, веб-ресурсы не подтвердили доступность" else
-            "Веб-ресурсы отвечают, MTProto не подтвердил доступность"
-        "TG_DOWN" -> "Контрольные сайты отвечают, Telegram не отвечает"
-        "NO_NETWORK" -> "Нет активной сети или требуется вход в Wi-Fi"
-        else -> "Доступность не определена: ни один адрес не подтвердил связь"
+            ctx.getString(R.string.reason_partial_mt) else
+            ctx.getString(R.string.partial_reason)
+        "TG_DOWN" -> ctx.getString(R.string.down_reason)
+        "NO_NETWORK" -> ctx.getString(R.string.offline_reason)
+        else -> ctx.getString(R.string.unknown_reason)
     }
     companion object {
         fun classify(results: List<ProbeOutcome>, connected: Boolean): String {
@@ -94,13 +99,13 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             endpoints.forEach { endpoint ->
                 val lease = acquire(pool, endpoint)
                 if (lease == null) {
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
+                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, probeBusyDetail())
                     return@forEach
                 }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Проверка отменена")
+                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, probeCancelledDetail())
                         try { cancellation.check(); operation(endpoint, cancellation) }
                         catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }
                         finally { cancellation.close(); lease.finish() }
@@ -108,7 +113,7 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
                     handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
                     lease.cancelBeforeStart()
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, "Предыдущий запрос ещё завершается")
+                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, probeBusyDetail())
                 }
             }
             repeat(handles.size) {
@@ -125,20 +130,30 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             }
         }
         return endpoints.map { ep -> results.firstOrNull { it.endpoint == ep.name }
-            ?: ProbeOutcome(ep.name, ep.group, false, -1, "Общий срок ожидания истёк") }
+            ?: ProbeOutcome(ep.name, ep.group, false, -1, probeDeadlineDetail()) }
     }
 }
 
+private fun probeBusyDetail(): String =
+    if (cisLocale()) "Предыдущий запрос ещё завершается" else "Previous request is still finishing"
+
+private fun probeCancelledDetail(): String =
+    if (cisLocale()) "Проверка отменена" else "Check cancelled"
+
+private fun probeDeadlineDetail(): String =
+    if (cisLocale()) "Общий срок ожидания истёк" else "Overall deadline expired"
+
 fun describeProbeError(e: Exception): String = when (e) {
-    is UnknownHostException -> "DNS: адрес не найден"
-    is SSLException -> "TLS: защищённое соединение не установлено"
-    is SocketTimeoutException, is TimeoutException -> "Таймаут"
-    is InterruptedException -> "Проверка отменена"
+    is UnknownHostException -> if (cisLocale()) "DNS: адрес не найден" else "DNS: address not found"
+    is SSLException -> if (cisLocale()) "TLS: защищённое соединение не установлено" else "TLS: secure connection failed"
+    is SocketTimeoutException, is TimeoutException -> if (cisLocale()) "Таймаут" else "Timeout"
+    is InterruptedException -> probeCancelledDetail()
     else -> "${e.javaClass.simpleName}: ${e.message.orEmpty().take(120)}"
 }
 
 /** Separate network adapter allows Android to bind all requests to one Network. */
 class NetworkProbe(
+    private val ctx: Context,
     private val pool: ExecutorService,
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
     private val openSocket: () -> java.net.Socket = { java.net.Socket() },
@@ -155,7 +170,7 @@ class NetworkProbe(
         // Controls are unnecessary when Telegram itself proves internet connectivity.
         if (results.none { it.reachable }) {
             val controls = listOf(
-                ProbeEndpoint("Яндекс", ProbeGroup.CONTROL, "https://ya.ru/"),
+                ProbeEndpoint(ctx.getString(R.string.endpoint_yandex), ProbeGroup.CONTROL, "https://ya.ru/"),
                 ProbeEndpoint("Mail.ru", ProbeGroup.CONTROL, "https://mail.ru/"),
                 ProbeEndpoint("Google 204", ProbeGroup.CONTROL, "https://www.gstatic.com/generate_204"),
             )
@@ -167,7 +182,8 @@ class NetworkProbe(
         val start = System.nanoTime()
         if (ep.group == ProbeGroup.MTPROTO) {
             val ok = MtProto.probe(ep.address, openSocket, cancellation)
-            return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), if (ok) "MTProto resPQ; nonce совпал" else "Ответ MTProto не подтверждён")
+            val detail = if (ok) ctx.getString(R.string.mtproto_ok) else ctx.getString(R.string.mtproto_fail)
+            return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), detail)
         }
         fun request(method: String): Int {
             cancellation.check()

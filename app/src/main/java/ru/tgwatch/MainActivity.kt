@@ -101,10 +101,10 @@ class MainActivity : Activity() {
         btnPeriod = findViewById(R.id.btnPeriod)
         btnProfile = findViewById(R.id.btnProfile)
         tvDiagnostics = findViewById(R.id.tvDiagnostics)
-        btnPeriod.text = if (historyDays == 1) "Период: сутки" else "Период: неделя"
+        btnPeriod.text = getString(if (historyDays == 1) R.string.period_day else R.string.period_week)
         btnPeriod.setOnClickListener {
             historyDays = if (historyDays == 1) 7 else 1
-            btnPeriod.text = if (historyDays == 1) "Период: сутки" else "Период: неделя"
+            btnPeriod.text = getString(if (historyDays == 1) R.string.period_day else R.string.period_week)
             shownHistoryVersion = -1L
             render()
         }
@@ -118,8 +118,8 @@ class MainActivity : Activity() {
         }
         updateProfileLabel()
         btnProfile.setOnClickListener {
-            AlertDialog.Builder(this).setTitle("Расход батареи")
-                .setItems(PowerProfile.entries.map { "${it.title}: ${it.awake} с / сон ${it.asleep} с / сбой ${it.failure} с" }.toTypedArray()) { _, index ->
+            AlertDialog.Builder(this).setTitle(R.string.profile_picker_title)
+                .setItems(PowerProfile.entries.map { getString(R.string.profile_item, it.title(this), it.awake, it.asleep, it.failure) }.toTypedArray()) { _, index ->
                     val profile = PowerProfile.entries[index]
                     Prefs.setProfile(this, profile)
                     changingProfile = true
@@ -174,7 +174,7 @@ class MainActivity : Activity() {
         statusCard.backgroundTintList = ColorStateList.valueOf(cardColor)
 
         findViewById<TextView>(R.id.tvVersion).text = try {
-            "Версия " + packageManager.getPackageInfo(packageName, 0).versionName
+            getString(R.string.version_fmt, packageManager.getPackageInfo(packageName, 0).versionName)
         } catch (_: Exception) {
             ""
         }
@@ -193,7 +193,7 @@ class MainActivity : Activity() {
         btnCheck.setOnClickListener {
             if (MonitorService.running) {
                 MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
-                Toast.makeText(this, "Проверяю…", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.checking, Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -240,11 +240,11 @@ class MainActivity : Activity() {
         btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
         btnAppDetails.setOnClickListener { OemTips.openAppDetails(this) }
         btnVibe.setOnClickListener { Vibe.alarm(this) }
-        btnShareLog.setOnClickListener { shareText("Журнал TG Монитор", EventLog.exportText(this)) }
-        btnShareStats.setOnClickListener { shareText("Сводка TG Монитор", History.exportSummary(this, historyDays)) }
+        btnShareLog.setOnClickListener { shareText(getString(R.string.share_log_subject), EventLog.exportText(this)) }
+        btnShareStats.setOnClickListener { shareText(getString(R.string.share_summary_subject), History.exportSummary(this, historyDays)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
-        val oem = OemTips.manufacturerHint()
+        val oem = OemTips.manufacturerHint(this)
         if (oem != null) {
             tvOem.visibility = View.VISIBLE
             tvOem.text = oem
@@ -270,7 +270,7 @@ class MainActivity : Activity() {
         try {
             MonitorService.start(this)
         } catch (e: Exception) {
-            Toast.makeText(this, "Не удалось запустить: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.start_failed, e.message), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -287,13 +287,13 @@ class MainActivity : Activity() {
         try {
             startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
-            Toast.makeText(this, "Не удалось поделиться: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.share_failed, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun updateQuietHoursLabel() {
         val label = ProbeRules.quietHoursLabel(Prefs.quietStartHour(this), Prefs.quietEndHour(this))
-        swQuietHours.text = "Тихие часы $label (без вибрации)"
+        swQuietHours.text = getString(R.string.quiet_hours, label)
     }
 
     /** Два шага: сначала час начала тихих часов, затем час окончания. */
@@ -305,25 +305,25 @@ class MainActivity : Activity() {
                 swQuietHours.isChecked = true
                 updateQuietHoursLabel()
             }, Prefs.quietEndHour(this), 0, true).apply {
-                setTitle("Конец тихих часов")
+                setTitle(R.string.quiet_hours_end)
                 show()
             }
         }, Prefs.quietStartHour(this), 0, true).apply {
-            setTitle("Начало тихих часов")
+            setTitle(R.string.quiet_hours_start)
             show()
         }
     }
 
     private fun confirmClearLog() {
         AlertDialog.Builder(this)
-            .setTitle("Очистить журнал?")
-            .setMessage("Записи о сменах статуса будут удалены. График и статистика останутся.")
-            .setPositiveButton("Очистить") { _, _ ->
+            .setTitle(R.string.clear_log_title)
+            .setMessage(R.string.clear_log_message)
+            .setPositiveButton(R.string.clear) { _, _ ->
                 EventLog.clear(this)
                 shownLog = null
                 render()
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
@@ -381,73 +381,80 @@ class MainActivity : Activity() {
 
         renderSetup(notifOk, batteryOk, alarmOk)
 
-        btnToggle.text = if (running) "Остановить" else "Запустить"
+        btnToggle.text = getString(if (running) R.string.stop else R.string.start)
         btnCheck.isEnabled = running
 
         var color = getColor(R.color.status_idle)
         if (!running) {
             ivStatus.setImageResource(R.drawable.ic_stat_pause)
-            tvTitle.text = "Мониторинг выключен"
-            tvSince.text = "Проверки остановлены"
-            tvReason.text = "Нажми «Запустить», и приложение начнёт следить за Telegram."
+            ivStatus.contentDescription = getString(R.string.a11y_status_off)
+            tvTitle.text = getString(R.string.monitoring_off_title)
+            tvSince.text = getString(R.string.monitoring_off_since)
+            tvReason.text = getString(R.string.monitoring_off_reason)
         } else if (stale) {
             color = getColor(R.color.status_idle)
             ivStatus.setImageResource(R.drawable.ic_stat_wait)
+            ivStatus.contentDescription = getString(R.string.a11y_status_stale)
             tvTitle.text = when (s.status) {
-                MonitorService.Status.OK -> "Последний раз: доступен"
-                MonitorService.Status.PARTIAL -> "Последний раз: частично доступен"
-                MonitorService.Status.TG_DOWN -> "Последний раз: недоступен"
-                MonitorService.Status.NO_NETWORK -> "Последний раз: нет сети"
-                MonitorService.Status.UNKNOWN -> "Проверяю…"
+                MonitorService.Status.OK -> getString(R.string.last_ok)
+                MonitorService.Status.PARTIAL -> getString(R.string.last_partial)
+                MonitorService.Status.TG_DOWN -> getString(R.string.last_down)
+                MonitorService.Status.NO_NETWORK -> getString(R.string.last_offline)
+                MonitorService.Status.UNKNOWN -> getString(R.string.checking)
             }
-            tvSince.text = "Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку"
-            tvReason.text = "Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить»."
+            tvSince.text = getString(R.string.checked_waiting, agoStr(s.checkedAt, now))
+            tvReason.text = getString(R.string.stale_reason)
         } else {
             when (s.status) {
                 MonitorService.Status.OK -> {
                     color = getColor(R.color.status_ok)
                     ivStatus.setImageResource(R.drawable.ic_stat_ok)
-                    tvTitle.text = "Telegram отвечает"
+                    ivStatus.contentDescription = getString(R.string.a11y_status_ok)
+                    tvTitle.text = getString(R.string.status_ok_title)
                 }
                 MonitorService.Status.PARTIAL -> {
                     color = getColor(R.color.status_offline)
                     ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                    tvTitle.text = "Telegram частично доступен"
+                    ivStatus.contentDescription = getString(R.string.a11y_status_partial)
+                    tvTitle.text = getString(R.string.status_partial_title)
                 }
                 MonitorService.Status.TG_DOWN -> {
                     color = getColor(R.color.status_fail)
                     ivStatus.setImageResource(R.drawable.ic_stat_fail)
-                    tvTitle.text = "Telegram недоступен"
+                    ivStatus.contentDescription = getString(R.string.a11y_status_down)
+                    tvTitle.text = getString(R.string.status_down_title)
                 }
                 MonitorService.Status.NO_NETWORK -> {
                     color = getColor(R.color.status_offline)
                     ivStatus.setImageResource(R.drawable.ic_stat_offline)
-                    tvTitle.text = "Нет интернета"
+                    ivStatus.contentDescription = getString(R.string.a11y_status_offline)
+                    tvTitle.text = getString(R.string.status_offline_title)
                 }
                 MonitorService.Status.UNKNOWN -> {
                     ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                    tvTitle.text = if (s.checkedAt > 0) "Доступность не определена" else "Проверяю…"
+                    ivStatus.contentDescription = getString(R.string.a11y_status_unknown)
+                    tvTitle.text = if (s.checkedAt > 0) getString(R.string.status_unknown_title) else getString(R.string.checking)
                 }
             }
             tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
-                if (s.checkedAt > 0) "Проверено ${agoStr(s.checkedAt, now)}" else "Первая проверка идёт прямо сейчас"
+                if (s.checkedAt > 0) getString(R.string.checked_ago, agoStr(s.checkedAt, now)) else getString(R.string.first_check)
             } else {
-                "Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}"
+                getString(R.string.running_for, durationStr(now - s.since), timeStr(s.since))
             }
             tvReason.text = when (s.status) {
-                MonitorService.Status.OK -> "MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется."
+                MonitorService.Status.OK -> getString(R.string.reason_ok)
                 MonitorService.Status.PARTIAL -> s.reason
-                MonitorService.Status.TG_DOWN -> "Причина: ${s.reason}"
-                MonitorService.Status.NO_NETWORK -> "Причина: ${s.reason}"
-                MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { "Проверяю веб-ресурсы и MTProto" }
-            } + if (s.lastVibrationAt > 0L) "\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}" else ""
+                MonitorService.Status.TG_DOWN -> getString(R.string.reason_prefix, s.reason)
+                MonitorService.Status.NO_NETWORK -> getString(R.string.reason_prefix, s.reason)
+                MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { getString(R.string.reason_checking) }
+            } + if (s.lastVibrationAt > 0L) "\n" + getString(R.string.last_vibration, timeStr(s.lastVibrationAt)) else ""
         }
         animateCardColor(color)
 
-        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) "${s.latencyMs} мс" else "—"
+        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) getString(R.string.ms_fmt, s.latencyMs) else getString(R.string.em_dash)
         val uptime = History.uptimePercent(this)
-        tvUptime.text = if (uptime >= 0) formatPercent(uptime) else "—"
-        tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
+        tvUptime.text = if (uptime >= 0) formatPercent(uptime) else getString(R.string.em_dash)
+        tvChecked.text = if (running) agoStr(s.checkedAt, now) else getString(R.string.em_dash)
 
         val minute = now / 60_000L
         if (History.version != shownHistoryVersion || minute != shownChartMinute) {
@@ -455,41 +462,40 @@ class MainActivity : Activity() {
             shownChartMinute = minute
             val window = if (historyDays == 1) 60 else 7 * 24 * 60
             chart.setData(History.lastMinutes(this, window, now), now, window)
-            findViewById<TextView>(R.id.tvChartTitle).text = if (historyDays == 1) "Последний час" else "Последняя неделя"
-            tvDayStats.text = History.describeStats(History.stats(this, historyDays, now), historyDays)
+            findViewById<TextView>(R.id.tvChartTitle).text = getString(if (historyDays == 1) R.string.chart_last_hour else R.string.chart_last_week)
+            tvDayStats.text = History.describeStats(this, History.stats(this, historyDays, now), historyDays)
         }
         if (tvDiagnostics.visibility == View.VISIBLE) {
-            tvDiagnostics.text = s.diagnostics.ifEmpty { "Диагностика появится после первой проверки." } +
-                "\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с."
+            tvDiagnostics.text = s.diagnostics.ifEmpty { getString(R.string.diagnostics_placeholder) } +
+                "\n" + getString(R.string.diagnostics_age, agoStr(s.checkedAt, now), s.expectedIntervalSec)
         }
         val log = EventLog.all(this)
         if (log !== shownLog) {
             shownLog = log
-            tvLog.text = if (log.isEmpty()) "Пока пусто" else log.joinToString("\n")
+            tvLog.text = if (log.isEmpty()) getString(R.string.log_empty_ui) else log.joinToString("\n")
         }
 
         if (notifOk) {
-            tvNotif.text = "✓ Уведомления включены, значок виден в строке состояния."
+            tvNotif.text = getString(R.string.notif_ok)
             btnNotif.visibility = View.GONE
         } else {
-            tvNotif.text = "Уведомления выключены, поэтому значка в строке состояния не будет."
+            tvNotif.text = getString(R.string.notif_off)
             btnNotif.visibility = View.VISIBLE
         }
 
         if (batteryOk) {
-            tvBattery.text = "✓ Работа в фоне без ограничений разрешена."
+            tvBattery.text = getString(R.string.battery_ok)
             btnBattery.visibility = View.GONE
         } else {
-            tvBattery.text = "Android может «усыплять» приложение при выключенном экране, " +
-                "и тогда проверки будут останавливаться."
+            tvBattery.text = getString(R.string.battery_off)
             btnBattery.visibility = View.VISIBLE
         }
 
         if (alarmOk) {
-            tvAlarm.text = "✓ Точные будильники разрешены. Android всё равно может откладывать проверки в глубоком сне."
+            tvAlarm.text = getString(R.string.alarm_ok)
             btnAlarm.visibility = View.GONE
         } else {
-            tvAlarm.text = "Без точных будильников Android откладывает проверки во сне, и статус устаревает."
+            tvAlarm.text = getString(R.string.alarm_off)
             btnAlarm.visibility = View.VISIBLE
         }
     }
@@ -500,11 +506,11 @@ class MainActivity : Activity() {
             return
         }
         setupCard.visibility = View.VISIBLE
-        val lines = mutableListOf("Без этих разрешений значок в строке состояния может пропасть или врать.")
-        if (!notifOk) lines += "• Включи уведомления — иначе постоянного значка не будет."
-        if (!batteryOk) lines += "• Разреши работу без ограничений — иначе Android усыпит проверки."
-        if (!alarmOk) lines += "• Разреши точные будильники — иначе проверки замирают при выключенном экране."
-        OemTips.manufacturerHint()?.let { lines += "• $it" }
+        val lines = mutableListOf(getString(R.string.setup_intro))
+        if (!notifOk) lines += getString(R.string.setup_notif)
+        if (!batteryOk) lines += getString(R.string.setup_battery)
+        if (!alarmOk) lines += getString(R.string.setup_alarm)
+        OemTips.manufacturerHint(this)?.let { lines += "• $it" }
         tvSetup.text = lines.joinToString("\n")
         btnSetupNotif.visibility = if (notifOk) View.GONE else View.VISIBLE
         btnSetupBattery.visibility = if (batteryOk) View.GONE else View.VISIBLE
@@ -513,7 +519,8 @@ class MainActivity : Activity() {
 
     private fun updateProfileLabel() {
         val profile = Prefs.profile(this)
-        btnProfile.text = "Профиль: ${profile?.title ?: "Свой интервал"}"
+        val name = profile?.title(this) ?: getString(R.string.profile_custom)
+        btnProfile.text = getString(R.string.profile_prefix, name)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -529,7 +536,7 @@ class MainActivity : Activity() {
             putExtra(Intent.EXTRA_TITLE, "tgwatch-${if (exportDays == 1) "day" else "week"}.csv")
         }
         try { startActivityForResult(intent, 20) }
-        catch (e: Exception) { Toast.makeText(this, "Не удалось открыть сохранение файла", Toast.LENGTH_LONG).show() }
+        catch (e: Exception) { Toast.makeText(this, R.string.export_picker_failed, Toast.LENGTH_LONG).show() }
     }
 
     @Deprecated("Platform activity result API for dependency-free native UI")
@@ -542,10 +549,10 @@ class MainActivity : Activity() {
         Thread({
             val message = try {
                 val csv = History.exportCsv(app, days)
-                val output = app.contentResolver.openOutputStream(uri, "wt") ?: error("Файл недоступен")
+                val output = app.contentResolver.openOutputStream(uri, "wt") ?: error(app.getString(R.string.file_unavailable))
                 output.bufferedWriter(Charsets.UTF_8).use { it.write(csv) }
-                "CSV сохранён"
-            } catch (e: Exception) { "Не удалось сохранить CSV: ${e.message}" }
+                app.getString(R.string.csv_saved)
+            } catch (e: Exception) { app.getString(R.string.csv_save_failed, e.message) }
             runOnUiThread { if (!isFinishing && !isDestroyed) Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
         }, "tg-export").start()
     }

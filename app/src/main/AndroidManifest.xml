@@ -52,7 +52,7 @@
             android:name=".StatusTileService"
             android:exported="true"
             android:icon="@drawable/ic_stat_ok"
-            android:label="Telegram"
+            android:label="@string/tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -69,7 +69,7 @@
             android:name=".StatusWidget"
             android:directBootAware="true"
             android:exported="true"
-            android:label="Статус Telegram">
+            android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ru.tgwatch.action.WIDGET_CLICK" />

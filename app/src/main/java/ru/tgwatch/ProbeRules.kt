@@ -12,9 +12,12 @@ object ProbeRules {
 
     fun isReachableHttpCode(code: Int): Boolean = code in 100..499
 
-    fun describeHttpFailure(code: Int): String = when (code) {
-        in 500..599 -> "сервер вернул ошибку HTTP $code"
-        else -> "некорректный ответ сервера (HTTP $code)"
+    fun describeHttpFailure(code: Int, locale: java.util.Locale = java.util.Locale.getDefault()): String {
+        val ru = locale.language in setOf("ru", "be", "uk")
+        return when (code) {
+            in 500..599 -> if (ru) "сервер вернул ошибку HTTP $code" else "server returned HTTP error $code"
+            else -> if (ru) "некорректный ответ сервера (HTTP $code)" else "unexpected server response (HTTP $code)"
+        }
     }
 
     /**

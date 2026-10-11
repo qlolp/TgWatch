@@ -27,7 +27,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:text="Следит, доступен ли Telegram"
+            android:text="@string/tagline"
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
@@ -44,7 +44,7 @@
 
             <TextView
                 style="@style/CardTitle"
-                android:text="Нужно разрешить работу" />
+                android:text="@string/setup_title" />
 
             <TextView
                 android:id="@+id/tvSetup"
@@ -56,28 +56,28 @@
                 style="@style/ButtonFilled"
                 android:layout_width="match_parent"
                 android:layout_marginTop="12dp"
-                android:text="Включить уведомления" />
+                android:text="@string/enable_notifications" />
 
             <Button
                 android:id="@+id/btnSetupBattery"
                 style="@style/ButtonFilled"
                 android:layout_width="match_parent"
                 android:layout_marginTop="8dp"
-                android:text="Разрешить работу без ограничений" />
+                android:text="@string/allow_unrestricted_battery" />
 
             <Button
                 android:id="@+id/btnSetupAlarm"
                 style="@style/ButtonFilled"
                 android:layout_width="match_parent"
                 android:layout_marginTop="8dp"
-                android:text="Разрешить точные будильники" />
+                android:text="@string/allow_exact_alarms" />
 
             <Button
                 android:id="@+id/btnSetupApp"
                 style="@style/ButtonOutlined"
                 android:layout_width="match_parent"
                 android:layout_marginTop="8dp"
-                android:text="Открыть настройки приложения" />
+                android:text="@string/open_app_settings" />
         </LinearLayout>
 
         <LinearLayout
@@ -156,7 +156,7 @@
 
                 <TextView
                     style="@style/StatLabel"
-                    android:text="Время ответа" />
+                    android:text="@string/latency_label" />
             </LinearLayout>
 
             <LinearLayout
@@ -170,7 +170,7 @@
 
                 <TextView
                     style="@style/StatLabel"
-                    android:text="Telegram за сутки" />
+                    android:text="@string/uptime_label" />
             </LinearLayout>
 
             <LinearLayout style="@style/StatBox">
@@ -181,7 +181,7 @@
 
                 <TextView
                     style="@style/StatLabel"
-                    android:text="Проверка" />
+                    android:text="@string/check_label" />
             </LinearLayout>
         </LinearLayout>
 
@@ -196,7 +196,7 @@
                 style="@style/ButtonFilled"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:text="Проверить сейчас" />
+                android:text="@string/check_now" />
 
             <Button
                 android:id="@+id/btnToggle"
@@ -210,23 +210,23 @@
 
             <TextView
                 style="@style/CardTitle"
-                android:text="История доступности" />
+                android:text="@string/history_title" />
 
-            <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="Период: сутки" />
+            <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="@string/period_day" />
             <TextView
                 android:id="@+id/tvDayStats"
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Пока нет данных — подожди несколько проверок." />
+                android:text="@string/no_history_yet" />
 
             <Button
                 android:id="@+id/btnShareStats"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
                 android:layout_marginTop="4dp"
-                android:text="Поделиться сводкой" />
-            <Button android:id="@+id/btnExportCsv" style="@style/ButtonText" android:text="Сохранить CSV" />
-            <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="Диагностика подключения" />
+                android:text="@string/share_summary" />
+            <Button android:id="@+id/btnExportCsv" style="@style/ButtonText" android:text="@string/save_csv" />
+            <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="@string/diagnostics" />
             <TextView android:id="@+id/tvDiagnostics" style="@style/Body" android:visibility="gone" android:textIsSelectable="true" />
         </LinearLayout>
 
@@ -235,7 +235,7 @@
             <TextView
                 style="@style/CardTitle"
                 android:id="@+id/tvChartTitle"
-                android:text="Последний час" />
+                android:text="@string/chart_last_hour" />
 
             <ru.tgwatch.ChartView
                 android:id="@+id/chart"
@@ -246,7 +246,7 @@
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Нажми столбик — увидишь результаты проверок за период. Красный — сбой, оранжевый — нет сети или частичная доступность, серый — нет данных. Процент доступности считается по времени в сводке."
+                android:text="@string/chart_hint"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -254,9 +254,9 @@
 
             <TextView
                 style="@style/CardTitle"
-                android:text="Как часто проверять" />
+                android:text="@string/interval_title" />
 
-            <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="Профиль: Обычный" />
+            <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="@string/profile_balanced_label" />
             <RadioGroup
                 android:id="@+id/rgInterval"
                 android:layout_width="match_parent"
@@ -269,33 +269,33 @@
                 <RadioButton
                     android:id="@+id/rb10"
                     style="@style/Segment"
-                    android:text="10 с" />
+                    android:text="@string/interval_10s" />
 
                 <RadioButton
                     android:id="@+id/rb15"
                     style="@style/Segment"
-                    android:text="15 с" />
+                    android:text="@string/interval_15s" />
 
                 <RadioButton
                     android:id="@+id/rb30"
                     style="@style/Segment"
-                    android:text="30 с" />
+                    android:text="@string/interval_30s" />
 
                 <RadioButton
                     android:id="@+id/rb60"
                     style="@style/Segment"
-                    android:text="1 мин" />
+                    android:text="@string/interval_1m" />
 
                 <RadioButton
                     android:id="@+id/rb120"
                     style="@style/Segment"
-                    android:text="2 мин" />
+                    android:text="@string/interval_2m" />
             </RadioGroup>
 
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="8dp"
-                android:text="Профиль задаёт интервалы при активном экране, во сне и при сбое. Выбор секунд ниже включает свой интервал."
+                android:text="@string/profile_hint"
                 android:textSize="12sp" />
 
             <Switch
@@ -303,14 +303,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Проверять при выключенном экране"
+                android:text="@string/keep_awake"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
             <TextView
                 style="@style/Body"
                 android:layout_marginTop="2dp"
-                android:text="Интервал во сне зависит от профиля. Android может откладывать будильники; время последней проверки всегда видно."
+                android:text="@string/keep_awake_hint"
                 android:textSize="12sp" />
 
             <Switch
@@ -318,7 +318,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Вибрация, если недоступен Telegram"
+                android:text="@string/vibrate_down"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
@@ -327,7 +327,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Вибрация при потере интернета"
+                android:text="@string/vibrate_offline"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
@@ -336,7 +336,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Короткая вибрация, когда связь вернулась"
+                android:text="@string/vibrate_recovery"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
@@ -345,7 +345,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Тихие часы 23:00–08:00 (без вибрации)"
+                android:text="@string/quiet_hours_default"
                 android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
@@ -353,21 +353,21 @@
                 android:id="@+id/btnQuietHours"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
-                android:text="Изменить тихие часы" />
+                android:text="@string/change_quiet_hours" />
 
             <Button
                 android:id="@+id/btnVibe"
                 style="@style/ButtonText"
                 android:layout_marginTop="8dp"
                 android:layout_marginStart="-12dp"
-                android:text="Проверить вибрацию" />
+                android:text="@string/test_vibration" />
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
 
             <TextView
                 style="@style/CardTitle"
-                android:text="Работа в фоне" />
+                android:text="@string/background_title" />
 
             <TextView
                 android:id="@+id/tvNotif"
@@ -378,7 +378,7 @@
                 android:id="@+id/btnNotif"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
-                android:text="Включить уведомления" />
+                android:text="@string/enable_notifications" />
 
             <TextView
                 android:id="@+id/tvBattery"
@@ -389,7 +389,7 @@
                 android:id="@+id/btnBattery"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
-                android:text="Разрешить работу без ограничений" />
+                android:text="@string/allow_unrestricted_battery" />
 
             <TextView
                 android:id="@+id/tvAlarm"
@@ -400,7 +400,7 @@
                 android:id="@+id/btnAlarm"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
-                android:text="Разрешить точные будильники" />
+                android:text="@string/allow_exact_alarms" />
 
             <TextView
                 android:id="@+id/tvOem"
@@ -413,14 +413,14 @@
                 android:id="@+id/btnAppDetails"
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
-                android:text="Открыть настройки приложения" />
+                android:text="@string/open_app_settings" />
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
 
             <TextView
                 style="@style/CardTitle"
-                android:text="Журнал" />
+                android:text="@string/log_title" />
 
             <TextView
                 android:id="@+id/tvLog"
@@ -441,12 +441,12 @@
                     android:id="@+id/btnShareLog"
                     style="@style/ButtonText"
                     android:layout_marginStart="-12dp"
-                    android:text="Поделиться" />
+                    android:text="@string/share" />
 
                 <Button
                     android:id="@+id/btnClearLog"
                     style="@style/ButtonText"
-                    android:text="Очистить" />
+                    android:text="@string/clear" />
             </LinearLayout>
         </LinearLayout>
 

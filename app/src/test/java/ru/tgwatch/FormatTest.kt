@@ -1,10 +1,26 @@
 package ru.tgwatch
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import java.util.Locale
 
 class FormatTest {
+
+    private lateinit var previous: Locale
+
+    @Before
+    fun setRuLocale() {
+        previous = Locale.getDefault()
+        Locale.setDefault(Locale("ru"))
+    }
+
+    @After
+    fun restoreLocale() {
+        Locale.setDefault(previous)
+    }
 
     @Test
     fun durationStr_seconds() {
@@ -28,11 +44,20 @@ class FormatTest {
     }
 
     @Test
+    fun durationStr_english() {
+        assertEquals("12s", durationStr(12_000, Locale.US))
+        assertEquals("5m", durationStr(5 * 60_000, Locale.US))
+        assertEquals("2h 15m", durationStr((2 * 60 + 15) * 60_000L, Locale.US))
+    }
+
+    @Test
     fun agoStr_recent() {
         val now = 1_000_000L
         assertEquals("—", agoStr(0, now))
         assertEquals("только что", agoStr(now - 500, now))
         assertTrue(agoStr(now - 5_000, now).endsWith(" назад"))
+        assertEquals("just now", agoStr(now - 500, now, Locale.US))
+        assertTrue(agoStr(now - 5_000, now, Locale.US).endsWith(" ago"))
     }
 
     @Test
@@ -41,5 +66,7 @@ class FormatTest {
         assertEquals("99,9 %", formatPercent(99.96))
         assertEquals("50 %", formatPercent(50.0))
         assertEquals("33,3 %", formatPercent(33.33))
+        assertEquals("99.9 %", formatPercent(99.96, Locale.US))
+        assertEquals("33.3 %", formatPercent(33.33, Locale.US))
     }
 }

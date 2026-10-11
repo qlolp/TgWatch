@@ -1,0 +1,1 @@
+English localization, targetSdk 35, accessibility labels, git-tag versioning, F-Droid metadata.

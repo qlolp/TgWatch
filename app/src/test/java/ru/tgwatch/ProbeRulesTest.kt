@@ -74,6 +74,7 @@ class ProbeRulesTest {
 
     @Test
     fun describeHttpFailure_mentionsCode() {
-        assertEquals("сервер вернул ошибку HTTP 503", ProbeRules.describeHttpFailure(503))
+        assertEquals("сервер вернул ошибку HTTP 503", ProbeRules.describeHttpFailure(503, java.util.Locale("ru")))
+        assertEquals("server returned HTTP error 503", ProbeRules.describeHttpFailure(503, java.util.Locale.US))
     }
 }
