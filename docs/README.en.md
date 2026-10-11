@@ -69,7 +69,7 @@ and diagnostics.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.13.0`, Android target API35. This states the source
+The source version is `1.13.1`, Android target API35. This states the source
 version, not that a release has already been published. The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
