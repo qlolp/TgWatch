@@ -27,6 +27,8 @@ object Prefs {
     private const val KEY_QUIET_HOURS = "quiet_hours"
     private const val KEY_QUIET_START = "quiet_start_hour"
     private const val KEY_QUIET_END = "quiet_end_hour"
+    private const val KEY_QUIET_START_MINUTE = "quiet_start_minute"
+    private const val KEY_QUIET_END_MINUTE = "quiet_end_minute"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -43,10 +45,8 @@ object Prefs {
      * (LOCKED_BOOT_COMPLETED). Старый файл из обычного хранилища переносим
      * при первой разблокировке.
      */
-    fun sp(ctx: Context): android.content.SharedPreferences {
-        BackupStore.finishPending(ctx)
-        return rawSp(ctx)
-    }
+    /** Startup recovery belongs to Application; settings reads never replay a transaction. */
+    fun sp(ctx: Context): android.content.SharedPreferences = rawSp(ctx)
     internal fun rawSp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     private fun store(ctx: Context): Context {
@@ -90,6 +90,7 @@ object Prefs {
     fun isEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(ctx: Context, value: Boolean) {
+        if (value && BackupManager.hasPending(ctx)) return
         sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
         if (value) WatchdogReceiver.schedule(ctx) else WatchdogReceiver.cancel(ctx)
     }
@@ -173,24 +174,45 @@ object Prefs {
         sp(ctx).edit().putBoolean(KEY_QUIET_HOURS, value).apply()
     }
 
-    fun quietStartHour(ctx: Context): Int = sp(ctx).getInt(KEY_QUIET_START, DEFAULT_QUIET_START)
+    /** Legacy callers still see hours; minute settings take precedence. */
+    fun quietStartHour(ctx: Context): Int = quietStartMinute(ctx) / 60
 
-    fun quietEndHour(ctx: Context): Int = sp(ctx).getInt(KEY_QUIET_END, DEFAULT_QUIET_END)
+    fun quietEndHour(ctx: Context): Int = quietEndMinute(ctx) / 60
+
+    fun quietStartMinute(ctx: Context): Int {
+        val values = sp(ctx).all
+        return QuietHours.resolveMinute(values[KEY_QUIET_START_MINUTE] as? Int,
+            values[KEY_QUIET_START] as? Int ?: DEFAULT_QUIET_START)
+    }
+
+    fun quietEndMinute(ctx: Context): Int {
+        val values = sp(ctx).all
+        return QuietHours.resolveMinute(values[KEY_QUIET_END_MINUTE] as? Int,
+            values[KEY_QUIET_END] as? Int ?: DEFAULT_QUIET_END)
+    }
 
     fun setQuietHours(ctx: Context, startHour: Int, endHour: Int) {
+        setQuietHoursMinutes(ctx, startHour.coerceIn(0, 23) * 60, endHour.coerceIn(0, 23) * 60)
+    }
+
+    fun setQuietHoursMinutes(ctx: Context, start: Int, end: Int) {
+        val startMinute = start.coerceIn(0, 1439)
+        val endMinute = end.coerceIn(0, 1439)
         sp(ctx).edit()
-            .putInt(KEY_QUIET_START, startHour.coerceIn(0, 23))
-            .putInt(KEY_QUIET_END, endHour.coerceIn(0, 23))
+            .putInt(KEY_QUIET_START_MINUTE, startMinute)
+            .putInt(KEY_QUIET_END_MINUTE, endMinute)
+            .putInt(KEY_QUIET_START, startMinute / 60)
+            .putInt(KEY_QUIET_END, endMinute / 60)
             .apply()
     }
 
     fun inQuietHoursNow(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
         if (!quietHoursEnabled(ctx)) return false
         val cal = Calendar.getInstance().apply { timeInMillis = now }
-        return ProbeRules.inQuietHours(
-            cal.get(Calendar.HOUR_OF_DAY),
-            quietStartHour(ctx),
-            quietEndHour(ctx),
+        return ProbeRules.inQuietHoursMinutes(
+            cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE),
+            quietStartMinute(ctx),
+            quietEndMinute(ctx),
         )
     }
 

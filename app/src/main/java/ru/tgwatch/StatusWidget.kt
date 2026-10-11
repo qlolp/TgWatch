@@ -109,7 +109,8 @@ class StatusWidget : AppWidgetProvider() {
                         MonitorService.Status.PARTIAL -> "Был частично доступен"
                         else -> "Не было интернета"
                     }
-                    subtitle = "Проверено ${agoStr(s.checkedAt, now)} · нажми"
+                    subtitle = if (now < s.checkedAt) "Часы изменились · проверка ${timeStr(s.checkedAt)}"
+                        else "Проверено ${agoStr(s.checkedAt, now)} · нажми"
                 }
                 s.status == MonitorService.Status.PARTIAL -> {
                     bg = R.drawable.bg_widget_offline
@@ -147,6 +148,8 @@ class StatusWidget : AppWidgetProvider() {
                 setImageViewResource(R.id.widgetIcon, icon)
                 setTextViewText(R.id.widgetTitle, title)
                 setTextViewText(R.id.widgetSubtitle, subtitle)
+                setTextViewText(R.id.widgetLastSuccess,
+                    LastSuccessPolicy.label(LastSuccessStore.lastSuccessAt(ctx), now))
                 setOnClickPendingIntent(R.id.widgetRoot, click)
             }
         }

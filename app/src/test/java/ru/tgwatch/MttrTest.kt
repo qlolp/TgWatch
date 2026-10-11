@@ -29,4 +29,11 @@ class MttrTest {
         assertEquals(0,number(Timeline.stats(rows,0,25),"CompletedOutages"))
         assertEquals(0,number(Timeline.stats(rows + row(40,50,"UNKNOWN",1),0,50),"CompletedOutages"))
     }
+    @Test fun partialContinuesEstablishedTelegramOutageAndMatchesRecoveryDuration() {
+        val rows = listOf(row(0,10,"OK"),row(10,20,"TG_DOWN"),row(20,30,"PARTIAL"),row(30,40,"OK"))
+        val s = Timeline.stats(rows,0,40)
+        assertEquals(1,number(s,"CompletedOutages"))
+        assertEquals(20,number(s,"MeanRecoveryMs"))
+        assertEquals(20L,Timeline.recovery(rows,30,false)?.durationMs)
+    }
 }

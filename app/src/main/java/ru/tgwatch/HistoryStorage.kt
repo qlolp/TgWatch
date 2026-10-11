@@ -8,6 +8,34 @@ import java.nio.file.AtomicMoveNotSupportedException
 
 /** File I/O is separate from Android so migration and crash-safe writes can be tested. */
 object HistoryStorage {
+    /** Tracks successful writes only; a failed append must not defer the next fsync. */
+    class AppendSyncPolicy {
+        private var lastSyncElapsed: Long? = null
+        private var lastKind: String? = null
+        fun needsSync(kind: String, elapsed: Long): Boolean {
+            val syncedAt = lastSyncElapsed ?: return true
+            return kind != lastKind || elapsed < syncedAt || elapsed - syncedAt >= 60_000L
+        }
+        fun saved(kind: String?, elapsed: Long, synced: Boolean) {
+            lastKind = kind
+            if (synced) lastSyncElapsed = elapsed
+        }
+    }
+
+    fun validateSnapshot(samples: List<Observation>) {
+        require(samples.size <= 65_000) { "Too many observations" }
+        require(samples.all { it.at >= 0 && it.until > it.at && it.until - it.at <= 600_000L &&
+            it.kind in Timeline.kinds && it.latencyMs >= -1L && it.clockEpoch >= 0L }) { "Invalid observation" }
+    }
+
+    /** Validation and durable replacement complete before the caller publishes this snapshot. */
+    fun replace(file: File, samples: List<Observation>, cutoff: Long): List<Observation> {
+        val snapshot = samples.toList()
+        validateSnapshot(snapshot)
+        val retained = Timeline.retained(snapshot, cutoff)
+        write(file, retained)
+        return retained
+    }
     data class Migration(val samples: List<Observation>, val complete: Boolean)
     fun migrateLegacy(legacy: File, destination: File, marker: File, current: List<Observation>): Migration {
         if (marker.exists()) return Migration(current, true)
@@ -53,10 +81,11 @@ object HistoryStorage {
             check(tmp.renameTo(file)) { "Cannot atomically replace history" }
         }
     }
-    fun append(file: File, sample: Observation) {
+    fun append(file: File, sample: Observation, sync: Boolean = false) {
         file.parentFile?.mkdirs()
         FileOutputStream(file, true).use { stream ->
             stream.write("\n${encode(sample)}\n".toByteArray(Charsets.UTF_8))
+            if (sync) stream.fd.sync()
         }
     }
     private fun encode(s: Observation) = "${s.at},${s.until},${s.kind},${s.latencyMs},${s.clockEpoch}"
@@ -72,5 +101,32 @@ object HistoryStorage {
                 offline > 0 && offline >= ok -> "NO_NETWORK"; else -> "OK" }
             Observation(minute * 60_000L, (minute + 1) * 60_000L, kind, if (ok > 0) p[4]!! / ok else -1)
         }
+    }
+}
+
+/** Length-prefixed strings preserve restored log entries; old newline storage remains readable. */
+object EventLogStorage {
+    private const val PREFIX = "TGLOG2\n"
+    fun encode(rows: List<String>): String = buildString {
+        require(rows.size <= 150 && rows.all { it.length <= 4096 }) { "Invalid event log" }
+        append(PREFIX)
+        rows.forEach { append(it.length).append(':').append(it) }
+    }
+    fun decode(text: String): List<String> {
+        if (!text.startsWith(PREFIX)) return text.split('\n').filter { it.isNotBlank() }
+        require(text.length <= PREFIX.length + 150 * (4096 + 5)) { "Event log too large" }
+        val rows = mutableListOf<String>()
+        var cursor = PREFIX.length
+        while (cursor < text.length) {
+            val colon = text.indexOf(':', cursor)
+            require(colon in cursor + 1..cursor + 4) { "Invalid event log length" }
+            val length = text.substring(cursor, colon).toIntOrNull()
+                ?: throw IllegalArgumentException("Invalid event log length")
+            require(length in 0..4096 && length <= text.length - colon - 1 && rows.size < 150) { "Invalid event log entry" }
+            cursor = colon + 1
+            rows += text.substring(cursor, cursor + length)
+            cursor += length
+        }
+        return rows
     }
 }

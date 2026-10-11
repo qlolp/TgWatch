@@ -3,8 +3,6 @@ package ru.tgwatch
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.Executors
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class ReliabilityTest {
     @Test fun repeatedCancelledEndpointCannotStarveHealthyEndpoints() {
@@ -112,10 +110,9 @@ class ReliabilityTest {
     @Test fun mtprotoRejectsWrongNonceOrShortPacket() {
         val nonce = ByteArray(16) { it.toByte() }
         assertFalse(MtProto.validResponse(ByteArray(8), nonce))
-        val b = ByteBuffer.allocate(76).order(ByteOrder.LITTLE_ENDIAN)
-        b.putLong(0).putLong(1).putInt(56).putInt(0x05162463).put(nonce)
-        assertTrue(MtProto.validResponse(b.array(), nonce))
-        b.array()[24] = 99
-        assertFalse(MtProto.validResponse(b.array(), nonce))
+        val response = MtProtoFixtures.response(nonce)
+        assertTrue(MtProto.validResponse(response, nonce))
+        response[24] = 99
+        assertFalse(MtProto.validResponse(response, nonce))
     }
 }
