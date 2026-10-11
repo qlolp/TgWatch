@@ -139,6 +139,27 @@ class ReleaseTests(ToolFixture, unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("--latest=false", self.created()[0])
 
+    def test_legacy_rolling_build_release_is_ignored_for_latest(self):
+        self.fixture["latest"] = {"tag_name": "v1.9.33", "draft": False}
+        self.fixture["releases"] = [{"tag_name": "v1.9.33", "draft": False},
+                                    {"tag_name": "build", "draft": False}]
+        result = self.run_release()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("--latest=true", self.created()[0])
+
+    def test_legacy_rolling_build_as_latest_does_not_block_promotion(self):
+        self.fixture["latest"] = {"tag_name": "build", "draft": False}
+        self.fixture["releases"] = [{"tag_name": "build", "draft": False}]
+        result = self.run_release()
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("--latest=true", self.created()[0])
+
+    def test_malformed_versioned_tag_still_blocks_publication(self):
+        self.fixture["releases"] = [{"tag_name": "v1.10.0", "draft": False}]
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.created())
+
     def existing(self, draft=False):
         self.fixture["releases"] = [{"tag_name": "v1.10.40", "draft": draft,
             "assets": [{"name": p.name, "size": p.stat().st_size,
