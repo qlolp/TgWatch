@@ -98,17 +98,32 @@ class BackupCodecTest {
         rejected { decode(base.replace("\"log\":[]", "\"log\":[\"\\ud800\"]")) }
         rejected { BackupCodec.encode(snapshot.copy(log = listOf("\ud800"))) }
     }
-    @Test fun allTwentyTwoSettingsIncludingEventsAndDailySummaryRoundTripWithStrictTypes() {
+    @Test fun allTwentySixSettingsIncludingEventsDailySummaryAndExtraProbesRoundTripWithStrictTypes() {
         val snapshot = sample().copy(settings = sample().settings + mapOf("notify_outage" to true,
-            "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false))
-        assertEquals(22, snapshot.settings.size)
+            "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false,
+            "extra_probe_matrix" to true, "extra_probe_whatsapp" to false, "extra_probe_custom" to true,
+            "extra_probe_custom_url" to "https://status.example.org/health"))
+        assertEquals(26, snapshot.settings.size)
         assertEquals(snapshot, BackupCodec.decode(BackupCodec.encode(snapshot)))
         for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery",
-            "daily_summary")) {
+            "daily_summary", "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom")) {
             rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + (key to "true"))) }
             rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":1}")) }
         }
         rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + ("daily_summary_minute" to 1440))) }
         rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"daily_summary_minute\":true}")) }
+    }
+    @Test fun customProbeUrlIsValidatedAndWebhookCredentialIsNeverAccepted() {
+        val empty = BackupSnapshot(0, mapOf("extra_probe_custom_url" to ""), emptyList(), emptyList())
+        assertEquals(empty, BackupCodec.decode(BackupCodec.encode(empty)))
+        for (bad in listOf("http://example.org/", "https://user:pass@example.org/", "https://example.org/?token=1",
+            "https://example.org/#x", " https://example.org/", "https://" + "a".repeat(250) + ".org/", "javascript:x")) {
+            rejected { BackupCodec.encode(empty.copy(settings = mapOf("extra_probe_custom_url" to bad))) }
+        }
+        rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"extra_probe_custom_url\":1}")) }
+        rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"extra_probe_custom_url\":\"ftp://x/\"}")) }
+        for (key in listOf("webhook_url", "webhook_enabled", "url", "token")) {
+            rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":\"https://ntfy.sh/t\"}")) }
+        }
     }
 }

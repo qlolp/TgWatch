@@ -85,6 +85,19 @@
     <string name="chart_now">now</string>
     <string name="chart_now_average">now · avg %1$d ms</string>
     <string name="export_diagnostics">Save local diagnostic report</string>
-    <string name="automation_settings">Automation access</string>
+    <string name="automation_settings">Automation and webhook</string>
     <string name="summary_unavailable">Couldn’t show the summary. Check notification settings and wait for enough history.</string>
+    <string name="extra_probes_title">Other services</string>
+    <string name="extra_probes_hint">Optional HTTPS checks, shown only in connection diagnostics. They never change the Telegram status, notifications, widget or webhook, and add up to 5 s to a check.</string>
+    <string name="extra_probe_matrix">Also check Matrix (matrix.org)</string>
+    <string name="extra_probe_whatsapp">Also check WhatsApp Web</string>
+    <string name="extra_probe_custom">Also check my HTTPS address</string>
+    <string name="extra_probe_custom_url_unset">Set my HTTPS address</string>
+    <string name="extra_probe_custom_url_set">My address: %1$s</string>
+    <string name="extra_probe_custom_url_message">A public https:// address, up to 256 characters, without a login, query or #fragment. It is included in encrypted backups.</string>
+    <string name="extra_probe_custom_url_invalid">Enter a public https:// address without a login, query or #fragment.</string>
+    <string name="dialog_save">Save</string>
+    <string name="dialog_remove">Remove</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="extra_probe_custom_url_hint">https://example.org/status</string>
 </resources>

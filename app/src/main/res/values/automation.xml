@@ -14,4 +14,18 @@
     <string name="automation_copied">Token copied. Clipboard cleanup is attempted after 45 seconds.</string>
     <string name="automation_storage_error">Could not save automation access. Try again.</string>
     <string name="automation_done">Done</string>
+    <string name="webhook_title">Webhook alert</string>
+    <string name="webhook_description">Optionally post one short line, such as “TG Monitor: Telegram is unreachable”, to your own HTTPS address (for example an ntfy.sh topic) when the published status changes. History, diagnostics and tokens are never sent; the same status is posted at most once a minute. Anyone who knows the address can post to it, so it is stored privately, excluded from backups and diagnostics, and used only after the device is unlocked. Off by default.</string>
+    <string name="webhook_enable">Send status changes to webhook</string>
+    <string name="webhook_url_unset">Webhook address is not set.</string>
+    <string name="webhook_url_saved">Webhook address saved: %1$s/…</string>
+    <string name="webhook_set_url">Set webhook address</string>
+    <string name="webhook_url_hint">https://ntfy.sh/your-topic</string>
+    <string name="webhook_url_message">HTTPS only, up to 512 characters, without a login or #fragment. The saved address is not shown; enter it again to replace it.</string>
+    <string name="webhook_url_invalid">Enter a valid https:// address without a login or #fragment.</string>
+    <string name="webhook_url_required">Set a valid webhook address first.</string>
+    <string name="webhook_test">Send test message</string>
+    <string name="webhook_test_sent">Test message delivered.</string>
+    <string name="webhook_test_failed">Test message was not delivered.</string>
+    <string name="webhook_test_busy">Another request is in progress. Try again in a few seconds.</string>
 </resources>

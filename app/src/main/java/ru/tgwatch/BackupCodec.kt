@@ -14,13 +14,18 @@ object BackupCodec {
     private val rowKeys = setOf("at", "until", "kind", "latencyMs", "clockEpoch")
     private val booleanKeys = setOf("keep_awake", "vibrate", "vibrate_partial", "vibrate_offline",
         "vibrate_recovery", "notify_recovery", "event_sound", "quiet_hours", "notify_outage",
-        "notify_partial", "sound_outage", "sound_partial", "sound_recovery", "daily_summary")
+        "notify_partial", "sound_outage", "sound_partial", "sound_recovery", "daily_summary",
+        "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom")
     private val integerRanges = mapOf("interval_sec" to 10..120, "quiet_start_hour" to 0..23,
         "quiet_end_hour" to 0..23, "quiet_start_minute" to 0..1439, "quiet_end_minute" to 0..1439,
         "daily_summary_minute" to 0..1439)
     private val profiles = setOf("ECONOMY", "BALANCED", "FREQUENT", "CUSTOM")
     private val patterns = setOf("STANDARD", "SHORT", "LONG")
-    private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size, booleanKeys.size + integerRanges.size + 2)
+    /** Public probe address only; the webhook address is a credential and never enters backups. */
+    private const val CUSTOM_PROBE_URL = "extra_probe_custom_url"
+    private val stringKeys = setOf("power_profile", "vibration_pattern", CUSTOM_PROBE_URL)
+    private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size,
+        booleanKeys.size + integerRanges.size + stringKeys.size)
 
     fun encode(snapshot: BackupSnapshot): ByteArray = checked {
         validate(snapshot)
@@ -92,6 +97,8 @@ object BackupCodec {
                 key in integerRanges -> require(value is Int && value in integerRanges.getValue(key))
                 key == "power_profile" -> require(value is String && value in profiles)
                 key == "vibration_pattern" -> require(value is String && value in patterns)
+                key == CUSTOM_PROBE_URL -> require(value is String &&
+                    (value.isEmpty() || ExtraProbes.normalizeCustomUrl(value) == value))
                 else -> invalid()
             }
         }

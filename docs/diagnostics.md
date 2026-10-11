@@ -19,6 +19,11 @@ probe errors/reasons. Endpoint addresses are excluded, including the public
 MTProto addresses. Endpoint names are restricted to the bundled known probes;
 results are empty after restart/restore until a fresh probe completes.
 
+Optional informational probes of other services (Matrix, WhatsApp Web, one
+custom HTTPS address) use a separate `EXTRA` group. They appear only in the
+in-app connection diagnostics, under their own heading, and are excluded from
+this report. They never change the Telegram status, latency, reason or alerts.
+
 ## Scheduling observations
 
 Periodic checks record their target and arrival with Android's monotonic elapsed

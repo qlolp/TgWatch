@@ -107,3 +107,34 @@ embedding its value in shell history; command arguments remain visible to the
 authorized debugging environment while the command runs. This ADB example does
 not require weakening the receiver's authentication. Disable wireless debugging
 when finished if it is only needed for setup/testing.
+
+## Webhook alert
+
+**Advanced → Automation and webhook** can also post one short plain-text line,
+for example `TG Monitor: Telegram is unreachable`, to an HTTPS address you own,
+such as an ntfy.sh topic, when the published status changes. It is disabled by
+default and needs a saved address before it can be enabled. **Send test message**
+posts a fixed test line, even while the switch is off.
+
+- Only `https://` addresses up to 512 characters, without user info or a
+  fragment, are accepted; a query string (ntfy options) is allowed. Redirects
+  are not followed. The body is `text/plain; charset=utf-8`; the User-Agent is
+  `TgWatch/<installed version> (Android)`.
+- The body is one status line in the interface language: no history,
+  diagnostics, endpoint results, addresses or tokens.
+- Reported statuses: OK, PARTIAL, TG_DOWN and NO_NETWORK. UNKNOWN is never sent,
+  and a monitor that starts in OK stays silent until the first change. The
+  first post of each status is immediate; the same status is posted again at
+  most once per 60 seconds. A post held back by that limit, or one that failed
+  (no 2xx response), is retried by a later check, so the endpoint converges to
+  the current status. Delivery is best effort: a NO_NETWORK post usually cannot
+  leave the device.
+- One background thread, at most one request in flight, 5-second connect and
+  read timeouts. Posting never blocks or changes monitoring, notifications or
+  history. The decision state is per process.
+- Treat the address as a credential: anyone who knows an ntfy topic URL can post
+  to it. Like the automation token it lives in private credential-protected
+  SharedPreferences (`webhook-private-v1`), outside Direct Boot storage, portable
+  backups, platform backup/transfer and diagnostic exports, and it is never
+  logged. The screen shows only the host; enter the address again to replace it.
+  Before the first unlock after a reboot the webhook is inactive.

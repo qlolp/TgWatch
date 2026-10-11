@@ -214,7 +214,7 @@ class MonitorService : Service() {
     }
     private fun ensureProgress() {
         val now = SystemClock.elapsedRealtime()
-        // Checks have a 12-second total network budget. If overdue, cancel wait and retry.
+        // Checks have a 12-second network budget (+5 s for opt-in extra probes). If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
         } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
@@ -454,13 +454,21 @@ class MonitorService : Service() {
         }
         val report = NetworkProbe(probeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
-            { selected.socketFactory.createSocket() }).check()
-        val details = Lang.t("Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n", "Network: $transport\nCheck: ${timeStr(System.currentTimeMillis())}\n") +
-            report.results.joinToString("\n") { r ->
-                "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
-                    if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
-            } + Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ", "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
-            Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.", "A proxy configured inside Telegram is not used here.")
+            { selected.socketFactory.createSocket() }).check(Prefs.extraProbeEndpoints(this))
+        fun line(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
+            if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
+        val (extraResults, telegramResults) = report.results.partition { it.group == ProbeGroup.EXTRA }
+        val extraDetails = if (extraResults.isEmpty()) "" else
+            Lang.t("\nДругие сервисы (не влияют на статус Telegram):\n",
+                "\nOther services (do not affect Telegram status):\n") +
+                extraResults.joinToString("\n", transform = ::line)
+        val checkedAt = timeStr(System.currentTimeMillis())
+        val details = Lang.t("Сеть: $transport\nПроверка: $checkedAt\n", "Network: $transport\nCheck: $checkedAt\n") +
+            telegramResults.joinToString("\n", transform = ::line) + extraDetails +
+            Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ",
+                "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
+            Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.",
+                "A proxy configured inside Telegram is not used here.")
         if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1,
             Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details, report.results)
         return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details, report.results)
@@ -557,6 +565,8 @@ class MonitorService : Service() {
         }
         postNotification(newState)
         broadcastState()
+        // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
+        WebhookNotifier.onPublished(this, newState.status)
     }
 
     private fun broadcastState() {

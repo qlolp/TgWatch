@@ -38,6 +38,8 @@ class BackupRestoreIntegrationTest {
         "notify_outage" to false, "notify_partial" to true,
         "sound_outage" to false, "sound_partial" to true, "sound_recovery" to true,
         "daily_summary" to true, "daily_summary_minute" to 1290,
+        "extra_probe_matrix" to true, "extra_probe_whatsapp" to false, "extra_probe_custom" to true,
+        "extra_probe_custom_url" to "https://status.example.org/health",
     )
 
     @Before fun saveCurrentDataAndStopMonitoring() {

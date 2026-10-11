@@ -479,6 +479,29 @@
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/extra_probes_title" />
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="2dp"
+                android:text="@string/extra_probes_hint"
+                android:textSize="12sp" />
+            <Switch android:id="@+id/swExtraMatrix" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="8dp"
+                android:text="@string/extra_probe_matrix" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swExtraWhatsapp" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/extra_probe_whatsapp" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swExtraCustom" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/extra_probe_custom" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Button
+                android:id="@+id/btnExtraCustomUrl"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="@string/extra_probe_custom_url_unset" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
 
             <TextView
                 style="@style/CardTitle"

@@ -117,6 +117,22 @@ class WorkflowPreflightTests(unittest.TestCase):
         self.assertEqual('None', metadata['AutoUpdateMode'])
         self.assertNotIn('Binaries', metadata)
 
+    def test_fastlane_store_text_is_bounded_and_has_changelog_for_source_code(self):
+        import yaml
+        root = SCRIPTS.parent
+        store = root / 'fastlane/metadata/android'
+        code = policy.version_code(policy.read_version(root / 'version.properties'))
+        metadata = yaml.safe_load((root / 'metadata/ru.tgwatch.yml').read_text())
+        limits = {'title.txt': 50, 'short_description.txt': 80, 'full_description.txt': 4000,
+                  f'changelogs/{code}.txt': 500}
+        for locale in ('en-US', 'ru-RU'):
+            for name, limit in limits.items():
+                with self.subTest(locale=locale, name=name):
+                    text = (store / locale / name).read_text(encoding='utf-8').strip()
+                    self.assertTrue(0 < len(text) <= limit)
+        short = (store / 'en-US/short_description.txt').read_text(encoding='utf-8').strip()
+        self.assertEqual(metadata['Summary'], short)
+
 class PaginationTests(unittest.TestCase):
     def test_full_page_is_followed_until_short_page(self):
         first = [{'tag_name': f'v1.13.{n}'} for n in range(100)]

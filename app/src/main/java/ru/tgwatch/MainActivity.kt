@@ -69,8 +69,6 @@ class MainActivity : Activity() {
     private lateinit var tvNotif: TextView
     private lateinit var btnNotif: Button
     private lateinit var tvOem: TextView
-    private lateinit var btnAppDetails: Button
-    private lateinit var btnVibe: Button
     private lateinit var tvLog: TextView
     private lateinit var btnShareLog: Button
     private lateinit var btnClearLog: Button
@@ -195,8 +193,6 @@ class MainActivity : Activity() {
         tvNotif = findViewById(R.id.tvNotif)
         btnNotif = findViewById(R.id.btnNotif)
         tvOem = findViewById(R.id.tvOem)
-        btnAppDetails = findViewById(R.id.btnAppDetails)
-        btnVibe = findViewById(R.id.btnVibe)
         tvLog = findViewById(R.id.tvLog)
         btnShareLog = findViewById(R.id.btnShareLog)
         btnClearLog = findViewById(R.id.btnClearLog)
@@ -310,6 +306,8 @@ class MainActivity : Activity() {
                 Toast.makeText(this, R.string.summary_unavailable, Toast.LENGTH_LONG).show()
         }
 
+        ExtraProbesUi(this, ::notifyServiceSettingsChanged)
+
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
         updateQuietHoursLabel()
@@ -325,8 +323,8 @@ class MainActivity : Activity() {
         btnSetupBattery.setOnClickListener(openBatt)
         btnSetupAlarm.setOnClickListener(openAlarm)
         btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
-        btnAppDetails.setOnClickListener { OemTips.openAppDetails(this) }
-        btnVibe.setOnClickListener { Vibe.alarm(this) }
+        findViewById<Button>(R.id.btnAppDetails).setOnClickListener { OemTips.openAppDetails(this) }
+        findViewById<Button>(R.id.btnVibe).setOnClickListener { Vibe.alarm(this) }
         btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }
         btnShareStats.setOnClickListener { shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), History.exportSummary(this, historyDays)) }
         btnClearLog.setOnClickListener { confirmClearLog() }

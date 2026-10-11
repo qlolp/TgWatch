@@ -9,12 +9,15 @@ Changelog: https://github.com/qlolp/TgWatch/blob/HEAD/CHANGELOG.md
 
 AutoName: TgWatch
 Summary: Monitor Telegram connectivity on your device
+# Store text is maintained in fastlane/metadata/android/{en-US,ru-RU}; keep this summary in sync.
 Description: |-
   TgWatch checks Telegram connectivity using bounded network probes and keeps
   local availability history. It supports English and Russian, notifications,
   encrypted portable backups, daily summaries, and optional token-protected
-  automation. Diagnostic exports are local and contain aggregate information.
-  Monitoring is controlled by the user; no account or cloud service is needed.
+  automation. Optional checks of other services are informational only, and an
+  optional webhook can report status changes to a user-chosen HTTPS address.
+  Diagnostic exports are local and contain aggregate information. Monitoring is
+  controlled by the user; no account or cloud service is needed.
 
 RepoType: git
 Repo: https://github.com/qlolp/TgWatch.git

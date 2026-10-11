@@ -1,0 +1,6 @@
+* Android 15 target, better accessibility, contrast and large-font layout.
+* Optional token-protected automation for Tasker and Android clients.
+* Local diagnostic report export and scheduling delay counters.
+* Optional informational checks of Matrix, WhatsApp Web or your own HTTPS address.
+* Optional webhook alert (for example ntfy) on status change.
+* Daily summary fixes around daylight-saving time.

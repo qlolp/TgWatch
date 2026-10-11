@@ -34,6 +34,15 @@ Automatic update discovery is deliberately disabled because the Gradle code
 is computed from a properties file; a reviewed recipe must teach the update
 checker that mapping before enabling it.
 
+## Store text
+
+Title, short/full descriptions and per-version changelogs live in
+`fastlane/metadata/android/{en-US,ru-RU}/`, which F-Droid reads from the source
+tree. A changelog file is named after the computed version code, for example
+`changelogs/1013000.txt` for 1.13.0 (at most 500 characters). The candidate
+recipe's `Summary` matches the English short description; a script test keeps
+both, the length limits and the current changelog in place.
+
 ## Signing and updates
 
 Normal F-Droid builds use F-Droid's own signing key. They cannot update the

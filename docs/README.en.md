@@ -56,6 +56,13 @@ file picker. The report contains aggregate status and power/scheduling data;
 it excludes raw history, logs and automation credentials. Nothing is uploaded
 automatically.
 
+Optional, off by default: informational HTTPS checks of Matrix, WhatsApp Web and
+one custom `https://` address appear only in connection diagnostics and never
+change the Telegram status or alerts. A [webhook](automation.md#webhook-alert)
+(for example an ntfy.sh topic) can receive one short line when the published
+status changes. Its address is treated as a credential and kept out of backups
+and diagnostics.
+
 ## Install and develop
 
 [Latest published APK](https://github.com/qlolp/TgWatch/releases/latest/download/TgWatch.apk).
