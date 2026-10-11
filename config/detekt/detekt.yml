@@ -1,0 +1,6 @@
+# Extend pinned detekt defaults. Legacy findings live in baseline.xml.
+config:
+  validation: true
+style:
+  MaxLineLength:
+    maxLineLength: 120

@@ -64,7 +64,8 @@ if args[0] == 'api':
     if endpoint.endswith('/releases/latest'):
         if state['latest'] is None: print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)
         print(json.dumps(state['latest']))
-    elif endpoint.endswith('/releases'): print(json.dumps([state['releases']]))
+    elif '/releases?' in endpoint: print(json.dumps(state['releases']))
+    elif '/compare/' in endpoint: print(json.dumps({'status': state.get('main_status', 'ahead')}))
     elif '/git/ref/tags/' in endpoint:
         if state.get('tag_missing'): print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)
         print(json.dumps({'object': state.get('tag_object', {'type':'commit', 'sha':state['sha']})}))
@@ -90,11 +91,16 @@ else: raise AssertionError(args)
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
-    def run_release(self, run="40", version="1.10"):
+    def run_release(self, version="1.13.0", **overrides):
         self.state.write_text(json.dumps(self.fixture))
+        source = self.work / "version.properties"
+        source.write_text(f"version={version}\n")
+        notes = self.work / "notes.md"
+        notes.write_text("Fixture release notes\n")
         return subprocess.run([sys.executable, str(SCRIPTS / "release-policy.py"),
-                               "--repo", "owner/repo", "--version", version, "--run-number", run,
-                               "--sha", "a" * 40, "--notes", "notes.md", "--assets",
+                               "--repo", "owner/repo", "--version-file", str(source),
+                               "--ref", overrides.get("ref", "refs/heads/main"),
+                               "--sha", "a" * 40, "--notes", str(notes), "--assets",
                                *map(str, self.files)], env=self.env, text=True, capture_output=True)
 
     def created(self):
@@ -107,6 +113,7 @@ class ReleaseTests(ToolFixture, unittest.TestCase):
         result = self.run_release()
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("--latest=true", self.created()[0])
+        self.assertIn("v1.13.0", self.created()[0])
 
     def test_orphan_existing_tag_other_commit_cannot_publish(self):
         self.fixture["sha"] = "b" * 40
@@ -116,100 +123,33 @@ class ReleaseTests(ToolFixture, unittest.TestCase):
 
     def test_orphan_matching_annotated_tag_can_publish(self):
         self.fixture["tag_object"] = {"type": "tag", "sha": "c" * 40}
-        result = self.run_release()
+        result = self.run_release(ref="refs/tags/v1.13.0")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(1, len(self.created()))
 
-    def test_older_manual_run_does_not_roll_back_latest(self):
-        self.fixture["latest"] = {"tag_name": "v1.10.50", "draft": False}
-        result = self.run_release()
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("--latest=false", self.created()[0])
+    def test_non_monotonic_release_is_refused(self):
+        for tag in ("v1.14.0", "v1.13.1"):
+            with self.subTest(tag=tag):
+                self.fixture["latest"] = {"tag_name": tag, "draft": False}
+                result = self.run_release()
+                self.assertNotEqual(0, result.returncode)
+                self.assertFalse(self.created())
 
-    def test_newer_run_promotes_latest(self):
-        self.fixture["latest"] = {"tag_name": "v1.9.33", "draft": False}
+    def test_legacy_published_version_allows_upgrade(self):
+        self.fixture["latest"] = {"tag_name": "v1.10.47", "draft": False}
         result = self.run_release()
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("--latest=true", self.created()[0])
 
-    def test_newer_published_nonlatest_also_blocks_rollback(self):
-        self.fixture["latest"] = {"tag_name": "v1.9.33", "draft": False}
-        self.fixture["releases"] = [{"tag_name": "v1.10.60", "draft": False}]
-        result = self.run_release()
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("--latest=false", self.created()[0])
-
-    def existing(self, draft=False):
-        self.fixture["releases"] = [{"tag_name": "v1.10.40", "draft": draft,
-            "assets": [{"name": p.name, "size": p.stat().st_size,
-                         "digest": "sha256:" + hashlib.sha256(p.read_bytes()).hexdigest()} for p in self.files]}]
-
-    def test_matching_published_release_is_immutable_noop(self):
-        self.existing()
-        result = self.run_release()
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertFalse(self.created())
-        self.assertFalse(any(call[1:3] in (["release", "edit"], ["release", "upload"]) for call in self.calls()))
-
-    def test_published_scan_evidence_stays_immutable_when_new_scan_timestamp_differs(self):
-        self.existing()
-        old = scan_fixture()
-        old["CreatedAt"] = "2026-10-09T00:00:00Z"
-        old_report = json.dumps(old)
-        asset = self.fixture["releases"][0]["assets"][-1]
-        asset["size"] = len(old_report)
-        asset["digest"] = "sha256:" + hashlib.sha256(old_report.encode()).hexdigest()
-        self.fixture["download"] = {"TgWatch.trivy.json": old_report}
-        result = self.run_release()
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertFalse(self.created())
-
-    def test_existing_scan_evidence_integrity_must_match_published_digest(self):
-        self.existing()
-        self.fixture["releases"][0]["assets"][-1]["digest"] = "sha256:" + "0" * 64
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertFalse(self.created())
-
-    def test_missing_results_cannot_be_accepted_as_published_scan(self):
-        self.existing()
-        old_report = '{"SchemaVersion":2}'
-        asset = self.fixture["releases"][0]["assets"][-1]
-        asset["size"] = len(old_report)
-        asset["digest"] = "sha256:" + hashlib.sha256(old_report.encode()).hexdigest()
-        self.fixture["download"] = {"TgWatch.trivy.json": old_report}
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertFalse(self.created())
-
-    def test_existing_draft_fails_explicitly(self):
-        self.existing(draft=True)
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("draft", result.stderr.lower())
-        self.assertFalse(self.created())
-
-    def test_partial_published_release_fails_without_mutation(self):
-        self.existing()
-        self.fixture["releases"][0]["assets"].pop()
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("assets", result.stderr.lower())
-        self.assertFalse(self.created())
-
-    def test_existing_asset_mismatch_fails_without_mutation(self):
-        self.existing()
-        self.fixture["releases"][0]["assets"][0]["digest"] = "sha256:" + "0" * 64
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertFalse(self.created())
-
-    def test_existing_tag_other_commit_fails(self):
-        self.existing()
-        self.fixture["sha"] = "b" * 40
-        result = self.run_release()
-        self.assertNotEqual(0, result.returncode)
-        self.assertFalse(self.created())
+    def test_nonlatest_and_draft_releases_also_block_reused_version(self):
+        for draft in (False, True):
+            with self.subTest(draft=draft):
+                self.fixture["releases"] = [{"tag_name": "v1.13.0", "draft": draft}]
+                result = self.run_release()
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("immutable", result.stderr)
+                self.assertFalse(self.created())
+                self.assertFalse(any(call[1:3] in (["release", "edit"], ["release", "upload"]) for call in self.calls()))
 
     def test_unknown_latest_code_fails_closed(self):
         self.fixture["latest"] = {"tag_name": "unrecognized", "draft": False}
@@ -223,17 +163,28 @@ class ReleaseTests(ToolFixture, unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertFalse(self.created())
 
-    def test_invalid_run_numbers_fail_before_api(self):
-        for value in ("", "0", "-1", "abc", "1.5", " 1", "2147483548", "999999999999999999999"):
+    def test_invalid_source_version_fails_before_api(self):
+        for value in ("", "1.13", "1.13.00", "1.13.0-beta", "2147.483.648"):
             with self.subTest(value=value):
                 if self.log.exists(): self.log.unlink()
-                result = self.run_release(run=value)
+                result = self.run_release(version=value)
                 self.assertNotEqual(0, result.returncode)
                 self.assertFalse(self.calls())
 
-    def test_max_valid_run_does_not_overflow(self):
-        result = self.run_release(run="2147483547")
-        self.assertEqual(0, result.returncode, result.stderr)
+    def test_removed_override_arguments_are_rejected(self):
+        result = subprocess.run([sys.executable, str(SCRIPTS / "release-policy.py"),
+                                 "--repo", "owner/repo", "--sha", "a" * 40,
+                                 "--ref", "refs/heads/main", "--run-number", "40"],
+                                env=self.env, capture_output=True, text=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.calls())
+
+    def test_new_release_cannot_publish_high_vulnerability(self):
+        next(path for path in self.files if path.name == "TgWatch.trivy.json").write_text(
+            json.dumps(scan_fixture([{"Severity": "HIGH"}])))
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.created())
 
 
 class SigningTests(ToolFixture, unittest.TestCase):
@@ -499,10 +450,11 @@ class WorkflowTests(unittest.TestCase):
 
     def test_version_code_is_validated_instead_of_falling_back(self):
         text = (ROOT / "app/build.gradle.kts").read_text()
-        self.assertIn('versionName = "1.12"', text)
-        self.assertIn("?: 13", text)
+        self.assertIn('versionName = sourceVersion', text)
+        self.assertIn('versionCode = sourceVersionCode.toInt()', text)
         self.assertNotIn("toIntOrNull()?.plus(100)", text)
-        self.assertIn("2147483547", text)
+        self.assertIn("2147483647", text)
+        self.assertNotIn("GITHUB_RUN_NUMBER", text)
         self.assertIn('testImplementation("org.json:json:20240303")', text)
 
 

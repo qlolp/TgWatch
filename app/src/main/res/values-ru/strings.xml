@@ -71,4 +71,20 @@
     <string name="log_title">Журнал</string>
     <string name="share">Поделиться</string>
     <string name="clear">Очистить</string>
+    <string name="chart_counts">За выбранный период: успешных проверок %1$d, Telegram недоступен %2$d, нет интернета %3$d, частично доступен %4$d, не определено %5$d.</string>
+    <string name="chart_no_checks">За выбранный период проверок не было.</string>
+    <string name="chart_average">Среднее время ответа: %1$d мс.</string>
+    <string name="chart_accessibility_hint">Откройте график, чтобы выбрать период и увидеть результаты проверок.</string>
+    <string name="chart_period_details">Результаты проверок по периодам</string>
+    <string name="chart_bucket_counts">%1$d успешно, %2$d недоступен, %3$d нет сети, %4$d частично, %5$d не определено</string>
+    <string name="chart_bucket_empty">%1$s — проверок не было</string>
+    <string name="chart_bucket_average">, ср. %1$d мс</string>
+    <string name="chart_scale">%1$d мс</string>
+    <string name="chart_hour_ago">60 мин назад</string>
+    <string name="chart_week_ago">7 дней назад</string>
+    <string name="chart_now">сейчас</string>
+    <string name="chart_now_average">сейчас · ср. %1$d мс</string>
+    <string name="export_diagnostics">Сохранить локальный отчёт диагностики</string>
+    <string name="automation_settings">Доступ для автоматизации</string>
+    <string name="summary_unavailable">Не удалось показать сводку. Проверьте настройки уведомлений и дождитесь достаточного объёма истории.</string>
 </resources>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
@@ -100,7 +101,7 @@
                     android:layout_width="56dp"
                     android:layout_height="56dp"
                     android:background="@drawable/bg_status_icon"
-                    android:contentDescription="@string/status_icon"
+                    android:importantForAccessibility="no"
                     android:padding="14dp"
                     android:src="@drawable/ic_stat_wait" />
 
@@ -125,7 +126,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:alpha="0.85"
                         android:textColor="@color/on_status"
                         android:textSize="14sp" />
                 </LinearLayout>
@@ -136,7 +136,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:alpha="0.92"
                 android:lineSpacingExtra="2dp"
                 android:textColor="@color/on_status"
                 android:textSize="14sp" />
@@ -229,6 +228,7 @@
             <Button android:id="@+id/btnImportCsv" style="@style/ButtonText" android:text="@string/import_csv" />
             <Button android:id="@+id/btnBackup" style="@style/ButtonText" android:text="@string/encrypted_backup" />
             <Button android:id="@+id/btnRestoreBackup" style="@style/ButtonText" android:text="@string/restore_backup" />
+            <Button android:id="@+id/btnExportDiagnostics" style="@style/ButtonText" android:text="@string/export_diagnostics" />
             <Button android:id="@+id/btnDiagnostics" style="@style/ButtonText" android:text="@string/connection_diagnostics" />
             <TextView android:id="@+id/tvDiagnostics" style="@style/Body" android:visibility="gone" android:textIsSelectable="true" />
         </LinearLayout>
@@ -244,7 +244,8 @@
                 android:id="@+id/chart"
                 android:contentDescription="@string/chart_description"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="wrap_content"
+                android:minHeight="120dp"
                 android:layout_marginTop="12dp" />
 
             <TextView
@@ -256,6 +257,7 @@
 
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/battery_title" />
+            <Button android:id="@+id/btnAutomation" style="@style/ButtonText" android:text="@string/automation_settings" />
             <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="@string/profile_default" />
             <Button
                 android:id="@+id/btnAdvanced"
@@ -320,6 +322,7 @@
                 android:id="@+id/swKeepAwake"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="16dp"
                 android:text="@string/keep_awake"
                 android:textColor="@color/text_primary"
@@ -335,6 +338,7 @@
                 android:id="@+id/swVibrate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="12dp"
                 android:text="@string/vibrate_down"
                 android:textColor="@color/text_primary"
@@ -359,6 +363,7 @@
                 android:id="@+id/swVibrateOffline"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/vibrate_offline"
                 android:textColor="@color/text_primary"
@@ -368,6 +373,7 @@
                 android:id="@+id/swVibrateRecovery"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/vibrate_recovery"
                 android:textColor="@color/text_primary"
@@ -452,6 +458,7 @@
                 android:id="@+id/swQuietHours"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/quiet_hours_default"
                 android:textColor="@color/text_primary"

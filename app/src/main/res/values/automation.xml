@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="automation_title">Automation</string>
+    <string name="automation_enable">Allow automation requests</string>
+    <string name="automation_description">Allow explicit CHECK_NOW and GET_STATE requests with a private access token. Checks only work while monitoring is running. Anyone holding the token can use this access; share it only with a trusted automation app.</string>
+    <string name="automation_disabled">Automation is disabled. Enabling it creates a new access token.</string>
+    <string name="automation_token">Access token</string>
+    <string name="automation_copy">Copy token</string>
+    <string name="automation_regenerate">Regenerate token</string>
+    <string name="automation_regenerate_title">Replace access token?</string>
+    <string name="automation_regenerate_message">Existing automation tasks will lose access until you update their token.</string>
+    <string name="automation_replace">Replace</string>
+    <string name="automation_cancel">Cancel</string>
+    <string name="automation_copied">Token copied. Clipboard cleanup is attempted after 45 seconds.</string>
+    <string name="automation_storage_error">Could not save automation access. Try again.</string>
+    <string name="automation_done">Done</string>
+</resources>

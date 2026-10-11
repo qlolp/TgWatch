@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="automation_title">Автоматизация</string>
+    <string name="automation_enable">Разрешить запросы автоматизации</string>
+    <string name="automation_description">Разрешить явные запросы CHECK_NOW и GET_STATE с приватным токеном доступа. Проверки работают только при запущенном мониторинге. Любой обладатель токена получает этот доступ; передавайте его только доверенному приложению автоматизации.</string>
+    <string name="automation_disabled">Автоматизация отключена. При включении будет создан новый токен доступа.</string>
+    <string name="automation_token">Токен доступа</string>
+    <string name="automation_copy">Копировать токен</string>
+    <string name="automation_regenerate">Пересоздать токен</string>
+    <string name="automation_regenerate_title">Заменить токен доступа?</string>
+    <string name="automation_regenerate_message">Существующие задачи автоматизации потеряют доступ, пока вы не обновите их токен.</string>
+    <string name="automation_replace">Заменить</string>
+    <string name="automation_cancel">Отмена</string>
+    <string name="automation_copied">Токен скопирован. Через 45 секунд будет выполнена попытка очистки буфера.</string>
+    <string name="automation_storage_error">Не удалось сохранить доступ автоматизации. Повторите попытку.</string>
+    <string name="automation_done">Готово</string>
+</resources>

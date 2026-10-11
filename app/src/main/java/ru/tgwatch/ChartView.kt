@@ -1,16 +1,17 @@
 package ru.tgwatch
 
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 /**
  * График за последний час: один столбик на минуту.
@@ -18,6 +19,8 @@ import java.util.Locale
  * Нажатие на столбик показывает детали.
  */
 class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+
+    private companion object { const val LABEL_PADDING_DP = 8f }
 
     private val slots = 60
 
@@ -38,11 +41,17 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = context.getColor(R.color.text_secondary)
-        textSize = 11f * dp
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 11f, resources.displayMetrics)
     }
 
     private val rect = RectF()
-    private val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private var touchedSlot: Int? = null
+
+    init {
+        isClickable = true
+        isFocusable = true
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
 
     fun setData(data: List<History.Minute>, now: Long, window: Int = 60) {
         windowMinutes = window
@@ -57,41 +66,48 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action != MotionEvent.ACTION_UP) return true
-        val w = width.toFloat()
-        if (w <= 0f) return true
-        val slotW = w / slots
-        val i = (event.x / slotW).toInt().coerceIn(0, slots - 1)
-        val minute = nowMinute - windowMinutes + 1 + i * bucketMinutes
-        val m = minutes.firstOrNull { it.minute == minute }
-        val whenText = (if (windowMinutes > 60) SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) else timeFmt).format(Date(minute * 60_000L))
-        val msg = if (m == null || m.total == 0) {
-            Lang.t("$whenText — проверок не было", "$whenText — no checks")
-        } else {
-            buildString {
-                append(whenText)
-                append(": ")
-                append("${m.ok} ok")
-                if (m.fail > 0) append(Lang.t(", ${m.fail} без Telegram", ", ${m.fail} Telegram unreachable"))
-                if (m.offline > 0) append(Lang.t(", ${m.offline} без сети", ", ${m.offline} no internet"))
-                if (m.partial > 0) append(Lang.t(", ${m.partial} частично", ", ${m.partial} partial"))
-                if (m.unknown > 0) append(Lang.t(", ${m.unknown} не определено", ", ${m.unknown} unknown"))
-                if (m.avgLatency >= 0) append(Lang.t(", ср. ${m.avgLatency} мс", ", avg ${m.avgLatency} ms"))
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> return true
+            MotionEvent.ACTION_UP -> {
+                if (width <= 0) return true
+                touchedSlot = (event.x / (width.toFloat() / slots)).toInt().coerceIn(0, slots - 1)
+                performClick()
+                return true
             }
+            MotionEvent.ACTION_CANCEL -> touchedSlot = null
         }
-        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-        performClick()
-        return true
+        return super.onTouchEvent(event)
     }
 
     override fun performClick(): Boolean {
         super.performClick()
+        val selected = touchedSlot
+        touchedSlot = null
+        if (selected != null) {
+            Toast.makeText(context, bucketDetails(selected), Toast.LENGTH_LONG).show()
+        } else {
+            // One accessible entry per bucket also makes every result available to keyboard users.
+            AlertDialog.Builder(context).setTitle(R.string.chart_period_details)
+                .setItems(Array(slots) { bucketDetails(it) }) { _, _ -> }
+                .setNegativeButton(android.R.string.cancel, null).show()
+        }
         return true
+    }
+
+    private fun bucketDetails(slot: Int): String {
+        val minute = nowMinute - windowMinutes + 1 + slot * bucketMinutes
+        val bucket = minutes.firstOrNull { it.minute == minute }
+        val format = if (windowMinutes > 60) "dd.MM HH:mm" else "HH:mm"
+        val timestamp = SimpleDateFormat(format, resources.configuration.locales[0]).format(Date(minute * 60_000L))
+        if (bucket == null || bucket.total == 0) return context.getString(R.string.chart_bucket_empty, timestamp)
+        return "$timestamp: " + context.getString(R.string.chart_bucket_counts,
+            bucket.ok, bucket.fail, bucket.offline, bucket.partial, bucket.unknown) +
+            if (bucket.avgLatency >= 0) context.getString(R.string.chart_bucket_average, bucket.avgLatency) else ""
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val labelH = 16f * dp
+        val labelH = textPaint.fontSpacing + LABEL_PADDING_DP * dp
         val top = labelH
         val bottom = height - labelH
         val chartH = bottom - top
@@ -147,23 +163,24 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         }
 
         textPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText(Lang.t("${scale.toLong()} мс", "${scale.toLong()} ms"), 0f, top - 4f * dp, textPaint)
-        canvas.drawText(if (windowMinutes > 60) Lang.t("7 дней назад", "7 days ago") else Lang.t("60 мин назад", "60 min ago"), 0f, height - 2f * dp, textPaint)
+        canvas.drawText(context.getString(R.string.chart_scale, scale.toLong()), 0f, top - 4f * dp, textPaint)
+        val beginning = context.getString(if (windowMinutes > 60) R.string.chart_week_ago else R.string.chart_hour_ago)
+        canvas.drawText(beginning, 0f, height - 2f * dp, textPaint)
         textPaint.textAlign = Paint.Align.RIGHT
         val avg = History.Minute.merge(0L, minutes).avgLatency
         canvas.drawText(
-            if (avg >= 0) Lang.t("сейчас · ср. $avg мс", "now · avg $avg ms") else Lang.t("сейчас", "now"),
+            if (avg >= 0) context.getString(R.string.chart_now_average, avg) else context.getString(R.string.chart_now),
             w, height - 2f * dp, textPaint
         )
     }
 
     private fun describe(): String {
-        val ok = minutes.sumOf { it.ok }
-        val fail = minutes.sumOf { it.fail }
-        val offline = minutes.sumOf { it.offline }
-        val avg = History.Minute.merge(0L, minutes).avgLatency
-        return Lang.t("За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline.", "Selected period: $ok successful checks, $fail with Telegram unreachable, $offline with no internet.") +
-            (if (avg >= 0) Lang.t(" Среднее время ответа: $avg мс.", " Average response time: $avg ms.") else "") + Lang.t(" Нажми столбик, чтобы увидеть детали.", " Tap a bar to see details.")
+        val total = History.Minute.merge(0L, minutes)
+        val counts = if (total.total == 0) context.getString(R.string.chart_no_checks) else
+            context.getString(R.string.chart_counts, total.ok, total.fail, total.offline, total.partial, total.unknown)
+        val average = if (total.avgLatency >= 0) {
+            " " + context.getString(R.string.chart_average, total.avgLatency)
+        } else ""
+        return counts + average + " " + context.getString(R.string.chart_accessibility_hint)
     }
 }
-

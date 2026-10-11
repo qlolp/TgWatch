@@ -1,0 +1,97 @@
+package ru.tgwatch
+
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** Explicit allowlist serializer. Never serialize State, ProbeOutcome, preferences, or files directly. */
+data class DiagnosticSnapshot(
+    val appVersion: String,
+    val appVersionCode: Long,
+    val sdkInt: Int,
+    val running: Boolean,
+    val status: MonitorService.State,
+    val stale: Boolean,
+    val notificationsAllowed: Boolean,
+    val exactAlarmsAllowed: Boolean,
+    val batteryExempt: Boolean,
+    val deviceIdleObserved: Boolean,
+    val powerSave: Boolean,
+    val userUnlocked: Boolean,
+    val dailyStats: TimeStats,
+    val endpoints: List<ProbeOutcome>,
+    val scheduling: ScheduleDiagnostics.Snapshot,
+) {
+    fun toJson(): String {
+        val json = JSONObject().put("schema_version", 1)
+            .put("app", JSONObject()
+                .put("version", appVersion.takeIf { VERSION.matches(it) } ?: "unknown")
+                .put("version_code", appVersionCode.coerceAtLeast(0)))
+            .put("os", JSONObject().put("sdk_int", sdkInt.coerceIn(0, MAX_SDK)))
+            .put("flags", flagsJson())
+            .put("state", stateJson())
+            .put("last_24_hours", statsJson())
+            .put("endpoints", endpointsJson())
+            .put("scheduling", schedulingJson())
+        return json.toString(2).also { check(it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) }
+    }
+
+    private fun flagsJson() = JSONObject()
+        .put("notifications_allowed", notificationsAllowed)
+        .put("exact_alarms_allowed", exactAlarmsAllowed)
+        .put("battery_exempt", batteryExempt)
+        .put("device_idle_observed", deviceIdleObserved)
+        .put("power_save", powerSave)
+        .put("user_unlocked", userUnlocked)
+
+    private fun stateJson() = JSONObject()
+        .put("running", running)
+        .put("status", status.status.name)
+        .put("checked_at_ms", status.checkedAt.coerceAtLeast(0))
+        .put("stale", stale)
+        .put("latency_ms", status.latencyMs.coerceIn(-1, MAX_LATENCY_MS))
+
+    private fun statsJson() = JSONObject()
+        .put("ok_ms", dailyStats.okMs.coerceAtLeast(0))
+        .put("down_ms", dailyStats.downMs.coerceAtLeast(0))
+        .put("partial_ms", dailyStats.partialMs.coerceAtLeast(0))
+        .put("offline_ms", dailyStats.offlineMs.coerceAtLeast(0))
+        .put("unknown_ms", dailyStats.unknownMs.coerceAtLeast(0))
+        .put("checks", dailyStats.checks.coerceAtLeast(0))
+        .put("outage_count", dailyStats.outageCount.coerceAtLeast(0))
+        .put("availability_percent", dailyStats.uptimePercent.takeIf { it.isFinite() && it >= 0 } ?: JSONObject.NULL)
+
+    private fun endpointsJson(): JSONArray {
+        val outcomes = JSONArray()
+        endpoints.asSequence().filter { ENDPOINTS[it.endpoint] == it.group }.distinctBy { it.endpoint }
+            .take(ENDPOINTS.size).forEach { outcomes.put(JSONObject()
+                .put("endpoint", it.endpoint).put("group", it.group.name)
+                .put("reachable", it.reachable).put("latency_ms", it.latencyMs.coerceIn(-1, MAX_LATENCY_MS))) }
+        return outcomes
+    }
+
+    private fun schedulingJson() = JSONObject()
+        .put("scope", "service_session")
+        .put("scheduled_arrivals", scheduling.scheduledArrivals)
+        .put("late_arrivals", scheduling.lateArrivals)
+        .put("late_tolerance_ms", ScheduleDiagnostics.LATE_TOLERANCE_MS)
+        .put("total_delay_ms", scheduling.totalDelayMs)
+        .put("max_delay_ms", scheduling.maxDelayMs)
+        .put("idle_observed_arrivals", scheduling.idleObservedArrivals)
+        .put("manual_requests", scheduling.manualRequests)
+        .put("overlapping_requests", scheduling.overlappingRequests)
+
+    companion object {
+        const val MAX_BYTES = 16 * 1024
+        private const val MAX_LATENCY_MS = 60_000L
+        private const val MAX_SDK = 1_000
+        private val VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,3}(\\.[0-9]{1,3})?")
+        private val ENDPOINTS = mapOf(
+            "api.telegram.org" to ProbeGroup.WEB, "web.telegram.org" to ProbeGroup.WEB,
+            "core.telegram.org" to ProbeGroup.WEB, "MTProto DC1" to ProbeGroup.MTPROTO,
+            "MTProto DC2" to ProbeGroup.MTPROTO, "MTProto DC3" to ProbeGroup.MTPROTO,
+            "MTProto DC4" to ProbeGroup.MTPROTO, "MTProto DC5" to ProbeGroup.MTPROTO,
+            "Yandex" to ProbeGroup.CONTROL, "Яндекс" to ProbeGroup.CONTROL,
+            "Mail.ru" to ProbeGroup.CONTROL, "Google 204" to ProbeGroup.CONTROL,
+        )
+    }
+}

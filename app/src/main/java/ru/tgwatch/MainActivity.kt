@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +20,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.RadioGroup
@@ -106,6 +108,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         Lang.update(this)
         setContentView(R.layout.activity_main)
+        applySystemBarInsets()
+        findViewById<Button>(R.id.btnAutomation).setOnClickListener { AutomationSettingsActivity.open(this) }
+        findViewById<Button>(R.id.btnExportDiagnostics).setOnClickListener { LocalDiagnostics.export(this) }
         backupUi = BackupUi(this)
         findViewById<Button>(R.id.btnBackup).setOnClickListener { backupUi.export() }
         findViewById<Button>(R.id.btnRestoreBackup).setOnClickListener { backupUi.restore() }
@@ -302,7 +307,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnDailySummaryNow).setOnClickListener {
             requestNotificationPermissionIfNeeded()
             if (!DailySummaryReceiver.post(this, force = true))
-                Toast.makeText(this, Lang.t("За последние сутки ещё нет проверок", "No checks in the last 24 hours yet"), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.summary_unavailable, Toast.LENGTH_LONG).show()
         }
 
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
@@ -343,6 +348,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        Lang.update(this)
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
         ui.removeCallbacks(ticker)
@@ -438,9 +444,6 @@ class MainActivity : Activity() {
             .show()
     }
 
-    private fun notificationsAllowed(): Boolean =
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()
-
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -454,9 +457,6 @@ class MainActivity : Activity() {
             .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
         safeStart(intent)
     }
-
-    private fun ignoringBatteryOptimizations(): Boolean =
-        (getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
 
     private fun openBatterySettings() {
         val direct = Intent(
@@ -660,6 +660,7 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (backupUi.onResult(requestCode, resultCode, data)) return
+        if (LocalDiagnostics.onActivityResult(this, requestCode, resultCode, data)) return
         if (requestCode != 20 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         val days = exportDays
@@ -689,4 +690,26 @@ class MainActivity : Activity() {
         }
     }
 }
+
+private fun Activity.applySystemBarInsets() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    window.setDecorFitsSystemWindows(false)
+    val root = findViewById<View>(R.id.mainScroll)
+    root.fitsSystemWindows = false
+    val original = Rect(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
+    root.setOnApplyWindowInsetsListener { view, insets ->
+        val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+        view.setPadding(original.left + bars.left, original.top + bars.top,
+            original.right + bars.right, original.bottom + bars.bottom)
+        insets
+    }
+    root.requestApplyInsets()
+}
+
+private fun Activity.notificationsAllowed(): Boolean =
+    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()
+
+
+private fun Activity.ignoringBatteryOptimizations(): Boolean =
+    (getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
 

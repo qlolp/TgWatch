@@ -71,4 +71,20 @@
     <string name="log_title">Event log</string>
     <string name="share">Share</string>
     <string name="clear">Clear</string>
+    <string name="chart_counts">Selected period: %1$d successful checks, %2$d with Telegram unreachable, %3$d with no internet, %4$d partially reachable, %5$d unknown.</string>
+    <string name="chart_no_checks">No checks in the selected period.</string>
+    <string name="chart_average">Average response time: %1$d ms.</string>
+    <string name="chart_accessibility_hint">Activate the chart to choose a period and see its check results.</string>
+    <string name="chart_period_details">Check results by period</string>
+    <string name="chart_bucket_counts">%1$d successful, %2$d unreachable, %3$d no internet, %4$d partial, %5$d unknown</string>
+    <string name="chart_bucket_empty">%1$s — no checks</string>
+    <string name="chart_bucket_average">, avg %1$d ms</string>
+    <string name="chart_scale">%1$d ms</string>
+    <string name="chart_hour_ago">60 min ago</string>
+    <string name="chart_week_ago">7 days ago</string>
+    <string name="chart_now">now</string>
+    <string name="chart_now_average">now · avg %1$d ms</string>
+    <string name="export_diagnostics">Save local diagnostic report</string>
+    <string name="automation_settings">Automation access</string>
+    <string name="summary_unavailable">Couldn’t show the summary. Check notification settings and wait for enough history.</string>
 </resources>

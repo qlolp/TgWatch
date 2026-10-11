@@ -16,14 +16,21 @@ python3 -m pip install -r scripts/requirements-release.txt
 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/test_dependency_audit.py
 python3 scripts/test_signing_keychain.py
-bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
+bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-Локальная 1.12 имеет versionCode 13; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
-silent fallback. `assembleRelease` без signing environment создаёт unsigned APK для проверки
+`version.properties` задаёт SemVer `1.13.0`; код `1013000` вычисляется одинаково локально и
+в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
+`assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
 `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.
 Debug APK — test-only.
+
+`.editorconfig` задаёт основной стиль. Detekt закреплён в сборке и использует
+baseline существующих замечаний из исходного `main`; новые файлы туда не входят.
+Успешный запуск означает отсутствие новых замечаний по выбранным правилам,
+а не полное устранение старых. Не обновляйте baseline для сокрытия новых ошибок;
+обоснованное локальное suppression указывается рядом с причиной.
 
 Для changes в логике нужна meaningful regression с ожидаемым RED assertion и GREEN.
 Не заменяйте malformed-input/tamper/process-death/cancellation проверки тривиальными mocks.
@@ -121,13 +128,15 @@ Signing scripts используют только существующий кл�
 [signing backup](docs/signing-backup.md). Linux cloud не предоставляет login Keychain. Не меняйте
 реальные Secrets/ключи в тестах; helper regressions используют fixtures/mocks.
 
-Push/main и PR запускают checks. Публикация разрешена только ручным `Build APK` на `main` с
-`publish=true` после checks и двух audits. Build/Android cancellation отделена от последовательной
-repository-wide publication с `cancel-in-progress=false`. Для версии обновите `versionName`,
-локальный `versionCode`, [CHANGELOG](CHANGELOG.md) и `docs/releases/<versionName>.md`.
+Push/main и PR запускают checks. Публикация разрешена совпадающим с исходниками SemVer-тегом
+на commit из `main` либо ручным `Build APK` на `main` с `publish=true`, после checks и двух
+audits. Build/Android cancellation отделена от последовательной repository-wide publication
+с `cancel-in-progress=false`. Для версии обновите `version.properties`, [CHANGELOG](CHANGELOG.md)
+и `docs/releases/<versionName>.md`. Изменение поведения требует новой версии; PR-проверка
+валидирует формат и однозначное вычисление кода, но не требует существования ещё не опубликованного тега.
 
-Release policy сохраняет published tags/assets. Complete identical rerun — no-op; draft,
-incomplete/different assets, другой commit или conflicting orphan tag требуют явного разбора.
+Release policy сохраняет published tags/assets. Уже существующий выпуск нельзя перезаписывать;
+draft, incomplete/different assets, другой commit или conflicting orphan tag требуют явного разбора.
 Более старый code не заменяет latest. Не обходите это удалением тега или перезаписью assets.
 CI должен проверить production certificate и upgrade реального 1.10.47 до публикации.
 
