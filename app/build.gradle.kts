@@ -27,8 +27,8 @@ android {
         applicationId = "ru.tgwatch"
         minSdk = 26
         targetSdk = 34
-        versionCode = ciVersionCode ?: 12
-        versionName = "1.11"
+        versionCode = ciVersionCode ?: 13
+        versionName = "1.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {

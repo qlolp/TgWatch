@@ -418,6 +418,36 @@
                 android:text="Сигнал вибрации: Тройной" />
 
             <Switch
+                android:id="@+id/swDailySummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="Сводка за день в 21:00"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="-12dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/btnDailySummaryTime"
+                    style="@style/ButtonText"
+                    android:text="Изменить время" />
+                <Button
+                    android:id="@+id/btnDailySummaryNow"
+                    style="@style/ButtonText"
+                    android:text="Показать сейчас" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/Body"
+                android:text="Одно тихое уведомление в день: доступность, сбои и отклик Telegram за последние 24 часа."
+                android:textSize="12sp" />
+
+            <Switch
                 android:id="@+id/swQuietHours"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

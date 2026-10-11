@@ -15,7 +15,8 @@ class BackupCodecTest {
         "vibrate_recovery" to true, "notify_recovery" to true, "event_sound" to false,
         "vibration_pattern" to "LONG", "quiet_hours" to true,
         "quiet_start_hour" to 23, "quiet_end_hour" to 0,
-        "quiet_start_minute" to 1439, "quiet_end_minute" to 0),
+        "quiet_start_minute" to 1439, "quiet_end_minute" to 0,
+        "daily_summary" to true, "daily_summary_minute" to 1439),
         listOf(Observation(0, 600_000, "OK", Long.MAX_VALUE, Long.MAX_VALUE),
             Observation(Long.MAX_VALUE - 1, Long.MAX_VALUE, "UNKNOWN")),
         listOf("Проверка: связь восстановлена 🛰️", "line\nwith\t\"quotes\""))
@@ -48,7 +49,8 @@ class BackupCodecTest {
         val invalid = listOf("\"enabled\":false", "\"last_state\":\"OK\"", "\"keep_awake\":1", "\"quiet_hours\":\"true\"",
             "\"interval_sec\":9", "\"interval_sec\":121", "\"interval_sec\":30.0", "\"interval_sec\":\"30\"",
             "\"interval_sec\":4294967326", "\"power_profile\":\"other\"", "\"vibration_pattern\":\"other\"",
-            "\"quiet_start_hour\":24", "\"quiet_end_hour\":-1", "\"quiet_start_minute\":1440", "\"quiet_end_minute\":-1")
+            "\"quiet_start_hour\":24", "\"quiet_end_hour\":-1", "\"quiet_start_minute\":1440", "\"quiet_end_minute\":-1",
+            "\"daily_summary\":1", "\"daily_summary_minute\":1440", "\"daily_summary_minute\":-1")
         invalid.forEach { rejected { decode(base.replace("\"settings\":{}", "\"settings\":{$it}")) } }
         rejected { BackupCodec.encode(sample().copy(settings = mapOf("interval_sec" to 30L))) }
         rejected { BackupCodec.encode(sample().copy(settings = mapOf("enabled" to true))) }

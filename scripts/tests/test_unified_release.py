@@ -175,8 +175,8 @@ class UnifiedWorkflowTests(unittest.TestCase):
     def test_new_version_and_keychain_wrapper_are_safe(self):
         gradle = (ROOT / "app/build.gradle.kts").read_text()
         self.assertNotIn("<<<<<<<", gradle)
-        self.assertIn('versionName = "1.11"', gradle)
-        self.assertIn("?: 12", gradle)
+        self.assertIn('versionName = "1.12"', gradle)
+        self.assertIn("?: 13", gradle)
         wrapper = (SCRIPTS / "configure-signing.sh").read_text()
         self.assertNotIn("<<<<<<<", wrapper)
         self.assertIn("signing-keychain.py", wrapper)

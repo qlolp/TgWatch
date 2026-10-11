@@ -37,6 +37,7 @@ class BackupRestoreIntegrationTest {
         "quiet_start_minute" to 1395, "quiet_end_minute" to 525,
         "notify_outage" to false, "notify_partial" to true,
         "sound_outage" to false, "sound_partial" to true, "sound_recovery" to true,
+        "daily_summary" to true, "daily_summary_minute" to 1290,
     )
 
     @Before fun saveCurrentDataAndStopMonitoring() {

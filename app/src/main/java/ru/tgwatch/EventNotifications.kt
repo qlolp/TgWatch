@@ -21,6 +21,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         const val OUTAGE_ID = 2
         const val RECOVERY_ID = 3
         const val PARTIAL_ID = 4
+        const val SUMMARY_ID = 5
+        const val SUMMARY_CHANNEL = "daily_summary_v1"
         fun channel(event: String) = when(event) {
             "TG_DOWN" -> SOUND_CHANNEL; "PARTIAL" -> PARTIAL_CHANNEL; "RECOVERY" -> RECOVERY_CHANNEL
             else -> error("Unknown event")
@@ -35,6 +37,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
+        manager.createNotificationChannel(NotificationChannel(SUMMARY_CHANNEL, "Сводка за день",
+            NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
         val legacy = manager.getNotificationChannel(outageChannel)
         manager.createNotificationChannel(NotificationChannel(partialChannel,"Частичная доступность",
             NotificationManager.IMPORTANCE_DEFAULT).apply {
@@ -65,6 +69,10 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         if (blocked(partialChannel)) { manager.cancel(PARTIAL_ID); return }
         manager.notify(PARTIAL_ID,notification("Telegram частично доступен",reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
+    }
+    fun summary(title: String, text: String) {
+        if (blocked(SUMMARY_CHANNEL)) { manager.cancel(SUMMARY_ID); return }
+        manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok, SUMMARY_CHANNEL))
     }
     private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {

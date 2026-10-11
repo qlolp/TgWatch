@@ -67,6 +67,11 @@
             android:exported="false" />
 
         <receiver
+            android:name=".DailySummaryReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".StatusWidget"
             android:directBootAware="true"
             android:exported="true"
@@ -91,6 +96,9 @@
                 <!-- Xiaomi / некоторые OEM будят иначе, чем обычный BOOT_COMPLETED -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <!-- Сводка за день привязана к местному времени -->
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

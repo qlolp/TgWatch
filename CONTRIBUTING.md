@@ -1,4 +1,4 @@
-# Разработка TgWatch 1.11
+# Разработка TgWatch 1.12
 
 Перед изменением поведения прочитайте [README](README.md), [архитектуру](docs/superpowers/architecture.md)
 и [unified 1.11 spec](docs/superpowers/specs/2026-10-10-unified-1.11-design.md). Приложение
@@ -19,7 +19,7 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-Локальная 1.11 имеет versionCode 12; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
+Локальная 1.12 имеет versionCode 13; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
 silent fallback. `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
 `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.

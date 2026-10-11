@@ -57,6 +57,7 @@ class MainActivity : Activity() {
     private lateinit var swNotifyRecovery: Switch
     private lateinit var swEventSound: Switch
     private lateinit var btnAlarmPattern: Button
+    private lateinit var swDailySummary: Switch
     private lateinit var swQuietHours: Switch
     private lateinit var btnQuietHours: Button
     private lateinit var tvBattery: TextView
@@ -289,6 +290,20 @@ class MainActivity : Activity() {
                 }.show()
         }
 
+        swDailySummary = findViewById(R.id.swDailySummary)
+        swDailySummary.isChecked = Prefs.dailySummary(this)
+        swDailySummary.setOnCheckedChangeListener { _, checked ->
+            Prefs.setDailySummary(this, checked)
+            if (checked) requestNotificationPermissionIfNeeded()
+        }
+        updateDailySummaryLabel()
+        findViewById<Button>(R.id.btnDailySummaryTime).setOnClickListener { pickDailySummaryTime() }
+        findViewById<Button>(R.id.btnDailySummaryNow).setOnClickListener {
+            requestNotificationPermissionIfNeeded()
+            if (!DailySummaryReceiver.post(this, force = true))
+                Toast.makeText(this, "За последние сутки ещё нет проверок", Toast.LENGTH_SHORT).show()
+        }
+
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
         updateQuietHoursLabel()
@@ -366,6 +381,23 @@ class MainActivity : Activity() {
             startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
             Toast.makeText(this, "Не удалось поделиться: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateDailySummaryLabel() {
+        swDailySummary.text = "Сводка за день в ${DailySummary.timeLabel(Prefs.dailySummaryMinute(this))}"
+    }
+
+    private fun pickDailySummaryTime() {
+        val minute = Prefs.dailySummaryMinute(this)
+        TimePickerDialog(this, { _, hour, min ->
+            Prefs.setDailySummaryMinute(this, hour * 60 + min)
+            Prefs.setDailySummary(this, true)
+            swDailySummary.isChecked = true
+            updateDailySummaryLabel()
+        }, minute / 60, minute % 60, true).apply {
+            setTitle("Время сводки за день")
+            show()
         }
     }
 

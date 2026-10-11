@@ -29,6 +29,8 @@ object Prefs {
     private const val KEY_QUIET_END = "quiet_end_hour"
     private const val KEY_QUIET_START_MINUTE = "quiet_start_minute"
     private const val KEY_QUIET_END_MINUTE = "quiet_end_minute"
+    private const val KEY_DAILY_SUMMARY = "daily_summary"
+    private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -166,6 +168,19 @@ object Prefs {
         it.name == sp(ctx).getString(KEY_ALARM_PATTERN, AlarmPattern.STANDARD.name)
     } ?: AlarmPattern.STANDARD
     fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN, pattern.name).apply() }
+
+    /** Opt-in: an upgrade must not start posting a new daily notification. */
+    fun dailySummary(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_DAILY_SUMMARY, false)
+    fun setDailySummary(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_DAILY_SUMMARY, value).apply()
+        DailySummaryReceiver.schedule(ctx)
+    }
+    fun dailySummaryMinute(ctx: Context): Int =
+        sp(ctx).getInt(KEY_DAILY_SUMMARY_MINUTE, DailySummary.DEFAULT_MINUTE).coerceIn(0, 1439)
+    fun setDailySummaryMinute(ctx: Context, minute: Int) {
+        sp(ctx).edit().putInt(KEY_DAILY_SUMMARY_MINUTE, minute.coerceIn(0, 1439)).apply()
+        DailySummaryReceiver.schedule(ctx)
+    }
 
     /** Не вибрировать ночью. */
     fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)
