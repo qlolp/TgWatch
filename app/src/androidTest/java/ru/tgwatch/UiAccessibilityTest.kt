@@ -64,14 +64,13 @@ class UiAccessibilityTest {
 
     @Test fun mainUiFollowsSelectedAppLanguageAfterRecreation() {
         if (Build.VERSION.SDK_INT < 33) return
-        val manager = ctx.getSystemService(android.app.LocaleManager::class.java)
-        val previous = manager.applicationLocales
+        val previous = AppLocales.get(ctx)
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
         try {
             for ((locale, title) in listOf("en" to "Monitoring is off", "ru" to "Мониторинг выключен")) {
                 InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                    manager.applicationLocales = LocaleList.forLanguageTags(locale)
+                    AppLocales.set(ctx, locale)
                 }
                 InstrumentationRegistry.getInstrumentation().waitForIdleSync()
                 ActivityScenario.launch(MainActivity::class.java).use { scenario ->
@@ -83,7 +82,7 @@ class UiAccessibilityTest {
                 }
             }
         } finally {
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { manager.applicationLocales = previous }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { AppLocales.set(ctx, previous) }
             Prefs.setEnabled(ctx, wasEnabled)
             Lang.update(ctx)
         }
