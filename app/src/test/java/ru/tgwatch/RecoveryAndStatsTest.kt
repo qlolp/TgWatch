@@ -1,9 +1,14 @@
 package ru.tgwatch
 
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 
 class RecoveryAndStatsTest {
+    @Before fun useRussianDefault() {
+        Lang.ru = true
+    }
+
     @Test fun expiredCurrentEpochRemainsArchivedAfterRepeatedRetentionAndStorageReload() {
         val rows = listOf(Observation(10_000,20_000,"OK",clockEpoch=0),
             Observation(20_000,30_000,"TG_DOWN",clockEpoch=0),

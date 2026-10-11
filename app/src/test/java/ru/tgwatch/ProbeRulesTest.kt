@@ -3,9 +3,14 @@ package ru.tgwatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class ProbeRulesTest {
+
+    @Before fun useRussianDefault() {
+        Lang.ru = true
+    }
 
     @Test
     fun reachableCodes_include2xx3xx4xx_exclude5xx() {

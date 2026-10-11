@@ -2,9 +2,14 @@ package ru.tgwatch
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class FormatTest {
+
+    @Before fun useRussianDefault() {
+        Lang.ru = true
+    }
 
     @Test
     fun durationStr_seconds() {

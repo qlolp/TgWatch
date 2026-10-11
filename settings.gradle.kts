@@ -1,8 +1,10 @@
 pluginManagement {
     repositories {
+        // Prefer the plugin portal for Kotlin Compose; Maven Central intermittently 403s
+        // the compose-compiler-gradle-plugin POM on GitHub Actions runners.
+        gradlePluginPortal()
         google()
         mavenCentral()
-        gradlePluginPortal()
     }
 }
 

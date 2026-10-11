@@ -20,9 +20,14 @@ class ProbeCatalogTest {
 
     @Test
     fun extraService_titlesLocalized() {
-        Lang.ru = true
-        assertEquals("Matrix", ExtraService.MATRIX.title())
-        Lang.ru = false
-        assertEquals("Custom URL", ExtraService.CUSTOM.title())
+        val previous = Lang.ru
+        try {
+            Lang.ru = true
+            assertEquals("Matrix", ExtraService.MATRIX.title())
+            Lang.ru = false
+            assertEquals("Custom URL", ExtraService.CUSTOM.title())
+        } finally {
+            Lang.ru = previous
+        }
     }
 }
