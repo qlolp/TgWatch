@@ -435,7 +435,11 @@ class MonitorService : Service() {
             checkStartedMono = 0L
             releaseWakeLock()
         }
-        if (acceptsRunningCheck(this)) checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+        if (acceptsRunningCheck(this)) {
+            checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+            // Re-arming replaces the pending watchdog: it wakes the phone only when checks stop landing.
+            WatchdogReceiver.schedule(this, ServiceHealth.watchdogDelayMs(state.expectedIntervalSec))
+        }
     }
 
     private fun performCheck(): Probe {

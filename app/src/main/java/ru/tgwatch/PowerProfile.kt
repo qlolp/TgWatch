@@ -17,6 +17,13 @@ enum class PowerProfile(val awake: Int, val asleep: Int, val failure: Int) {
 }
 
 object ServiceHealth {
+    /** Watchdog period when nothing else is known, e.g. after boot or service death. */
+    const val WATCHDOG_MS = 3 * 60 * 1000L
+    private const val SECOND_MS = 1000L
+
+    /** After a completed check the watchdog waits out the next check too, so a healthy loop never meets it. */
+    fun watchdogDelayMs(expectedSec: Int): Long = WATCHDOG_MS + expectedSec.coerceAtLeast(0) * SECOND_MS
+
     fun isOverdue(lastProgress: Long, now: Long, expectedSec: Int): Boolean =
         lastProgress <= 0L || now < lastProgress || now - lastProgress > expectedSec.coerceAtLeast(10) * 3_000L + 30_000L
 }

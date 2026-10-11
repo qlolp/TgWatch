@@ -39,15 +39,13 @@ class WatchdogReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "TgWatch"
         private const val ACTION = "ru.tgwatch.action.WATCHDOG"
-        private const val INTERVAL_MS = 3 * 60 * 1000L
-
-        fun schedule(ctx: Context) {
+        fun schedule(ctx: Context, delayMs: Long = ServiceHealth.WATCHDOG_MS) {
             if (!Prefs.isEnabled(ctx)) {
                 cancel(ctx)
                 return
             }
             val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val at = SystemClock.elapsedRealtime() + INTERVAL_MS
+            val at = SystemClock.elapsedRealtime() + delayMs
             try {
                 if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
                     am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pending(ctx))
