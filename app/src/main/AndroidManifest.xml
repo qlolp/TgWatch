@@ -25,6 +25,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
@@ -53,7 +54,7 @@
             android:name=".StatusTileService"
             android:exported="true"
             android:icon="@drawable/ic_stat_ok"
-            android:label="Telegram"
+            android:label="@string/telegram"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
@@ -67,10 +68,15 @@
             android:exported="false" />
 
         <receiver
+            android:name=".DailySummaryReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".StatusWidget"
             android:directBootAware="true"
             android:exported="true"
-            android:label="Статус Telegram">
+            android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="ru.tgwatch.action.WIDGET_CLICK" />
@@ -91,6 +97,9 @@
                 <!-- Xiaomi / некоторые OEM будят иначе, чем обычный BOOT_COMPLETED -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <!-- Сводка за день привязана к местному времени -->
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

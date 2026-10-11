@@ -21,50 +21,64 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         const val OUTAGE_ID = 2
         const val RECOVERY_ID = 3
         const val PARTIAL_ID = 4
+        const val SUMMARY_ID = 5
+        const val SUMMARY_CHANNEL = "daily_summary_v1"
         fun channel(event: String) = when(event) {
             "TG_DOWN" -> SOUND_CHANNEL; "PARTIAL" -> PARTIAL_CHANNEL; "RECOVERY" -> RECOVERY_CHANNEL
             else -> error("Unknown event")
         }
     }
     init {
-        manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, "События без звука",
+        manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, Lang.t("События без звука", "Silent events"),
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
-        manager.createNotificationChannel(NotificationChannel(outageChannel, "События со звуком",
+        manager.createNotificationChannel(NotificationChannel(outageChannel, Lang.t("События со звуком", "Events with sound"),
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
+        manager.createNotificationChannel(NotificationChannel(SUMMARY_CHANNEL, Lang.t("Сводка за день", "Daily summary"),
+            NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
         val legacy = manager.getNotificationChannel(outageChannel)
-        manager.createNotificationChannel(NotificationChannel(partialChannel,"Частичная доступность",
+        manager.createNotificationChannel(NotificationChannel(partialChannel,Lang.t("Частичная доступность", "Partially reachable"),
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        if (manager.getNotificationChannel(recoveryChannel) == null)
-            manager.createNotificationChannel(NotificationChannel(recoveryChannel,"Восстановление связи",
+        val recoveryName = Lang.t("Восстановление связи", "Connection restored")
+        val existingRecovery = manager.getNotificationChannel(recoveryChannel)
+        if (existingRecovery == null) {
+            manager.createNotificationChannel(NotificationChannel(recoveryChannel,recoveryName,
                 legacy.importance).apply { setSound(legacy.sound,legacy.audioAttributes); enableVibration(false) })
+        } else if (existingRecovery.name?.toString() != recoveryName) {
+            // Only the visible name follows the UI language; importance and sound stay the user's.
+            manager.createNotificationChannel(NotificationChannel(recoveryChannel,recoveryName,existingRecovery.importance))
+        }
     }
     fun clearRecovery() { manager.cancel(RECOVERY_ID) }
     fun clearOutage() { manager.cancel(OUTAGE_ID); manager.cancel(PARTIAL_ID) }
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
         if (blocked(recoveryChannel)) { clearRecovery(); return }
-        manager.notify(RECOVERY_ID, notification("Telegram снова доступен",
-            "Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
+        manager.notify(RECOVERY_ID, notification(Lang.t("Telegram снова доступен", "Telegram is back"),
+            Lang.t("Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", "The observed outage lasted ${recoveryDurationStr(event.durationMs)}"), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(PARTIAL_ID)
         if (blocked(outageChannel)) { manager.cancel(OUTAGE_ID); return }
-        manager.notify(OUTAGE_ID, notification("Telegram недоступен", reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
+        manager.notify(OUTAGE_ID, notification(Lang.t("Telegram недоступен", "Telegram is unreachable"), reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(OUTAGE_ID)
         if (blocked(partialChannel)) { manager.cancel(PARTIAL_ID); return }
-        manager.notify(PARTIAL_ID,notification("Telegram частично доступен",reason,sound && allowed,
+        manager.notify(PARTIAL_ID,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
+    }
+    fun summary(title: String, text: String) {
+        if (blocked(SUMMARY_CHANNEL)) { manager.cancel(SUMMARY_ID); return }
+        manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok, SUMMARY_CHANNEL))
     }
     private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {

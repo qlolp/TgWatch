@@ -91,50 +91,50 @@ class StatusWidget : AppWidgetProvider() {
                 !running -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_pause
-                    title = "Мониторинг выключен"
-                    subtitle = "Нажми, чтобы открыть"
+                    title = Lang.t("Мониторинг выключен", "Monitoring is off")
+                    subtitle = Lang.t("Нажми, чтобы открыть", "Tap to open")
                 }
                 s.status == MonitorService.Status.UNKNOWN -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_wait
-                    title = if (s.checkedAt > 0) "Нет свежего подтверждения" else "Проверяю…"
+                    title = if (s.checkedAt > 0) Lang.t("Нет свежего подтверждения", "No fresh confirmation") else Lang.t("Проверяю…", "Checking…")
                     subtitle = "Telegram"
                 }
                 stale -> {
                     bg = R.drawable.bg_widget_idle
                     icon = R.drawable.ic_stat_wait
                     title = when (s.status) {
-                        MonitorService.Status.OK -> "Был доступен"
-                        MonitorService.Status.TG_DOWN -> "Был недоступен"
-                        MonitorService.Status.PARTIAL -> "Был частично доступен"
-                        else -> "Не было интернета"
+                        MonitorService.Status.OK -> Lang.t("Был доступен", "Was reachable")
+                        MonitorService.Status.TG_DOWN -> Lang.t("Был недоступен", "Was unreachable")
+                        MonitorService.Status.PARTIAL -> Lang.t("Был частично доступен", "Was partially reachable")
+                        else -> Lang.t("Не было интернета", "Had no internet")
                     }
-                    subtitle = if (now < s.checkedAt) "Часы изменились · проверка ${timeStr(s.checkedAt)}"
-                        else "Проверено ${agoStr(s.checkedAt, now)} · нажми"
+                    subtitle = if (now < s.checkedAt) Lang.t("Часы изменились · проверка ${timeStr(s.checkedAt)}", "Clock changed · checked ${timeStr(s.checkedAt)}")
+                        else Lang.t("Проверено ${agoStr(s.checkedAt, now)} · нажми", "Checked ${agoStr(s.checkedAt, now)} · tap")
                 }
                 s.status == MonitorService.Status.PARTIAL -> {
                     bg = R.drawable.bg_widget_offline
                     icon = R.drawable.ic_stat_wait
-                    title = "Частично доступен"
-                    subtitle = "Нажми проверить"
+                    title = Lang.t("Частично доступен", "Partially reachable")
+                    subtitle = Lang.t("Нажми проверить", "Tap to check")
                 }
                 s.status == MonitorService.Status.OK -> {
                     bg = R.drawable.bg_widget_ok
                     icon = R.drawable.ic_stat_ok
-                    title = "Telegram доступен"
-                    subtitle = "${s.latencyMs} мс · нажми проверить"
+                    title = Lang.t("Telegram доступен", "Telegram is reachable")
+                    subtitle = Lang.t("${s.latencyMs} мс · нажми проверить", "${s.latencyMs} ms · tap to check")
                 }
                 s.status == MonitorService.Status.TG_DOWN -> {
                     bg = R.drawable.bg_widget_fail
                     icon = R.drawable.ic_stat_fail
-                    title = "Telegram недоступен"
-                    subtitle = "С ${timeStr(s.since)} · нажми"
+                    title = Lang.t("Telegram недоступен", "Telegram is unreachable")
+                    subtitle = Lang.t("С ${timeStr(s.since)} · нажми", "Since ${timeStr(s.since)} · tap")
                 }
                 else -> {
                     bg = R.drawable.bg_widget_offline
                     icon = R.drawable.ic_stat_offline
-                    title = "Нет интернета"
-                    subtitle = "С ${timeStr(s.since)} · нажми"
+                    title = Lang.t("Нет интернета", "No internet")
+                    subtitle = Lang.t("С ${timeStr(s.since)} · нажми", "Since ${timeStr(s.since)} · tap")
                 }
             }
 
@@ -146,6 +146,7 @@ class StatusWidget : AppWidgetProvider() {
             return RemoteViews(ctx.packageName, R.layout.widget_status).apply {
                 setInt(R.id.widgetRoot, "setBackgroundResource", bg)
                 setImageViewResource(R.id.widgetIcon, icon)
+                setContentDescription(R.id.widgetIcon, title)
                 setTextViewText(R.id.widgetTitle, title)
                 setTextViewText(R.id.widgetSubtitle, subtitle)
                 setTextViewText(R.id.widgetLastSuccess,

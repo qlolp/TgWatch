@@ -17,8 +17,8 @@ object ProbeRules {
     fun isReachableHttpCode(code: Int): Boolean = code in 100..499
 
     fun describeHttpFailure(code: Int): String = when (code) {
-        in 500..599 -> "сервер вернул ошибку HTTP $code"
-        else -> "некорректный ответ сервера (HTTP $code)"
+        in 500..599 -> Lang.t("сервер вернул ошибку HTTP $code", "server returned HTTP error $code")
+        else -> Lang.t("некорректный ответ сервера (HTTP $code)", "invalid server response (HTTP $code)")
     }
 
     /**

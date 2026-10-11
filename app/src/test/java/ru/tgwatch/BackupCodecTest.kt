@@ -15,7 +15,8 @@ class BackupCodecTest {
         "vibrate_recovery" to true, "notify_recovery" to true, "event_sound" to false,
         "vibration_pattern" to "LONG", "quiet_hours" to true,
         "quiet_start_hour" to 23, "quiet_end_hour" to 0,
-        "quiet_start_minute" to 1439, "quiet_end_minute" to 0),
+        "quiet_start_minute" to 1439, "quiet_end_minute" to 0,
+        "daily_summary" to true, "daily_summary_minute" to 1439),
         listOf(Observation(0, 600_000, "OK", Long.MAX_VALUE, Long.MAX_VALUE),
             Observation(Long.MAX_VALUE - 1, Long.MAX_VALUE, "UNKNOWN")),
         listOf("Проверка: связь восстановлена 🛰️", "line\nwith\t\"quotes\""))
@@ -48,7 +49,8 @@ class BackupCodecTest {
         val invalid = listOf("\"enabled\":false", "\"last_state\":\"OK\"", "\"keep_awake\":1", "\"quiet_hours\":\"true\"",
             "\"interval_sec\":9", "\"interval_sec\":121", "\"interval_sec\":30.0", "\"interval_sec\":\"30\"",
             "\"interval_sec\":4294967326", "\"power_profile\":\"other\"", "\"vibration_pattern\":\"other\"",
-            "\"quiet_start_hour\":24", "\"quiet_end_hour\":-1", "\"quiet_start_minute\":1440", "\"quiet_end_minute\":-1")
+            "\"quiet_start_hour\":24", "\"quiet_end_hour\":-1", "\"quiet_start_minute\":1440", "\"quiet_end_minute\":-1",
+            "\"daily_summary\":1", "\"daily_summary_minute\":1440", "\"daily_summary_minute\":-1")
         invalid.forEach { rejected { decode(base.replace("\"settings\":{}", "\"settings\":{$it}")) } }
         rejected { BackupCodec.encode(sample().copy(settings = mapOf("interval_sec" to 30L))) }
         rejected { BackupCodec.encode(sample().copy(settings = mapOf("enabled" to true))) }
@@ -96,14 +98,17 @@ class BackupCodecTest {
         rejected { decode(base.replace("\"log\":[]", "\"log\":[\"\\ud800\"]")) }
         rejected { BackupCodec.encode(snapshot.copy(log = listOf("\ud800"))) }
     }
-    @Test fun allTwentySettingsIncludingIndependentEventsRoundTripWithStrictTypes() {
+    @Test fun allTwentyTwoSettingsIncludingEventsAndDailySummaryRoundTripWithStrictTypes() {
         val snapshot = sample().copy(settings = sample().settings + mapOf("notify_outage" to true,
             "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false))
-        assertEquals(20, snapshot.settings.size)
+        assertEquals(22, snapshot.settings.size)
         assertEquals(snapshot, BackupCodec.decode(BackupCodec.encode(snapshot)))
-        for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery")) {
+        for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery",
+            "daily_summary")) {
             rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + (key to "true"))) }
             rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":1}")) }
         }
+        rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + ("daily_summary_minute" to 1440))) }
+        rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"daily_summary_minute\":true}")) }
     }
 }

@@ -31,7 +31,7 @@
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
-            android:text="Telegram"
+            android:text="@string/telegram"
             android:textColor="@color/on_status"
             android:textSize="15sp" />
 

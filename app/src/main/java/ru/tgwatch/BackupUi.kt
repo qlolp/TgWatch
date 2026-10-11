@@ -25,12 +25,12 @@ class BackupUi(private val activity: Activity) {
     fun export() = document(Intent.ACTION_CREATE_DOCUMENT, EXPORT, "application/octet-stream", "tgwatch.tgwb")
     fun restore() {
         if (BackupManager.hasPending(activity)) {
-            AlertDialog.Builder(activity).setTitle("Завершить восстановление?")
-                .setMessage("Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения.")
-                .setPositiveButton("Продолжить") { _, _ -> work("Восстановление…", {
+            AlertDialog.Builder(activity).setTitle(Lang.t("Завершить восстановление?", "Finish restoring?"))
+                .setMessage(Lang.t("Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения.", "The previous restore was interrupted. Monitoring stays off until it is finished."))
+                .setPositiveButton(Lang.t("Продолжить", "Continue")) { _, _ -> work(Lang.t("Восстановление…", "Restoring…"), {
                     BackupManager.recoverPending(activity.applicationContext)
-                }, { activity.recreate() }, "Не удалось завершить восстановление. Повторите попытку.") }
-                .setNegativeButton("Отмена", null).show().also { dialogs.add(it) }
+                }, { activity.recreate() }, Lang.t("Не удалось завершить восстановление. Повторите попытку.", "Couldn’t finish restoring. Please try again.")) }
+                .setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
             return
         }
         document(Intent.ACTION_OPEN_DOCUMENT, RESTORE, "*/*")
@@ -46,7 +46,7 @@ class BackupUi(private val activity: Activity) {
                 this.type = type
                 if (name != null) putExtra(Intent.EXTRA_TITLE, name)
             }, code)
-        } catch (_: Exception) { message("Не удалось открыть выбор файла") }
+        } catch (_: Exception) { message(Lang.t("Не удалось открыть выбор файла", "Couldn’t open the file picker")) }
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {
@@ -54,24 +54,24 @@ class BackupUi(private val activity: Activity) {
         if (result != Activity.RESULT_OK) return true
         val uri = data?.data ?: return true
         when (code) {
-            EXPORT -> password(true) { pass -> work("Создание копии…", {
+            EXPORT -> password(true) { pass -> work(Lang.t("Создание копии…", "Creating backup…"), {
                 try {
                     val archive = BackupManager.export(activity.applicationContext, pass)
                     activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(archive) }
                         ?: error("No output")
                 } finally { pass.fill('\u0000') }
-            }, { message("Зашифрованная копия сохранена. Для восстановления потребуется пароль.") },
-                "Не удалось сохранить копию") }
-            RESTORE -> password(false) { pass -> work("Проверка копии…", {
+            }, { message(Lang.t("Зашифрованная копия сохранена. Для восстановления потребуется пароль.", "Encrypted backup saved. You will need the password to restore it.")) },
+                Lang.t("Не удалось сохранить копию", "Couldn’t save the backup")) }
+            RESTORE -> password(false) { pass -> work(Lang.t("Проверка копии…", "Checking backup…"), {
                 try { BackupManager.decrypt(read(uri, BackupCrypto.MAX_ENVELOPE_BYTES), pass) }
                 finally { pass.fill('\u0000') }
-            }, { preview(it, "Восстановить копию?") }, "Неверный пароль или повреждённая копия") }
-            CSV -> work("Проверка CSV…", {
+            }, { preview(it, Lang.t("Восстановить копию?", "Restore this backup?")) }, Lang.t("Неверный пароль или повреждённая копия", "Wrong password or damaged backup")) }
+            CSV -> work(Lang.t("Проверка CSV…", "Checking CSV…"), {
                 val bytes = read(uri, BackupCodec.MAX_PLAINTEXT_BYTES)
                 val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
                 BackupSnapshot(System.currentTimeMillis(), emptyMap(), CsvImport.parse(text), emptyList())
-            }, { preview(it, "Импортировать CSV?", true) }, "CSV повреждён или имеет неподдерживаемый формат")
+            }, { preview(it, Lang.t("Импортировать CSV?", "Import CSV?"), true) }, Lang.t("CSV повреждён или имеет неподдерживаемый формат", "The CSV is damaged or in an unsupported format"))
         }
         return true
     }
@@ -93,11 +93,11 @@ class BackupUi(private val activity: Activity) {
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             layout.addView(this)
         }
-        val first = field(if (confirm) "Пароль: от 12 до 256 символов" else "Пароль этой копии")
-        val second = if (confirm) field("Повторите пароль") else null
-        val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) "Пароль копии" else "Открыть копию")
-            .setMessage(if (confirm) "Запомните пароль: восстановить его невозможно." else "Введите пароль этой копии.")
-            .setView(layout).setPositiveButton("Продолжить", null).setNegativeButton("Отмена", null).create()
+        val first = field(if (confirm) Lang.t("Пароль: от 12 до 256 символов", "Password: 12 to 256 characters") else Lang.t("Пароль этой копии", "Password for this backup"))
+        val second = if (confirm) field(Lang.t("Повторите пароль", "Repeat the password")) else null
+        val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) Lang.t("Пароль копии", "Backup password") else Lang.t("Открыть копию", "Open backup"))
+            .setMessage(if (confirm) Lang.t("Запомните пароль: восстановить его невозможно.", "Remember the password: it cannot be recovered.") else Lang.t("Введите пароль этой копии.", "Enter the password for this backup."))
+            .setView(layout).setPositiveButton(Lang.t("Продолжить", "Continue"), null).setNegativeButton(Lang.t("Отмена", "Cancel"), null).create()
         dialog.setOnDismissListener { first.text.clear(); second?.text?.clear() }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -106,7 +106,7 @@ class BackupUi(private val activity: Activity) {
                 val valid = pass.size in (if (confirm) 12..256 else 1..1024) &&
                     (repeated == null || pass.contentEquals(repeated))
                 repeated?.fill('\u0000')
-                if (!valid) { pass.fill('\u0000'); first.error = "Проверьте длину и совпадение паролей" }
+                if (!valid) { pass.fill('\u0000'); first.error = Lang.t("Проверьте длину и совпадение паролей", "Check the password length and that both entries match") }
                 else { dialog.dismiss(); action(pass) }
             }
         }
@@ -117,16 +117,16 @@ class BackupUi(private val activity: Activity) {
     private fun preview(snapshot: BackupSnapshot, title: String, csv: Boolean = false) {
         val date = DateFormat.getDateTimeInstance().format(Date(snapshot.createdAt))
         AlertDialog.Builder(activity).setTitle(title)
-            .setMessage("Дата: $date\nЗаписей истории: ${snapshot.observations.size}\n" +
-                (if (csv) "Настройки и журнал сохранятся. Текущая история будет заменена.\n\n" else
-                    "Записей журнала: ${snapshot.log.size}\n\nТекущие данные будут заменены. ") +
-                "Мониторинг будет остановлен; включите его вручную после восстановления.")
-            .setPositiveButton("Заменить данные") { _, _ -> work("Восстановление…", {
+            .setMessage(Lang.t("Дата: $date\nЗаписей истории: ${snapshot.observations.size}\n", "Date: $date\nHistory records: ${snapshot.observations.size}\n") +
+                (if (csv) Lang.t("Настройки и журнал сохранятся. Текущая история будет заменена.\n\n", "Settings and the log will be kept. The current history will be replaced.\n\n") else
+                    Lang.t("Записей журнала: ${snapshot.log.size}\n\nТекущие данные будут заменены. ", "Log records: ${snapshot.log.size}\n\nThe current data will be replaced. ")) +
+                Lang.t("Мониторинг будет остановлен; включите его вручную после восстановления.", "Monitoring will be stopped; turn it back on manually after restoring."))
+            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ -> work(Lang.t("Восстановление…", "Restoring…"), {
                 if (csv) BackupManager.importHistory(activity.applicationContext, snapshot.observations)
                 else BackupManager.restore(activity.applicationContext, snapshot)
-            }, { message("Данные восстановлены. Мониторинг выключен."); activity.recreate() },
-                "Восстановление прервано. Нажмите «Восстановить резервную копию» для повторной попытки.") }
-            .setNegativeButton("Отмена", null).show().also { dialogs.add(it) }
+            }, { message(Lang.t("Данные восстановлены. Мониторинг выключен.", "Data restored. Monitoring is off.")); activity.recreate() },
+                Lang.t("Восстановление прервано. Нажмите «Восстановить резервную копию» для повторной попытки.", "Restore interrupted. Tap “Restore backup” to try again.")) }
+            .setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
     }
 
     @Suppress("DEPRECATION")

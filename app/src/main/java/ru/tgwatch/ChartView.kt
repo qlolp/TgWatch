@@ -66,17 +66,17 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val m = minutes.firstOrNull { it.minute == minute }
         val whenText = (if (windowMinutes > 60) SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()) else timeFmt).format(Date(minute * 60_000L))
         val msg = if (m == null || m.total == 0) {
-            "$whenText — проверок не было"
+            Lang.t("$whenText — проверок не было", "$whenText — no checks")
         } else {
             buildString {
                 append(whenText)
                 append(": ")
                 append("${m.ok} ok")
-                if (m.fail > 0) append(", ${m.fail} без Telegram")
-                if (m.offline > 0) append(", ${m.offline} без сети")
-                if (m.partial > 0) append(", ${m.partial} частично")
-                if (m.unknown > 0) append(", ${m.unknown} не определено")
-                if (m.avgLatency >= 0) append(", ср. ${m.avgLatency} мс")
+                if (m.fail > 0) append(Lang.t(", ${m.fail} без Telegram", ", ${m.fail} Telegram unreachable"))
+                if (m.offline > 0) append(Lang.t(", ${m.offline} без сети", ", ${m.offline} no internet"))
+                if (m.partial > 0) append(Lang.t(", ${m.partial} частично", ", ${m.partial} partial"))
+                if (m.unknown > 0) append(Lang.t(", ${m.unknown} не определено", ", ${m.unknown} unknown"))
+                if (m.avgLatency >= 0) append(Lang.t(", ср. ${m.avgLatency} мс", ", avg ${m.avgLatency} ms"))
             }
         }
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -147,12 +147,12 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         }
 
         textPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText("${scale.toLong()} мс", 0f, top - 4f * dp, textPaint)
-        canvas.drawText(if (windowMinutes > 60) "7 дней назад" else "60 мин назад", 0f, height - 2f * dp, textPaint)
+        canvas.drawText(Lang.t("${scale.toLong()} мс", "${scale.toLong()} ms"), 0f, top - 4f * dp, textPaint)
+        canvas.drawText(if (windowMinutes > 60) Lang.t("7 дней назад", "7 days ago") else Lang.t("60 мин назад", "60 min ago"), 0f, height - 2f * dp, textPaint)
         textPaint.textAlign = Paint.Align.RIGHT
         val avg = History.Minute.merge(0L, minutes).avgLatency
         canvas.drawText(
-            if (avg >= 0) "сейчас · ср. $avg мс" else "сейчас",
+            if (avg >= 0) Lang.t("сейчас · ср. $avg мс", "now · avg $avg ms") else Lang.t("сейчас", "now"),
             w, height - 2f * dp, textPaint
         )
     }
@@ -162,8 +162,8 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         val fail = minutes.sumOf { it.fail }
         val offline = minutes.sumOf { it.offline }
         val avg = History.Minute.merge(0L, minutes).avgLatency
-        return "За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline." +
-            (if (avg >= 0) " Среднее время ответа: $avg мс." else "") + " Нажми столбик, чтобы увидеть детали."
+        return Lang.t("За выбранный период: успешных проверок $ok, Telegram недоступен $fail, нет интернета $offline.", "Selected period: $ok successful checks, $fail with Telegram unreachable, $offline with no internet.") +
+            (if (avg >= 0) Lang.t(" Среднее время ответа: $avg мс.", " Average response time: $avg ms.") else "") + Lang.t(" Нажми столбик, чтобы увидеть детали.", " Tap a bar to see details.")
     }
 }
 

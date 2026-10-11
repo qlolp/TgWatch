@@ -1,4 +1,4 @@
-# Разработка TgWatch 1.11
+# Разработка TgWatch 1.12
 
 Перед изменением поведения прочитайте [README](README.md), [архитектуру](docs/superpowers/architecture.md)
 и [unified 1.11 spec](docs/superpowers/specs/2026-10-10-unified-1.11-design.md). Приложение
@@ -19,7 +19,7 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-Локальная 1.11 имеет versionCode 12; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
+Локальная 1.12 имеет versionCode 13; CI проверяет `GITHUB_RUN_NUMBER + 100` без overflow или
 silent fallback. `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
 `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.
@@ -56,7 +56,19 @@ OEM background restrictions и живой Telegram ответ требуют о�
 - `BackupSnapshot`/`BackupCodec` — local typed snapshot и strict JSON private journal; `PortableBackupCodec` пишет TGWB v2 и читает опубликованный binary TGWB v1 и локальный TGWBKUP1. Format versions portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
 - `BackupManager`/`RestoreTransaction`/`TgWatchApplication` — validation before changes, stop-and-await monitoring, durable journal и replay до компонентов. Оба старых private journals мигрируют. Cache меняется после durable write; monitoring после restore/import остаётся остановленным, transient status/last OK не переносятся.
 - `Prefs`/`QuietHours`/`EventPreferences` — minute boundaries с legacy hour fallback и independent outage/PARTIAL/recovery notify/sound. Отсутствующие legacy flags имеют прежний fallback; PARTIAL остаётся opt-in. `LastSuccessStore` сохраняет только published OK; Android channel overrides принадлежат устройству.
-- `MonitorService`/`CheckSchedule`/`OfflineBackoff` — existing native lifecycle/scheduling; `EventNotifications`/`StatusWidget`/`MainActivity`/`BackupUi` — Android adapters/UI. Full Telegram RPC, NTP, coroutine rewrite и English localization не реализованы.
+- `MonitorService`/`CheckSchedule`/`OfflineBackoff` — existing native lifecycle/scheduling; `EventNotifications`/`StatusWidget`/`MainActivity`/`BackupUi` — Android adapters/UI. Full Telegram RPC, NTP и coroutine rewrite не реализованы.
+
+### Язык интерфейса
+
+Интерфейс следует языку системы: по умолчанию английский, для русской локали — русский.
+Тексты разметки, манифеста и виджета берутся из строковых ресурсов: английские в
+`res/values/strings.xml`, русские в `res/values-ru/strings.xml`. Текст, который собирается
+в коде (уведомления, виджет, плитка, журнал, сводки, диалоги), пишется как `Lang.t(ru, en)`;
+`Lang.ru` выставляется из ресурса `R.string.lang` в `TgWatchApplication` и `MainActivity`,
+поэтому код и ресурсы всегда выбирают один язык. JVM-тесты по умолчанию проверяют русский
+текст, английский — в `LangTest`; инструментальные тесты сравнивают с `Lang.t(...)` или
+ресурсом, потому что эмуляторы CI работают в en-US. Любую новую строку добавляйте сразу
+на обоих языках: имена строк в `values/` и `values-ru/` должны совпадать.
 
 UNKNOWN не доказывает отсутствие интернета или блокировку; VPN не доказывает работоспособность
 туннеля. Append sync выполняется при смене статуса и на следующей записи после 60 с с прошлого
