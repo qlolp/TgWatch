@@ -1,9 +1,12 @@
 package ru.tgwatch
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Insets
 import android.os.Build
 import android.os.LocaleList
+import android.os.ParcelFileDescriptor
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,12 +14,13 @@ import android.view.WindowInsets
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.annotation.RequiresApi
+import androidx.test.filters.SdkSuppress
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
@@ -24,6 +28,15 @@ import java.util.Locale
 @RunWith(AndroidJUnit4::class)
 class UiAccessibilityTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Before fun allowNotificationsForActivityScenarios() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")
+        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        assertEquals("Activity fixtures require notification permission", PackageManager.PERMISSION_GRANTED,
+            ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS))
+    }
 
     @Test fun chartDescribesPartialUnknownAndEmptyPeriods() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -101,6 +114,7 @@ class UiAccessibilityTest {
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
         try {
+            stopMonitoringForScenario(ctx)
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
                     val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
@@ -144,7 +158,7 @@ class UiAccessibilityTest {
 }
 
 /** Keep API 33 types out of JUnit's reflection over the test class on older devices. */
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.TIRAMISU)
 private object Api33LocaleChecks {
     fun verify(ctx: android.content.Context) {
         val manager = ctx.getSystemService(android.app.LocaleManager::class.java)
@@ -152,6 +166,7 @@ private object Api33LocaleChecks {
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
         try {
+            stopMonitoringForScenario(ctx)
             for ((locale, title) in listOf("en" to "Monitoring is off", "ru" to "Мониторинг выключен")) {
                 InstrumentationRegistry.getInstrumentation().runOnMainSync {
                     manager.applicationLocales = LocaleList.forLanguageTags(locale)
@@ -171,4 +186,11 @@ private object Api33LocaleChecks {
             Lang.update(ctx)
         }
     }
+}
+
+/** Disabling the preference alone does not tear down an already running foreground service. */
+private fun stopMonitoringForScenario(ctx: android.content.Context) {
+    MonitorService.stopAndAwait(ctx)
+    assertFalse("Activity fixtures must disable monitoring", Prefs.isEnabled(ctx))
+    assertFalse("Activity fixtures must finish monitor teardown", MonitorService.running)
 }
