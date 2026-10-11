@@ -14,13 +14,16 @@ object BackupCodec {
     private val rowKeys = setOf("at", "until", "kind", "latencyMs", "clockEpoch")
     private val booleanKeys = setOf("keep_awake", "vibrate", "vibrate_partial", "vibrate_offline",
         "vibrate_recovery", "notify_recovery", "event_sound", "quiet_hours", "notify_outage",
-        "notify_partial", "sound_outage", "sound_partial", "sound_recovery", "daily_summary")
+        "notify_partial", "sound_outage", "sound_partial", "sound_recovery", "daily_summary",
+        "webhook_enabled", "extra_matrix", "extra_whatsapp", "extra_custom")
     private val integerRanges = mapOf("interval_sec" to 10..120, "quiet_start_hour" to 0..23,
         "quiet_end_hour" to 0..23, "quiet_start_minute" to 0..1439, "quiet_end_minute" to 0..1439,
         "daily_summary_minute" to 0..1439)
+    private val stringKeys = setOf("webhook_url", "custom_probe_url")
     private val profiles = setOf("ECONOMY", "BALANCED", "FREQUENT", "CUSTOM")
     private val patterns = setOf("STANDARD", "SHORT", "LONG")
-    private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size, booleanKeys.size + integerRanges.size + 2)
+    private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size,
+        booleanKeys.size + integerRanges.size + stringKeys.size + 2)
 
     fun encode(snapshot: BackupSnapshot): ByteArray = checked {
         validate(snapshot)
@@ -92,6 +95,7 @@ object BackupCodec {
                 key in integerRanges -> require(value is Int && value in integerRanges.getValue(key))
                 key == "power_profile" -> require(value is String && value in profiles)
                 key == "vibration_pattern" -> require(value is String && value in patterns)
+                key in stringKeys -> require(value is String && value.length <= 256)
                 else -> invalid()
             }
         }

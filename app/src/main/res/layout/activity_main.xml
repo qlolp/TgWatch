@@ -448,6 +448,76 @@
                 android:text="@string/daily_summary_hint"
                 android:textSize="12sp" />
 
+            <TextView
+                style="@style/CardTitle"
+                android:layout_marginTop="16dp"
+                android:text="@string/extra_services_title" />
+            <Switch
+                android:id="@+id/swExtraMatrix"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/extra_matrix"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+            <Switch
+                android:id="@+id/swExtraWhatsapp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/extra_whatsapp"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+            <Switch
+                android:id="@+id/swExtraCustom"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/extra_custom"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+            <EditText
+                android:id="@+id/etCustomUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/custom_url_hint"
+                android:inputType="textUri"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_marginTop="16dp"
+                android:text="@string/webhook_title" />
+            <Switch
+                android:id="@+id/swWebhook"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/webhook_enable"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+            <EditText
+                android:id="@+id/etWebhookUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/webhook_url_hint"
+                android:inputType="textUri"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+            <TextView
+                android:id="@+id/tvDozeMissed"
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:textSize="12sp" />
+            <Button
+                android:id="@+id/btnAutomationHelp"
+                style="@style/ButtonText"
+                android:text="@string/automation_help" />
+
+
             <Switch
                 android:id="@+id/swQuietHours"
                 android:layout_width="match_parent"

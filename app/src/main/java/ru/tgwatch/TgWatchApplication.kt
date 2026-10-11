@@ -9,6 +9,7 @@ class TgWatchApplication : Application() {
         super.onCreate()
         // Text built in code (notifications, widget, tile) follows the resource locale.
         Lang.update(this)
+        MtProtoEndpoints.loadFromAssets(this)
         try { BackupManager.recoverPending(this) }
         catch (_: Exception) {
             // Preserve the durable journal for another replay; no monitoring until completion.

@@ -6,6 +6,8 @@ import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jlleitschuh.gradle.ktlint")
 }
 
 val releaseStore = providers.environmentVariable("TGWATCH_KEYSTORE_PATH").orNull
@@ -26,9 +28,9 @@ android {
     defaultConfig {
         applicationId = "ru.tgwatch"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = ciVersionCode ?: 13
-        versionName = "1.12"
+        versionName = "1.13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -53,18 +55,36 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose = true }
     testOptions { unitTests.isReturnDefaultValues = true }
     lint {
         abortOnError = true
-        // Existing native Russian UI intentionally targets API 34 and has inline copy.
-        disable += setOf("OldTargetApi", "GradleDependency", "HardcodedText")
+        disable += setOf("GradleDependency", "HardcodedText")
     }
 }
+
+ktlint {
+    android.set(true)
+    ignoreFailures.set(true)
+    filter {
+        exclude("**/build/**")
+    }
+}
+
 dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
+    implementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
 }
 
 // Resolve all audit scopes once. The runtime artifact inventory and OSV graph

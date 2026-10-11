@@ -20,6 +20,14 @@
     <!-- Автозапуск после перезагрузки телефона -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Tasker / Termux / Shortcuts automation (install-time normal permission) -->
+    <permission
+        android:name="ru.tgwatch.permission.AUTOMATION"
+        android:protectionLevel="normal"
+        android:label="@string/automation_permission_label"
+        android:description="@string/automation_permission_description" />
+    <uses-permission android:name="ru.tgwatch.permission.AUTOMATION" />
+
     <application
         android:name=".TgWatchApplication"
         android:allowBackup="false"
@@ -85,6 +93,36 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_status_info" />
         </receiver>
+
+        <receiver
+            android:name=".StatusGlanceWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_glance_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_glance_info" />
+        </receiver>
+
+        <receiver
+            android:name=".AutomationReceiver"
+            android:exported="true"
+            android:permission="ru.tgwatch.permission.AUTOMATION">
+            <intent-filter>
+                <action android:name="ru.tgwatch.action.EXTERNAL_CHECK_NOW" />
+                <action android:name="ru.tgwatch.action.EXTERNAL_START" />
+                <action android:name="ru.tgwatch.action.EXTERNAL_STOP" />
+                <action android:name="ru.tgwatch.action.EXTERNAL_QUERY" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name=".StatusProvider"
+            android:authorities="ru.tgwatch.status"
+            android:exported="true"
+            android:permission="ru.tgwatch.permission.AUTOMATION" />
 
         <receiver
             android:name=".BootReceiver"

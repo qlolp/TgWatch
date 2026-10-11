@@ -1,0 +1,4 @@
+TG Monitor watches whether Telegram is reachable from your device.
+
+No Telegram login. Optional Tasker automation, Glance widget, and ntfy webhooks.
+Privacy first: history stays on-device; webhooks are off by default.

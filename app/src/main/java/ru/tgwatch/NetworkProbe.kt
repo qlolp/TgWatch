@@ -1,5 +1,6 @@
 package ru.tgwatch
 
+import android.content.Context
 import java.io.Closeable
 import java.net.HttpURLConnection
 import java.net.URL
@@ -143,21 +144,15 @@ class NetworkProbe(
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
     private val openSocket: () -> java.net.Socket = { java.net.Socket() },
 ) {
-    fun check(): ProbeReport {
-        val telegram = listOf(
-            ProbeEndpoint("api.telegram.org", ProbeGroup.WEB, "https://api.telegram.org/"),
-            ProbeEndpoint("web.telegram.org", ProbeGroup.WEB, "https://web.telegram.org/"),
-            ProbeEndpoint("core.telegram.org", ProbeGroup.WEB, "https://core.telegram.org/"),
-        ) + MtProtoEndpoints.all
-        val results = ProbeBatch(pool).run(telegram, ::probe).toMutableList()
+    fun check(ctx: Context? = null): ProbeReport {
+        val results = ProbeBatch(pool).run(ProbeCatalog.telegramEndpoints(), ::probe).toMutableList()
         // Controls are unnecessary when Telegram itself proves internet connectivity.
         if (results.none { it.reachable }) {
-            val controls = listOf(
-                ProbeEndpoint(Lang.t("Яндекс", "Yandex"), ProbeGroup.CONTROL, "https://ya.ru/"),
-                ProbeEndpoint("Mail.ru", ProbeGroup.CONTROL, "https://mail.ru/"),
-                ProbeEndpoint("Google 204", ProbeGroup.CONTROL, "https://www.gstatic.com/generate_204"),
-            )
-            results += ProbeBatch(pool).run(controls, ::probe)
+            results += ProbeBatch(pool).run(ProbeCatalog.controlEndpoints(), ::probe)
+        }
+        val extras = ctx?.let { ProbeCatalog.extraEndpoints(it) }.orEmpty()
+        if (extras.isNotEmpty()) {
+            results += ProbeBatch(pool).run(extras, ::probe)
         }
         return ProbeReport(results)
     }

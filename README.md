@@ -1,10 +1,12 @@
-# TG Монитор 1.12
+# TG Монитор 1.13
 
 [![Build APK](https://github.com/qlolp/TgWatch/actions/workflows/build-apk.yml/badge.svg?branch=main)](https://github.com/qlolp/TgWatch/actions/workflows/build-apk.yml)
 [![Release](https://img.shields.io/github/v/release/qlolp/TgWatch)](https://github.com/qlolp/TgWatch/releases/latest)
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Android-приложение для локального наблюдения за доступностью Telegram. Android 8.0+.
+
+1.13 adds Tasker automation, optional extra probes/webhooks, Glance widget and Doze miss stats. See [`docs/releases/1.13.md`](docs/releases/1.13.md) and [`docs/automation.md`](docs/automation.md).
 Аккаунт Telegram, номер телефона и доступ к переписке не нужны. Приложение не отправляет сообщения.
 
 ## Что показывает

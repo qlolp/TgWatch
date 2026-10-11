@@ -499,7 +499,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_version_code_is_validated_instead_of_falling_back(self):
         text = (ROOT / "app/build.gradle.kts").read_text()
-        self.assertIn('versionName = "1.12"', text)
+        self.assertIn('versionName = "1.13"', text)
         self.assertIn("?: 13", text)
         self.assertNotIn("toIntOrNull()?.plus(100)", text)
         self.assertIn("2147483547", text)

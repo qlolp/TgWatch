@@ -1,0 +1,11 @@
+{
+  "source": "telegramdesktop/tdesktop mtproto_dc_options.cpp",
+  "reviewed": "2026-10-10",
+  "tcp": [
+    {"name": "MTProto DC1", "ip": "149.154.175.50"},
+    {"name": "MTProto DC2", "ip": "149.154.167.51"},
+    {"name": "MTProto DC3", "ip": "149.154.175.100"},
+    {"name": "MTProto DC4", "ip": "149.154.167.91"},
+    {"name": "MTProto DC5", "ip": "149.154.171.5"}
+  ]
+}

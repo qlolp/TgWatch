@@ -20,6 +20,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.RadioGroup
 import android.widget.Switch
@@ -305,6 +306,35 @@ class MainActivity : Activity() {
                 Toast.makeText(this, Lang.t("За последние сутки ещё нет проверок", "No checks in the last 24 hours yet"), Toast.LENGTH_SHORT).show()
         }
 
+        bindExtraService(R.id.swExtraMatrix, ExtraService.MATRIX)
+        bindExtraService(R.id.swExtraWhatsapp, ExtraService.WHATSAPP)
+        bindExtraService(R.id.swExtraCustom, ExtraService.CUSTOM)
+        val etCustom = findViewById<EditText>(R.id.etCustomUrl)
+        etCustom.setText(Prefs.customProbeUrl(this))
+        etCustom.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) Prefs.setCustomProbeUrl(this, etCustom.text?.toString().orEmpty())
+        }
+        val swWebhook = findViewById<Switch>(R.id.swWebhook)
+        swWebhook.isChecked = Prefs.webhookEnabled(this)
+        swWebhook.setOnCheckedChangeListener { _, checked -> Prefs.setWebhookEnabled(this, checked) }
+        val etWebhook = findViewById<EditText>(R.id.etWebhookUrl)
+        etWebhook.setText(Prefs.webhookUrl(this))
+        etWebhook.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) Prefs.setWebhookUrl(this, etWebhook.text?.toString().orEmpty())
+        }
+        findViewById<Button>(R.id.btnAutomationHelp).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.automation_help)
+                .setMessage(
+                    Lang.t(
+                        "Tasker/Termux: broadcast ru.tgwatch.action.EXTERNAL_CHECK_NOW|START|STOP|QUERY с permission ru.tgwatch.permission.AUTOMATION.\nСтатус: content://ru.tgwatch.status/current\nСобытие: ru.tgwatch.action.STATE_CHANGED с extras status, latency_ms, uptime_percent, doze_missed.",
+                        "Tasker/Termux: broadcast ru.tgwatch.action.EXTERNAL_CHECK_NOW|START|STOP|QUERY with permission ru.tgwatch.permission.AUTOMATION.\nStatus: content://ru.tgwatch.status/current\nEvent: ru.tgwatch.action.STATE_CHANGED with extras status, latency_ms, uptime_percent, doze_missed.",
+                    ),
+                )
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        }
+
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
         updateQuietHoursLabel()
@@ -339,6 +369,13 @@ class MainActivity : Activity() {
         advancedSettings.visibility = if (advancedExpanded) View.VISIBLE else View.GONE
         btnAdvanced.text = getString(if (advancedExpanded) R.string.advanced_hide else R.string.advanced_show)
     }
+
+    private fun bindExtraService(id: Int, service: ExtraService) {
+        val sw = findViewById<Switch>(id)
+        sw.isChecked = Prefs.extraServiceEnabled(this, service)
+        sw.setOnCheckedChangeListener { _, checked -> Prefs.setExtraServiceEnabled(this, service, checked) }
+    }
+
     private fun updateAlarmPatternLabel() { btnAlarmPattern.text = Lang.t("Сигнал вибрации: ${Prefs.alarmPattern(this).title}", "Vibration pattern: ${Prefs.alarmPattern(this).title}") }
 
     override fun onResume() {
@@ -582,8 +619,10 @@ class MainActivity : Activity() {
         }
         if (tvDiagnostics.visibility == View.VISIBLE) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { Lang.t("Диагностика появится после первой проверки.", "Diagnostics will appear after the first check.") } +
-                Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.")
+                Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.") +
+                "\n" + DozeStats.describe(this)
         }
+        findViewById<TextView>(R.id.tvDozeMissed)?.text = DozeStats.describe(this)
         val log = EventLog.all(this)
         if (log !== shownLog) {
             shownLog = log

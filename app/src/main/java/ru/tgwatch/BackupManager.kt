@@ -13,7 +13,9 @@ object BackupManager {
         "vibrate_partial", "vibrate_offline", "vibrate_recovery", "notify_recovery", "event_sound",
         "vibration_pattern", "quiet_hours", "quiet_start_hour", "quiet_end_hour",
         "quiet_start_minute", "quiet_end_minute", "notify_outage", "notify_partial",
-        "sound_outage", "sound_partial", "sound_recovery", "daily_summary", "daily_summary_minute")
+        "sound_outage", "sound_partial", "sound_recovery", "daily_summary", "daily_summary_minute",
+        "webhook_enabled", "webhook_url", "extra_matrix", "extra_whatsapp", "extra_custom",
+        "custom_probe_url")
     private val transientKeys = setOf("last_status", "last_checked", "last_since", "last_latency",
         "last_reason", "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at")
 
@@ -38,7 +40,12 @@ object BackupManager {
         "notify_outage" to Prefs.notifyFor(ctx, "TG_DOWN"), "notify_partial" to Prefs.notifyFor(ctx, "PARTIAL"),
         "sound_outage" to Prefs.soundFor(ctx, "TG_DOWN"), "sound_partial" to Prefs.soundFor(ctx, "PARTIAL"),
         "sound_recovery" to Prefs.soundFor(ctx, "RECOVERY"),
-        "daily_summary" to Prefs.dailySummary(ctx), "daily_summary_minute" to Prefs.dailySummaryMinute(ctx)),
+        "daily_summary" to Prefs.dailySummary(ctx), "daily_summary_minute" to Prefs.dailySummaryMinute(ctx),
+        "webhook_enabled" to Prefs.webhookEnabled(ctx), "webhook_url" to Prefs.webhookUrl(ctx),
+        "extra_matrix" to Prefs.extraServiceEnabled(ctx, ExtraService.MATRIX),
+        "extra_whatsapp" to Prefs.extraServiceEnabled(ctx, ExtraService.WHATSAPP),
+        "extra_custom" to Prefs.extraServiceEnabled(ctx, ExtraService.CUSTOM),
+        "custom_probe_url" to Prefs.customProbeUrl(ctx)),
         History.snapshot(ctx), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {

@@ -31,6 +31,12 @@ object Prefs {
     private const val KEY_QUIET_END_MINUTE = "quiet_end_minute"
     private const val KEY_DAILY_SUMMARY = "daily_summary"
     private const val KEY_DAILY_SUMMARY_MINUTE = "daily_summary_minute"
+    private const val KEY_WEBHOOK = "webhook_enabled"
+    private const val KEY_WEBHOOK_URL = "webhook_url"
+    private const val KEY_EXTRA_MATRIX = "extra_matrix"
+    private const val KEY_EXTRA_WHATSAPP = "extra_whatsapp"
+    private const val KEY_EXTRA_CUSTOM = "extra_custom"
+    private const val KEY_CUSTOM_PROBE_URL = "custom_probe_url"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -180,6 +186,34 @@ object Prefs {
     fun setDailySummaryMinute(ctx: Context, minute: Int) {
         sp(ctx).edit().putInt(KEY_DAILY_SUMMARY_MINUTE, minute.coerceIn(0, 1439)).apply()
         DailySummaryReceiver.schedule(ctx)
+    }
+
+    /** Opt-in HTTPS webhook (ntfy topic URL). Off by default. */
+    fun webhookEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_WEBHOOK, false)
+    fun setWebhookEnabled(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_WEBHOOK, value).apply()
+    }
+    fun webhookUrl(ctx: Context): String = sp(ctx).getString(KEY_WEBHOOK_URL, "") ?: ""
+    fun setWebhookUrl(ctx: Context, value: String) {
+        sp(ctx).edit().putString(KEY_WEBHOOK_URL, value.trim().take(256)).apply()
+    }
+
+    fun extraServiceEnabled(ctx: Context, service: ExtraService): Boolean = when (service) {
+        ExtraService.MATRIX -> sp(ctx).getBoolean(KEY_EXTRA_MATRIX, false)
+        ExtraService.WHATSAPP -> sp(ctx).getBoolean(KEY_EXTRA_WHATSAPP, false)
+        ExtraService.CUSTOM -> sp(ctx).getBoolean(KEY_EXTRA_CUSTOM, false)
+    }
+    fun setExtraServiceEnabled(ctx: Context, service: ExtraService, value: Boolean) {
+        val key = when (service) {
+            ExtraService.MATRIX -> KEY_EXTRA_MATRIX
+            ExtraService.WHATSAPP -> KEY_EXTRA_WHATSAPP
+            ExtraService.CUSTOM -> KEY_EXTRA_CUSTOM
+        }
+        sp(ctx).edit().putBoolean(key, value).apply()
+    }
+    fun customProbeUrl(ctx: Context): String = sp(ctx).getString(KEY_CUSTOM_PROBE_URL, "") ?: ""
+    fun setCustomProbeUrl(ctx: Context, value: String) {
+        sp(ctx).edit().putString(KEY_CUSTOM_PROBE_URL, value.trim().take(256)).apply()
     }
 
     /** Не вибрировать ночью. */

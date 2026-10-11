@@ -71,4 +71,18 @@
     <string name="log_title">Журнал</string>
     <string name="share">Поделиться</string>
     <string name="clear">Очистить</string>
+    <string name="automation_permission_label">Автоматизация TG Монитор</string>
+    <string name="automation_permission_description">Разрешить приложениям вроде Tasker запускать, останавливать или запрашивать TG Монитор.</string>
+    <string name="widget_glance_label">Статус Telegram (Glance)</string>
+    <string name="widget_glance_description">Декларативный виджет статуса Telegram.</string>
+    <string name="extra_services_title">Дополнительные сервисы</string>
+    <string name="extra_matrix">Также проверять Matrix (matrix.org)</string>
+    <string name="extra_whatsapp">Также проверять WhatsApp Web</string>
+    <string name="extra_custom">Также проверять свой HTTPS URL</string>
+    <string name="custom_url_hint">Свой HTTPS URL</string>
+    <string name="webhook_title">Вебхук-алерты</string>
+    <string name="webhook_enable">Отправлять смены статуса на вебхук (ntfy)</string>
+    <string name="webhook_url_hint">https://ntfy.sh/your-topic</string>
+    <string name="doze_missed_label">Пропущено во сне</string>
+    <string name="automation_help">Автоматизация (Tasker)</string>
 </resources>

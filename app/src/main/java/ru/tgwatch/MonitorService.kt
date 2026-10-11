@@ -142,6 +142,23 @@ class MonitorService : Service() {
             if (state.checkedAt > 0L) return
             Prefs.loadLastState(ctx)?.let { state = it }
         }
+
+        /** Explicit automation broadcast with status extras (requires AUTOMATION permission). */
+        fun stateIntent(ctx: Context): Intent {
+            restorePersistedState(ctx)
+            val s = state
+            val now = System.currentTimeMillis()
+            return Intent(ACTION_STATE_CHANGED)
+                .putExtra("running", running)
+                .putExtra("status", s.status.name)
+                .putExtra("checked_at", s.checkedAt)
+                .putExtra("since", s.since)
+                .putExtra("latency_ms", s.latencyMs)
+                .putExtra("reason", s.reason)
+                .putExtra("uptime_percent", History.uptimePercent(ctx))
+                .putExtra("stale", s.isStale(now, Prefs.intervalSec(ctx), Prefs.keepAwake(ctx)))
+                .putExtra("doze_missed", DozeStats.missedChecks(ctx))
+        }
     }
 
     private lateinit var workerThread: HandlerThread
@@ -181,6 +198,7 @@ class MonitorService : Service() {
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
         } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
+            DozeStats.noteOverdue(this, !pm.isInteractive)
             scheduleCheck(0L)
         }
     }
@@ -311,6 +329,7 @@ class MonitorService : Service() {
     private fun enqueueCheck(delayMs: Long) {
         if (destroyed) return
         worker.removeCallbacks(checkRunnable)
+        DozeStats.noteScheduled(this, SystemClock.elapsedRealtime() + delayMs.coerceAtLeast(0L))
         worker.postDelayed(checkRunnable, delayMs)
         // Обычный таймер замирает, когда телефон засыпает с выключенным экраном.
         // Поэтому дублируем его системным будильником, который будит процессор.
@@ -399,7 +418,7 @@ class MonitorService : Service() {
         }
         val report = NetworkProbe(probeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
-            { selected.socketFactory.createSocket() }).check()
+            { selected.socketFactory.createSocket() }).check(this)
         val details = Lang.t("Сеть: $transport\nПроверка: ${timeStr(System.currentTimeMillis())}\n", "Network: $transport\nCheck: ${timeStr(System.currentTimeMillis())}\n") +
             report.results.joinToString("\n") { r ->
                 "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
@@ -497,6 +516,7 @@ class MonitorService : Service() {
                     Status.UNKNOWN -> Lang.t("Статус неизвестен", "Status unknown")
                 }
             )
+            WebhookNotifier.maybeNotify(this, p.status, p.reason, p.latencyMs)
         }
         postNotification(newState)
         broadcastState()
@@ -504,8 +524,10 @@ class MonitorService : Service() {
 
     private fun broadcastState() {
         StatusWidget.updateAll(this)
+        StatusGlanceWidget.updateAll(this)
         try {
             sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
+            sendBroadcast(stateIntent(this), AutomationReceiver.PERMISSION)
         } catch (e: Exception) {
             Log.w(TAG, "broadcastState", e)
         }
@@ -640,6 +662,10 @@ class MonitorService : Service() {
                     Icon.createWithResource(this, R.drawable.ic_stat_pause), Lang.t("Остановить", "Stop"), stop
                 ).build()
             )
+        if (uptime >= 0) {
+            // Deterministic “available X of 24h” bar for the last day (not indeterminate spinner).
+            builder.setProgress(100, uptime.coerceIn(0.0, 100.0).toInt(), false)
+        }
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }

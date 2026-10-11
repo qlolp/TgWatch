@@ -91,8 +91,10 @@ object History {
         // Bound inferred coverage to one expected interval plus the bounded network-check budget.
         val end = now + (expectedSec.coerceIn(10, 300) * 1000L + 15_000L)
         val status = when (kind) { Kind.FAIL -> "TG_DOWN"; Kind.OFFLINE -> "NO_NETWORK"; else -> kind.name }
-        samples.add(Observation(now, end, status, latencyMs, samples.maxOfOrNull { it.clockEpoch } ?: 0))
+        val row = Observation(now, end, status, latencyMs, samples.maxOfOrNull { it.clockEpoch } ?: 0)
+        samples.add(row)
         version++
+        HistoryDb.get(ctx).upsert(row)
         try {
             if (now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
                 HistoryStorage.write(file(ctx), samples)

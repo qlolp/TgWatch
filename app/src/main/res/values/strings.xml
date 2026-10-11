@@ -71,4 +71,18 @@
     <string name="log_title">Event log</string>
     <string name="share">Share</string>
     <string name="clear">Clear</string>
+    <string name="automation_permission_label">TG Monitor automation</string>
+    <string name="automation_permission_description">Allow apps such as Tasker to start, stop or query TG Monitor.</string>
+    <string name="widget_glance_label">Telegram status (Glance)</string>
+    <string name="widget_glance_description">Declarative Telegram status widget.</string>
+    <string name="extra_services_title">Extra services</string>
+    <string name="extra_matrix">Also probe Matrix (matrix.org)</string>
+    <string name="extra_whatsapp">Also probe WhatsApp Web</string>
+    <string name="extra_custom">Also probe a custom HTTPS URL</string>
+    <string name="custom_url_hint">Custom HTTPS URL</string>
+    <string name="webhook_title">Webhook alerts</string>
+    <string name="webhook_enable">Send status changes to a webhook (ntfy)</string>
+    <string name="webhook_url_hint">https://ntfy.sh/your-topic</string>
+    <string name="doze_missed_label">Missed while asleep</string>
+    <string name="automation_help">Automation (Tasker)</string>
 </resources>

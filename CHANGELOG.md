@@ -1,5 +1,14 @@
 # История изменений
 
+## 1.13 — автоматизация, доп. пробы, Glance
+
+- Публичный API для Tasker/Termux: permission `ru.tgwatch.permission.AUTOMATION`, broadcast-команды, `content://ru.tgwatch.status/current`, событие `STATE_CHANGED` с extras. [docs/automation.md](docs/automation.md).
+- Опциональные доп. пробы Matrix / WhatsApp Web / свой HTTPS URL (только диагностика).
+- Опциональный вебхук (ntfy HTTPS) при смене статуса; выключен по умолчанию.
+- Счётчик пропущенных проверок во сне (Doze), progress-bar доступности в уведомлении.
+- Виджет Glance рядом с классическим RemoteViews; SQLite-зеркало истории; `assets/dc.json` для MTProto.
+- targetSdk 35, Compose/Glance/coroutines, `.editorconfig` + ktlint (не блокирует CI). Локальный versionName 1.13. [Заметки 1.13](docs/releases/1.13.md).
+
 ## 1.12 — сводка за день
 
 - Новое тихое уведомление «Сводка за день» в выбранное время (по умолчанию 21:00): доступность Telegram за 24 часа, число сбоев и самый долгий, время без интернета и без наблюдения, средний отклик и число проверок. Выключено по умолчанию; кнопка «Показать сейчас» выводит сводку сразу.
