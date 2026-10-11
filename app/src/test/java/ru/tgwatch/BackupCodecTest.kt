@@ -98,14 +98,17 @@ class BackupCodecTest {
         rejected { decode(base.replace("\"log\":[]", "\"log\":[\"\\ud800\"]")) }
         rejected { BackupCodec.encode(snapshot.copy(log = listOf("\ud800"))) }
     }
-    @Test fun allTwentySettingsIncludingIndependentEventsRoundTripWithStrictTypes() {
+    @Test fun allTwentyTwoSettingsIncludingEventsAndDailySummaryRoundTripWithStrictTypes() {
         val snapshot = sample().copy(settings = sample().settings + mapOf("notify_outage" to true,
             "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false))
-        assertEquals(20, snapshot.settings.size)
+        assertEquals(22, snapshot.settings.size)
         assertEquals(snapshot, BackupCodec.decode(BackupCodec.encode(snapshot)))
-        for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery")) {
+        for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery",
+            "daily_summary")) {
             rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + (key to "true"))) }
             rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":1}")) }
         }
+        rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + ("daily_summary_minute" to 1440))) }
+        rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"daily_summary_minute\":true}")) }
     }
 }
