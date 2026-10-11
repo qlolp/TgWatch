@@ -96,7 +96,7 @@ class StatusTileService : TileService() {
         val tile = qsTile ?: return
         val s = MonitorService.state
         val now = System.currentTimeMillis()
-        val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
+        val stale = s.isStale(now)
         val (tileState, icon, subtitle) = when {
             !MonitorService.running -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, Lang.t("Выключен", "Off"))
             stale && s.status == MonitorService.Status.PARTIAL ->

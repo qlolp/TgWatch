@@ -48,10 +48,14 @@ class MonitorService : Service() {
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
 
-        fun isStale(now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean =
+        /**
+         * Judged against the interval this result scheduled: [expectedIntervalSec] already holds the
+         * profile, screen-off sleep and offline backoff, so current settings are not re-read here.
+         */
+        fun isStale(now: Long, elapsedNow: Long = SystemClock.elapsedRealtime()): Boolean =
             checkedAt > 0L && (now < checkedAt || if (checkedElapsed > 0L)
-                ProbeRules.isStale(checkedElapsed, SystemClock.elapsedRealtime(), expectedIntervalSec, false)
-                else ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false))
+                ProbeRules.isStale(checkedElapsed, elapsedNow, expectedIntervalSec)
+                else ProbeRules.isStale(checkedAt, now, expectedIntervalSec))
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
@@ -645,7 +649,7 @@ class MonitorService : Service() {
         val stop = servicePending(2, ACTION_STOP)
 
         val now = System.currentTimeMillis()
-        val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
+        val stale = s.isStale(now)
         val dailyStats = notificationStats.get(History.version, now) { History.stats(this, now = now) }
         val uptime = dailyStats.uptimePercent
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""

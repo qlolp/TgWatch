@@ -81,7 +81,7 @@ class StatusWidget : AppWidgetProvider() {
             val s = MonitorService.state
             val now = System.currentTimeMillis()
             val running = MonitorService.running || Prefs.isEnabled(ctx)
-            val stale = s.isStale(now, Prefs.intervalSec(ctx), Prefs.keepAwake(ctx))
+            val stale = s.isStale(now)
 
             val bg: Int
             val icon: Int

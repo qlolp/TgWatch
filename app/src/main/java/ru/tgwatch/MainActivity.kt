@@ -493,7 +493,7 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         val running = MonitorService.running
         val s = MonitorService.state
-        val stale = running && s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
+        val stale = running && s.isStale(now)
         val notifOk = notificationsAllowed()
         val batteryOk = ignoringBatteryOptimizations()
         val alarmOk = Prefs.exactAlarmsAllowed(this)
