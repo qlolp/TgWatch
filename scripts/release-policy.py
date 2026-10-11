@@ -52,6 +52,15 @@ def optional_api(endpoint):
     return json.loads(result.stdout)
 
 
+# The pre-1.7 rolling release carries no Android code and never competes for latest.
+# Only this exact published tag is exempt; any other unrecognized tag still fails closed.
+LEGACY_TAGS = {"build"}
+
+
+def versioned(tag):
+    return tag not in LEGACY_TAGS
+
+
 def tag_code(tag):
     match = re.fullmatch(r"v[0-9]+\.[0-9]+\.([1-9][0-9]*)", tag)
     if not match:
@@ -147,8 +156,8 @@ def publish(args):
         raise ValueError(f"Existing tag {tag} points to another commit; it remains unchanged")
     latest = optional_api(f"repos/{args.repo}/releases/latest")
     codes = [tag_code(release["tag_name"]) for release in releases
-             if not release.get("draft") and not release.get("prerelease")]
-    if latest:
+             if not release.get("draft") and not release.get("prerelease") and versioned(release["tag_name"])]
+    if latest and versioned(latest["tag_name"]):
         codes.append(tag_code(latest["tag_name"]))
     promote = not codes or code > max(codes)
     # Explicit false is essential: gh/GitHub otherwise chooses latest automatically.
