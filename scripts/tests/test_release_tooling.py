@@ -68,7 +68,7 @@ if args[0] == 'api':
     elif '/compare/' in endpoint: print(json.dumps({'status': state.get('main_status', 'ahead')}))
     elif '/git/ref/tags/' in endpoint:
         if state.get('tag_missing'): print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)
-        print(json.dumps({'object': state.get('tag_object', {'type':'commit', 'sha':state['sha']})}))
+        print(json.dumps({'object': state.get('tag_object', {'type':'commit', 'sha':state.get('tag_shas', {}).get(endpoint.rsplit('/', 1)[-1], state['sha'])})}))
     elif '/git/tags/' in endpoint: print(json.dumps({'object': {'type':'commit', 'sha':state['sha']}}))
     else: raise AssertionError(endpoint)
 elif args[:2] == ['release', 'download']:
@@ -98,7 +98,7 @@ else: raise AssertionError(args)
         notes = self.work / "notes.md"
         notes.write_text("Fixture release notes\n")
         return subprocess.run([sys.executable, str(SCRIPTS / "release-policy.py"),
-                               "--repo", "owner/repo", "--version-file", str(source),
+                               "--repo", overrides.get("repo", "owner/repo"), "--version-file", str(source),
                                "--ref", overrides.get("ref", "refs/heads/main"),
                                "--sha", "a" * 40, "--notes", str(notes), "--assets",
                                *map(str, self.files)], env=self.env, text=True, capture_output=True)
@@ -140,6 +140,51 @@ class ReleaseTests(ToolFixture, unittest.TestCase):
         result = self.run_release()
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("--latest=true", self.created()[0])
+
+    def pinned_legacy_build(self):
+        self.fixture["tag_shas"] = {"build": "fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2"}
+        return {"id": 408759859, "tag_name": "build", "draft": False, "assets": [{
+            "id": 627276037, "name": "TgWatch.apk", "size": 905179,
+            "digest": "sha256:0a5f4a61d30bb18f2d9f00117630657d5a0e790c3e593a18560ffcd927d53368"}]}
+
+    def test_pinned_legacy_rolling_build_inventory_allows_publication(self):
+        self.fixture["latest"] = {"tag_name": "v1.12.59", "draft": False}
+        self.fixture["releases"] = [self.fixture["latest"], self.pinned_legacy_build()]
+        result = self.run_release(repo="qlolp/TgWatch")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("--latest=true", self.created()[0])
+
+    def test_pinned_legacy_rolling_build_as_latest_allows_publication(self):
+        build = self.pinned_legacy_build()
+        self.fixture["latest"] = build
+        self.fixture["releases"] = [build]
+        result = self.run_release(repo="qlolp/TgWatch")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("--latest=true", self.created()[0])
+
+    def test_unpinned_rolling_build_inventory_or_latest_refuses_publication(self):
+        for latest in (False, True):
+            with self.subTest(latest=latest):
+                build = {"tag_name": "build", "draft": False}
+                self.fixture["latest"] = build if latest else None
+                self.fixture["releases"] = [] if latest else [build]
+                result = self.run_release(repo="qlolp/TgWatch")
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("Unrecognized or changed legacy build", result.stderr)
+                self.assertFalse(self.created())
+
+    def test_malformed_versioned_tag_still_blocks_publication(self):
+        self.fixture["releases"] = [{"tag_name": "v1.10.0", "draft": False}]
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.created())
+
+    def test_newer_published_nonlatest_blocks_rollback(self):
+        self.fixture["latest"] = {"tag_name": "v1.12.59", "draft": False}
+        self.fixture["releases"] = [{"tag_name": "v1.14.0", "draft": False}]
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.created())
 
     def test_nonlatest_and_draft_releases_also_block_reused_version(self):
         for draft in (False, True):
