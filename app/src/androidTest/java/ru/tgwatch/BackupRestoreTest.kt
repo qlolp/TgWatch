@@ -62,11 +62,12 @@ class BackupRestoreTest {
         try {
             Prefs.rawSp(ctx).edit().putLong("last_checked", now).putString("last_status", "OK").commit()
             val encrypted = PortableBackupCodec.encrypt(replacement, "Пароль для теста!".toCharArray())
-            val before = BackupManager.snapshot(ctx)
+            // Compare copies clipped at one time; a later clock would shorten any open coverage.
+            val before = BackupManager.snapshot(ctx, now)
             try { BackupManager.decrypt(encrypted, "Другой пароль!!".toCharArray()); fail("Wrong password accepted") }
             catch (_: IllegalArgumentException) { }
-            assertEquals(before.observations, BackupManager.snapshot(ctx).observations)
-            assertEquals(before.settings, BackupManager.snapshot(ctx).settings)
+            assertEquals(before.observations, BackupManager.snapshot(ctx, now).observations)
+            assertEquals(before.settings, BackupManager.snapshot(ctx, now).settings)
             BackupManager.restore(ctx, BackupManager.decrypt(encrypted, "Пароль для теста!".toCharArray()))
             assertFalse(Prefs.isEnabled(ctx))
             assertNull(Prefs.loadLastState(ctx))

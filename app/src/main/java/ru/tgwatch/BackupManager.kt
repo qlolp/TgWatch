@@ -27,7 +27,9 @@ object BackupManager {
     private fun hasJournal(ctx: Context): Boolean = pending(ctx).exists() || publishedPending(ctx).exists()
     fun hasPending(ctx: Context): Boolean = replacingHistory || hasJournal(ctx)
 
-    @Synchronized fun snapshot(ctx: Context): BackupSnapshot = BackupSnapshot(System.currentTimeMillis(), linkedMapOf(
+    /** One `now` stamps the copy and clips the predicted coverage tail it must not carry. */
+    @Synchronized fun snapshot(ctx: Context, now: Long = System.currentTimeMillis()): BackupSnapshot =
+        BackupSnapshot(now, linkedMapOf(
         "power_profile" to (Prefs.profile(ctx)?.name ?: "CUSTOM"),
         "interval_sec" to Prefs.intervalSec(ctx), "keep_awake" to Prefs.keepAwake(ctx),
         "vibrate" to Prefs.vibrateEnabled(ctx), "vibrate_partial" to Prefs.vibratePartial(ctx),
@@ -42,7 +44,7 @@ object BackupManager {
         "daily_summary" to Prefs.dailySummary(ctx), "daily_summary_minute" to Prefs.dailySummaryMinute(ctx),
         "extra_probe_matrix" to Prefs.extraMatrix(ctx), "extra_probe_whatsapp" to Prefs.extraWhatsapp(ctx),
         "extra_probe_custom" to Prefs.extraCustom(ctx), "extra_probe_custom_url" to Prefs.extraCustomUrl(ctx)),
-        History.snapshot(ctx), EventLog.all(ctx).toList())
+        History.snapshot(ctx, now), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {
         check(!hasPending(ctx)) { "Complete pending restore before export" }

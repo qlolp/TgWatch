@@ -155,7 +155,9 @@ class BackupRestoreIntegrationTest {
             val encrypted = BackupManager.export(ctx, password)
             val decoded = BackupManager.decrypt(encrypted, password)
             assertEquals(source.settings, decoded.settings)
-            assertEquals(source.observations, decoded.observations)
+            // The portable copy ends at its creation time: a predicted tail is not observed time.
+            assertEquals(source.observations.dropLast(1), decoded.observations.dropLast(1))
+            assertEquals(source.observations.last().copy(until = decoded.createdAt), decoded.observations.last())
             assertEquals(source.log, decoded.log)
             assertTrue(decoded.createdAt >= source.createdAt)
             assertFalse(decoded.settings.keys.any { it == "enabled" || it.startsWith("last_") })
@@ -169,6 +171,21 @@ class BackupRestoreIntegrationTest {
         } finally {
             password.fill('\u0000')
         }
+    }
+
+    @Test fun directRestoreKeepsCoverageWhilePortableSnapshotClipsItAtCreation() {
+        val source = snapshot()
+        // Low-level restore applies the staged intervals exactly, including future coverage.
+        BackupManager.restore(ctx, source)
+        assertPortableData(source)
+        val createdAt = source.createdAt + 1_000
+        val portable = BackupManager.snapshot(ctx, createdAt)
+        assertEquals(createdAt, portable.createdAt)
+        assertEquals(source.observations.dropLast(1) + source.observations.last().copy(until = createdAt),
+            portable.observations)
+        assertTrue(portable.observations.all { it.until <= portable.createdAt })
+        // Clipping the exported copy must not change the device's own history.
+        assertPortableData(source)
     }
 
     @Test fun wrongPasswordTamperingAndTruncationDoNotMutateCurrentData() {
