@@ -41,7 +41,7 @@ jobs:
       - name: Audit all exact resolved runtime and test dependencies against OSV
         run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
       - name: Install pinned Trivy scanner
-        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
         with:
           version: v0.75.0
       - name: Gate release runtime SBOM on HIGH and CRITICAL vulnerabilities
