@@ -19,7 +19,7 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`version.properties` задаёт SemVer `1.13.2`; код `1013002` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.13.3`; код `1013003` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,

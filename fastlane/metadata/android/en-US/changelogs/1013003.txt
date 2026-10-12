@@ -1,0 +1,3 @@
+* Backup export clips the last check's predicted tail at the copy's creation time.
+* Repeated signal/bandwidth updates of the same network no longer reset a good result.
+* A check requested while another runs now gets one follow-up check.

@@ -69,8 +69,10 @@ class ClockBoundaryIntegrationTest {
         val fresh = History.snapshot(ctx)
         assertEquals(3L, fresh.last().clockEpoch)
         assertEquals(1, History.stats(ctx, 1, now + 2).okChecks)
-        val encoded = BackupCodec.encode(BackupManager.snapshot(ctx))
-        assertEquals(fresh, BackupCodec.decode(encoded).observations)
+        // An explicit creation time keeps the clipped portable tail deterministic.
+        val backup = BackupManager.snapshot(ctx, now + 2)
+        assertEquals(fresh.dropLast(1) + fresh.last().copy(until = now + 2), backup.observations)
+        assertEquals(backup.observations, BackupCodec.decode(BackupCodec.encode(backup)).observations)
         assertTrue(fresh.all { it.clockEpoch >= 0 })
     }
 

@@ -38,7 +38,11 @@ handler delivery consume the same target once. Manual requests and network
 replacement retries cancel that target and do not count as late scheduled
 arrivals. Arrivals during an active probe also count only as overlaps. Manual
 request and overlapping request counts are separate; settings refreshes are not
-manual check requests.
+manual check requests. A manual or settings request during an active probe is not
+replaced by the normal interval: all such requests merge into one immediate
+follow-up check. An alarm during a probe is satisfied by that probe. Repeated
+capability updates of the same validated network do not invalidate a result;
+a new network, its loss, or a validation/captive-portal change does.
 
 `idle_observed_arrivals` records whether Android reported device idle at the
 arrival. It does **not** establish that Doze caused a delay. The operating system,

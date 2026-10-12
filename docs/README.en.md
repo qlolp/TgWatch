@@ -77,9 +77,9 @@ request may finish without changing the new address's delivery history.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.13.2`, Android target API35. The latest published
+The source version is `1.13.3`, Android target API35. The latest published
 release is [1.13.1](https://github.com/qlolp/TgWatch/releases/tag/v1.13.1);
-these source changes do not claim publication of 1.13.2. The release workflow
+these source changes do not claim publication of 1.13.3. The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
 Use JDK17, Android SDK35 and the checked-in Gradle wrapper:
