@@ -41,6 +41,8 @@ object Prefs {
     private const val KEY_LAST_LATENCY = "last_latency"
     private const val KEY_LAST_REASON = "last_reason"
     private const val KEY_LAST_VIBE = "last_vibe"
+    // Device-local; BackupManager exports only its explicit settings list.
+    private const val KEY_ALERTS_MUTED_UNTIL = "alerts_muted_until"
 
     const val DEFAULT_INTERVAL_SEC = 30
     const val DEFAULT_QUIET_START = 23
@@ -79,9 +81,9 @@ object Prefs {
         }
     }
 
-    /** Не вибрировать в тихие часы и в системном «не беспокоить». */
+    /** Не вибрировать в тихие часы, пока оповещения заглушены, и в системном «не беспокоить». */
     fun alertsAllowed(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
-        if (inQuietHoursNow(ctx, now)) return false
+        if (inQuietHoursNow(ctx, now) || alertsMutedUntil(ctx, now) > 0L) return false
         return try {
             val filter = (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .currentInterruptionFilter
@@ -249,6 +251,14 @@ object Prefs {
             .putInt(KEY_QUIET_START, startMinute / 60)
             .putInt(KEY_QUIET_END, endMinute / 60)
             .apply()
+    }
+
+    /** Deadline of the "Mute for 1 hour" alert action, or 0 when alerts are not muted. */
+    fun alertsMutedUntil(ctx: Context, now: Long = System.currentTimeMillis()): Long =
+        sp(ctx).getLong(KEY_ALERTS_MUTED_UNTIL, 0L).takeIf { AlertMute.active(it, now) } ?: 0L
+
+    fun muteAlerts(ctx: Context, now: Long = System.currentTimeMillis()) {
+        sp(ctx).edit().putLong(KEY_ALERTS_MUTED_UNTIL, AlertMute.until(now)).commit()
     }
 
     fun inQuietHoursNow(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {

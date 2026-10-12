@@ -78,6 +78,17 @@ class DailySummaryTest {
             DailySummary.nextAt(at(zone, 2026, 3, 29, 4, 0), 2 * 60 + 30, zone))
     }
 
+    @Test fun scheduledSummaryNeedsOptInMonitoringAndNoDeliveryToday() {
+        assertTrue(DailySummary.due(force = false, optedIn = true, monitoring = true, deliveredToday = false))
+        assertFalse("Monitoring is off", DailySummary.due(force = false, optedIn = true, monitoring = false, deliveredToday = false))
+        assertFalse(DailySummary.due(force = false, optedIn = false, monitoring = true, deliveredToday = false))
+        assertFalse(DailySummary.due(force = false, optedIn = true, monitoring = true, deliveredToday = true))
+    }
+
+    @Test fun manualPreviewIgnoresOptInMonitoringAndDeduplication() {
+        assertTrue(DailySummary.due(force = true, optedIn = false, monitoring = false, deliveredToday = true))
+    }
+
     @Test fun timeLabelPadsHoursAndMinutes() {
         assertEquals("07:05", DailySummary.timeLabel(425))
         assertEquals("21:00", DailySummary.timeLabel(DailySummary.DEFAULT_MINUTE))

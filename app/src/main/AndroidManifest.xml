@@ -97,6 +97,12 @@
                 android:resource="@xml/widget_status_info" />
         </receiver>
 
+        <!-- «Заглушить на час» из тревожного уведомления: только собственный PendingIntent -->
+        <receiver
+            android:name=".AlertActionReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+
         <!-- Нажатие на виджет: только собственный PendingIntent, не другие приложения -->
         <receiver
             android:name=".WidgetClickReceiver"

@@ -26,12 +26,13 @@ class DailySummaryReceiver : BroadcastReceiver() {
         // Device-local delivery state; BackupManager exports only its explicit settings list.
         private const val LAST_DELIVERY = "daily_summary_last_at"
 
-        /** Manual preview bypasses opt-in/deduplication, while permission/channel blocks still apply. */
+        /** Manual preview bypasses opt-in/monitoring/deduplication, while permission/channel blocks still apply. */
         @Synchronized fun post(ctx: Context, force: Boolean): Boolean {
             val now = System.currentTimeMillis()
             val settings = Prefs.sp(ctx)
-            val scheduled = force || (Prefs.dailySummary(ctx) &&
-                !alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L)))
+            // Stopped monitoring stays quiet: no scheduled summary until the user starts it again.
+            val scheduled = DailySummary.due(force, Prefs.dailySummary(ctx), Prefs.isEnabled(ctx),
+                alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L)))
             if (!scheduled) return false
             return try {
                 val text = DailySummary.text(History.stats(ctx, 1, now))

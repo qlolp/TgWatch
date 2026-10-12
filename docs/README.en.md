@@ -32,8 +32,11 @@ explained in the app.
 
 Full outages, partial availability and recovery have independent notification
 and sound settings. Quiet hours support minute precision and follow local time.
-An optional daily summary reports the last 24 hours. The home-screen widget and
-Quick Settings tile offer the current status and a manual check.
+Outage and partial alerts offer "Check now" and "Mute for 1 hour"; a mute
+silences alert sound and vibration like quiet hours and stays on this device.
+An optional daily summary reports the last 24 hours while monitoring is on.
+The home-screen widget and Quick Settings tile offer the current status and a
+manual check.
 
 Seven-day history distinguishes measured intervals from gaps. Offline or unknown
 time does not silently become a Telegram outage. Uptime is calculated by time;
@@ -77,9 +80,9 @@ request may finish without changing the new address's delivery history.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.13.3`, Android target API35. The latest published
+The source version is `1.14.0`, Android target API35. The latest published
 release is [1.13.1](https://github.com/qlolp/TgWatch/releases/tag/v1.13.1);
-these source changes do not claim publication of 1.13.3. The release workflow
+these source changes do not claim publication of 1.14.0. The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
 Use JDK17, Android SDK35 and the checked-in Gradle wrapper:
