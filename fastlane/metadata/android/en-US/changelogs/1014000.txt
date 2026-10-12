@@ -1,0 +1,3 @@
+* Outage alerts have "Check now" and "Mute for 1 hour" buttons.
+* No scheduled daily summary while monitoring is off.
+* The chart grows with large system font sizes instead of squeezing its bars.
