@@ -37,14 +37,19 @@ Quick Settings tile offer the current status and a manual check.
 
 Seven-day history distinguishes measured intervals from gaps. Offline or unknown
 time does not silently become a Telegram outage. Uptime is calculated by time;
-check counts and mean recovery time are separate metrics.
+check counts and mean recovery time are separate metrics. Clock-epoch metadata
+is excluded from check counts and the chart. A temporary storage write failure
+is repaired by saving the complete retained snapshot on the next successful write.
 
 ## Backup, automation and diagnostics
 
 The encrypted portable backup contains settings, history and the event log. New
 exports use AES-256-GCM and PBKDF2-HMAC-SHA256 with 600,000 iterations. Keep the
 password: there is no recovery service. Restoring replaces data and leaves
-monitoring stopped. CSV export/import is also supported. See [backup formats](backup.md).
+monitoring stopped. Exports from 1.13.2 use JSON payload version 2 inside the
+unchanged TGWB v2 envelope and require TgWatch 1.13.2 or later to restore. Older
+supported backups remain readable. CSV export/import is also supported.
+See [backup formats](backup.md).
 
 [Automation](automation.md) is disabled by default. An explicit broadcast API
 allows authorized Tasker/Termux clients to read a bounded status snapshot or
@@ -58,10 +63,13 @@ automatically.
 
 Optional, off by default: informational HTTPS checks of Matrix, WhatsApp Web and
 one custom `https://` address appear only in connection diagnostics. Their
-results are excluded from Telegram classification and alerts. A [webhook](automation.md#webhook-alert)
+results are excluded from Telegram classification and alerts, and use three
+separate workers so a stuck extra probe cannot occupy Telegram/control workers.
+A [webhook](automation.md#webhook-alert)
 (for example an ntfy.sh topic) can receive one short line when the published
 status changes. Its address is treated as a credential and kept out of backups
-and diagnostics.
+and diagnostics. Address changes invalidate stale send decisions; an older
+request may finish without changing the new address's delivery history.
 
 ## Install and develop
 
@@ -69,8 +77,9 @@ and diagnostics.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.13.1`, Android target API35. This states the source
-version, not that a release has already been published. The release workflow
+The source version is `1.13.2`, Android target API35. The latest published
+release is [1.13.1](https://github.com/qlolp/TgWatch/releases/tag/v1.13.1);
+these source changes do not claim publication of 1.13.2. The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
 Use JDK17, Android SDK35 and the checked-in Gradle wrapper:

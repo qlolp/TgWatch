@@ -6,7 +6,10 @@ import java.util.Locale
 import java.util.TimeZone
 
 data class Observation(val at: Long, val until: Long, val kind: String, val latencyMs: Long = -1L,
-    val clockEpoch: Long = 0L)
+    val clockEpoch: Long = 0L) {
+    /** A zero-width marker carries epoch identity without claiming a performed check. */
+    val isEpochMetadata: Boolean get() = at == until && kind == "UNKNOWN" && latencyMs == -1L
+}
 data class TimeStats(val okMs: Long, val downMs: Long, val partialMs: Long, val offlineMs: Long,
     val unknownMs: Long, val longestOutageMs: Long, val checks: Int, val avgLatencyMs: Long,
     val outageCount: Int = 0, val lastOutageMs: Long = 0, val lastOutageOngoing: Boolean = false,
@@ -49,28 +52,39 @@ object Timeline {
             archived = samples
             nextEpoch = epoch + 1
         }
-        return archived + Observation(now, now + 1, "UNKNOWN", clockEpoch = nextEpoch)
+        return archived + Observation(now, now, "UNKNOWN", clockEpoch = nextEpoch)
+    }
+    /** A real result wins over metadata at the same timestamp, regardless of input order. */
+    internal fun unique(samples: List<Observation>): List<Observation> {
+        val rows = linkedMapOf<Pair<Long, Long>, Observation>()
+        for (sample in samples) {
+            val key = sample.clockEpoch to sample.at
+            if (!sample.isEpochMetadata || key !in rows) rows[key] = sample
+        }
+        return rows.values.toList()
     }
     /** Retain the epoch boundary even when its final observation expires. */
     fun retained(samples: List<Observation>, from: Long, limit: Int = 65_000): List<Observation> {
         require(limit > 0)
-        val unique = samples.associateBy { it.clockEpoch to it.at }.values
+        val unique = unique(samples)
         val latest = unique.maxWithOrNull(compareBy<Observation> { it.clockEpoch }.thenBy { it.at })
             ?: return emptyList()
         val retained = unique.filter { it.until > from }.toMutableList()
         if (retained.none { it.clockEpoch == latest.clockEpoch })
-            retained += latest.copy(kind="UNKNOWN",latencyMs=-1)
+            retained += latest.copy(until = latest.at, kind = "UNKNOWN", latencyMs = -1)
         return retained.sortedWith(compareBy<Observation> { it.clockEpoch }.thenBy { it.at }).takeLast(limit)
     }
     fun current(samples: List<Observation>): List<Observation> {
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
         return samples.filter { it.clockEpoch == epoch }
     }
+    fun currentChecks(samples: List<Observation>): List<Observation> =
+        unique(current(samples).filter { !it.isEpochMetadata })
     fun segments(samples: List<Observation>, from: Long, until: Long): List<Observation> {
         if (until <= from) return emptyList()
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
-        val ordered = current(samples).filter { it.until > it.at && it.at < until && it.until > from }
-            .associateBy { it.at }.values.sortedBy { it.at }
+        val ordered = currentChecks(samples).filter { it.until > it.at && it.at < until && it.until > from }
+            .sortedBy { it.at }
         val result = mutableListOf<Observation>()
         var cursor = from
         ordered.forEachIndexed { index, sample ->
@@ -119,7 +133,7 @@ object Timeline {
             }
             previous = segment.kind
         }
-        val inRange = current(samples).filter { it.at >= from && it.at < until }
+        val inRange = currentChecks(samples).filter { it.at >= from && it.at < until }
         val latency = inRange.filter { it.kind == "OK" && it.latencyMs >= 0 }.map { it.latencyMs }
         return TimeStats(duration["OK"] ?: 0, duration["TG_DOWN"] ?: 0, duration["PARTIAL"] ?: 0,
             duration["NO_NETWORK"] ?: 0, duration["UNKNOWN"] ?: 0, longest, inRange.size,
@@ -133,7 +147,7 @@ object Timeline {
     }
     /** Only a fresh OK closes a contiguous observed incident. Gaps are never outage time. */
     fun recovery(samples: List<Observation>, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? {
-        val rows = current(samples)
+        val rows = currentChecks(samples)
         val latest = rows.maxByOrNull { it.at } ?: return null
         if (latest.at != checkedAt || latest.kind != "OK") return null
         val before = rows.filter { it.at < checkedAt }
@@ -155,7 +169,8 @@ object Timeline {
             append("from_utc,until_utc,status,duration_ms,latency_ms,clock_epoch,in_current_statistics\n")
             val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
             // Archived epochs retain original timestamps, including future dates after rollback.
-            val rows = segments(samples, from, until) + samples.filter { it.clockEpoch != epoch }
+            val rows = segments(samples, from, until) + current(samples).filter { it.isEpochMetadata } +
+                samples.filter { it.clockEpoch != epoch }
             for (s in rows) {
                 append(format.format(Date(s.at))).append(',').append(format.format(Date(s.until))).append(',')
                 append(s.kind).append(',').append(s.until - s.at).append(',')

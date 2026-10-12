@@ -79,8 +79,9 @@ class ExtraProbesTest {
     @Test fun networkProbeRunsExtrasAfterTelegramWithoutAffectingStatus() {
         val requested = mutableListOf<String>()
         val pool = NetworkProbe.executor()
+        val extraPool = NetworkProbe.extraExecutor()
         try {
-            val report = NetworkProbe(pool, { url ->
+            val report = NetworkProbe(pool, extraPool, { url ->
                 synchronized(requested) { requested += url.host }
                 object : HttpURLConnection(url) {
                     override fun connect() {}
@@ -100,14 +101,15 @@ class ExtraProbesTest {
             assertTrue(extras.all { it.reachable && it.detail == "HTTP 200" })
             assertTrue(requested.containsAll(listOf("matrix.org", "web.whatsapp.com", "status.example.org")))
             assertEquals(-1L, report.latencyMs)
-        } finally { pool.shutdownNow() }
+        } finally { pool.shutdownNow(); extraPool.shutdownNow() }
     }
 
     @Test fun extrasWithoutEnabledServicesAddNoRequests() {
         val pool = NetworkProbe.executor()
+        val extraPool = NetworkProbe.extraExecutor()
         val requested = mutableListOf<URL>()
         try {
-            val report = NetworkProbe(pool, { url ->
+            val report = NetworkProbe(pool, extraPool, { url ->
                 synchronized(requested) { requested += url }
                 object : HttpURLConnection(url) {
                     override fun connect() {}
@@ -121,6 +123,6 @@ class ExtraProbesTest {
             assertEquals("PARTIAL", report.status)
             assertTrue(report.results.none { it.group == ProbeGroup.EXTRA })
             assertTrue(requested.all { it.host.endsWith("telegram.org") })
-        } finally { pool.shutdownNow() }
+        } finally { pool.shutdownNow(); extraPool.shutdownNow() }
     }
 }

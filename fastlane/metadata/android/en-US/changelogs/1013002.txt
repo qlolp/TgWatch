@@ -1,0 +1,5 @@
+* Retry the full retained history after temporary storage errors.
+* Isolate extra probes from Telegram workers.
+* Make webhook address changes and request completion safe.
+* Exclude clock-epoch metadata from check counts and the chart.
+* New backups require TgWatch 1.13.2+; older backups remain readable.

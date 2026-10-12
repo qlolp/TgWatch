@@ -13,7 +13,7 @@ class ClockEpochBoundaryTest {
         val rolled = rollback(rows, 2000)
         assertEquals(listOf(2L, 0L, 1L, 0L, 3L), rolled.map { it.clockEpoch })
         assertEquals(rows.map { it.copy(clockEpoch = 0) }, rolled.dropLast(1).map { it.copy(clockEpoch = 0) })
-        assertEquals(Observation(2000, 2001, "UNKNOWN", clockEpoch = 3), rolled.last())
+        assertEquals(Observation(2000, 2000, "UNKNOWN", clockEpoch = 3), rolled.last())
         assertEquals(listOf(rolled.last()), Timeline.current(rolled))
         assertTrue(rolled.all { it.clockEpoch >= 0 })
     }

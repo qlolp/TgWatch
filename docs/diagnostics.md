@@ -23,8 +23,11 @@ Optional informational probes of other services (Matrix, WhatsApp Web, one
 custom HTTPS address) use a separate `EXTRA` group. They appear only in the
 in-app connection diagnostics, under their own heading, and are excluded from
 this report. Their results are excluded from Telegram classification, latency,
-reason and alerts. Isolation of their worker capacity is a follow-up improvement
-described in the [current review](review/improvements-2026-10-12.md).
+reason and alerts. They run with a five-second overall budget on three separate
+bounded workers, with no buffered queue. Telegram/control probes retain their own
+eight workers. A stuck extra transport cannot occupy that pool; the service
+reuses both pools and shuts them down when it is destroyed. Transport cancellation
+still depends on the underlying operation responding to interruption or closure.
 
 ## Scheduling observations
 
@@ -49,6 +52,8 @@ The ongoing notification displays native progress from last-24-hour TimeStats.
 Its percentage uses reachable time divided by reachable + partial + Telegram
 outage time. Offline and unknown time are excluded. Unknown/offline-only history
 has no progress indicator; confirmed outage-only history displays zero.
+Zero-width clock-epoch metadata is excluded from check counts and the chart;
+real positive-width UNKNOWN observations remain checks.
 Statistics are cached until the history version or current minute changes,
 avoiding repeated history work on health ticks.
 

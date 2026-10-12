@@ -28,8 +28,9 @@ class EndpointFallbackTest {
         // HTTPS probe fails in TLS before any HTTP code could count as "server answered".
         val urls = java.util.Collections.synchronizedList(mutableListOf<URL>())
         val pool = NetworkProbe.executor()
+        val extraPool = NetworkProbe.extraExecutor()
         val report = try {
-            NetworkProbe(pool,
+            NetworkProbe(pool, extraPool,
                 { url -> urls += url; object : HttpURLConnection(url) {
                     override fun connect() {}
                     override fun disconnect() {}
@@ -40,7 +41,7 @@ class EndpointFallbackTest {
                 { object : Socket() {
                     override fun connect(endpoint: SocketAddress, timeout: Int) { throw SocketTimeoutException("blocked") }
                 } }).check()
-        } finally { pool.shutdownNow() }
+        } finally { pool.shutdownNow(); extraPool.shutdownNow() }
         assertEquals("TG_DOWN", report.status)
         assertTrue(urls.isNotEmpty())
         assertTrue(urls.all { it.protocol == "https" })
@@ -49,8 +50,9 @@ class EndpointFallbackTest {
 
     private fun checkWithOnlyDc3Available(wrongNonce: Boolean): ProbeReport {
         val pool = NetworkProbe.executor()
+        val extraPool = NetworkProbe.extraExecutor()
         try {
-            return NetworkProbe(pool,
+            return NetworkProbe(pool, extraPool,
                 { url -> object : HttpURLConnection(url) {
                     override fun connect() {}
                     override fun disconnect() {}
@@ -58,7 +60,7 @@ class EndpointFallbackTest {
                     override fun getResponseCode() = 200
                 } },
                 { GreetingSocket(wrongNonce) }).check()
-        } finally { pool.shutdownNow() }
+        } finally { pool.shutdownNow(); extraPool.shutdownNow() }
     }
 
     private class GreetingSocket(private val wrongNonce: Boolean) : Socket() {

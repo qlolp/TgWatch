@@ -38,11 +38,14 @@ object CsvImport {
             val kind = fields[2]
             require(kind in Timeline.kinds) { "Unknown status" }
             val duration = number(fields[3])
-            require(until > at && duration == until - at) { "Invalid duration" }
+            require(until >= at && duration == until - at) { "Invalid duration" }
             // UNKNOWN export rows also represent generated, potentially multi-day gaps.
             require(kind == "UNKNOWN" || duration <= 600_000L) { "Observation exceeds coverage limit" }
             val latency = if (fields[4].isEmpty()) -1L else number(fields[4])
             require(latency >= -1L) { "Invalid latency" }
+            require(until > at || currentFormat && kind == "UNKNOWN" && latency == -1L) {
+                "Invalid epoch metadata"
+            }
             val epoch = if (currentFormat) number(fields[5]) else 0L
             require(epoch >= 0L) { "Invalid clock epoch" }
             val active = if (currentFormat) when (fields[6]) {
@@ -56,10 +59,14 @@ object CsvImport {
         require(rows.all { (row, active) -> active == (row.clockEpoch == maxEpoch) }) { "Inconsistent clock epoch flag" }
         // The old export cannot distinguish real UNKNOWN checks from generated gaps.
         // Omitting both retains unknown time coverage without inventing check counts.
-        val observations = rows.map { it.first }.filter { it.kind != "UNKNOWN" }
+        val observations = rows.map { it.first }.filter { it.kind != "UNKNOWN" || it.isEpochMetadata }
         // Without a retained current-epoch row, archived records would become current.
-        // The legacy format has no way to retain an epoch marker without adding a check.
-        return observations.takeIf { retained -> retained.any { it.clockEpoch == maxEpoch } } ?: emptyList()
+        // Seven-column exports can preserve the epoch even when all its rows were UNKNOWN gaps.
+        if (currentFormat && rows.isNotEmpty() && observations.none { it.clockEpoch == maxEpoch }) {
+            val latest = rows.map { it.first }.filter { it.clockEpoch == maxEpoch }.maxBy { it.at }
+            return observations + latest.copy(until = latest.at, kind = "UNKNOWN", latencyMs = -1)
+        }
+        return observations
     }
 
     private fun number(value: String): Long {

@@ -58,7 +58,7 @@ class ClockBoundaryIntegrationTest {
         assertEquals(0, History.stats(ctx, 1, now).okChecks)
         val rolled = History.snapshot(ctx)
         assertEquals(listOf(0L, 1L, 2L, 3L), rolled.map { it.clockEpoch })
-        assertEquals(Observation(now, now + 1, "UNKNOWN", clockEpoch = 3), rolled.last())
+        assertEquals(Observation(now, now, "UNKNOWN", clockEpoch = 3), rolled.last())
         val version = History.version
         History.stats(ctx, 1, now)
         assertEquals("Reading stats must not repeatedly roll over", version, History.version)

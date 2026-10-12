@@ -138,12 +138,18 @@ fun describeProbeError(e: Exception): String = when (e) {
     else -> "${e.javaClass.simpleName}: ${e.message.orEmpty().take(120)}"
 }
 
-/** Separate network adapter allows Android to bind all requests to one Network. */
+/**
+ * Separate network adapter allows Android to bind all requests to one Network.
+ * The caller owns and reuses both distinct executors, shutting them down when monitoring stops.
+ */
 class NetworkProbe(
     private val pool: ExecutorService,
+    private val extraPool: ExecutorService,
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
     private val openSocket: () -> java.net.Socket = { java.net.Socket() },
 ) {
+    init { require(pool !== extraPool) { "EXTRA probes require a separate executor" } }
+
     /** [extras] run after Telegram/control probes in their own bounded batch; see [ExtraProbes]. */
     fun check(extras: List<ProbeEndpoint> = emptyList()): ProbeReport {
         val telegram = listOf(
@@ -163,7 +169,7 @@ class NetworkProbe(
         }
         val informational = extras.filter { it.group == ProbeGroup.EXTRA }
         if (informational.isNotEmpty()) {
-            results += ProbeBatch(pool, ExtraProbes.BATCH_TIMEOUT_MS).run(informational, ::probe)
+            results += ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS).run(informational, ::probe)
         }
         return ProbeReport(results)
     }
@@ -193,7 +199,10 @@ class NetworkProbe(
     }
     private fun elapsed(start: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
     companion object {
+        private const val EXTRA_WORKERS = 3
         fun executor(): ExecutorService = ThreadPoolExecutor(8, 8, 30L, TimeUnit.SECONDS,
             SynchronousQueue(), { r -> Thread(r, "tg-probe").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
+        fun extraExecutor(): ExecutorService = ThreadPoolExecutor(EXTRA_WORKERS, EXTRA_WORKERS, 30L, TimeUnit.SECONDS,
+            SynchronousQueue(), { r -> Thread(r, "tg-extra-probe").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
     }
 }
