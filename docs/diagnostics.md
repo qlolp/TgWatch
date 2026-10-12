@@ -22,7 +22,9 @@ results are empty after restart/restore until a fresh probe completes.
 Optional informational probes of other services (Matrix, WhatsApp Web, one
 custom HTTPS address) use a separate `EXTRA` group. They appear only in the
 in-app connection diagnostics, under their own heading, and are excluded from
-this report. They never change the Telegram status, latency, reason or alerts.
+this report. Their results are excluded from Telegram classification, latency,
+reason and alerts. Isolation of their worker capacity is a follow-up improvement
+described in the [current review](review/improvements-2026-10-12.md).
 
 ## Scheduling observations
 
