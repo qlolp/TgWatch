@@ -237,11 +237,21 @@ class MonitorService : Service() {
         runCheck()
     }
 
+    private val networkTransitions = NetworkTransitions()
+
+    /** Only identity and validated/captive-portal changes invalidate a running or good result. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { checkSchedule.networkChanged(1_500L) }
-        override fun onLost(network: Network) { checkSchedule.networkChanged(500L) }
+        override fun onAvailable(network: Network) {
+            if (networkTransitions.available(network.networkHandle)) checkSchedule.networkChanged(1_500L)
+        }
+        override fun onLost(network: Network) {
+            networkTransitions.lost()
+            checkSchedule.networkChanged(500L)
+        }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-            if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+            if (networkTransitions.capabilities(network.networkHandle,
+                    networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
+                    networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL))) {
                 checkSchedule.networkChanged(800L)
             }
         }
