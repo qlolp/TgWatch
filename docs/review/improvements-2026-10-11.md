@@ -68,6 +68,49 @@ webhooks, targetSdk 35»); он закрыт и частично перенес�
 
 ---
 
+---
+
+## Итог 1.14.0: закрытые пункты (12 октября 2026)
+
+Предложения из этого отчёта реализованы в 1.14.0 (см. [заметки](../releases/1.14.0.md)).
+Изменения проверены локально: `detekt`, 231 JVM-тест, `lintDebug`, обе сборки APK (release —
+с R8), инвентарь зависимостей и SBOM, а также 106 тестов релизного Python-инструментария.
+Инструментальные тесты и подписанное обновление остаются за CI; песочница без эмулятора.
+
+| Пункт | Статус | Реализация |
+|---|---|---|
+| 2. IPv6-адреса DC | ✅ | Пять DC в обоих семействах (`MtProtoEndpoints.kt`), пул пробы 16 потоков, тест каталога |
+| 3. `USE_EXACT_ALARM` | ✅ | Оставлен только `SCHEDULE_EXACT_ALARM`; на API 33+ пользователь даёт согласие, кнопка чеклиста снова работает |
+| 5. Запись на каждую проверку | ✅ | `saveLastState` пишет при смене статуса и не чаще раза в 30 с, `LastSuccessStore` перешёл на `apply()` |
+| 9. Тикер 1 Гц | ✅ | Экран подписан на `ACTION_STATE_CHANGED` (`StateRefresh`), тикер обновляет только «N с назад» |
+| 10. Baseline `v1.10.47` | ✅ | `scripts/upgrade-baseline.py` выбирает предыдущий релиз из опубликованных и сверяет его checksum |
+| 11. Секреты, права, actions | 🟡 | Все actions закреплены на коммитах, есть wrapper-validation и таймауты; GitHub Environment с обязательным ревьюером — за владельцем |
+| 12. Перепроверка APK | ✅ | `sha256sum -c`, `apksigner verify` и сверка `versionCode`/`versionName` из badging перед публикацией; checksum проверяет и `release-policy.py` |
+| 13. Wrapper и зависимости | 🟡 | `distributionSha256Sum`, wrapper-validation, pip `--require-hashes` по lock-файлу, Dependabot; `gradle/verification-metadata.xml` не заводился — это отдельная механика с ротацией хэшей |
+| 16. `User-Agent` | ✅ | `TgWatch/${BuildConfig.VERSION_NAME} (Android)` |
+| 17. R8 | ✅ | Release сжимается и обфусцируется; keep-правила для компонентов манифеста и имён enum (`app/proguard-rules.pro`) |
+| 19. Кэш CI | 🟡 | `org.gradle.caching` и `org.gradle.parallel` включены; configuration cache остаётся выключенным, пока `dependencyInventory` разрешает конфигурации в action (причина записана в `gradle.properties`) |
+| 21. Воспроизводимость аудита | 🟡 | Отчёт OSV фиксирует `database_state.newest_osv_record`; саму БД не закрепляем намеренно — иначе гейт перестанет видеть новые уязвимости |
+| 23. Сводка при выключенном мониторинге | ✅ | `post()` требует `Prefs.isEnabled` |
+| 24. Действия в уведомлениях | ✅ | «Проверить» и «Остановить» в уведомлениях о сбое, частичной доступности и восстановлении |
+| 25. Deprecated API | 🟡 | `ProgressDialog` заменён на `AlertDialog` с `ProgressBar`; `startActivityForResult` оставлен осознанно (альтернатива требует зависимости `androidx.activity`, что противоречит нулевым runtime-зависимостям проекта) |
+| 28. Мелочи | ✅ | Один `SecureRandom` на процесс вместо нового на каждую пробу |
+
+### Что осталось после 1.14.0
+
+1. **P1: GitHub Environment** для публикации (обязательный ревьюер, environment-секреты) —
+   требует прав владельца репозитория, код готов.
+2. **P2: `gradle/verification-metadata.xml`** — верификация Maven-артефактов; заводится
+   командой `./gradlew --write-verification-metadata sha256` и требует ротации при обновлениях.
+3. **P2: configuration cache** — станет доступна после переделки `dependencyInventory` на
+   заранее разрешённые входы (в `gradle.properties` оставлено объяснение).
+4. **P2: `startActivityForResult` → `ActivityResultLauncher`** — только вместе с решением
+   о зависимости `androidx.activity`.
+5. **P2: матрица обновлений N-1 и N-2** — сейчас прогоняется только предыдущий релиз;
+   расширение — небольшая правка `upgrade-baseline.py` и шага эмулятора.
+
+---
+
 ## P0 — достоверность и блокеры публикации
 
 ### 1. Сеть с подменой ответов не может быть классифицирована как `TG_DOWN`

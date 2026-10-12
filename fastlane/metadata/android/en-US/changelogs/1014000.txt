@@ -1,0 +1,6 @@
+* Every data centre is probed over IPv4 and IPv6; IPv6-only networks are no longer an outage.
+* Exact alarms are granted by consent on Android 13+.
+* Outage and recovery notifications gained Check and Stop actions.
+* The daily summary is sent only while monitoring runs.
+* The release build is shrunk with R8 and the published APK is verified again.
+* Actions, Gradle and release tooling are pinned by checksum.

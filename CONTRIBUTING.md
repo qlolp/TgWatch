@@ -12,7 +12,7 @@ target API 34; native UI, Direct Boot, настройки и seven-day history �
 неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
 ```bash
-python3 -m pip install -r scripts/requirements-release.txt
+python3 -m pip install --require-hashes -r scripts/requirements-release.lock
 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/test_dependency_audit.py
 python3 scripts/test_signing_keychain.py
@@ -139,7 +139,10 @@ audits. Build/Android cancellation отделена от последовате�
 Release policy сохраняет published tags/assets. Уже существующий выпуск нельзя перезаписывать;
 draft, incomplete/different assets, другой commit или conflicting orphan tag требуют явного разбора.
 Более старый code не заменяет latest. Не обходите это удалением тега или перезаписью assets.
-CI должен проверить production certificate и upgrade реального 1.10.47 до публикации.
+CI должен проверить production certificate и upgrade реального предыдущего опубликованного
+релиза до публикации; baseline выбирает `scripts/upgrade-baseline.py`. После изменения
+`scripts/requirements-release.txt` перегенерируйте lock-файл:
+`python3 scripts/lock-requirements.py scripts/requirements-release.txt scripts/requirements-release.lock`.
 
 ## Как предложить изменение
 
