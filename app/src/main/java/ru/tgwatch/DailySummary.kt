@@ -51,5 +51,9 @@ object DailySummary {
         return cal.timeInMillis
     }
 
+    /** A manual preview always posts; the scheduled one needs opt-in, monitoring on and no delivery today. */
+    fun due(force: Boolean, optedIn: Boolean, monitoring: Boolean, deliveredToday: Boolean): Boolean =
+        force || (optedIn && monitoring && !deliveredToday)
+
     fun timeLabel(minuteOfDay: Int): String = String.format(Locale.ROOT, "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
 }

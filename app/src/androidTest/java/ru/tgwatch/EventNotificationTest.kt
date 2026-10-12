@@ -152,6 +152,14 @@ class EventNotificationTest {
             settings.edit().putBoolean("daily_summary", true).remove("daily_summary_last_at").commit()
             val alarm = android.content.Intent(ctx, DailySummaryReceiver::class.java)
                 .setAction("ru.tgwatch.action.DAILY_SUMMARY")
+            manager.cancel(EventNotifications.SUMMARY_ID)
+            awaitAbsent(manager, EventNotifications.SUMMARY_ID)
+            DailySummaryReceiver().onReceive(ctx, alarm)
+            android.os.SystemClock.sleep(250)
+            assertTrue("No scheduled summary while monitoring is off",
+                manager.activeNotifications.none { it.id == EventNotifications.SUMMARY_ID })
+            // The service stays stopped; only the setting says monitoring is on.
+            assertTrue(settings.edit().putBoolean("enabled", true).commit())
             DailySummaryReceiver().onReceive(ctx, alarm)
             awaitNotification(manager, EventNotifications.SUMMARY_ID)
             manager.cancel(EventNotifications.SUMMARY_ID)
@@ -198,7 +206,7 @@ class EventNotificationTest {
         try {
             val now = System.currentTimeMillis()
             History.replaceSnapshot(ctx, listOf(Observation(now - 60_000, now, "OK", 100)))
-            assertTrue(settings.edit().putBoolean("daily_summary", true)
+            assertTrue(settings.edit().putBoolean("daily_summary", true).putBoolean("enabled", true)
                 .putLong("daily_summary_last_at", now + 9 * 86_400_000L).commit())
             assertTrue("A clock correction to a different day must not suppress summaries for nine days",
                 DailySummaryReceiver.post(ctx, force = false))
