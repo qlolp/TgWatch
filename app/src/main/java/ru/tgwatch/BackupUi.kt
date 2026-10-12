@@ -89,6 +89,7 @@ class BackupUi(private val activity: Activity) {
         fun field(hint: String) = EditText(activity).apply {
             this.hint = hint
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            minHeight = resources.getDimensionPixelSize(R.dimen.touch_target_min)
             isSaveEnabled = false
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             layout.addView(this)
@@ -115,7 +116,9 @@ class BackupUi(private val activity: Activity) {
     }
 
     private fun preview(snapshot: BackupSnapshot, title: String, csv: Boolean = false) {
-        val date = DateFormat.getDateTimeInstance().format(Date(snapshot.createdAt))
+        val locale = activity.resources.configuration.locales[0]
+        val format = DateFormat.getDateTimeInstance(DateFormat.DEFAULT, DateFormat.DEFAULT, locale)
+        val date = format.format(Date(snapshot.createdAt))
         AlertDialog.Builder(activity).setTitle(title)
             .setMessage(Lang.t("Дата: $date\nЗаписей истории: ${snapshot.observations.size}\n", "Date: $date\nHistory records: ${snapshot.observations.size}\n") +
                 (if (csv) Lang.t("Настройки и журнал сохранятся. Текущая история будет заменена.\n\n", "Settings and the log will be kept. The current history will be replaced.\n\n") else

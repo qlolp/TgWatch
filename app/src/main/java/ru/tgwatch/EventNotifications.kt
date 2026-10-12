@@ -76,9 +76,14 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         manager.notify(PARTIAL_ID,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
     }
-    fun summary(title: String, text: String) {
-        if (blocked(SUMMARY_CHANNEL)) { manager.cancel(SUMMARY_ID); return }
-        manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok, SUMMARY_CHANNEL))
+    fun summary(title: String, text: String): Boolean {
+        if (!manager.areNotificationsEnabled() || blocked(SUMMARY_CHANNEL)) {
+            manager.cancel(SUMMARY_ID)
+            return false
+        }
+        manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok,
+            SUMMARY_CHANNEL))
+        return true
     }
     private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {
@@ -89,7 +94,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             .setStyle(Notification.BigTextStyle().bigText(text)).setAutoCancel(true)
             .setContentIntent(open).setCategory(Notification.CATEGORY_STATUS)
         // Suppress child alerts even if the user later changes this channel's sound.
-        if (!audible) builder.setGroup("tgwatch_silent_events")
+        if (!audible || channel == SUMMARY_CHANNEL) builder.setGroup("tgwatch_silent_events")
             .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
         return builder.build()
     }

@@ -1,4 +1,4 @@
-# Архитектура TgWatch 1.11
+# Архитектура TgWatch 1.13.0
 
 Android 8.0+; native Views и существующая foreground-служба. Чистые Kotlin policies и codecs отделены от Android-хранилища, Network/SAF и UI. Карта показывает потоки данных; наличие пути не заменяет отчёт о его проверке.
 
@@ -25,8 +25,19 @@ flowchart TD
     RESTORE["Android restore adapter · confirmed replace, stop monitoring"]
     TX["RestoreTransaction · durable pending journal"]
     START["Application startup · pending replay before components"]
+    AUTO["AutomationReceiver · opt-in capability token"]
+    CREDENTIALS["AutomationSettings · private credential-protected storage"]
+    DIAG["LocalDiagnostics · bounded redacted export"]
+    SUMMARY["DailySummaryReceiver · local-time opt-in summary"]
 
     UI --> SERVICE
+    UI --> CREDENTIALS
+    AUTO --> CREDENTIALS
+    AUTO --> SERVICE
+    UI --> DIAG
+    DIAG --> FILE
+    HISTORY --> SUMMARY
+    SUMMARY --> PRESENT
     UI --> PREFS
     SERVICE --> SCHEDULE
     SCHEDULE --> SERVICE
@@ -73,20 +84,22 @@ flowchart TD
 - Restore после preview/подтверждения заменяет данные и оставляет monitoring остановленным. Оба старых private journal formats читаются при обновлении. Pending journal replay идемпотентно завершает прерванную замену до работы компонентов; это несколько durable записей с восстановлением после сбоя, а не обещание одной общей файловой транзакции Android. Неверный пароль и malformed input не создают transaction и не останавливают действующий monitoring.
 - CSV — plaintext history interchange. UNKNOWN rows опускаются, поскольку экспорт не отличает реальные UNKNOWN checks от generated gaps. При отсутствии сохранённых строк текущей эпохи возвращается пустая история. Семидневное хранение сохраняется.
 - Quiet hours — local minute-of-day с legacy hour fallback; last success — сохранённый опубликованный OK, независимый от свежести текущего состояния.
+- Automation — явный opt-in и 256-bit bearer token; только snapshot статуса и ручной запрос уже работающей службе. Нет включения мониторинга, обхода pending restore или автоматического запуска службы. Секреты находятся отдельно от backup и device-protected settings.
+- Diagnostics — локальный ограниченный JSON через SAF, только фиксированные поля и агрегаты. Нет raw history/log, автоматической отправки или credential export. Scheduling counters измеряют задержку по monotonic clock; состояние device idle не доказывает причину задержки.
 
 ## Выпуск
 
 ```mermaid
 flowchart LR
-    INPUT["main push / PR / manual workflow"] --> CHECKS["build + unit + lint + Android scenarios"]
+    INPUT["main push / PR / version tag / manual workflow"] --> CHECKS["build + unit + detekt + lint + Android scenarios"]
     CHECKS --> INVENTORY["resolved releaseRuntimeClasspath"]
     INVENTORY --> BOM["CycloneDX 1.6 · purl / version / SHA-256"]
     BOM --> SCAN["Trivy HIGH / CRITICAL gate"]
     CHECKS --> OSV["resolved runtime + tests · OSV audit"]
     OSV --> ARTIFACT
     SCAN --> ARTIFACT["this run's SBOM + Trivy + OSV evidence"]
-    ARTIFACT --> MANUAL["main + manual publish=true"]
-    MANUAL --> SIGN["existing signing identity + v1.10.47 upgrade gate"]
+    ARTIFACT --> POLICY_INPUT["matching SemVer + main reachability + monotonic code"]
+    POLICY_INPUT --> SIGN["existing signing identity + v1.10.47 upgrade gate"]
     SIGN --> POLICY["serialized release-policy · immutable tag/assets"]
     POLICY --> RELEASE["APK + hash + SBOM + Trivy / OSV reports"]
     POLICY --> LATEST["latest only for higher versionCode"]
@@ -94,4 +107,4 @@ flowchart LR
 
 Оба audits должны завершиться успешно; недоступность не превращается в чистый результат. Trivy проверяет HIGH/CRITICAL с runtime package coverage, OSV — точные runtime/test Maven versions и неотозванные записи. SBOM отражает разрешённые JAR/AAR runtime dependencies, а не Android platform или test libraries. Публикации отделены от отменяемых checks; signing helper принимает только существующий private key с expected-certificate проверкой и не генерирует новый. Production continuity проверяется в CI, development-key upgrade этого не доказывает.
 
-Спецификация: [unified 1.11](specs/2026-10-10-unified-1.11-design.md). План: [implementation](plans/2026-10-10-unified-1.11.md). Команды и ограничения проверок: [CONTRIBUTING](../../CONTRIBUTING.md).
+Спецификация: [improvements 1.13.0](specs/2026-10-11-next-improvements-design.md). Совместимость backup: [unified 1.11](specs/2026-10-10-unified-1.11-design.md). Команды и ограничения проверок: [CONTRIBUTING](../../CONTRIBUTING.md).

@@ -70,6 +70,14 @@ class DailySummaryTest {
         assertEquals(25 * hour, next - at(zone, 2026, 10, 24, 21, 0))
     }
 
+    @Test fun nextDayRestoresChosenTimeAfterSpringDstGap() {
+        val zone = TimeZone.getTimeZone("Europe/Berlin")
+        // 02:30 does not exist on March 29. Its normalization to 03:30 must not
+        // change the selected 02:30 time on the following, ordinary day.
+        assertEquals(at(zone, 2026, 3, 30, 2, 30),
+            DailySummary.nextAt(at(zone, 2026, 3, 29, 4, 0), 2 * 60 + 30, zone))
+    }
+
     @Test fun timeLabelPadsHoursAndMinutes() {
         assertEquals("07:05", DailySummary.timeLabel(425))
         assertEquals("21:00", DailySummary.timeLabel(DailySummary.DEFAULT_MINUTE))

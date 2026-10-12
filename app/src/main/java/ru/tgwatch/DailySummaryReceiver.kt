@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import java.util.Calendar
 
 /** Posts the daily summary at the user's chosen time and re-arms itself for the next day. */
 class DailySummaryReceiver : BroadcastReceiver() {
@@ -22,18 +23,37 @@ class DailySummaryReceiver : BroadcastReceiver() {
         private const val TAG = "TgWatch"
         private const val ACTION = "ru.tgwatch.action.DAILY_SUMMARY"
 
-        /** Returns false when there is nothing to summarise (no checks in the last 24 h). */
-        fun post(ctx: Context, force: Boolean): Boolean {
-            if (!force && !Prefs.dailySummary(ctx)) return false
-            val text = DailySummary.text(History.stats(ctx, 1)) ?: return false
+        // Device-local delivery state; BackupManager exports only its explicit settings list.
+        private const val LAST_DELIVERY = "daily_summary_last_at"
+
+        /** Manual preview bypasses opt-in/deduplication, while permission/channel blocks still apply. */
+        @Synchronized fun post(ctx: Context, force: Boolean): Boolean {
+            val now = System.currentTimeMillis()
+            val settings = Prefs.sp(ctx)
+            val scheduled = force || (Prefs.dailySummary(ctx) &&
+                !alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L)))
+            if (!scheduled) return false
             return try {
-                EventNotifications(ctx, ctx.getSystemService(NotificationManager::class.java))
-                    .summary(text.title, text.body)
-                true
+                val text = DailySummary.text(History.stats(ctx, 1, now))
+                if (text == null) false else {
+                    val posted = EventNotifications(ctx, ctx.getSystemService(NotificationManager::class.java))
+                        .summary(text.title, text.body)
+                    if (posted && !force) settings.edit().putLong(LAST_DELIVERY, now).commit()
+                    posted
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "daily summary", e)
                 false
             }
+        }
+
+        private fun alreadyDelivered(now: Long, last: Long): Boolean {
+            val today = Calendar.getInstance().apply { timeInMillis = now }
+            val previous = Calendar.getInstance().apply { timeInMillis = last }
+            val sameDay = today.get(Calendar.YEAR) == previous.get(Calendar.YEAR) &&
+                today.get(Calendar.DAY_OF_YEAR) == previous.get(Calendar.DAY_OF_YEAR)
+            // A different local day remains eligible after a wall-clock correction.
+            return last > 0L && sameDay
         }
 
         fun schedule(ctx: Context) {

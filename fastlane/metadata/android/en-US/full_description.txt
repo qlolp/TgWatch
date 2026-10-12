@@ -1,0 +1,17 @@
+TG Monitor checks whether Telegram is reachable from your device and keeps a local seven-day availability history. It needs no Telegram account, phone number or access to messages, and it never sends messages.
+
+Each check combines an unauthenticated MTProto greeting (req_pq_multi / resPQ) with HTTPS requests to Telegram web endpoints. Control sites are asked only when Telegram does not answer, so the status distinguishes "Telegram unreachable", "partially reachable", "no network" and "unknown". A check does not prove that messages are delivered.
+
+Features:
+* Battery profiles or a custom interval; Android Doze and vendor restrictions can still delay checks, and the app shows how fresh the result is.
+* Independent notifications, sound and vibration for outages, partial availability and recovery; minute-precise quiet hours.
+* Home-screen widget, Quick Settings tile and an optional daily summary.
+* Chart, CSV export/import and a password-encrypted portable backup.
+* English and Russian interface.
+
+Optional and off by default:
+* Token-protected automation API for Tasker or your own Android client.
+* Informational checks of Matrix, WhatsApp Web or one HTTPS address of your choice, shown only in diagnostics; they never change the Telegram status or alerts.
+* A webhook (for example an ntfy.sh topic) that receives one short line when the status changes. The address is kept private and is not included in backups or diagnostics.
+
+Privacy: there is no account and no telemetry. History, logs and settings stay on the device; the diagnostic report is saved only where you choose.

@@ -1,0 +1,37 @@
+# Packaging candidate; no F-Droid submission or acceptance is implied.
+Categories:
+  - Connectivity
+License: MIT
+WebSite: https://github.com/qlolp/TgWatch
+SourceCode: https://github.com/qlolp/TgWatch
+IssueTracker: https://github.com/qlolp/TgWatch/issues
+Changelog: https://github.com/qlolp/TgWatch/blob/HEAD/CHANGELOG.md
+
+AutoName: TgWatch
+Summary: Monitor Telegram connectivity on your device
+# Store text is maintained in fastlane/metadata/android/{en-US,ru-RU}; keep this summary in sync.
+Description: |-
+  TgWatch checks Telegram connectivity using bounded network probes and keeps
+  local availability history. It supports English and Russian, notifications,
+  encrypted portable backups, daily summaries, and optional token-protected
+  automation. Optional checks of other services are informational only, and an
+  optional webhook can report status changes to a user-chosen HTTPS address.
+  Diagnostic exports are local and contain aggregate information. Monitoring is
+  controlled by the user; no account or cloud service is needed.
+
+RepoType: git
+Repo: https://github.com/qlolp/TgWatch.git
+
+Builds:
+  - versionName: 1.13.1
+    versionCode: 1013001
+    disable: Packaging candidate; verify the published tag and F-Droid build first
+    commit: v1.13.1
+    subdir: app
+    gradle:
+      - "yes"
+
+# The Gradle versionCode is computed from version.properties. Automatic checking
+# needs an F-Droid maintainer-approved recipe before enabling update discovery.
+AutoUpdateMode: None
+UpdateCheckMode: None

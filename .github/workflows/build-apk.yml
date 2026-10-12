@@ -2,6 +2,7 @@ name: Build APK
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -32,7 +33,7 @@ jobs:
           python3 scripts/test_dependency_audit.py
           python3 scripts/test_signing_keychain.py
       - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
+        run: bash ./gradlew detekt testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
       - name: Audit all exact resolved runtime and test dependencies against OSV
         run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
       - name: Install pinned Trivy scanner
@@ -92,16 +93,25 @@ jobs:
           fi
   release:
     needs: [build, android]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     concurrency:
-      # Serial across branches/run numbers; checks have separate cancellable groups.
+      # Serial across version tags and manual publications; checks have separate groups.
       group: tgwatch-publication-${{ github.repository }}
       cancel-in-progress: false
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate source tag, main ancestry and monotonic publication before signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m pip install -r scripts/requirements-release.txt
+          python3 scripts/release-policy.py --repo "$GITHUB_REPOSITORY" \
+            --sha "$(git rev-parse HEAD)" --ref "$GITHUB_REF" --preflight
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -198,9 +208,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version=$(sed -n 's/^[[:space:]]*versionName = "\([0-9.]*\)".*/\1/p' app/build.gradle.kts)
+          version=$(sed -n 's/^version=//p' version.properties)
           python3 scripts/release-policy.py --repo "$GITHUB_REPOSITORY" \
-            --version "$version" --run-number "$GITHUB_RUN_NUMBER" --sha "$GITHUB_SHA" \
+            --sha "$(git rev-parse HEAD)" --ref "$GITHUB_REF" \
             --notes "docs/releases/${version}.md" \
             --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json TgWatch.dependencies.json TgWatch.osv.json
   android:
@@ -232,6 +242,9 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: bash scripts/android-smoke.sh
+      - name: Connected Android test summary and bounded failure annotations
+        if: always()
+        run: python3 scripts/report-android-tests.py app/build/outputs/androidTest-results/connected
       - name: Android reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -239,4 +252,5 @@ jobs:
           name: android-reports-${{ matrix.api }}
           path: |
             app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/connected/
             smoke-logcat.txt

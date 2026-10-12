@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="automation_title">Автоматизация</string>
+    <string name="automation_enable">Разрешить запросы автоматизации</string>
+    <string name="automation_description">Разрешить явные запросы CHECK_NOW и GET_STATE с приватным токеном доступа. Проверки работают только при запущенном мониторинге. Любой обладатель токена получает этот доступ; передавайте его только доверенному приложению автоматизации.</string>
+    <string name="automation_disabled">Автоматизация отключена. При включении будет создан новый токен доступа.</string>
+    <string name="automation_token">Токен доступа</string>
+    <string name="automation_copy">Копировать токен</string>
+    <string name="automation_regenerate">Пересоздать токен</string>
+    <string name="automation_regenerate_title">Заменить токен доступа?</string>
+    <string name="automation_regenerate_message">Существующие задачи автоматизации потеряют доступ, пока вы не обновите их токен.</string>
+    <string name="automation_replace">Заменить</string>
+    <string name="automation_cancel">Отмена</string>
+    <string name="automation_copied">Токен скопирован. Через 45 секунд будет выполнена попытка очистки буфера.</string>
+    <string name="automation_storage_error">Не удалось сохранить доступ автоматизации. Повторите попытку.</string>
+    <string name="automation_done">Готово</string>
+    <string name="webhook_title">Вебхук-оповещение</string>
+    <string name="webhook_description">По желанию при смене опубликованного статуса отправлять одну короткую строку, например «TG Монитор: Telegram недоступен», на ваш HTTPS-адрес (например, тему ntfy.sh). История, диагностика и токены не отправляются; один и тот же статус — не чаще раза в минуту. Любой, кто знает адрес, может публиковать в него, поэтому адрес хранится приватно, не входит в резервные копии и диагностику и используется только после разблокировки устройства. По умолчанию выключено.</string>
+    <string name="webhook_enable">Отправлять смену статуса на вебхук</string>
+    <string name="webhook_url_unset">Адрес вебхука не задан.</string>
+    <string name="webhook_url_saved">Адрес вебхука сохранён: %1$s/…</string>
+    <string name="webhook_set_url">Задать адрес вебхука</string>
+    <string name="webhook_url_hint">https://ntfy.sh/your-topic</string>
+    <string name="webhook_url_message">Только HTTPS, до 512 символов, без логина и #фрагмента. Сохранённый адрес не показывается; чтобы заменить, введите его заново.</string>
+    <string name="webhook_url_invalid">Введите корректный адрес https:// без логина и #фрагмента.</string>
+    <string name="webhook_url_required">Сначала задайте корректный адрес вебхука.</string>
+    <string name="webhook_test">Отправить тестовое сообщение</string>
+    <string name="webhook_test_sent">Тестовое сообщение доставлено.</string>
+    <string name="webhook_test_failed">Тестовое сообщение не доставлено.</string>
+    <string name="webhook_test_busy">Выполняется другой запрос. Повторите через несколько секунд.</string>
+</resources>

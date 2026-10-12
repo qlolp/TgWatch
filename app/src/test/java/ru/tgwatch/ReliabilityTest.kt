@@ -84,6 +84,11 @@ class ReliabilityTest {
         assertFalse(ServiceHealth.isOverdue(1000, 20_000, 30))
         assertTrue(ServiceHealth.isOverdue(1000, 150_000, 30))
     }
+    @Test fun watchdogAfterCheckWaitsOutTheNextScheduledCheck() {
+        assertEquals(ServiceHealth.WATCHDOG_MS + 30_000L, ServiceHealth.watchdogDelayMs(30))
+        assertEquals(ServiceHealth.WATCHDOG_MS + 300_000L, ServiceHealth.watchdogDelayMs(300))
+        assertEquals(ServiceHealth.WATCHDOG_MS, ServiceHealth.watchdogDelayMs(-5))
+    }
     @Test fun slowControlsDoNotHideFastLastControl() {
         val pool = Executors.newFixedThreadPool(4)
         try {
