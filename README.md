@@ -216,7 +216,7 @@ debug-ключом ранее опубликованного APK.
 Основные компоненты: `NetworkProbe.kt`, `MtProto.kt`, `Timeline.kt`, `HistoryStorage.kt`,
 `History.kt`, `PortableBackupCodec.kt`, `BackupCrypto.kt`, `BackupCodec.kt`, `CsvImport.kt`, `RestoreTransaction.kt`,
 `PowerProfile.kt`, `MonitorService.kt`. [Карта архитектуры](docs/superpowers/architecture.md).
-План и решения: `docs/superpowers/`.
+Архитектура и проектные решения: `docs/superpowers/`.
 
 Протокол и адреса: [MTProto](https://core.telegram.org/mtproto/samples-auth_key),
 [встроенные DC Telegram Desktop](https://github.com/telegramdesktop/tdesktop/blob/dev/Telegram/SourceFiles/mtproto/mtproto_dc_options.cpp).
