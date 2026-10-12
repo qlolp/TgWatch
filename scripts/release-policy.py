@@ -6,6 +6,7 @@ Historical scan evidence stays unchanged. Version tags must match source,
 be reachable from main, and advance both SemVer and Android installation order.
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -165,6 +166,20 @@ def commit_for_tag(repo, tag, allow_missing=False):
     raise ValueError("Release tag does not resolve to a commit")
 
 
+def verify_checksum(by_name):
+    """The published APK must be the bytes its own checksum asset describes."""
+    apk = by_name["TgWatch.apk"]
+    line = by_name["TgWatch.apk.sha256"].read_text().strip()
+    match = re.fullmatch(r"([0-9a-fA-F]{64})(?:\s+\*?([^\s]+))?", line)
+    if not match:
+        raise ValueError("Checksum asset is not a single sha256 line")
+    expected, recorded = match.group(1).lower(), match.group(2)
+    if recorded and recorded != apk.name:
+        raise ValueError(f"Checksum asset names {recorded}, not {apk.name}")
+    if hashlib.sha256(apk.read_bytes()).hexdigest() != expected:
+        raise ValueError("Published APK does not match its checksum asset")
+
+
 def publish(args):
     version = read_version(args.version_file)
     tag = preflight(args.repo, version, args.sha, args.ref)
@@ -181,6 +196,7 @@ def publish(args):
     required = {"TgWatch.apk", "TgWatch.apk.sha256", "TgWatch.osv.json", "TgWatch.dependencies.json", "TgWatch.sbom.cdx.json", "TgWatch.trivy.json"}
     if set(by_name) != required:
         raise ValueError("Unified release needs complete APK/checksum, SBOM, Trivy and full dependency/OSV evidence")
+    verify_checksum(by_name)
     inventory = json.loads(by_name["TgWatch.dependencies.json"].read_text())
     bom = json.loads(by_name["TgWatch.sbom.cdx.json"].read_text())
     verify_osv(json.loads(by_name["TgWatch.osv.json"].read_text()), inventory)

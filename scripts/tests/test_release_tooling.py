@@ -11,6 +11,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 SCAN_ARTIFACT = "app/build/reports/sbom/TgWatch.sbom.cdx.json"
+# The sandbox token cannot update .github/workflows, so the reviewed workflow lives
+# beside the report until a maintainer applies it over the published one.
+PROPOSED_WORKFLOW = ROOT / "docs/review/build-apk.yml.proposed"
 LIBRARY = {"type": "library", "group": "org.example", "name": "library", "version": "1.0",
            "purl": "pkg:maven/org.example/library@1.0?type=jar", "bom-ref": "pkg:maven/org.example/library@1.0?type=jar",
            "hashes": [{"alg": "SHA-256", "content": "a" * 64}]}
@@ -44,7 +47,9 @@ class ToolFixture:
         audit = {"checked_at": "2026-10-10T00:00:00+00:00", "source": "https://api.osv.dev/v1/query",
                  "packages": [dict(package, vulnerabilities=[]) for package in packages]}
         self.files = []
-        for name, data in (("TgWatch.apk", b"apk"), ("TgWatch.apk.sha256", b"checksum"),
+        apk_bytes = b"apk"
+        for name, data in (("TgWatch.apk", apk_bytes),
+                           ("TgWatch.apk.sha256", (hashlib.sha256(apk_bytes).hexdigest() + "  TgWatch.apk\n").encode()),
                            ("TgWatch.sbom.cdx.json", json.dumps(BOM).encode()),
                            ("TgWatch.dependencies.json", json.dumps({"packages": packages}).encode()),
                            ("TgWatch.osv.json", json.dumps(audit).encode()),
@@ -108,6 +113,14 @@ else: raise AssertionError(args)
 
 
 class ReleaseTests(ToolFixture, unittest.TestCase):
+    def test_checksum_mismatch_blocks_publication(self):
+        self.fixture["tag_missing"] = True
+        (self.work / "TgWatch.apk.sha256").write_text("0" * 64 + "  TgWatch.apk\n")
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("checksum", result.stderr.lower())
+        self.assertEqual([], self.created())
+
     def test_first_release_is_latest(self):
         self.fixture["tag_missing"] = True
         result = self.run_release()
@@ -484,7 +497,35 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('$1 == checked', smoke)
         workflow = (ROOT / ".github/workflows/build-apk.yml").read_text()
         self.assertIn("signed-upgrade-smoke.sh previous/TgWatch.apk TgWatch.apk", workflow)
-        self.assertIn("efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1", workflow)
+
+    def test_proposed_workflow_follows_the_published_upgrade_baseline(self):
+        # The baseline follows the published inventory; only the signing identity stays pinned.
+        proposed = PROPOSED_WORKFLOW.read_text()
+        self.assertIn("scripts/upgrade-baseline.py", proposed)
+        self.assertIn("ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1", proposed)
+        self.assertNotIn("efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1", proposed)
+        import yaml
+        jobs = yaml.safe_load(proposed)["jobs"]
+        for script in ("scripts/upgrade-baseline.py", "scripts/release-policy.py"):
+            self.assertTrue((SCRIPTS / Path(script).name).is_file() or (ROOT / script).is_file(), script)
+        self.assertIn("upgrade_check", proposed)
+
+    def test_actions_are_pinned_and_the_wrapper_checksum_is_fixed(self):
+        import re
+        for reference in re.findall(r"uses:\s+(\S+)", PROPOSED_WORKFLOW.read_text()):
+            self.assertRegex(reference, r"@[0-9a-f]{40}$", reference)
+        wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
+        self.assertRegex(wrapper, r"distributionSha256Sum=[0-9a-f]{64}")
+
+    def test_release_tooling_installs_from_hash_locked_requirements(self):
+        workflow = PROPOSED_WORKFLOW.read_text()
+        self.assertNotIn("pip install -r scripts/requirements-release.txt", workflow)
+        self.assertIn("--require-hashes -r scripts/requirements-release.lock", workflow)
+        lock = (SCRIPTS / "requirements-release.lock").read_text()
+        self.assertIn("--hash=sha256:", lock)
+        for line in lock.splitlines():
+            if line.strip() and not line.startswith("#"):
+                self.assertRegex(line, r"^\s*(\S+==\S+|--hash=sha256:[0-9a-f]{64})\s*\\?$", line)
 
     def test_ci_scans_sbom_and_keeps_failed_scan_reports(self):
         text = (ROOT / ".github/workflows/build-apk.yml").read_text()

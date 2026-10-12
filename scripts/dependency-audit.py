@@ -24,7 +24,7 @@ def query_osv(query):
             time.sleep(attempt + 1)
 
 
-def audit(packages, query=query_osv):
+def audit(packages, query=query_osv, observed=None):
     if not packages:
         raise ValueError('No resolved dependencies: refusing an empty audit')
     def check(package):
@@ -44,6 +44,12 @@ def audit(packages, query=query_osv):
             for record in records:
                 if not isinstance(record, dict) or not isinstance(record.get('id'), str) or not record['id']:
                     raise ValueError('OSV record missing its ID')
+                if observed is not None and 'modified' in record:
+                    modified = record['modified']
+                    if not isinstance(modified, str) or not re.fullmatch(
+                        r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})', modified):
+                        raise ValueError('Invalid OSV record timestamp')
+                    observed[record['id']] = modified
                 if 'withdrawn' in record:
                     withdrawn = record['withdrawn']
                     if not isinstance(withdrawn,str) or not re.fullmatch(
@@ -73,8 +79,13 @@ def main():
         packages = inventory['packages']
         if not any('releaseRuntimeClasspath' in p.get('scopes', []) for p in packages):
             raise ValueError('Release runtime graph missing')
+        # The gate queries a live database; record which state of it this run saw, so a
+        # reproduced report can be compared instead of silently differing.
+        observed = {}
         report = {'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'source': 'https://api.osv.dev/v1/query', 'packages': audit(packages)}
+            'source': 'https://api.osv.dev/v1/query',
+            'database_state': {'newest_osv_record': max(observed.values()) if observed else None},
+            'packages': audit(packages, observed=observed)}
         destination.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
         findings = [(p['group'] + ':' + p['name'] + ':' + p['version'], p['vulnerabilities'])
             for p in report['packages'] if p['vulnerabilities']]

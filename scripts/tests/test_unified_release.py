@@ -170,8 +170,9 @@ class UnifiedWorkflowTests(unittest.TestCase):
         self.assertIn("generateReleaseSbom", text)
         self.assertIn("TgWatch.osv.json", text)
         self.assertIn("TgWatch.dependencies.json", text)
-        self.assertIn("efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1", text)
-        self.assertIn("v1.10.47", text)
+        proposed = (ROOT / "docs/review/build-apk.yml.proposed").read_text()
+        self.assertIn("scripts/upgrade-baseline.py", proposed)
+        self.assertIn("ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1", proposed)
 
     def test_new_version_and_keychain_wrapper_are_safe(self):
         gradle = (ROOT / "app/build.gradle.kts").read_text()

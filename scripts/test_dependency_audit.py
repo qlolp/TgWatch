@@ -28,6 +28,11 @@ class AuditTest(unittest.TestCase):
             return {'vulns': [{'id': 'OSV-later'}]} if 'page_token' in query else {'next_page_token': 'next'}
         self.assertEqual(['OSV-later'], module.audit([package], pages)[0]['vulnerabilities'])
         self.assertEqual('1.2.3', calls[0]['version'])
+        observed = {}
+        module.audit([package], lambda query: {'vulns': [{'id': 'OSV-1', 'modified': '2026-10-10T00:00:00Z'}]}, observed)
+        self.assertEqual({'OSV-1': '2026-10-10T00:00:00Z'}, observed)
+        with self.assertRaises(ValueError):
+            module.audit([package], lambda query: {'vulns': [{'id': 'OSV-1', 'modified': 'yesterday'}]}, observed)
         self.assertEqual('example:library', calls[0]['package']['name'])
 
     def test_malformed_optional_fields_fail_the_audit_and_cli(self):
@@ -45,7 +50,7 @@ class AuditTest(unittest.TestCase):
             source.write_text(json.dumps({'packages':[package]}))
             original_audit = module.audit
             with mock.patch.object(module.sys,'argv',['audit',str(source),str(destination)]), \
-                 mock.patch.object(module,'audit',side_effect=lambda packages:original_audit(packages,lambda _:responses[0])):
+                 mock.patch.object(module,'audit',side_effect=lambda packages,observed=None:original_audit(packages,lambda _:responses[0],observed)):
                 self.assertEqual(2,module.main())
             self.assertEqual('audit_failed',json.loads(destination.read_text())['status'])
 
