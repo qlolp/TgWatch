@@ -79,12 +79,13 @@ object Timeline {
         return samples.filter { it.clockEpoch == epoch }
     }
     fun currentChecks(samples: List<Observation>): List<Observation> =
-        unique(current(samples).filter { !it.isEpochMetadata })
+        if (samples is PreparedChecks) samples else unique(current(samples).filter { !it.isEpochMetadata })
     fun segments(samples: List<Observation>, from: Long, until: Long): List<Observation> {
         if (until <= from) return emptyList()
-        val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L
-        val ordered = currentChecks(samples).filter { it.until > it.at && it.at < until && it.until > from }
-            .sortedBy { it.at }
+        val epoch = if (samples is PreparedChecks) samples.epoch else samples.maxOfOrNull { it.clockEpoch } ?: 0L
+        val checks = currentChecks(samples)
+        val ordered = (if (checks is PreparedChecks) checks else checks.sortedBy { it.at })
+            .filter { it.until > it.at && it.at < until && it.until > from }
         val result = mutableListOf<Observation>()
         var cursor = from
         ordered.forEachIndexed { index, sample ->

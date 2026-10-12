@@ -21,10 +21,23 @@ import kotlin.math.ceil
  */
 class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    private companion object {
-        const val LABEL_PADDING_DP = 8f
+    companion object {
+        private const val LABEL_PADDING_DP = 8f
         /** Bars keep this much height; with 11 sp labels at font scale 1 the view stays at its 120 dp minimum. */
-        const val MIN_PLOT_DP = 76f
+        private const val MIN_PLOT_DP = 76f
+        private const val SLOTS = 60
+        private const val MINUTE_MS = 60_000L
+
+        data class Prepared(val minutes: List<History.Minute>, val now: Long, val window: Int)
+
+        /** Group large windows on the history worker, before handing sixty buckets to the view. */
+        fun prepare(data: List<History.Minute>, now: Long, window: Int = 60): Prepared {
+            val bucket = (window / SLOTS).coerceAtLeast(1)
+            val first = now / MINUTE_MS - window + 1
+            val minutes = data.groupBy { first + ((it.minute - first) / bucket) * bucket }
+                .map { (key, values) -> History.Minute.merge(key, values) }
+            return Prepared(minutes, now, window)
+        }
     }
 
     private val slots = 60
@@ -68,13 +81,14 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
     }
 
     fun setData(data: List<History.Minute>, now: Long, window: Int = 60) {
-        windowMinutes = window
-        bucketMinutes = (window / slots).coerceAtLeast(1)
-        nowMinute = now / 60_000L
-        val first = nowMinute - window + 1
-        minutes = data.groupBy { first + ((it.minute - first) / bucketMinutes) * bucketMinutes }.map { (key, values) ->
-            History.Minute.merge(key, values)
-        }
+        setData(prepare(data, now, window))
+    }
+
+    fun setData(data: Prepared) {
+        windowMinutes = data.window
+        bucketMinutes = (data.window / slots).coerceAtLeast(1)
+        nowMinute = data.now / 60_000L
+        minutes = data.minutes
         contentDescription = describe()
         invalidate()
     }

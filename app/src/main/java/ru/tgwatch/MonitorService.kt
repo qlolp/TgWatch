@@ -61,7 +61,10 @@ class MonitorService : Service() {
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
-        val outcomes: List<ProbeOutcome> = emptyList())
+        val outcomes: List<ProbeOutcome> = emptyList(), val extraCheck: ExtraCheck? = null)
+
+    private data class ExtraCheck(val token: ExtraProbeCoordinator.Token, val probe: NetworkProbe,
+        val endpoints: List<ProbeEndpoint>)
 
     companion object {
         private const val TAG = "TgWatch"
@@ -144,7 +147,7 @@ class MonitorService : Service() {
         }
 
         fun stop(ctx: Context) {
-            activeService?.let { synchronized(it) { it.stopping = true } }
+            activeService?.let { synchronized(it) { it.stopping = true; it.extraCoordinator.invalidate() } }
             ctx.stopService(Intent(ctx, MonitorService::class.java))
         }
 
@@ -170,6 +173,7 @@ class MonitorService : Service() {
         }
 
         fun clearRestoredState() {
+            activeService?.let { synchronized(it) { it.extraCoordinator.invalidate() } }
             state = State()
             lastEndpoints = emptyList()
             lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
@@ -203,6 +207,7 @@ class MonitorService : Service() {
      */
     private val probeExecutor: ExecutorService = NetworkProbe.executor()
     private val extraProbeExecutor: ExecutorService = NetworkProbe.extraExecutor()
+    private val extraCoordinator = ExtraProbeCoordinator()
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -221,7 +226,7 @@ class MonitorService : Service() {
     }
     private fun ensureProgress() {
         val now = SystemClock.elapsedRealtime()
-        // Checks have a 12-second network budget (+5 s for opt-in extra probes). If overdue, cancel wait and retry.
+        // Primary checks have a 12-second network budget. If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
         } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
@@ -242,19 +247,24 @@ class MonitorService : Service() {
     /** Only identity and validated/captive-portal changes invalidate a running or good result. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            if (networkTransitions.available(network.networkHandle)) checkSchedule.networkChanged(1_500L)
+            if (networkTransitions.available(network.networkHandle)) networkChanged(1_500L)
         }
         override fun onLost(network: Network) {
             networkTransitions.lost()
-            checkSchedule.networkChanged(500L)
+            networkChanged(500L)
         }
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (networkTransitions.capabilities(network.networkHandle,
                     networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
                     networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL))) {
-                checkSchedule.networkChanged(800L)
+                networkChanged(800L)
             }
         }
+    }
+
+    @Synchronized private fun networkChanged(delayMs: Long) {
+        extraCoordinator.invalidate()
+        checkSchedule.networkChanged(delayMs)
     }
 
     /** Unlocking after sleep should not show a result from the long screen-off interval. */
@@ -332,8 +342,11 @@ class MonitorService : Service() {
         return START_STICKY
     }
 
-    private fun recordRequestedTrigger(action: String?) {
-        if (action == ACTION_STOP) stopping = true
+    @Synchronized private fun recordRequestedTrigger(action: String?) {
+        if (action == ACTION_STOP) {
+            stopping = true
+            extraCoordinator.invalidate()
+        }
         if (action == ACTION_CHECK_NOW) scheduleDiagnostics.manual(checkStartedMono > 0L)
     }
 
@@ -341,6 +354,7 @@ class MonitorService : Service() {
         try {
         destroyed = true
         stopping = true
+        extraCoordinator.close()
         scheduleDiagnostics.canceled()
         lastScheduleDiagnostics = scheduleDiagnostics.snapshot()
         lastEndpoints = emptyList()
@@ -452,13 +466,17 @@ class MonitorService : Service() {
         if (!acceptsRunningCheck(this)) return
         // An interrupt from the health monitor must not poison the following check.
         Thread.interrupted()
+        extraCoordinator.invalidate()
         checkStartedMono = SystemClock.elapsedRealtime()
         val revision = checkSchedule.begin()
         acquireWakeLockForCheck()
         try {
             val result = performCheck()
             if (!acceptsRunningCheck(this)) return
-            if (revision == checkSchedule.revision) handleResult(result)
+            if (revision == checkSchedule.revision) {
+                handleResult(result)
+                startExtras(result)
+            }
             else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics, result.outcomes))
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
@@ -478,6 +496,7 @@ class MonitorService : Service() {
     }
 
     private fun performCheck(): Probe {
+        val revision = checkSchedule.revision
         var network = cm.activeNetwork
         if (network == null) {
             Thread.sleep(NETWORK_GRACE_MS)
@@ -495,26 +514,48 @@ class MonitorService : Service() {
         if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) {
             return Probe(Status.NO_NETWORK, -1, Lang.t("Требуется вход в сеть Wi-Fi", "Wi-Fi sign-in required"), Lang.t("Сеть: $transport; captive portal", "Network: $transport; captive portal"))
         }
-        val report = NetworkProbe(probeExecutor, extraProbeExecutor,
+        val token = extraCoordinator.begin(revision, selected.networkHandle)
+        val probe = NetworkProbe(probeExecutor, extraProbeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
-            { selected.socketFactory.createSocket() }).check(Prefs.extraProbeEndpoints(this))
-        fun line(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
-            if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
-        val (extraResults, telegramResults) = report.results.partition { it.group == ProbeGroup.EXTRA }
-        val extraDetails = if (extraResults.isEmpty()) "" else
-            Lang.t("\nДругие сервисы (не влияют на статус Telegram):\n",
-                "\nOther services (do not affect Telegram status):\n") +
-                extraResults.joinToString("\n", transform = ::line)
+            { selected.socketFactory.createSocket() })
+        val report = probe.checkPrimary()
         val checkedAt = timeStr(System.currentTimeMillis())
         val details = Lang.t("Сеть: $transport\nПроверка: $checkedAt\n", "Network: $transport\nCheck: $checkedAt\n") +
-            telegramResults.joinToString("\n", transform = ::line) + extraDetails +
+            report.results.joinToString("\n", transform = ::outcomeLine) +
             Lang.t("\nMTProto: только приветствие без авторизации. Доставка сообщений не проверяется. ",
                 "\nMTProto: handshake only, without authorization. Message delivery is not checked. ") +
             Lang.t("Прокси, настроенный внутри Telegram, здесь не используется.",
                 "A proxy configured inside Telegram is not used here.")
         if (selected != cm.activeNetwork) return Probe(Status.UNKNOWN, -1,
             Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details, report.results)
-        return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details, report.results)
+        return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details, report.results,
+            ExtraCheck(token, probe, Prefs.extraProbeEndpoints(this)))
+    }
+
+    private fun outcomeLine(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
+        if (r.latencyMs >= 0) Lang.t(" · ${r.latencyMs} мс", " · ${r.latencyMs} ms") else ""
+
+    @Synchronized private fun startExtras(primary: Probe) {
+        val extra = primary.extraCheck ?: return
+        if (extra.endpoints.isEmpty() || Thread.currentThread().isInterrupted || !acceptsExtras(extra.token)) return
+        extraCoordinator.submit(extra.token, { extra.probe.checkExtras(extra.endpoints) }) { outcomes ->
+            worker.post { publishExtras(primary, extra.token, outcomes) }
+        }
+    }
+
+    private fun acceptsExtras(token: ExtraProbeCoordinator.Token): Boolean = acceptsRunningCheck(this) &&
+        extraCoordinator.accepts(token, checkSchedule.revision, cm.activeNetwork?.networkHandle)
+
+    /** Diagnostic delivery deliberately does not enter handleResult or any persistence/alert/scheduling path. */
+    @Synchronized private fun publishExtras(primary: Probe, token: ExtraProbeCoordinator.Token,
+        outcomes: List<ProbeOutcome>) {
+        if (!acceptsExtras(token)) return
+        val details = primary.diagnostics + Lang.t("\nДругие сервисы (не влияют на статус Telegram):\n",
+            "\nOther services (do not affect Telegram status):\n") +
+            outcomes.joinToString("\n", transform = ::outcomeLine)
+        lastEndpoints = primary.outcomes + outcomes
+        state = state.copy(diagnostics = details)
+        broadcastState()
     }
 
     @Synchronized private fun handleResult(p: Probe) {

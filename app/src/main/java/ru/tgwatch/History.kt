@@ -45,6 +45,8 @@ object History {
     private var dirty = false
     private var lastCompacted = 0L
     private val statsCache = mutableMapOf<String, TimeStats>()
+    private val preparation = HistoryPreparationCache()
+    private var appliedPreparation: HistoryPreparationCache.Prepared? = null
     private val appendSync = HistoryStorage.AppendSyncPolicy()
     @Volatile var version = 0L
         private set
@@ -53,6 +55,9 @@ object History {
     private fun load(ctx: Context) {
         if (!loaded) {
             samples = HistoryStorage.read(file(ctx)).toMutableList()
+            preparation.clear()
+            appliedPreparation = null
+            statsCache.clear()
             dirty = false
             loaded = true
             lastCompacted = System.currentTimeMillis()
@@ -63,20 +68,31 @@ object History {
             val marker = File(dp, "history-migrated-v2")
             val legacy = File(ctx.applicationContext.filesDir, "history.csv")
             val result = HistoryStorage.migrateLegacy(legacy, file(ctx), marker, samples)
+            if (samples != result.samples) {
+                preparation.clear()
+                appliedPreparation = null
+                statsCache.clear()
+                version++
+            }
             samples = result.samples.toMutableList()
             migrated = result.complete
         }
     }
     private fun prune(now: Long) {
-        val retained = Timeline.retained(samples,now-KEEP_MS)
-        if (retained != samples) {
-            samples = retained.toMutableList()
+        val prepared = preparation.prepare(samples, version, now - KEEP_MS)
+        if (prepared === appliedPreparation) return
+        if (prepared.rows != samples) {
+            samples = prepared.rows.toMutableList()
             dirty = true
             version++
             statsCache.clear()
+            preparation.acceptRevision(version)
         }
+        appliedPreparation = prepared
     }
     private fun ensureClock(ctx: Context, now: Long) {
+        val latest = preparation.prepare(samples, version, now - KEEP_MS).latestAt
+        if (latest == null || latest <= now) return
         val rolled = Timeline.clockRollback(samples, now)
         if (rolled !== samples) {
             samples = rolled.toMutableList()
@@ -135,7 +151,17 @@ object History {
         val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1,7)}"
         statsCache[cacheKey]?.let { return it }
         if (statsCache.size > 4) statsCache.clear()
-        return Timeline.stats(samples, now - days.coerceIn(1,7) * 86_400_000L, now).also { statsCache[cacheKey] = it }
+        val checks = preparation.prepare(samples, version, now - KEEP_MS).checks
+        return Timeline.stats(checks, now - days.coerceIn(1,7) * 86_400_000L, now)
+            .also { statsCache[cacheKey] = it }
+    }
+    @Synchronized fun incidents(ctx: Context, days: Int = 7,
+        now: Long = System.currentTimeMillis()): List<OutageEpisode> {
+        if (!ready(ctx)) return emptyList()
+        ensureClock(ctx, now)
+        prune(now)
+        val checks = preparation.prepare(samples, version, now - KEEP_MS).checks
+        return OutageEpisodes.derivePrepared(checks, now - days.coerceIn(1, 7) * 86_400_000L, now)
     }
     @Synchronized fun uptimePercent(ctx: Context): Double = stats(ctx).uptimePercent
     @Synchronized fun recovery(ctx: Context, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? =
@@ -152,7 +178,8 @@ object History {
         prune(now)
         val from = now / 60_000L - count + 1
         val bins = sortedMapOf<Long, Minute>()
-        for (s in Timeline.currentChecks(samples).filter { it.at / 60_000L >= from && it.at <= now }) {
+        for (s in preparation.prepare(samples, version, now - KEEP_MS).checks) {
+            if (s.at / 60_000L < from || s.at > now) continue
             val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
             when (s.kind) {
                 "OK" -> m.addLatency(s.latencyMs)
@@ -231,6 +258,8 @@ object History {
     @Synchronized fun flush(ctx: Context) {
         if (!loaded) return
         dirty = true
+        preparation.clear()
+        appliedPreparation = null
         try {
             HistoryStorage.write(file(ctx), samples)
             dirty = false

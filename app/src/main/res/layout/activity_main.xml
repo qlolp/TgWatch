@@ -139,6 +139,13 @@
                 android:lineSpacingExtra="2dp"
                 android:textColor="@color/on_status"
                 android:textSize="14sp" />
+            <Button
+                android:id="@+id/btnResumeAlerts"
+                style="@style/ButtonText"
+                android:layout_marginTop="4dp"
+                android:text="@string/alerts_resume"
+                android:textColor="@color/on_status"
+                android:visibility="gone" />
         </LinearLayout>
 
         <LinearLayout
@@ -212,6 +219,7 @@
                 android:text="@string/history_title" />
 
             <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="@string/period_day" />
+            <Button android:id="@+id/btnIncidents" style="@style/ButtonText" android:text="@string/incidents_title" />
             <TextView
                 android:id="@+id/tvDayStats"
                 style="@style/Body"

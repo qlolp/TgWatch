@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Card">
+    <TextView android:id="@+id/incidentText" style="@style/Body"
+        android:textColor="@color/text_primary" android:textIsSelectable="true" />
+    <Button android:id="@+id/incidentShare" style="@style/ButtonText" android:text="@string/incident_share" />
+</LinearLayout>

@@ -100,4 +100,14 @@
     <string name="dialog_remove">Удалить</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="extra_probe_custom_url_hint">https://example.org/status</string>
+    <string name="alerts_resume">Возобновить оповещения</string>
+    <string name="alerts_resumed">Пауза отменена. Тихие часы и настройки уведомлений продолжают действовать.</string>
+    <string name="alert_mute_save_failed">Не удалось сохранить изменение паузы оповещений</string>
+    <string name="history_loading">Готовлю историю…</string>
+    <string name="history_load_failed">История временно недоступна</string>
+    <string name="incidents_title">Карточки сбоев</string>
+    <string name="incidents_hint">Последние 100 эпизодов за период. Пробелы и отсутствие сети показаны отдельно; начало или восстановление могут быть не наблюдены. Сводка содержит только время и длительности.</string>
+    <string name="incidents_empty">В этом периоде не наблюдалось сбоев или частичной доступности.</string>
+    <string name="incident_share">Поделиться эпизодом</string>
+    <string name="incident_share_unavailable">Нет приложения для отправки сводки</string>
 </resources>

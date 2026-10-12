@@ -11,7 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,7 +19,6 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
-import android.view.WindowInsets
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.RadioGroup
@@ -43,13 +41,10 @@ class MainActivity : Activity() {
     private lateinit var tvSince: TextView
     private lateinit var tvReason: TextView
     private lateinit var tvLatency: TextView
-    private lateinit var tvUptime: TextView
     private lateinit var tvChecked: TextView
-    private lateinit var tvDayStats: TextView
-    private lateinit var chart: ChartView
     private lateinit var btnToggle: Button
     private lateinit var btnCheck: Button
-    private lateinit var btnShareStats: Button
+    private lateinit var btnResumeAlerts: Button
     private lateinit var rgInterval: RadioGroup
     private lateinit var swKeepAwake: Switch
     private lateinit var swVibrate: Switch
@@ -88,9 +83,8 @@ class MainActivity : Activity() {
 
     private var cardColor = 0
     private var colorAnimator: ValueAnimator? = null
-    private var shownHistoryVersion = -1L
     private var shownLog: List<String>? = null
-    private var shownChartMinute = -1L
+    private lateinit var historyUi: MainHistoryUi
     private var historyDays = 1
     private var exportDays = 7
     private lateinit var btnPeriod: Button
@@ -106,7 +100,11 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         Lang.update(this)
         setContentView(R.layout.activity_main)
+        historyUi = MainHistoryUi(this) { text ->
+            shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), text)
+        }
         applySystemBarInsets()
+        findViewById<Button>(R.id.btnIncidents).setOnClickListener { IncidentActivity.open(this, historyDays) }
         findViewById<Button>(R.id.btnAutomation).setOnClickListener { AutomationSettingsActivity.open(this) }
         findViewById<Button>(R.id.btnExportDiagnostics).setOnClickListener { LocalDiagnostics.export(this) }
         backupUi = BackupUi(this)
@@ -130,7 +128,7 @@ class MainActivity : Activity() {
         btnPeriod.setOnClickListener {
             historyDays = if (historyDays == 1) 7 else 1
             btnPeriod.text = getString(if (historyDays == 1) R.string.period_day else R.string.period_week)
-            shownHistoryVersion = -1L
+            historyUi.selectPeriod(historyDays)
             render()
         }
         findViewById<Button>(R.id.btnExportCsv).setOnClickListener {
@@ -168,13 +166,16 @@ class MainActivity : Activity() {
         tvSince = findViewById(R.id.tvSince)
         tvReason = findViewById(R.id.tvReason)
         tvLatency = findViewById(R.id.tvLatency)
-        tvUptime = findViewById(R.id.tvUptime)
         tvChecked = findViewById(R.id.tvChecked)
-        tvDayStats = findViewById(R.id.tvDayStats)
-        chart = findViewById(R.id.chart)
         btnToggle = findViewById(R.id.btnToggle)
         btnCheck = findViewById(R.id.btnCheck)
-        btnShareStats = findViewById(R.id.btnShareStats)
+        btnResumeAlerts = findViewById(R.id.btnResumeAlerts)
+        btnResumeAlerts.setOnClickListener {
+            val saved = Prefs.clearAlertMute(this)
+            Toast.makeText(this, if (saved) R.string.alerts_resumed else R.string.alert_mute_save_failed,
+                Toast.LENGTH_SHORT).show()
+            render()
+        }
         rgInterval = findViewById(R.id.rgInterval)
         swKeepAwake = findViewById(R.id.swKeepAwake)
         swVibrate = findViewById(R.id.swVibrate)
@@ -326,7 +327,6 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnAppDetails).setOnClickListener { OemTips.openAppDetails(this) }
         findViewById<Button>(R.id.btnVibe).setOnClickListener { Vibe.alarm(this) }
         btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }
-        btnShareStats.setOnClickListener { shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), History.exportSummary(this, historyDays)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
         val oem = OemTips.manufacturerHint()
@@ -347,6 +347,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Lang.update(this)
+        historyUi.resume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
         ui.removeCallbacks(ticker)
@@ -354,11 +355,13 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        historyUi.pause()
         ui.removeCallbacks(ticker)
         super.onPause()
     }
 
     override fun onDestroy() {
+        historyUi.close()
         backupUi.close()
         colorAnimator?.cancel()
         super.onDestroy()
@@ -562,25 +565,15 @@ class MainActivity : Activity() {
             } + if (s.lastVibrationAt > 0L) Lang.t("\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}", "\nLast vibration: ${timeStr(s.lastVibrationAt)}") else ""
         }
         val mutedUntil = Prefs.alertsMutedUntil(this, now)
+        btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
         if (running && mutedUntil > 0L) tvReason.append(Lang.t("\nОповещения заглушены до ${timeStr(mutedUntil)}",
             "\nAlerts muted until ${timeStr(mutedUntil)}"))
         ivStatus.contentDescription = tvTitle.text
         animateCardColor(color)
 
         tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) Lang.t("${s.latencyMs} мс", "${s.latencyMs} ms") else "—"
-        val uptime = History.uptimePercent(this)
-        tvUptime.text = if (uptime >= 0) formatPercent(uptime) else "—"
         tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
-
-        val minute = now / 60_000L
-        if (History.version != shownHistoryVersion || minute != shownChartMinute) {
-            shownHistoryVersion = History.version
-            shownChartMinute = minute
-            val window = if (historyDays == 1) 60 else 7 * 24 * 60
-            chart.setData(History.lastMinutes(this, window, now), now, window)
-            findViewById<TextView>(R.id.tvChartTitle).text = getString(if (historyDays == 1) R.string.chart_last_hour else R.string.chart_last_week)
-            tvDayStats.text = History.describeStats(History.stats(this, historyDays, now), historyDays)
-        }
+        historyUi.refresh(historyDays, now)
         if (tvDiagnostics.visibility == View.VISIBLE) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { Lang.t("Диагностика появится после первой проверки.", "Diagnostics will appear after the first check.") } +
                 Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.")
@@ -693,18 +686,7 @@ class MainActivity : Activity() {
 }
 
 private fun Activity.applySystemBarInsets() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
-    window.setDecorFitsSystemWindows(false)
-    val root = findViewById<View>(R.id.mainScroll)
-    root.fitsSystemWindows = false
-    val original = Rect(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
-    root.setOnApplyWindowInsetsListener { view, insets ->
-        val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-        view.setPadding(original.left + bars.left, original.top + bars.top,
-            original.right + bars.right, original.bottom + bars.bottom)
-        insets
-    }
-    root.requestApplyInsets()
+    ScreenInsets.apply(this, findViewById(R.id.mainScroll))
 }
 
 private fun Activity.notificationsAllowed(): Boolean =

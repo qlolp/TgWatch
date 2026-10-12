@@ -69,10 +69,12 @@ class EventNotificationTest {
         }
         val manager = ctx.getSystemService(NotificationManager::class.java)
         val settings = Prefs.sp(ctx)
-        val previous = settings.all["alerts_muted_until"] as? Long
+        val muteKeys = listOf("alerts_muted_until", "alert_mute_boot", "alert_mute_started_elapsed",
+            "alert_mute_until_elapsed")
+        val previous = muteKeys.associateWith { settings.all[it] }
         val log = EventLog.all(ctx).toList()
         try {
-            settings.edit().remove("alerts_muted_until").commit()
+            assertTrue(Prefs.clearAlertMute(ctx))
             assertEquals(0L, Prefs.alertsMutedUntil(ctx))
             EventNotifications(ctx, manager).outage("Test", sound = false, allowed = true)
             val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
@@ -83,10 +85,16 @@ class EventNotificationTest {
             assertTrue("Mute must last one hour from the tap", until >= before + AlertMute.DURATION_MS &&
                 until <= System.currentTimeMillis() + AlertMute.DURATION_MS)
             assertFalse("Muted alerts use the quiet-hours suppression", Prefs.alertsAllowed(ctx))
-            assertEquals(0L, Prefs.alertsMutedUntil(ctx, until))
+            assertTrue("A wall-clock jump must not expire the elapsed timer", Prefs.alertsMutedUntil(ctx, until) > until)
+            assertTrue(Prefs.clearAlertMute(ctx))
+            assertEquals(0L, Prefs.alertsMutedUntil(ctx))
         } finally {
             manager.cancel(EventNotifications.OUTAGE_ID)
-            settings.edit().apply { if (previous == null) remove("alerts_muted_until") else putLong("alerts_muted_until", previous) }.commit()
+            settings.edit().apply { previous.forEach { (key, value) -> when (value) {
+                is Long -> putLong(key, value)
+                is Int -> putInt(key, value)
+                else -> remove(key)
+            } } }.commit()
             EventLog.replace(ctx, log)
         }
     }

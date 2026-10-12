@@ -8,6 +8,8 @@ object WebhookPolicy {
     const val MAX_URL_LENGTH = 512
     /** Connect and read timeouts, each. */
     const val TIMEOUT_MS = 5_000
+    /** Total monotonic budget for a result, including queued work and DNS. */
+    const val RESULT_DEADLINE_MS = 10_000L
     /** Minimum time between two posts of the same status; the first post of a status is immediate. */
     const val MIN_GAP_MS = 60_000L
     const val TEST_GAP_MS = 10_000L

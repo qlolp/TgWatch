@@ -1,0 +1,1 @@
+Alert pauses follow elapsed time and can be canceled; a reboot ends the pause. Telegram results appear before optional checks finish. History preparation runs off the UI thread. Incident cards show gaps and partial/offline time, with explicit redacted sharing. Webhook tests have a total deadline and delivery health. Improved ADB reconnect handling in CI.

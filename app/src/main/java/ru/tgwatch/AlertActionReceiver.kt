@@ -14,7 +14,10 @@ class AlertActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_MUTE) return
         val now = System.currentTimeMillis()
-        Prefs.muteAlerts(context, now)
+        if (!Prefs.muteAlerts(context, now)) {
+            EventLog.add(context, Lang.t("Не удалось сохранить заглушение оповещений", "Could not save alert mute"))
+            return
+        }
         // The tapped alert has been handled; the ongoing status notification still shows the outage.
         context.getSystemService(NotificationManager::class.java)?.let {
             it.cancel(EventNotifications.OUTAGE_ID)

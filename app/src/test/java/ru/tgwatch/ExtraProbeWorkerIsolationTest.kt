@@ -21,6 +21,52 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class ExtraProbeWorkerIsolationTest {
+    @Test fun primaryPublicationDoesNotWaitForDelayedExtras() {
+        val pool = NetworkProbe.executor()
+        val extraPool = NetworkProbe.extraExecutor()
+        val coordinator = Executors.newSingleThreadExecutor()
+        val transport = Transport()
+        val probe = NetworkProbe(pool, extraPool, transport::connection, transport::socket)
+        val gate = TelegramGate()
+        transport.gate = gate
+        val diagnostics = ExtraProbeCoordinator()
+        val published = CountDownLatch(1)
+        val publication = java.util.concurrent.atomic.AtomicReference<ProbeReport>()
+        val check = coordinator.submit {
+            val primary = probe.checkPrimary()
+            publication.set(primary)
+            published.countDown()
+            val token = diagnostics.begin(7, 19)
+            assertTrue(diagnostics.submit(token, {
+                probe.checkExtras(ExtraProbes.endpoints(true, true, true, "https://status.example.org/"))
+            }, {}))
+        }
+        try {
+            assertTrue(gate.started.await(2, TimeUnit.SECONDS))
+            gate.release.countDown()
+            assertTrue(transport.extrasStarted.await(2, TimeUnit.SECONDS))
+            assertTrue("Telegram primary must publish while EXTRA transports are still blocked",
+                published.await(500, TimeUnit.MILLISECONDS))
+            check.get(1, TimeUnit.SECONDS)
+            assertEquals(1L, transport.releaseExtras.count)
+            assertEquals("OK", publication.get().status)
+            assertTrue(publication.get().results.none { it.group == ProbeGroup.EXTRA })
+        } finally {
+            gate.release.countDown()
+            check.cancel(true)
+            diagnostics.close()
+            assertTrue("Split coordinator cancellation closes bound EXTRA connections",
+                transport.extrasCancelled.await(2, TimeUnit.SECONDS))
+            transport.releaseExtras.countDown()
+            coordinator.shutdownNow()
+            pool.shutdownNow()
+            extraPool.shutdownNow()
+            assertTrue(coordinator.awaitTermination(2, TimeUnit.SECONDS))
+            assertTrue(pool.awaitTermination(2, TimeUnit.SECONDS))
+            assertTrue(extraPool.awaitTermination(2, TimeUnit.SECONDS))
+        }
+    }
+
     @Test fun sharedTelegramAndExtraExecutorIsRejectedBeforeAnyRequest() {
         val pool = NetworkProbe.executor()
         try {

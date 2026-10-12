@@ -127,6 +127,7 @@ class UiAccessibilityTest {
             val root = LayoutInflater.from(large).inflate(R.layout.activity_main, null) as ScrollView
             root.findViewById<View>(R.id.advancedSettings).visibility = View.VISIBLE
             root.findViewById<View>(R.id.setupCard).visibility = View.VISIBLE
+            root.findViewById<View>(R.id.btnResumeAlerts).visibility = View.VISIBLE
             val width = (360 * large.resources.displayMetrics.density).toInt()
             root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
