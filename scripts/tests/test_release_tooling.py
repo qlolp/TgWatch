@@ -503,6 +503,182 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('testImplementation("org.json:json:20240303")', text)
 
 
+class LockedRequirementsTests(unittest.TestCase):
+    def check(self, requirements, lock):
+        script = SCRIPTS / "lock-requirements.py"
+        self.assertTrue(script.is_file(), "Missing requirements lock generator/checker")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, destination = root / "requirements.txt", root / "requirements.lock"
+            source.write_text(requirements)
+            destination.write_text(lock)
+            return subprocess.run([sys.executable, str(script), "--check", str(source), str(destination)],
+                                  text=True, capture_output=True)
+
+    def test_direct_pins_can_be_checked_offline_with_transitive_hashes(self):
+        result = self.check("# direct packages\njsonschema==4.23.0\nPyYAML==6.0.2\n",
+                            "jsonschema==4.23.0 \\\n    --hash=sha256:" + "a" * 64 + "\n" +
+                            "pyyaml==6.0.2 \\\n    --hash=sha256:" + "b" * 64 + "\n" +
+                            "attrs==26.1.0 \\\n    --hash=sha256:" + "c" * 64 + "\n")
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_changed_direct_pin_requires_regenerating_lock(self):
+        result = self.check("jsonschema==4.24.0\n", "jsonschema==4.23.0 \\\n    --hash=sha256:" + "a" * 64 + "\n")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("regenerate", result.stderr.lower())
+        self.assertIn("jsonschema==4.24.0", result.stderr)
+
+    def test_missing_direct_dependency_fails_lock_check(self):
+        result = self.check("PyYAML==6.0.2\n", "attrs==26.1.0 \\\n    --hash=sha256:" + "a" * 64 + "\n")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("PyYAML==6.0.2", result.stderr)
+
+    def test_missing_distribution_hash_fails_lock_check(self):
+        result = self.check("jsonschema==4.23.0\n", "jsonschema==4.23.0\n")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("hash", result.stderr.lower())
+
+
+class SignedUpgradeWorkflowTests(unittest.TestCase):
+    def setUp(self):
+        import yaml
+        workflow = yaml.safe_load((ROOT / ".github/workflows/build-apk.yml").read_text())
+        steps = workflow["jobs"]["release"]["steps"]
+        self.script = next(step["with"]["script"] for step in steps
+                           if "signed-upgrade-smoke.sh" in step.get("with", {}).get("script", ""))
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.work = Path(self.tmp.name)
+        scripts, tools = self.work / "scripts", self.work / "bin"
+        scripts.mkdir()
+        tools.mkdir()
+        for name in ("signed-upgrade-smoke.sh", "upgrade-policy.py"):
+            (scripts / name).write_text((SCRIPTS / name).read_text())
+        self.log, self.state = self.work / "calls.jsonl", self.work / "state.json"
+        self.state.write_text(json.dumps({"installed": None, "checked": 0, "prefs": "", "history": ""}))
+        (scripts / "adb-readiness.py").write_text("import json, os, sys\n"
+            "with open(os.environ['UPGRADE_LOG'], 'a') as stream: "
+            "stream.write(json.dumps(['readiness'] + sys.argv[1:]) + '\\n')\n")
+        adb = tools / "adb"
+        adb.write_text('''#!/usr/bin/env python3
+import json, os, sys, xml.etree.ElementTree as ET
+from pathlib import Path
+args = sys.argv[1:]
+with open(os.environ['UPGRADE_LOG'], 'a') as stream:
+    stream.write(json.dumps(['adb'] + args) + '\\n')
+path = Path(os.environ['UPGRADE_STATE'])
+state = json.loads(path.read_text())
+if args[0] in ('root', 'wait-for-device'): pass
+elif args[:3] == ['shell', 'id', '-u']: print('0')
+elif args[0] == 'install':
+    if '-r' not in args:
+        if state['installed'] is not None: sys.exit(17)
+        state.update(installed=args[-1], checked=0, prefs='<map><long name="last_checked" value="0"/></map>', history='')
+    elif state['installed'] is None: sys.exit(18)
+    else: state['installed'] = args[-1]
+elif args[0] == 'uninstall':
+    if state['installed'] is None: sys.exit(19)
+    state.update(installed=None, checked=0, prefs='', history='')
+elif args[:3] == ['shell', 'am', 'start']:
+    state['checked'] += 100
+    tree = ET.fromstring(state['prefs'])
+    tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
+    state['prefs'] = ET.tostring(tree, encoding='unicode')
+    state['history'] += str(state['checked']) + ',400,ONLINE,10,1\\n'
+elif args[:3] == ['shell', 'am', 'force-stop']: pass
+elif args[:2] == ['shell', 'cat']:
+    print(state['prefs'] if 'shared_prefs' in args[2] else state['history'])
+elif args[0] == 'pull':
+    Path(args[2]).write_text(state['prefs'] if 'shared_prefs' in args[1] else state['history'])
+elif args[0] == 'push': state['seeded'] = Path(args[1]).read_text()
+elif args[0] == 'shell' and args[1].startswith('cat /data/local/tmp/'):
+    state['prefs'] = state['seeded']
+elif args[:2] == ['exec-out', 'screencap']: sys.stdout.buffer.write(b'fixture screenshot')
+elif args[0] == 'logcat': print('fixture upgrade logcat')
+else: raise AssertionError(args)
+path.write_text(json.dumps(state))
+''')
+        adb.chmod(0o755)
+        self.env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"],
+                        UPGRADE_LOG=str(self.log), UPGRADE_STATE=str(self.state))
+
+    def run_paths(self, latest=True):
+        script = self.script.replace("${{ steps.latest_baseline.outputs.available }}", str(latest).lower())
+        # The pinned emulator runner parses each noncomment line as a separate sh -c command.
+        for command in (line.strip() for line in script.splitlines()):
+            if command and not command.startswith("#"):
+                result = subprocess.run(["sh", "-c", command], cwd=self.work, env=self.env, text=True, capture_output=True)
+                self.assertEqual(0, result.returncode, result.stderr)
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def test_both_upgrade_pairs_preserve_data_and_reset_only_between_pairs(self):
+        calls = self.run_paths()
+        installations = [(index, call[-1]) for index, call in enumerate(calls) if call[:2] == ["adb", "install"]]
+        self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk", "previous-latest/TgWatch.apk", "TgWatch.apk"],
+                         [apk for _, apk in installations])
+        resets = [index for index, call in enumerate(calls) if call[:2] == ["adb", "uninstall"]]
+        self.assertEqual(1, len(resets))
+        self.assertLess(installations[1][0], resets[0])
+        self.assertLess(resets[0], installations[2][0])
+        self.assertFalse(any(call[:3] == ["adb", "shell", "pm"] for call in calls))
+        self.assertLess(next(i for i, call in enumerate(calls) if call[:1] == ["readiness"]), installations[0][0])
+        for path in ("legacy", "latest"):
+            reports = self.work / "signed-upgrade" / path
+            self.assertTrue((reports / "signed-upgrade-logcat.txt").is_file())
+            self.assertTrue((reports / "upgrade-seeded-prefs.xml").is_file())
+            self.assertTrue((reports / "upgrade-before-history.csv").is_file())
+            self.assertTrue((reports / "upgrade-after-history.csv").is_file())
+
+    def test_first_release_still_runs_legacy_gate(self):
+        calls = self.run_paths(latest=False)
+        self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk"],
+                         [call[-1] for call in calls if call[:2] == ["adb", "install"]])
+        self.assertFalse(any(call[:2] == ["adb", "uninstall"] for call in calls))
+        self.assertTrue((self.work / "signed-upgrade/legacy/upgrade-after-prefs.xml").is_file())
+
+
+class FinalSignedApkWorkflowTests(unittest.TestCase):
+    def run_guard(self, *, tamper=False, fingerprint=None, name="1.15.0", code="1015000"):
+        import yaml
+        steps = yaml.safe_load((ROOT / ".github/workflows/build-apk.yml").read_text())["jobs"]["release"]["steps"]
+        guard = next(step for step in steps if step.get("name") == "Re-verify the signed APK before publication")
+        self.assertNotIn("if", guard, "Final signed-byte and production-identity gate must be unconditional")
+        self.assertEqual("${{ steps.signed.outputs.apk_sha256 }}", guard["env"]["APK_SHA256"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = hashlib.sha256(b"original signed APK").hexdigest()
+            data = b"substituted APK" if tamper else b"original signed APK"
+            (root / "TgWatch.apk").write_bytes(data)
+            (root / "TgWatch.apk.sha256").write_text(hashlib.sha256(data).hexdigest() + "  TgWatch.apk\n")
+            (root / "version.properties").write_text("version=1.15.0\n")
+            tools = root / "sdk/build-tools/35.0.0"
+            tools.mkdir(parents=True)
+            certificate = fingerprint or "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1"
+            for executable, output in (("apksigner", "Signer #1 certificate SHA-256 digest: " + certificate),
+                                       ("aapt2", f"package: name='ru.tgwatch' versionCode='{code}' versionName='{name}'")):
+                path = tools / executable
+                path.write_text("#!/usr/bin/env python3\nprint(" + repr(output) + ")\n")
+                path.chmod(0o755)
+            env = dict(os.environ, APK_SHA256=original, ANDROID_HOME=str(root / "sdk"))
+            return subprocess.run(["bash", "-c", guard["run"]], cwd=root, env=env, text=True, capture_output=True)
+
+    def test_original_signed_apk_can_pass_publication_guard(self):
+        result = self.run_guard()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_replacing_both_apk_and_checksum_cannot_replace_original_signed_bytes(self):
+        self.assertNotEqual(0, self.run_guard(tamper=True).returncode)
+
+    def test_production_certificate_is_rechecked_after_emulator(self):
+        self.assertNotEqual(0, self.run_guard(fingerprint="0" * 64).returncode)
+
+    def test_version_name_is_rechecked_after_emulator(self):
+        self.assertNotEqual(0, self.run_guard(name="1.14.0").returncode)
+
+    def test_version_code_is_rechecked_after_emulator(self):
+        self.assertNotEqual(0, self.run_guard(code="1014000").returncode)
+
+
 class AndroidSmokeTests(unittest.TestCase):
     def run_observation(self, history, foreground=True, mutate=False):
         with tempfile.TemporaryDirectory() as directory:

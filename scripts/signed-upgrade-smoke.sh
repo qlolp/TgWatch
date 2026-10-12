@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Disposable root-capable emulator. Verify the immutable published 1.10.47 -> new release update.
+# Disposable root-capable emulator. Verify a published APK -> new release update.
 set -euo pipefail
 old_apk=${1:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
 new_apk=${2:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
@@ -26,14 +26,8 @@ await_observation() {
   echo "No fresh observation after $after" >&2
   exit 1
 }
-# Emulator startup can restart adbd concurrently with the first root request.
-for attempt in 1 2 3; do
-  if adb root > upgrade-root.txt 2>&1; then break; fi
-  if ! grep -q 'unable to connect for root: closed' upgrade-root.txt; then cat upgrade-root.txt; exit 1; fi
-  adb wait-for-device
-done
-adb wait-for-device
-[[ "$(adb shell id -u | tr -d '\r')" = 0 ]]
+# The same bounded reconnect/root/boot gate used by the Android smoke suite.
+python3 scripts/adb-readiness.py --timeout 180
 adb install -g "$old_apk"
 adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation 0

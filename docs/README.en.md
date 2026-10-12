@@ -22,6 +22,10 @@ strict bounded parsing. It does not authenticate the server, create an account
 session, or prove that messages can be delivered. A system VPN affects the probes;
 Telegram's own configured proxy does not.
 
+Each of the five production DCs has IPv4 and IPv6 probes. Either address family
+can establish the MTProto signal. A bounded pool admits all thirteen primary
+requests; optional informational checks retain their separate workers.
+
 ## Monitoring and history
 
 Choose an Economy, Balanced or Frequent battery profile, or a custom interval.
@@ -94,9 +98,9 @@ process, without exposing or exporting the address or exception details.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.14.0`, Android target API35. The latest published
-release is [1.13.1](https://github.com/qlolp/TgWatch/releases/tag/v1.13.1);
-these source changes do not claim publication of 1.14.0. The release workflow
+The source version is `1.15.0` (Android code `1015000`), Android target API35.
+Published versions and signed APKs are recorded on
+[GitHub Releases](https://github.com/qlolp/TgWatch/releases/latest). The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
 Use JDK17, Android SDK35 and the checked-in Gradle wrapper:

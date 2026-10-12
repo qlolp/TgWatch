@@ -12,19 +12,25 @@ target API 35; native UI, Direct Boot, настройки и seven-day history �
 неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
 ```bash
-python3 -m pip install -r scripts/requirements-release.txt
+python3 -m pip install --require-hashes -r scripts/requirements-release.lock
 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/test_dependency_audit.py
 python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`version.properties` задаёт SemVer `1.14.0`; код `1014000` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.15.0`; код `1015000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
 `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.
 Debug APK — test-only.
+
+Release tooling устанавливается из полного lock-файла с хешами прямых и транзитивных
+зависимостей. После изменения `scripts/requirements-release.txt` обновите lock командой
+`python3 scripts/lock-requirements.py scripts/requirements-release.txt scripts/requirements-release.lock`
+и проверьте его diff перед установкой. Проверка соответствия прямых pins выполняется
+той же командой с `--check` и не требует сети.
 
 `.editorconfig` задаёт основной стиль. Detekt закреплён в сборке и использует
 baseline существующих замечаний из исходного `main`; новые файлы туда не входят.
@@ -50,6 +56,9 @@ status timestamp должен иметь собственную строку his
 
 Upgrade baseline для CI — настоящий `v1.10.47` APK с фиксированным SHA-256
 `efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1`.
+Дополнительный сценарий использует последний стабильный опубликованный предшественник;
+его APK сверяется с checksum, production-сертификатом и версией тега. Данные очищаются
+только между двумя независимыми сценариями, без удаления между old → new внутри каждого.
 `scripts/signed-upgrade-smoke.sh <previous.apk> <current.apk>` проверяет сохранение истории,
 legacy hour settings и independent event options без clearing data. Локальный upgrade с общей
 development-подписью проверяет миграцию, но не production certificate continuity. Батарея,

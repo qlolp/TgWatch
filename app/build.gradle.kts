@@ -37,6 +37,7 @@ android {
         versionName = sourceVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    buildFeatures { buildConfig = true }
     signingConfigs {
         if (!releaseStore.isNullOrBlank()) {
             create("production") {

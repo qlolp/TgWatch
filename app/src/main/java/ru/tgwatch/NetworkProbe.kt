@@ -193,7 +193,7 @@ class NetworkProbe(
                 connection.requestMethod = method
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
-                connection.setRequestProperty("User-Agent", "TgWatch/1.9 (Android)")
+                connection.setRequestProperty("User-Agent", "TgWatch/${BuildConfig.VERSION_NAME} (Android)")
                 connection.responseCode
             } finally { connection.disconnect() }
         }
@@ -203,8 +203,10 @@ class NetworkProbe(
     }
     private fun elapsed(start: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
     companion object {
+        // Admit all 13 Telegram endpoints; retain room for 3 controls if cancellation is delayed.
+        private const val PRIMARY_WORKERS = 16
         private const val EXTRA_WORKERS = 3
-        fun executor(): ExecutorService = ThreadPoolExecutor(8, 8, 30L, TimeUnit.SECONDS,
+        fun executor(): ExecutorService = ThreadPoolExecutor(PRIMARY_WORKERS, PRIMARY_WORKERS, 30L, TimeUnit.SECONDS,
             SynchronousQueue(), { r -> Thread(r, "tg-probe").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
         fun extraExecutor(): ExecutorService = ThreadPoolExecutor(EXTRA_WORKERS, EXTRA_WORKERS, 30L, TimeUnit.SECONDS,
             SynchronousQueue(), { r -> Thread(r, "tg-extra-probe").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
