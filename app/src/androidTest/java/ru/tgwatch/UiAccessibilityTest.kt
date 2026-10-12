@@ -18,6 +18,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -76,7 +77,8 @@ class UiAccessibilityTest {
     }
 
     @Test fun mainUiFollowsSelectedAppLanguageAfterRecreation() {
-        if (Build.VERSION.SDK_INT < 33) return
+        assumeTrue("Per-app language selection requires API 33",
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
         val previous = AppLocales.get(ctx)
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
@@ -128,7 +130,8 @@ class UiAccessibilityTest {
     }
 
     @Test fun repeatedInsetsKeepContentClearOfBarsAndCutout() {
-        if (Build.VERSION.SDK_INT < 30) return
+        assumeTrue("System-bar and display-cutout inset types require API 30",
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
         val wasEnabled = Prefs.isEnabled(ctx)
         Prefs.setEnabled(ctx, false)
         try {
