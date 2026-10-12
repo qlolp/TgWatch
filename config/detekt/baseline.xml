@@ -5,7 +5,6 @@
     <ID>ComplexCondition:HistoryStorage.kt$HistoryStorage$at &lt; 0 || until &lt;= at || until - at &gt; 600_000L || p[2] !in Timeline.kinds</ID>
     <ID>ComplexCondition:MonitorService.kt$MonitorService$(changed || sound) &amp;&amp; p.status == Status.PARTIAL &amp;&amp; Prefs.notifyFor(this, "PARTIAL")</ID>
     <ID>ComplexCondition:MonitorService.kt$MonitorService$(changed || sound) &amp;&amp; p.status == Status.TG_DOWN &amp;&amp; Prefs.notifyFor(this, "TG_DOWN")</ID>
-    <ID>ComplexCondition:MonitorService.kt$MonitorService$first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS || action == ACTION_ALARM</ID>
     <ID>ComplexCondition:MtProto.kt$MtProto$bodySize != payload.size - 20 || bodySize &lt; 56 || bodySize % 4 != 0 || buffer.int != 0x05162463</ID>
     <ID>CyclomaticComplexMethod:BackupCodec.kt$BackupCodec.JsonPreflight$private fun string(): String</ID>
     <ID>CyclomaticComplexMethod:BackupCodec.kt$BackupCodec.JsonPreflight$private fun value(depth: Int)</ID>

@@ -322,8 +322,11 @@ class MonitorService : Service() {
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
             acquireWakeLockForCheck(force = true)
         }
-        if (first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS || action == ACTION_ALARM) {
+        if (first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS) {
             scheduleCheck(0L)
+        } else if (action == ACTION_ALARM) {
+            // The alarm duplicates the pending timer; it must not queue a check after a running one.
+            checkSchedule.wake()
         }
 
         return START_STICKY
@@ -450,7 +453,7 @@ class MonitorService : Service() {
         // An interrupt from the health monitor must not poison the following check.
         Thread.interrupted()
         checkStartedMono = SystemClock.elapsedRealtime()
-        val revision = checkSchedule.revision
+        val revision = checkSchedule.begin()
         acquireWakeLockForCheck()
         try {
             val result = performCheck()

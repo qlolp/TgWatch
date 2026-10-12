@@ -59,4 +59,59 @@ class CheckScheduleTest {
         assertEquals(1, resets)
         assertEquals(1_000L, pending)
     }
+
+    @Test fun immediateRequestDuringCheckCoalescesIntoOneFollowUp() {
+        val replaced = mutableListOf<Long>()
+        val scheduler = CheckSchedule({}) { replaced += it }
+        val revision = scheduler.begin()
+        // New settings or a manual press arrive while the check runs.
+        scheduler.request(0L)
+        scheduler.request(0L)
+        scheduler.afterCheck(revision, 300_000L)
+        assertEquals(0L, replaced.last())
+        // The follow-up consumes both requests; its own completion returns to the interval.
+        val followUp = scheduler.begin()
+        scheduler.afterCheck(followUp, 300_000L)
+        assertEquals(300_000L, replaced.last())
+    }
+
+    @Test fun requestFromAnotherThreadDuringCheckSurvivesCompletion() {
+        val pending = AtomicLong(-1)
+        val scheduler = CheckSchedule({}) { pending.set(it) }
+        val revision = scheduler.begin()
+        val failure = AtomicReference<Throwable?>(null)
+        thread { try { scheduler.request(0L) } catch (t: Throwable) { failure.set(t) } }.join(2_000)
+        scheduler.afterCheck(revision, 300_000L)
+        assertNull(failure.get())
+        assertEquals(0L, pending.get())
+    }
+
+    @Test fun requestThatStartedTheCheckIsNotRepeated() {
+        var pending = -1L
+        val scheduler = CheckSchedule({}) { pending = it }
+        scheduler.request(0L)
+        val revision = scheduler.begin()
+        scheduler.afterCheck(revision, 300_000L)
+        assertEquals(300_000L, pending)
+    }
+
+    @Test fun alarmWakeDuringCheckIsSatisfiedByIt() {
+        var pending = -1L
+        val scheduler = CheckSchedule({}) { pending = it }
+        val revision = scheduler.begin()
+        scheduler.wake()
+        assertEquals(0L, pending)
+        scheduler.afterCheck(revision, 300_000L)
+        assertEquals(300_000L, pending)
+    }
+
+    @Test fun requestDuringCheckWinsOverNetworkRetryDelay() {
+        var pending = -1L
+        val scheduler = CheckSchedule({}) { pending = it }
+        val revision = scheduler.begin()
+        scheduler.networkChanged(800L)
+        scheduler.request(0L)
+        scheduler.afterCheck(revision, 300_000L)
+        assertEquals(0L, pending)
+    }
 }
