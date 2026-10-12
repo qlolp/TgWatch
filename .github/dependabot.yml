@@ -4,10 +4,25 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: gradle
     directory: /
     schedule:
       interval: weekly
+    # Major toolchain upgrades need one coordinated migration (Gradle, AGP, Kotlin,
+    # build-tools and the release guards all move together); see docs/review.
+    ignore:
+      - dependency-name: com.android.application
+        update-types: ["version-update:semver-major"]
+      - dependency-name: org.jetbrains.kotlin.android
+        update-types: ["version-update:semver-major"]
+      - dependency-name: gradle-wrapper
+        update-types: ["version-update:semver-major"]
+      - dependency-name: io.gitlab.arturbosch.detekt
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: pip
     directory: /scripts
     schedule:
