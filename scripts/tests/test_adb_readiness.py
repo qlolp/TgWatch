@@ -23,7 +23,10 @@ if a[:1]==['-s']:
     a=a[2:]
 elif s.get('serial_required'): sys.exit(7)
 n=sum((x[2:] if x[:1]==['-s'] else x)==['root'] for x in s['calls'])
-p.write_text(json.dumps(s))
+# Timeout kills can interrupt the fixture itself; keep the previous journal readable.
+pending=p.with_name(p.name + '.' + str(os.getpid()) + '.tmp')
+pending.write_text(json.dumps(s))
+os.replace(pending,p)
 mode=s['mode']
 if a==['root']:
     if mode=='denied': print('adbd cannot run as root in production builds',file=sys.stderr);sys.exit(1)
