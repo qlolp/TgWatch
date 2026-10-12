@@ -75,7 +75,7 @@ class AutomationReceiver : BroadcastReceiver() {
         val checkedAt = state.checkedAt.coerceAtLeast(0L)
         val now = System.currentTimeMillis()
         val stale = if (running && state.checkedElapsed > 0L) {
-            checkedAt <= 0L || state.isStale(now, state.expectedIntervalSec)
+            checkedAt <= 0L || state.isStale(now)
         } else {
             AutomationPolicy.stale(running, checkedAt, now, state.expectedIntervalSec)
         }

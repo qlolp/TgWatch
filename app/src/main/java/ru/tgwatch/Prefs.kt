@@ -55,17 +55,17 @@ object Prefs {
     fun sp(ctx: Context): android.content.SharedPreferences = rawSp(ctx)
     internal fun rawSp(ctx: Context) = store(ctx).getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
+    private val legacyMove = OneTimeMigration()
+
     private fun store(ctx: Context): Context {
         val app = ctx.applicationContext
         if (Build.VERSION.SDK_INT < 24) return app
         val dp = app.createDeviceProtectedStorageContext()
-        try {
-            val um = app.getSystemService(UserManager::class.java)
-            if (um == null || um.isUserUnlocked) {
-                dp.moveSharedPreferencesFrom(app, FILE)
-            }
-        } catch (_: Exception) {
-        }
+        // sp() runs on every render and check; the move scans the old directory, so stop after success.
+        legacyMove.run(
+            ready = { app.getSystemService(UserManager::class.java)?.isUserUnlocked != false },
+            move = { dp.moveSharedPreferencesFrom(app, FILE) },
+        )
         return dp
     }
 
@@ -316,6 +316,19 @@ object Prefs {
             .remove("last_diagnostics")
             .remove("last_expected_sec")
             .apply()
+    }
+}
+
+/** Retries a one-time move until it reports success; failures and a locked user try again later. */
+internal class OneTimeMigration {
+    @Volatile private var done = false
+
+    fun run(ready: () -> Boolean, move: () -> Boolean) {
+        if (done) return
+        try {
+            if (ready() && move()) done = true
+        } catch (_: Exception) {
+        }
     }
 }
 

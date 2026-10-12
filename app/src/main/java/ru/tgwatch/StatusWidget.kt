@@ -30,17 +30,7 @@ class StatusWidget : AppWidgetProvider() {
         updateAll(ctx)
     }
 
-    override fun onReceive(ctx: Context, intent: Intent) {
-        if (intent.action == ACTION_CLICK) {
-            handleClick(ctx)
-            return
-        }
-        super.onReceive(ctx, intent)
-    }
-
     companion object {
-        const val ACTION_CLICK = "ru.tgwatch.action.WIDGET_CLICK"
-
         /** Перерисовать все виджеты. Дёшево: если виджетов нет, ничего не делает. */
         fun updateAll(ctx: Context) {
             try {
@@ -53,7 +43,7 @@ class StatusWidget : AppWidgetProvider() {
             }
         }
 
-        private fun handleClick(ctx: Context) {
+        internal fun handleClick(ctx: Context) {
             if (Prefs.isEnabled(ctx)) {
                 try {
                     MonitorService.send(ctx, MonitorService.ACTION_CHECK_NOW)
@@ -81,7 +71,7 @@ class StatusWidget : AppWidgetProvider() {
             val s = MonitorService.state
             val now = System.currentTimeMillis()
             val running = MonitorService.running || Prefs.isEnabled(ctx)
-            val stale = s.isStale(now, Prefs.intervalSec(ctx), Prefs.keepAwake(ctx))
+            val stale = s.isStale(now)
 
             val bg: Int
             val icon: Int
@@ -140,7 +130,7 @@ class StatusWidget : AppWidgetProvider() {
 
             val click = PendingIntent.getBroadcast(
                 ctx, 10,
-                Intent(ctx, StatusWidget::class.java).setAction(ACTION_CLICK),
+                Intent(ctx, WidgetClickReceiver::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             return RemoteViews(ctx.packageName, R.layout.widget_status).apply {

@@ -6,8 +6,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.drawable.Icon
@@ -48,10 +50,14 @@ class MonitorService : Service() {
     ) {
         val bad get() = status == Status.TG_DOWN || status == Status.NO_NETWORK
 
-        fun isStale(now: Long, intervalSec: Int, slowExpected: Boolean = false): Boolean =
+        /**
+         * Judged against the interval this result scheduled: [expectedIntervalSec] already holds the
+         * profile, screen-off sleep and offline backoff, so current settings are not re-read here.
+         */
+        fun isStale(now: Long, elapsedNow: Long = SystemClock.elapsedRealtime()): Boolean =
             checkedAt > 0L && (now < checkedAt || if (checkedElapsed > 0L)
-                ProbeRules.isStale(checkedElapsed, SystemClock.elapsedRealtime(), expectedIntervalSec, false)
-                else ProbeRules.isStale(checkedAt, now, expectedIntervalSec, false))
+                ProbeRules.isStale(checkedElapsed, elapsedNow, expectedIntervalSec)
+                else ProbeRules.isStale(checkedAt, now, expectedIntervalSec))
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
@@ -240,6 +246,16 @@ class MonitorService : Service() {
         }
     }
 
+    /** Unlocking after sleep should not show a result from the long screen-off interval. */
+    private val screenOnReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (checkStartedMono == 0L &&
+                ProbeRules.refreshOnScreenOn(state.checkedElapsed, SystemClock.elapsedRealtime())) {
+                scheduleCheck(0L)
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -267,6 +283,8 @@ class MonitorService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "registerDefaultNetworkCallback", e)
         }
+        // SCREEN_ON is a protected system broadcast, so no export flag is needed.
+        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -322,6 +340,11 @@ class MonitorService : Service() {
             cm.unregisterNetworkCallback(networkCallback)
         } catch (e: Exception) {
             Log.w(TAG, "unregisterNetworkCallback", e)
+        }
+        try {
+            unregisterReceiver(screenOnReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "unregisterReceiver", e)
         }
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -431,7 +454,11 @@ class MonitorService : Service() {
             checkStartedMono = 0L
             releaseWakeLock()
         }
-        if (acceptsRunningCheck(this)) checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+        if (acceptsRunningCheck(this)) {
+            checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+            // Re-arming replaces the pending watchdog: it wakes the phone only when checks stop landing.
+            WatchdogReceiver.schedule(this, ServiceHealth.watchdogDelayMs(state.expectedIntervalSec))
+        }
     }
 
     private fun performCheck(): Probe {
@@ -645,7 +672,7 @@ class MonitorService : Service() {
         val stop = servicePending(2, ACTION_STOP)
 
         val now = System.currentTimeMillis()
-        val stale = s.isStale(now, Prefs.intervalSec(this), Prefs.keepAwake(this))
+        val stale = s.isStale(now)
         val dailyStats = notificationStats.get(History.version, now) { History.stats(this, now = now) }
         val uptime = dailyStats.uptimePercent
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""

@@ -10,6 +10,7 @@ import java.net.Socket
 import java.net.SocketAddress
 import java.net.SocketTimeoutException
 import java.net.URL
+import javax.net.ssl.SSLHandshakeException
 
 class EndpointFallbackTest {
     @Test fun backupDcCanConfirmMtprotoWhenOriginalTwoDcsFail() {
@@ -20,6 +21,30 @@ class EndpointFallbackTest {
 
     @Test fun backupWithWrongNonceDoesNotProduceFalseSuccess() {
         assertEquals("PARTIAL", checkWithOnlyDc3Available(true).status)
+    }
+
+    @Test fun interceptedTelegramHostsCannotConfirmWebReachability() {
+        // A portal, DNS hijack or ISP proxy cannot present a Telegram certificate, so the
+        // HTTPS probe fails in TLS before any HTTP code could count as "server answered".
+        val urls = java.util.Collections.synchronizedList(mutableListOf<URL>())
+        val pool = NetworkProbe.executor()
+        val report = try {
+            NetworkProbe(pool,
+                { url -> urls += url; object : HttpURLConnection(url) {
+                    override fun connect() {}
+                    override fun disconnect() {}
+                    override fun usingProxy() = false
+                    override fun getResponseCode(): Int =
+                        if (url.host.endsWith("telegram.org")) throw SSLHandshakeException("certificate mismatch") else 200
+                } },
+                { object : Socket() {
+                    override fun connect(endpoint: SocketAddress, timeout: Int) { throw SocketTimeoutException("blocked") }
+                } }).check()
+        } finally { pool.shutdownNow() }
+        assertEquals("TG_DOWN", report.status)
+        assertTrue(urls.isNotEmpty())
+        assertTrue(urls.all { it.protocol == "https" })
+        assertTrue(report.results.filter { it.group == ProbeGroup.WEB }.all { !it.reachable && it.detail.startsWith("TLS") })
     }
 
     private fun checkWithOnlyDc3Available(wrongNonce: Boolean): ProbeReport {

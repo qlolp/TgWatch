@@ -91,17 +91,23 @@
             android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="ru.tgwatch.action.WIDGET_CLICK" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_status_info" />
         </receiver>
 
+        <!-- Нажатие на виджет: только собственный PendingIntent, не другие приложения -->
+        <receiver
+            android:name=".WidgetClickReceiver"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <!-- Системные broadcast доставляются и неэкспортированному получателю -->
         <receiver
             android:name=".BootReceiver"
             android:directBootAware="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />

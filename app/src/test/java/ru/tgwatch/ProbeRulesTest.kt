@@ -36,6 +36,16 @@ class ProbeRulesTest {
     }
 
     @Test
+    fun screenOn_refreshesOnlyAnOldResultFromThisProcess() {
+        val checked = 1_000_000L
+        assertFalse(ProbeRules.refreshOnScreenOn(checked, checked + 10_000))
+        assertFalse(ProbeRules.refreshOnScreenOn(checked, checked + ProbeRules.SCREEN_ON_REFRESH_MS))
+        assertTrue(ProbeRules.refreshOnScreenOn(checked, checked + 120_000))
+        // Restored or not-yet-checked state: the service's first check is already scheduled.
+        assertFalse(ProbeRules.refreshOnScreenOn(0L, checked))
+    }
+
+    @Test
     fun nextInterval_slowsWhenScreenOffAndOk() {
         assertEquals(10, ProbeRules.nextIntervalSec(15, bad = true, screenOffSlow = true))
         assertEquals(60, ProbeRules.nextIntervalSec(15, bad = false, screenOffSlow = true))

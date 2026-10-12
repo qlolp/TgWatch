@@ -1,0 +1,5 @@
+* Turning the screen on refreshes the status when the last check is older than 30 seconds.
+* The watchdog alarm wakes the phone only when checks stop arriving.
+* Fixed the stale-result indicator.
+* Boot and widget-tap receivers are no longer reachable by other apps.
+* Settings are no longer re-migrated on every access.

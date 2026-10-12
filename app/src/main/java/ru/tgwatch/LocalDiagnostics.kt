@@ -71,7 +71,7 @@ object LocalDiagnostics {
             appVersionCode = if (Build.VERSION.SDK_INT >= 28) app.longVersionCode else app.versionCode.toLong(),
             sdkInt = Build.VERSION.SDK_INT, running = MonitorService.running, status = current,
             stale = !MonitorService.running || current.checkedAt <= 0 ||
-                current.isStale(System.currentTimeMillis(), Prefs.intervalSec(ctx)),
+                current.isStale(System.currentTimeMillis()),
             notificationsAllowed = notifications.areNotificationsEnabled() &&
                 (Build.VERSION.SDK_INT < 33 ||
                     ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
