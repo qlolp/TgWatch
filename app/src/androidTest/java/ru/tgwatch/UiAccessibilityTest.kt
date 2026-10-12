@@ -57,6 +57,23 @@ class UiAccessibilityTest {
         }
     }
 
+    @Test fun chartGrowsWithFontScaleInsteadOfSqueezingBars() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            fun measuredHeight(fontScale: Float): Int {
+                val scaled = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply {
+                    this.fontScale = fontScale
+                })
+                val chart = ChartView(scaled).apply { minimumHeight = (120 * resources.displayMetrics.density).toInt() }
+                chart.measure(View.MeasureSpec.makeMeasureSpec((320 * chart.resources.displayMetrics.density).toInt(),
+                    View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+                return chart.measuredHeight
+            }
+            val density = ctx.resources.displayMetrics.density
+            assertEquals("Default font keeps the layout's 120 dp", (120 * density).toInt(), measuredHeight(1f))
+            assertTrue("Large fonts get taller label rows", measuredHeight(2f) > measuredHeight(1f))
+        }
+    }
+
     @Test fun selectedAppLocaleControlsResourcesAndDynamicText() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val systemLocale = Locale.getDefault()

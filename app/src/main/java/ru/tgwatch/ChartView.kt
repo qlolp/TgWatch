@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.math.ceil
 
 /**
  * График за последний час: один столбик на минуту.
@@ -20,7 +21,11 @@ import java.util.Date
  */
 class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    private companion object { const val LABEL_PADDING_DP = 8f }
+    private companion object {
+        const val LABEL_PADDING_DP = 8f
+        /** Bars keep this much height; with 11 sp labels at font scale 1 the view stays at its 120 dp minimum. */
+        const val MIN_PLOT_DP = 76f
+    }
 
     private val slots = 60
 
@@ -51,6 +56,15 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         isClickable = true
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+    }
+
+    // Label rows follow the user's font scale (sp); the view grows with them instead of squeezing the bars.
+    private fun labelHeight() = textPaint.fontSpacing + LABEL_PADDING_DP * dp
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val wanted = ChartLayout.height(labelHeight(), MIN_PLOT_DP * dp, suggestedMinimumHeight)
+        setMeasuredDimension(getDefaultSize(suggestedMinimumWidth, widthMeasureSpec),
+            resolveSize(wanted, heightMeasureSpec))
     }
 
     fun setData(data: List<History.Minute>, now: Long, window: Int = 60) {
@@ -107,7 +121,7 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val labelH = textPaint.fontSpacing + LABEL_PADDING_DP * dp
+        val labelH = labelHeight()
         val top = labelH
         val bottom = height - labelH
         val chartH = bottom - top
@@ -165,13 +179,17 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         textPaint.textAlign = Paint.Align.LEFT
         canvas.drawText(context.getString(R.string.chart_scale, scale.toLong()), 0f, top - 4f * dp, textPaint)
         val beginning = context.getString(if (windowMinutes > 60) R.string.chart_week_ago else R.string.chart_hour_ago)
-        canvas.drawText(beginning, 0f, height - 2f * dp, textPaint)
-        textPaint.textAlign = Paint.Align.RIGHT
         val avg = History.Minute.merge(0L, minutes).avgLatency
-        canvas.drawText(
-            if (avg >= 0) context.getString(R.string.chart_now_average, avg) else context.getString(R.string.chart_now),
-            w, height - 2f * dp, textPaint
-        )
+        val end = if (avg >= 0) context.getString(R.string.chart_now_average, avg)
+            else context.getString(R.string.chart_now)
+        // Large fonts have deeper descenders; keep them inside the view.
+        val baseline = height - maxOf(2f * dp, textPaint.descent())
+        val labelGap = LABEL_PADDING_DP * dp
+        if (ChartLayout.bothLabelsFit(textPaint.measureText(beginning), textPaint.measureText(end), labelGap, w)) {
+            canvas.drawText(beginning, 0f, baseline, textPaint)
+        }
+        textPaint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(end, w, baseline, textPaint)
     }
 
     private fun describe(): String {
@@ -183,4 +201,14 @@ class ChartView(context: Context, attrs: AttributeSet? = null) : View(context, a
         } else ""
         return counts + average + " " + context.getString(R.string.chart_accessibility_hint)
     }
+}
+
+/** Text-dependent chart geometry, kept pure so the font-scale rules are testable on the JVM. */
+internal object ChartLayout {
+    /** Two label rows plus at least [minPlot] for the bars, never below the layout's minimum height. */
+    fun height(labelHeight: Float, minPlot: Float, minHeight: Int): Int =
+        maxOf(minHeight, ceil(2f * labelHeight + minPlot).toInt())
+
+    /** False when the left "60 min ago" label would run into the right-aligned one; it is then dropped. */
+    fun bothLabelsFit(left: Float, right: Float, gap: Float, width: Float): Boolean = left + gap + right <= width
 }
