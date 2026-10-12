@@ -25,7 +25,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Release policy regression tests
         run: |
           python3 -m pip install -r scripts/requirements-release.txt
@@ -116,7 +116,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Download this run's successful SBOM scan
         uses: actions/download-artifact@v4
         with:
@@ -135,6 +135,7 @@ jobs:
             --status release-evidence/TgWatch.trivy.status.json \
             --inventory release-dependencies/resolved.json --osv release-dependencies/osv-report.json
       - name: Build with persistent signing key
+        id: signed
         env:
           TGWATCH_KEYSTORE_BASE64: ${{ secrets.TGWATCH_KEYSTORE_BASE64 }}
           TGWATCH_KEYSTORE_PASSWORD: ${{ secrets.TGWATCH_KEYSTORE_PASSWORD }}
@@ -154,6 +155,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
+          echo "apk_sha256=$(cut -d' ' -f1 TgWatch.apk.sha256)" >> "$GITHUB_OUTPUT"
           cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json
           cmp app/build/reports/dependencies/resolved.json release-dependencies/resolved.json
           cp release-evidence/TgWatch.sbom.cdx.json TgWatch.sbom.cdx.json
@@ -187,7 +189,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Upgrade the real signed release without clearing data
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           arch: x86_64
@@ -203,6 +205,17 @@ jobs:
             upgrade-*.xml
             upgrade-*.csv
             release-screen.png
+      - name: Re-verify the signed APK before publication
+        # Third-party emulator steps ran in this workspace after signing: publish only the exact signed bytes.
+        env:
+          APK_SHA256: ${{ steps.signed.outputs.apk_sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "$APK_SHA256"
+          echo "$APK_SHA256  TgWatch.apk" | sha256sum -c -
+          [ "$(cut -d' ' -f1 TgWatch.apk.sha256)" = "$APK_SHA256" ]
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs TgWatch.apk > publish-signature.txt
+          grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' publish-signature.txt
       - name: Publish versioned release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -230,13 +243,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
