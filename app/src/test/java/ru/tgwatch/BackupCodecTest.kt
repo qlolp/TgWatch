@@ -34,10 +34,30 @@ class BackupCodecTest {
         }
     }
     @Test fun rejectsUnknownMissingAndWrongRootFields() {
-        for (text in listOf(base.replace("\"formatVersion\":1", "\"formatVersion\":2"),
+        for (text in listOf(base.replace("\"formatVersion\":1", "\"formatVersion\":3"),
             base.replace("\"createdAt\":123,", ""), base.replace("\"log\":[]", "\"log\":[],\"enabled\":true"),
             base.replace("\"settings\":{}", "\"settings\":[]"), base.replace("\"observations\":[]", "\"observations\":{}"),
             base.replace("\"log\":[]", "\"log\":[null]"), "[]", base + "{}", base.dropLast(1))) rejected { decode(text) }
+    }
+    @Test fun readsLegacyV1AndWritesV2WithoutReinterpretingOneMillisecondUnknown() {
+        val row = """{"at":0,"until":1,"kind":"UNKNOWN","latencyMs":-1,"clockEpoch":1}"""
+        val text = base.replace("\"observations\":[]", "\"observations\":[$row]")
+        val legacy = decode(text)
+        assertEquals(listOf(Observation(0, 1, "UNKNOWN", clockEpoch = 1)), legacy.observations)
+        assertEquals(1, Timeline.stats(legacy.observations, 0, 2).unknownChecks)
+        val written = BackupCodec.encode(legacy).toString(Charsets.UTF_8)
+        assertTrue(written.contains("\"formatVersion\":2"))
+        assertEquals(legacy, decode(written))
+    }
+    @Test fun onlyV2AcceptsExplicitZeroWidthEpochMetadata() {
+        val row = """{"at":0,"until":0,"kind":"UNKNOWN","latencyMs":-1,"clockEpoch":1}"""
+        val text = base.replace("\"observations\":[]", "\"observations\":[$row]")
+        rejected { decode(text) }
+        val v2 = text.replace("\"formatVersion\":1", "\"formatVersion\":2")
+        assertEquals(listOf(Observation(0, 0, "UNKNOWN", clockEpoch = 1)), decode(v2).observations)
+        for (invalid in listOf(v2.replace("UNKNOWN", "OK"), v2.replace("\"latencyMs\":-1", "\"latencyMs\":0"))) {
+            rejected { decode(invalid) }
+        }
     }
     @Test fun rejectsCoercionOverflowFractionalAndNegativeRootNumbers() {
         for (number in listOf("\"123\"", "123.0", "1e3", "9223372036854775808", "-1", "null", "true")) {

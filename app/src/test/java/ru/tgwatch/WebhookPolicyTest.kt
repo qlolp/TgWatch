@@ -59,7 +59,7 @@ class WebhookPolicyTest {
     }
 
     @Test fun healthyStartIsSilentAndEachRealChangeIsSentOnce() {
-        val gate = WebhookGate()
+        val gate = GateFixture()
         assertFalse("Startup OK is a baseline, not news", gate.begin("OK", 1_000))
         assertFalse(gate.begin("OK", 2_000))
         assertTrue("First change is sent immediately", gate.begin("TG_DOWN", 3_000))
@@ -72,14 +72,14 @@ class WebhookPolicyTest {
     }
 
     @Test fun firstNonOkStatusAfterStartIsSent() {
-        val gate = WebhookGate()
+        val gate = GateFixture()
         assertTrue(gate.begin("TG_DOWN", 0))
         gate.finished("TG_DOWN", true)
         assertTrue("A first OK after a reported outage is a change", gate.begin("OK", 1))
     }
 
     @Test fun perStatusRateLimitDelaysFlappingButConvergesToCurrentStatus() {
-        val gate = WebhookGate(minGapMs = 60_000)
+        val gate = GateFixture(minGapMs = 60_000)
         gate.begin("OK", 0)
         assertTrue(gate.begin("TG_DOWN", 1_000)); gate.finished("TG_DOWN", true)
         assertTrue("First post of a different status is immediate", gate.begin("OK", 2_000)); gate.finished("OK", true)
@@ -92,7 +92,7 @@ class WebhookPolicyTest {
     }
 
     @Test fun atMostOneRequestInFlightAndFailuresRetryAfterTheGap() {
-        val gate = WebhookGate(minGapMs = 60_000)
+        val gate = GateFixture(minGapMs = 60_000)
         gate.begin("OK", 0)
         assertTrue(gate.begin("TG_DOWN", 1_000))
         assertFalse("In flight", gate.begin("NO_NETWORK", 1_500))
@@ -105,7 +105,7 @@ class WebhookPolicyTest {
     }
 
     @Test fun failedDeliveryRestoresThePreviousDeliveredStatus() {
-        val gate = WebhookGate()
+        val gate = GateFixture()
         gate.begin("OK", 0)
         assertTrue(gate.begin("NO_NETWORK", 10))
         gate.finished("NO_NETWORK", false)
@@ -113,7 +113,7 @@ class WebhookPolicyTest {
     }
 
     @Test fun testMessagesAreRateLimitedAndDoNotChangeStatusHistory() {
-        val gate = WebhookGate(testGapMs = 10_000)
+        val gate = GateFixture(testGapMs = 10_000)
         assertTrue(gate.beginTest(0))
         assertFalse(gate.begin("TG_DOWN", 1))
         gate.finishedTest()
@@ -125,7 +125,7 @@ class WebhookPolicyTest {
     }
 
     @Test fun resetForgetsHistoryAfterSettingsChange() {
-        val gate = WebhookGate()
+        val gate = GateFixture()
         gate.begin("OK", 0)
         assertTrue(gate.begin("TG_DOWN", 1)); gate.finished("TG_DOWN", true)
         gate.reset()
@@ -133,5 +133,34 @@ class WebhookPolicyTest {
         gate.finished("TG_DOWN", true)
         gate.reset()
         assertFalse(gate.begin("OK", 3))
+    }
+
+    /** Keeps the original boolean decision assertions while retaining the real completion token. */
+    private class GateFixture(minGapMs: Long = WebhookPolicy.MIN_GAP_MS,
+        testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {
+        private val gate = WebhookGate(minGapMs, testGapMs)
+        private var request: WebhookGate.Request? = null
+
+        fun begin(status: String, nowElapsed: Long): Boolean =
+            gate.begin(status, nowElapsed)?.also { request = it } != null
+
+        fun beginTest(nowElapsed: Long): Boolean =
+            gate.beginTest(nowElapsed)?.also { request = it } != null
+
+        fun finished(status: String, delivered: Boolean) {
+            val active = checkNotNull(request)
+            assertEquals(status, active.status)
+            assertTrue(gate.finished(active, delivered))
+            request = null
+        }
+
+        fun finishedTest() {
+            val active = checkNotNull(request)
+            assertNull(active.status)
+            assertTrue(gate.finished(active, true))
+            request = null
+        }
+
+        fun reset() = gate.reset()
     }
 }

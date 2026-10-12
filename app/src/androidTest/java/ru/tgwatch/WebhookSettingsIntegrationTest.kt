@@ -14,26 +14,45 @@ import org.junit.runner.RunWith
 class WebhookSettingsIntegrationTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val secret = "https://ntfy.sh/private-topic-7f3a"
-    private var previous: Map<String, *> = emptyMap<String, Any>()
+    private var previous: Map<String, *>? = null
+    private var previousEnabled: Boolean? = null
 
     private fun store() = ctx.getSharedPreferences(WebhookSettings.FILE, Context.MODE_PRIVATE)
 
     @Before fun clear() {
+        previousEnabled = Prefs.isEnabled(ctx)
+        Prefs.setEnabled(ctx, false)
+        MonitorService.stopAndAwait(ctx)
+        assertFalse("The production monitor must stop before fixture credentials are installed", MonitorService.running)
         previous = store().all.toMap()
-        assertTrue(store().edit().clear().commit())
+        assertTrue(WebhookSettings.clear(ctx))
     }
 
     @After fun restore() {
-        val edit = store().edit().clear()
-        previous.forEach { (key, value) ->
-            when (value) {
-                is String -> edit.putString(key, value)
-                is Boolean -> edit.putBoolean(key, value)
-                else -> error("Unsupported fixture preference")
+        try {
+            previous?.let { saved ->
+                synchronized(WebhookSettings) {
+                    val invalidated = WebhookSettings.clear(ctx)
+                    val edit = store().edit().clear()
+                    saved.forEach { (key, value) ->
+                        when (value) {
+                            is String -> edit.putString(key, value)
+                            is Boolean -> edit.putBoolean(key, value)
+                            else -> error("Unsupported fixture preference")
+                        }
+                    }
+                    val restored = edit.commit()
+                    assertTrue("Original webhook preferences must be restored", restored)
+                    assertTrue("Fixture settings must advance the configuration generation", invalidated)
+                }
+            }
+        } finally {
+            try {
+                WebhookNotifier.reset()
+            } finally {
+                previousEnabled?.let { Prefs.setEnabled(ctx, it) }
             }
         }
-        assertTrue(edit.commit())
-        WebhookNotifier.reset()
     }
 
     @Test fun addressIsOptInValidatedPrivateAndExcludedFromBackupAndDiagnostics() {
@@ -61,5 +80,68 @@ class WebhookSettingsIntegrationTest {
         assertTrue(WebhookSettings.clear(ctx))
         assertFalse(WebhookSettings.enabled(ctx))
         assertNull(WebhookSettings.url(ctx))
+    }
+
+    @Test fun successfulSettingsWritesAdvanceTheGenerationButInvalidInputDoesNot() {
+        val initial = WebhookSettings.configuration(ctx)
+        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        val saved = WebhookSettings.configuration(ctx)
+        assertTrue(saved.generation > initial.generation)
+        assertEquals(secret, saved.url)
+        assertFalse(saved.enabled)
+        assertFalse(WebhookSettings.setUrl(ctx, "http://example.org/invalid"))
+        assertEquals(saved, WebhookSettings.configuration(ctx))
+        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        val enabled = WebhookSettings.configuration(ctx)
+        assertTrue(enabled.generation > saved.generation)
+        assertTrue(enabled.enabled)
+        assertTrue(WebhookSettings.clear(ctx))
+        val removed = WebhookSettings.configuration(ctx)
+        assertTrue(removed.generation > enabled.generation)
+        assertNull(removed.url)
+        assertFalse(removed.enabled)
+    }
+
+    @Test fun coordinatorRejectsACapturedAddressAfterARealStorageWriteWithoutALaterReset() {
+        val replacement = "https://example.org/replacement"
+        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        var replaceAfterRead = true
+        val posted = mutableListOf<String>()
+        val coordinator = WebhookCoordinator(WebhookSettings, {
+            WebhookSettings.configuration(ctx).also {
+                if (replaceAfterRead) {
+                    replaceAfterRead = false
+                    assertTrue(WebhookSettings.setUrl(ctx, replacement))
+                }
+            }
+        }, { 0L }, { url, _, _ -> posted.add(url); true })
+
+        coordinator.onPublished("TG_DOWN")
+        assertTrue("The saved generation must invalidate the captured credential", posted.isEmpty())
+        coordinator.onPublished("TG_DOWN")
+        assertEquals(listOf(replacement), posted)
+    }
+
+    @Test fun realSettingsChangesKeepTheOldPhysicalRequestCountedAndTheNewHistoryFresh() {
+        val replacement = "https://example.org/replacement"
+        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        val posted = mutableListOf<String>()
+        val completions = mutableListOf<(Int) -> Unit>()
+        val coordinator = WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(ctx) }, { 0L },
+            { url, _, finished -> posted.add(url); completions.add(finished); true })
+        coordinator.onPublished("TG_DOWN")
+        assertTrue(WebhookSettings.setUrl(ctx, replacement))
+        coordinator.onPublished("TG_DOWN")
+        assertEquals(listOf(secret), posted)
+
+        completions.single()(204)
+        coordinator.onPublished("TG_DOWN")
+        assertEquals(listOf(secret, replacement), posted)
+        completions.first()(500)
+        coordinator.onPublished("NO_NETWORK")
+        assertEquals("Duplicate completion cannot release the replacement request", 2, posted.size)
+        completions.last()(204)
     }
 }

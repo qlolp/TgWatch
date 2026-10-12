@@ -19,7 +19,7 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`version.properties` задаёт SemVer `1.13.1`; код `1013001` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.13.2`; код `1013002` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
@@ -58,12 +58,12 @@ OEM background restrictions и живой Telegram ответ требуют о�
 ## Код и совместимость данных
 
 - `NetworkProbe`/`ProbeBatch`/`MtProto` — bounded HTTP/unauthenticated req_pq_multi/resPQ, Android Network binding, shared deadlines и cancellation с закрытием socket/connection. Полная TL validation сохранена; не добавляйте account/RPC или TLS bypass.
-- `Timeline`/`HistoryStorage`/`History` — interval observations, clock epochs, unknown gaps, per-status counts и exact latency totals. Полностью наблюдённый TG_DOWN для MTTR продолжается через PARTIAL до свежего OK; offline/gaps/clipping/clock change разрывают покрытие. Устаревшая последняя эпоха не должна оживлять старую статистику.
-- `CsvImport` — strict current/legacy UTC history. UNKNOWN rows пропускаются, чтобы generated gaps не увеличивали checks; archived epochs не становятся текущими после удаления UNKNOWN.
-- `BackupSnapshot`/`BackupCodec` — local typed snapshot и strict JSON private journal; `PortableBackupCodec` пишет TGWB v2 и читает опубликованный binary TGWB v1 и локальный TGWBKUP1. Format versions portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
+- `Timeline`/`HistoryStorage`/`History` — interval observations, clock epochs, unknown gaps, per-status counts и exact latency totals. Полностью наблюдённый TG_DOWN для MTTR продолжается через PARTIAL до свежего OK; offline/gaps/clipping/clock change разрывают покрытие. Устаревшая последняя эпоха не должна оживлять старую статистику. Zero-width UNKNOWN с latency=-1 — явные epoch metadata, не checks; positive-width UNKNOWN остаётся реальной проверкой. После failed write dirty snapshot должен сохраняться целиком до возврата к append.
+- `CsvImport` — strict current/legacy UTC history. Positive-width UNKNOWN rows пропускаются, чтобы generated gaps не увеличивали checks; явные zero-width epoch metadata принимаются только в текущих семи колонках. Archived epochs не становятся текущими после удаления UNKNOWN.
+- `BackupSnapshot`/`BackupCodec` — local typed snapshot и strict JSON private journal; `PortableBackupCodec` пишет TGWB v2 и читает опубликованный binary TGWB v1 и локальный TGWBKUP1. JSON writer использует payload v2, reader — strict v1 и constrained v2; новая копия требует reader 1.13.2+. Format versions portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
 - `BackupManager`/`RestoreTransaction`/`TgWatchApplication` — validation before changes, stop-and-await monitoring, durable journal и replay до компонентов. Оба старых private journals мигрируют. Cache меняется после durable write; monitoring после restore/import остаётся остановленным, transient status/last OK не переносятся.
 - `Prefs`/`QuietHours`/`EventPreferences` — minute boundaries с legacy hour fallback и independent outage/PARTIAL/recovery notify/sound. Отсутствующие legacy flags имеют прежний fallback; PARTIAL остаётся opt-in. `LastSuccessStore` сохраняет только published OK; Android channel overrides принадлежат устройству.
-- `ExtraProbes`/`HttpsUrlPolicy` — opt-in informational probes в группе `EXTRA`, которую `ProbeReport.classify` игнорирует; они не должны влиять на статус, latency, reason и тревоги. `WebhookPolicy`/`WebhookGate` — чистая логика payload и rate limit; `WebhookSettings` хранит адрес как секрет (как `AutomationSettings`), `WebhookNotifier` — единственный поток и не больше одного запроса.
+- `ExtraProbes`/`HttpsUrlPolicy` — opt-in informational probes в группе `EXTRA`, которую `ProbeReport.classify` игнорирует; они не должны влиять на статус, latency, reason и тревоги и используют отдельный трёхпоточный bounded executor. `WebhookPolicy`/`WebhookGate` — чистая логика payload и rate limit; `WebhookSettings` хранит адрес как секрет (как `AutomationSettings`). `WebhookCoordinator` связывает URL/generation с admission/completion; `WebhookNotifier` сохраняет не больше одного физического запроса, включая смену настроек.
 - `MonitorService`/`CheckSchedule`/`OfflineBackoff` — existing native lifecycle/scheduling; `EventNotifications`/`StatusWidget`/`MainActivity`/`BackupUi` — Android adapters/UI. Full Telegram RPC, NTP и coroutine rewrite не реализованы.
 
 ### Язык интерфейса

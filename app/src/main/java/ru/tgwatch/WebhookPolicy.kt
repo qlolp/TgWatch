@@ -1,5 +1,8 @@
 package ru.tgwatch
 
+/** One credential-storage snapshot; generation distinguishes replacements with the same URL. */
+internal data class WebhookConfiguration(val url: String?, val enabled: Boolean, val generation: Long)
+
 /** Android-independent webhook rules: address validation, payload text and request identity. */
 object WebhookPolicy {
     const val MAX_URL_LENGTH = 512
@@ -45,58 +48,64 @@ object WebhookPolicy {
  * Per-process send decisions. Called for every published status so a post skipped by the rate
  * limit or a failed delivery is retried by a later check. At most one request is in flight.
  */
-class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS,
+internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS,
     private val testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {
+    /** Identity belongs to one physical request; callbacks must retain this exact token. */
+    class Request internal constructor(internal val generation: Long, internal val status: String?,
+        internal val previousSent: String?)
+
     private var lastSent: String? = null
-    private var previousSent: String? = null
-    private var inFlight = false
+    private var generation = 0L
+    private var inFlight: Request? = null
     private var lastTestAt: Long? = null
     private val sentAt = HashMap<String, Long>()
 
     /** Forget delivery history after the address or switch changes; an active request stays counted. */
     @Synchronized fun reset() {
+        generation++
         lastSent = null
-        previousSent = null
         sentAt.clear()
     }
 
-    /** True when the caller must post [status] now and later call [finished]. */
-    @Synchronized fun begin(status: String, nowElapsed: Long): Boolean {
+    /** The token to post [status] now and later pass to [finished], or null when no post is due. */
+    @Synchronized fun begin(status: String, nowElapsed: Long): Request? {
+        if (inFlight != null) return null
         val last = lastSent
         // A monitor that starts healthy is not news; the first change after it is.
-        val baseline = !inFlight && last == null && status == "OK"
-        if (baseline) lastSent = status
-        val send = !baseline && !inFlight && WebhookPolicy.notifies(status) && status != last &&
-            gapAllows(sentAt[status], nowElapsed, minGapMs)
-        if (send) {
-            previousSent = last
-            lastSent = status
-            sentAt[status] = nowElapsed
-            inFlight = true
+        return when {
+            last == null && status == "OK" -> {
+                lastSent = status
+                null
+            }
+            WebhookPolicy.notifies(status) && status != last &&
+                gapAllows(sentAt[status], nowElapsed, minGapMs) -> Request(generation, status, last).also {
+                lastSent = status
+                sentAt[status] = nowElapsed
+                inFlight = it
+            }
+            else -> null
         }
-        return send
     }
 
-    /** A failed delivery is retried once the per-status gap allows it. */
-    @Synchronized fun finished(status: String, delivered: Boolean) {
-        inFlight = false
-        if (!delivered && lastSent == status) lastSent = previousSent
+    /** Only this physical request can release its slot; older generations cannot change history. */
+    @Synchronized fun finished(request: Request, delivered: Boolean): Boolean {
+        if (inFlight !== request) return false
+        inFlight = null
+        if (request.generation == generation && request.status != null && !delivered) {
+            lastSent = request.previousSent
+        }
+        return true
     }
 
-    @Synchronized fun beginTest(nowElapsed: Long): Boolean {
-        val send = !inFlight && gapAllows(lastTestAt, nowElapsed, testGapMs)
-        if (send) {
+    @Synchronized fun beginTest(nowElapsed: Long): Request? {
+        if (inFlight != null || !gapAllows(lastTestAt, nowElapsed, testGapMs)) return null
+        return Request(generation, null, null).also {
             lastTestAt = nowElapsed
-            inFlight = true
+            inFlight = it
         }
-        return send
     }
 
     /** Elapsed time going backwards (a new boot cannot share this process) never blocks a post. */
     private fun gapAllows(previous: Long?, now: Long, gap: Long): Boolean =
         previous == null || now < previous || now - previous >= gap
-
-    @Synchronized fun finishedTest() {
-        inFlight = false
-    }
 }

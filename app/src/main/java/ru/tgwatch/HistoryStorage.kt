@@ -1,12 +1,16 @@
 package ru.tgwatch
 
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 
-/** File I/O is separate from Android so migration and crash-safe writes can be tested. */
+/** File I/O is separate from Android context so migration and crash-safe writes can be tested. */
 object HistoryStorage {
     /** Tracks successful writes only; a failed append must not defer the next fsync. */
     class AppendSyncPolicy {
@@ -24,8 +28,7 @@ object HistoryStorage {
 
     fun validateSnapshot(samples: List<Observation>) {
         require(samples.size <= 65_000) { "Too many observations" }
-        require(samples.all { it.at >= 0 && it.until > it.at && it.until - it.at <= 600_000L &&
-            it.kind in Timeline.kinds && it.latencyMs >= -1L && it.clockEpoch >= 0L }) { "Invalid observation" }
+        require(samples.all { validObservation(it) }) { "Invalid observation" }
     }
 
     /** Validation and durable replacement complete before the caller publishes this snapshot. */
@@ -58,14 +61,14 @@ object HistoryStorage {
             val at = p[0].toLongOrNull() ?: return@mapNotNull null
             val until = p[1].toLongOrNull() ?: return@mapNotNull null
             val latency = p[3].toLongOrNull() ?: return@mapNotNull null
-            if (at < 0 || until <= at || until - at > 600_000L || p[2] !in Timeline.kinds) return@mapNotNull null
             val epoch = if (p.size == 5) p[4].toLongOrNull() ?: return@mapNotNull null else 0L
-            if (epoch < 0) return@mapNotNull null
-            Observation(at, until, p[2], latency, epoch)
+            val row = Observation(at, until, p[2], latency, epoch)
+            if (!validObservation(row)) return@mapNotNull null
+            row
         }
     }
     fun merge(older: List<Observation>, newer: List<Observation>): List<Observation> =
-        (older + newer).associateBy { it.clockEpoch to it.at }.values.sortedWith(compareBy({ it.clockEpoch }, { it.at }))
+        Timeline.unique(older + newer).sortedWith(compareBy({ it.clockEpoch }, { it.at }))
 
     fun write(file: File, samples: List<Observation>) {
         file.parentFile?.mkdirs()
@@ -80,13 +83,25 @@ object HistoryStorage {
             // Same-filesystem rename replaces atomically on Android/Linux; never delete first.
             check(tmp.renameTo(file)) { "Cannot atomically replace history" }
         }
+        syncDirectory(file.absoluteFile.parentFile!!)
+    }
+    /** Persist rename/creation metadata too; unsupported or failed sync must reach the caller. */
+    internal fun syncDirectory(directory: File) {
+        if (System.getProperty("java.vm.name") == "Dalvik") {
+            val descriptor = Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
+            try { Os.fsync(descriptor) } finally { Os.close(descriptor) }
+        } else {
+            FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { it.force(true) }
+        }
     }
     fun append(file: File, sample: Observation, sync: Boolean = false) {
         file.parentFile?.mkdirs()
+        val created = !file.exists()
         FileOutputStream(file, true).use { stream ->
             stream.write("\n${encode(sample)}\n".toByteArray(Charsets.UTF_8))
             if (sync) stream.fd.sync()
         }
+        if (created && sync) syncDirectory(file.absoluteFile.parentFile!!)
     }
     private fun encode(s: Observation) = "${s.at},${s.until},${s.kind},${s.latencyMs},${s.clockEpoch}"
     fun readLegacy(file: File): List<Observation> {
@@ -103,6 +118,16 @@ object HistoryStorage {
         }
     }
 }
+
+private fun validObservation(row: Observation): Boolean {
+    val validIdentity = row.at >= 0 && row.clockEpoch >= 0
+    val validResult = row.kind in Timeline.kinds && row.latencyMs >= -1
+    val validCoverage = row.isEpochMetadata ||
+        row.until > row.at && row.until - row.at <= MAX_OBSERVATION_COVERAGE_MS
+    return validIdentity && validResult && validCoverage
+}
+
+private const val MAX_OBSERVATION_COVERAGE_MS = 600_000L
 
 /** Length-prefixed strings preserve restored log entries; old newline storage remains readable. */
 object EventLogStorage {

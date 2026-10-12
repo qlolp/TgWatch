@@ -202,6 +202,7 @@ class MonitorService : Service() {
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
      */
     private val probeExecutor: ExecutorService = NetworkProbe.executor()
+    private val extraProbeExecutor: ExecutorService = NetworkProbe.extraExecutor()
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -334,8 +335,10 @@ class MonitorService : Service() {
         running = false
         worker.removeCallbacksAndMessages(null)
         workerThread.quitSafely()
+        workerThread.interrupt()
         cancelAlarm()
         probeExecutor.shutdownNow()
+        extraProbeExecutor.shutdownNow()
         try {
             cm.unregisterNetworkCallback(networkCallback)
         } catch (e: Exception) {
@@ -479,7 +482,7 @@ class MonitorService : Service() {
         if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) {
             return Probe(Status.NO_NETWORK, -1, Lang.t("Требуется вход в сеть Wi-Fi", "Wi-Fi sign-in required"), Lang.t("Сеть: $transport; captive portal", "Network: $transport; captive portal"))
         }
-        val report = NetworkProbe(probeExecutor,
+        val report = NetworkProbe(probeExecutor, extraProbeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
             { selected.socketFactory.createSocket() }).check(Prefs.extraProbeEndpoints(this))
         fun line(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +

@@ -131,7 +131,15 @@ posts a fixed test line, even while the switch is off.
   leave the device.
 - One background thread, at most one request in flight, 5-second connect and
   read timeouts. Posting never blocks or changes monitoring, notifications or
-  history. The decision state is per process.
+  history. These are per-operation timeouts, not a total HTTP deadline. The
+  decision state is per process.
+- Saving an address or changing the enabled setting invalidates older send
+  snapshots atomically. A request already admitted to the old address may finish,
+  but its completion cannot update the new address's delivery/rate history or
+  release another request. The old request continues to occupy the single
+  physical slot until it finishes; a later monitor check can then send the same
+  outage to the current address. A settings change does not send a new request
+  automatically.
 - Treat the address as a credential: anyone who knows an ntfy topic URL can post
   to it. Like the automation token it lives in private credential-protected
   SharedPreferences (`webhook-private-v1`), outside Direct Boot storage, portable

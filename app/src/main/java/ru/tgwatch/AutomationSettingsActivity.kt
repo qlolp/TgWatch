@@ -142,7 +142,6 @@ class AutomationSettingsActivity : Activity() {
                     val message = if (enabled) R.string.webhook_url_required else R.string.automation_storage_error
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
-                WebhookNotifier.reset()
                 refresh()
             }
         }
@@ -205,14 +204,12 @@ class AutomationSettingsActivity : Activity() {
             .setNegativeButton(R.string.dialog_cancel, null)
             .setNeutralButton(R.string.dialog_remove) { _, _ ->
                 if (!WebhookSettings.clear(this)) storageError()
-                WebhookNotifier.reset()
                 refresh()
             }
             .setPositiveButton(R.string.dialog_save) { _, _ ->
                 if (!WebhookSettings.setUrl(this, input.text.toString())) {
                     Toast.makeText(this, R.string.webhook_url_invalid, Toast.LENGTH_LONG).show()
                 }
-                WebhookNotifier.reset()
                 refresh()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)

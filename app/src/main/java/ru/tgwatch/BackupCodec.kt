@@ -37,7 +37,7 @@ object BackupCodec {
         snapshot.settings.forEach { (key, value) -> settings.put(key, value) }
         val log = JSONArray()
         snapshot.log.forEach { log.put(it) }
-        val text = JSONObject().put("formatVersion", 1).put("createdAt", snapshot.createdAt)
+        val text = JSONObject().put("formatVersion", 2).put("createdAt", snapshot.createdAt)
             .put("settings", settings).put("observations", rows).put("log", log).toString()
         require(text.length <= MAX_PLAINTEXT_BYTES)
         text.toByteArray(Charsets.UTF_8).also { require(it.size <= MAX_PLAINTEXT_BYTES) }
@@ -51,7 +51,9 @@ object BackupCodec {
         // its object tree, and bound nesting before any recursive platform parsing.
         JsonPreflight(text).check()
         val root = JSONObject(text)
-        require(keys(root) == rootKeys && integral(root.get("formatVersion")) == 1L)
+        require(keys(root) == rootKeys)
+        val version = integral(root.get("formatVersion"))
+        require(version in 1L..2L)
         val createdAt = integral(root.get("createdAt"))
         val jsonSettings = root.get("settings") as? JSONObject ?: invalid()
         val settings = linkedMapOf<String, Any>()
@@ -73,6 +75,8 @@ object BackupCodec {
             observations += Observation(integral(row.get("at")), integral(row.get("until")),
                 row.get("kind") as? String ?: invalid(), integral(row.get("latencyMs")), integral(row.get("clockEpoch")))
         }
+        // V1 observations always had positive width; do not reinterpret its UNKNOWN checks.
+        if (version == 1L) require(observations.all { it.until > it.at })
         val lines = root.get("log") as? JSONArray ?: invalid()
         require(lines.length() <= MAX_LOG_LINES)
         val log = (0 until lines.length()).map { lines.get(it) as? String ?: invalid() }
@@ -83,10 +87,7 @@ object BackupCodec {
         require(snapshot.createdAt >= 0)
         validateSettings(snapshot.settings)
         require(snapshot.observations.size <= MAX_OBSERVATIONS && snapshot.log.size <= MAX_LOG_LINES)
-        snapshot.observations.forEach {
-            require(it.at >= 0 && it.until > it.at && it.until - it.at <= 600_000L)
-            require(it.kind in Timeline.kinds && it.latencyMs >= -1 && it.clockEpoch >= 0)
-        }
+        HistoryStorage.validateSnapshot(snapshot.observations)
         snapshot.log.forEach { require(it.length <= MAX_LOG_LINE_CHARS); validUnicode(it) }
     }
 

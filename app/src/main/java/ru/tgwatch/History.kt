@@ -42,6 +42,7 @@ object History {
     private var samples = mutableListOf<Observation>()
     private var loaded = false
     private var migrated = false
+    private var dirty = false
     private var lastCompacted = 0L
     private val statsCache = mutableMapOf<String, TimeStats>()
     private val appendSync = HistoryStorage.AppendSyncPolicy()
@@ -52,6 +53,7 @@ object History {
     private fun load(ctx: Context) {
         if (!loaded) {
             samples = HistoryStorage.read(file(ctx)).toMutableList()
+            dirty = false
             loaded = true
             lastCompacted = System.currentTimeMillis()
         }
@@ -69,6 +71,7 @@ object History {
         val retained = Timeline.retained(samples,now-KEEP_MS)
         if (retained != samples) {
             samples = retained.toMutableList()
+            dirty = true
             version++
             statsCache.clear()
         }
@@ -77,6 +80,7 @@ object History {
         val rolled = Timeline.clockRollback(samples, now)
         if (rolled !== samples) {
             samples = rolled.toMutableList()
+            dirty = true
             version++
             flush(ctx)
         }
@@ -93,9 +97,12 @@ object History {
         val status = when (kind) { Kind.FAIL -> "TG_DOWN"; Kind.OFFLINE -> "NO_NETWORK"; else -> kind.name }
         samples.add(Observation(now, end, status, latencyMs, samples.maxOfOrNull { it.clockEpoch } ?: 0))
         version++
+        // Adding a row can exceed the row cap or replace a same-time epoch marker.
+        prune(now)
         try {
-            if (now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
+            if (dirty || now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
                 HistoryStorage.write(file(ctx), samples)
+                dirty = false
                 lastCompacted = now
                 appendSync.saved(status, SystemClock.elapsedRealtime(), true)
             } else {
@@ -104,7 +111,10 @@ object History {
                 HistoryStorage.append(file(ctx), samples.last(), sync)
                 appendSync.saved(status, elapsed, sync)
             }
-        } catch (e: Exception) { Log.w("TgWatch", "history save", e) }
+        } catch (e: Exception) {
+            dirty = true
+            Log.w("TgWatch", "history save", e)
+        }
     }
     @Synchronized fun endSession(ctx: Context, now: Long = System.currentTimeMillis()) {
         if (!ready(ctx)) return
@@ -114,6 +124,7 @@ object History {
             if (s.clockEpoch != epoch) s else if (s.at >= now) s.copy(kind = "UNKNOWN")
             else s.copy(until = minOf(s.until, now))
         }.toMutableList()
+        dirty = true
         version++
         flush(ctx)
     }
@@ -141,7 +152,7 @@ object History {
         prune(now)
         val from = now / 60_000L - count + 1
         val bins = sortedMapOf<Long, Minute>()
-        for (s in Timeline.current(samples).filter { it.at / 60_000L >= from && it.at <= now }) {
+        for (s in Timeline.currentChecks(samples).filter { it.at / 60_000L >= from && it.at <= now }) {
             val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
             when (s.kind) {
                 "OK" -> m.addLatency(s.latencyMs)
@@ -167,6 +178,7 @@ object History {
     }
     @Synchronized fun replaceSnapshot(ctx: Context, rows: List<Observation>) {
         val now = System.currentTimeMillis()
+        dirty = true
         val retained = HistoryStorage.replace(file(ctx), rows, now - KEEP_MS)
         // A restored snapshot supersedes legacy history on subsequent process starts too.
         val marker = File(file(ctx).parentFile, "history-migrated-v2")
@@ -174,9 +186,11 @@ object History {
             it.write("restored snapshot supersedes legacy history".toByteArray(Charsets.UTF_8))
             it.fd.sync()
         }
+        HistoryStorage.syncDirectory(marker.parentFile!!)
         samples = retained.toMutableList()
         loaded = true
         migrated = true
+        dirty = false
         lastCompacted = now
         appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
         statsCache.clear()
@@ -188,12 +202,11 @@ object History {
         ensureClock(ctx,now)
         prune(now)
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
-        val result = samples.mapNotNull { if (it.clockEpoch != epoch) it else
+        val result = samples.mapNotNull { if (it.clockEpoch != epoch || it.isEpochMetadata) it else
             if (it.at >= now) null else it.copy(until=minOf(it.until,now)) }
-        // A rollback marker may have just been created at now and then clipped away.
-        // Preserve its epoch as expired metadata, never as a fresh check.
+        // If clipping removed the current epoch's final check, retain its identity as metadata.
         return if (samples.isNotEmpty() && result.none { it.clockEpoch == epoch }) result +
-            Observation((now-KEEP_MS-1).coerceAtLeast(0),(now-KEEP_MS).coerceAtLeast(1),"UNKNOWN",clockEpoch=epoch)
+            Observation(now.coerceAtLeast(0), now.coerceAtLeast(0), "UNKNOWN", clockEpoch = epoch)
             else result
     }
     @Synchronized internal fun replace(ctx: Context, replacement: List<Observation>) {
@@ -217,8 +230,10 @@ object History {
     }
     @Synchronized fun flush(ctx: Context) {
         if (!loaded) return
+        dirty = true
         try {
             HistoryStorage.write(file(ctx), samples)
+            dirty = false
             appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
         } catch (e: Exception) { Log.w("TgWatch", "history flush", e) }
     }
