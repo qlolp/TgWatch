@@ -12,10 +12,8 @@ object LastSuccessStore {
         val previous = lastSuccessAt(ctx)
         val next = LastSuccessPolicy.updated(previous, statusName, checkedAt)
         if (next != previous) {
-            // Publication happens off the UI thread. Complete disk persistence before widget update.
-            check(settings.edit().putLong(KEY_LAST_SUCCESS, next).commit()) {
-                "Could not persist last successful check"
-            }
+            // apply() updates the in-process value the widget reads and flushes on a worker.
+            settings.edit().putLong(KEY_LAST_SUCCESS, next).apply()
         }
     }
 

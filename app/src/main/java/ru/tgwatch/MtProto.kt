@@ -12,6 +12,7 @@ import java.security.SecureRandom
  * A greeting is a reachability signal, not server authentication or message delivery.
  */
 object MtProto {
+    private val random = SecureRandom()
     fun request(nonce: ByteArray, nowMillis: Long): ByteArray {
         require(nonce.size == 16)
         val messageId = ((nowMillis / 1000) shl 32) or (((nowMillis % 1000) shl 32) / 1000 and -4L)
@@ -46,7 +47,7 @@ object MtProto {
             fingerprints == buffer.remaining() / 8
     }
     fun probe(host: String, socketFactory: () -> Socket, cancellation: ProbeCancellation): Boolean {
-        val nonce = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val nonce = ByteArray(16).also { random.nextBytes(it) }
         val socket = socketFactory()
         cancellation.register { socket.close() }
         socket.use {

@@ -30,7 +30,7 @@ class DailySummaryReceiver : BroadcastReceiver() {
         @Synchronized fun post(ctx: Context, force: Boolean): Boolean {
             val now = System.currentTimeMillis()
             val settings = Prefs.sp(ctx)
-            val scheduled = force || (Prefs.dailySummary(ctx) &&
+            val scheduled = force || (Prefs.dailySummary(ctx) && Prefs.isEnabled(ctx) &&
                 !alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L)))
             if (!scheduled) return false
             return try {

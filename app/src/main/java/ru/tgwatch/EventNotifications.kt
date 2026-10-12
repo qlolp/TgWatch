@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 
@@ -23,6 +24,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         const val PARTIAL_ID = 4
         const val SUMMARY_ID = 5
         const val SUMMARY_CHANNEL = "daily_summary_v1"
+        private const val CHECK_ACTION_CODE = 11
+        private const val STOP_ACTION_CODE = 12
         fun channel(event: String) = when(event) {
             "TG_DOWN" -> SOUND_CHANNEL; "PARTIAL" -> PARTIAL_CHANNEL; "RECOVERY" -> RECOVERY_CHANNEL
             else -> error("Unknown event")
@@ -61,20 +64,26 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
         if (blocked(recoveryChannel)) { clearRecovery(); return }
-        manager.notify(RECOVERY_ID, notification(Lang.t("Telegram снова доступен", "Telegram is back"),
-            Lang.t("Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", "The observed outage lasted ${recoveryDurationStr(event.durationMs)}"), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
+        val text = Lang.t("Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}",
+            "The observed outage lasted ${recoveryDurationStr(event.durationMs)}")
+        val builder = notification(Lang.t("Telegram снова доступен", "Telegram is back"),
+            text, sound && allowed, R.drawable.ic_stat_ok, recoveryChannel)
+        manager.notify(RECOVERY_ID, withActions(builder).build())
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(PARTIAL_ID)
         if (blocked(outageChannel)) { manager.cancel(OUTAGE_ID); return }
-        manager.notify(OUTAGE_ID, notification(Lang.t("Telegram недоступен", "Telegram is unreachable"), reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
+        val builder = notification(Lang.t("Telegram недоступен", "Telegram is unreachable"),
+            reason, sound && allowed, R.drawable.ic_stat_fail, outageChannel)
+        manager.notify(OUTAGE_ID, withActions(builder).build())
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(OUTAGE_ID)
         if (blocked(partialChannel)) { manager.cancel(PARTIAL_ID); return }
-        manager.notify(PARTIAL_ID,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
-            R.drawable.ic_stat_offline,partialChannel))
+        val builder = notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),
+            reason, sound && allowed, R.drawable.ic_stat_offline, partialChannel)
+        manager.notify(PARTIAL_ID, withActions(builder).build())
     }
     fun summary(title: String, text: String): Boolean {
         if (!manager.areNotificationsEnabled() || blocked(SUMMARY_CHANNEL)) {
@@ -82,11 +91,12 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             return false
         }
         manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok,
-            SUMMARY_CHANNEL))
+            SUMMARY_CHANNEL).build())
         return true
     }
     private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
-    private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {
+    private fun notification(title: String, text: String, audible: Boolean, icon: Int,
+        channel: String): Notification.Builder {
         val open = PendingIntent.getActivity(ctx, 4, Intent(ctx, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val builder = Notification.Builder(ctx, if (audible) channel else SILENT_CHANNEL)
@@ -96,6 +106,19 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         // Suppress child alerts even if the user later changes this channel's sound.
         if (!audible || channel == SUMMARY_CHANNEL) builder.setGroup("tgwatch_silent_events")
             .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
-        return builder.build()
+        return builder
+    }
+
+    /** An outage can be answered from the notification; summaries stay informational. */
+    private fun withActions(builder: Notification.Builder): Notification.Builder {
+        builder.addAction(Notification.Action.Builder(
+            Icon.createWithResource(ctx, R.drawable.ic_stat_ok),
+            Lang.t("Проверить", "Check"),
+            MonitorService.servicePending(ctx, CHECK_ACTION_CODE, MonitorService.ACTION_CHECK_NOW)).build())
+        builder.addAction(Notification.Action.Builder(
+            Icon.createWithResource(ctx, R.drawable.ic_stat_pause),
+            Lang.t("Остановить", "Stop"),
+            MonitorService.servicePending(ctx, STOP_ACTION_CODE, MonitorService.ACTION_STOP)).build())
+        return builder
     }
 }

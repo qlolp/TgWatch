@@ -49,11 +49,15 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrink and obfuscate the release build; keep rules live in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Unsigned local assembly is allowed; publication requires the production key.
             if (!releaseStore.isNullOrBlank()) signingConfig = signingConfigs.getByName("production")
         }
     }
+    buildFeatures { buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -78,21 +82,24 @@ dependencies {
 tasks.register("dependencyInventory") {
     val resolvedReport = layout.buildDirectory.file("reports/dependencies/resolved.json")
     val runtimeInventory = layout.buildDirectory.file("reports/sbom/release-runtime-inventory.json")
+    val scopes = listOf("releaseRuntimeClasspath", "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
+    val resolvedScopes: Map<String, org.gradle.api.provider.Provider<org.gradle.api.artifacts.Configuration>> =
+        scopes.associateWith { configurations.named(it) }
+    val applicationVersion = android.defaultConfig.versionName
     outputs.files(resolvedReport, runtimeInventory)
     outputs.upToDateWhen { false }
     doLast {
-        val scopes = listOf("releaseRuntimeClasspath", "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
         val packages = sortedMapOf<String, MutableMap<String, Any>>()
         val graphs = sortedMapOf<String, List<Map<String, Any>>>()
         for (scope in scopes) {
-            val graph = configurations.getByName(scope).incoming.resolutionResult
+            val graph = resolvedScopes.getValue(scope).get().incoming.resolutionResult
             check(graph.allDependencies.none { it is UnresolvedDependencyResult }) { "Unresolved dependencies in $scope" }
             fun key(id: org.gradle.api.artifacts.component.ComponentIdentifier): String {
                 if (id == graph.root.id) return "ru.tgwatch:$scope"
                 check(id is ModuleComponentIdentifier) { "Unsupported non-Maven dependency in $scope: $id" }
                 return "${id.group}:${id.module}:${id.version}"
             }
-            configurations.getByName(scope).incoming.artifacts.artifacts.forEach { artifact ->
+            resolvedScopes.getValue(scope).get().incoming.artifacts.artifacts.forEach { artifact ->
                 // Unit/Android test classpaths include :app's own classes.jar.
                 // It is represented by the graph root, not an external package.
                 check(artifact.id.componentIdentifier is ModuleComponentIdentifier || artifact.id.componentIdentifier == graph.root.id) {
@@ -117,14 +124,14 @@ tasks.register("dependencyInventory") {
             output.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(data)) + "\n")
         }
         write(resolvedReport.get().asFile, mapOf("packages" to packages.values.toList(), "graphs" to graphs))
-        val artifacts = configurations.getByName("releaseRuntimeClasspath").resolvedConfiguration.resolvedArtifacts
+        val artifacts = resolvedScopes.getValue("releaseRuntimeClasspath").get().resolvedConfiguration.resolvedArtifacts
         val resolved = artifacts.sortedBy { it.file.absolutePath }.map { artifact ->
             val id = artifact.moduleVersion.id
             check(artifact.id.componentIdentifier is ModuleComponentIdentifier) { "Unsupported runtime artifact: ${artifact.id}" }
             mapOf("group" to id.group, "name" to id.name, "version" to id.version,
                 "type" to artifact.extension, "classifier" to (artifact.classifier ?: ""), "file" to artifact.file.absolutePath)
         }
-        write(runtimeInventory.get().asFile, mapOf("applicationVersion" to android.defaultConfig.versionName,
+        write(runtimeInventory.get().asFile, mapOf("applicationVersion" to applicationVersion,
             "artifacts" to resolved, "runtimeGraph" to graphs.getValue("releaseRuntimeClasspath")))
     }
 }
@@ -136,13 +143,16 @@ tasks.register("generateReleaseSbom") {
     val sbom = layout.buildDirectory.file("reports/sbom/TgWatch.sbom.cdx.json")
     inputs.file(inventory)
     inputs.files(configurations.named("releaseRuntimeClasspath"))
+    val generator = rootProject.file("scripts/generate-sbom.py")
     inputs.files(rootProject.fileTree("scripts") { include("*.py") })
     inputs.dir(rootProject.file("scripts/schemas"))
     outputs.file(sbom)
     doLast {
-        project.exec {
-            commandLine("python3", rootProject.file("scripts/generate-sbom.py"), inventory.get().asFile, sbom.get().asFile)
-        }
+        // A plain process keeps the action configuration-cache friendly.
+        val result = ProcessBuilder("python3", generator.absolutePath,
+            inventory.get().asFile.absolutePath, sbom.get().asFile.absolutePath)
+            .inheritIO().start()
+        check(result.waitFor() == 0) { "generate-sbom.py failed" }
     }
 }
 

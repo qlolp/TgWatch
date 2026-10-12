@@ -183,7 +183,7 @@ class NetworkProbe(
                 connection.requestMethod = method
                 connection.instanceFollowRedirects = false
                 connection.useCaches = false
-                connection.setRequestProperty("User-Agent", "TgWatch/1.9 (Android)")
+                connection.setRequestProperty("User-Agent", "TgWatch/${BuildConfig.VERSION_NAME} (Android)")
                 connection.responseCode
             } finally { connection.disconnect() }
         }
@@ -193,7 +193,9 @@ class NetworkProbe(
     }
     private fun elapsed(start: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
     companion object {
-        fun executor(): ExecutorService = ThreadPoolExecutor(8, 8, 30L, TimeUnit.SECONDS,
+        // Every endpoint of a batch must fit: a rejected task reads as an unreachable probe.
+        const val THREADS = 16
+        fun executor(): ExecutorService = ThreadPoolExecutor(THREADS, THREADS, 30L, TimeUnit.SECONDS,
             SynchronousQueue(), { r -> Thread(r, "tg-probe").apply { isDaemon = true } }, ThreadPoolExecutor.AbortPolicy())
     }
 }

@@ -262,6 +262,13 @@ object Prefs {
     }
 
     /** Сохраняем последний статус, чтобы экран и значок не «мигали» после перезапуска процесса. */
+    /** Steady checks rewrite the block at most once a minute; status changes go out at once. */
+    private const val STATE_SAVE_MIN_INTERVAL_MS = 30_000L
+    private val stateSaveLock = Object()
+    private var stateSavedStatus: String? = null
+    private var stateSavedSince = 0L
+    private var stateSavedAtElapsed = 0L
+
     fun saveLastState(
         ctx: Context,
         status: MonitorService.Status,
@@ -273,6 +280,14 @@ object Prefs {
         diagnostics: String = "",
         expectedIntervalSec: Int = 30,
     ) {
+        val elapsed = android.os.SystemClock.elapsedRealtime()
+        synchronized(stateSaveLock) {
+            val changed = status.name != stateSavedStatus || since != stateSavedSince
+            if (!changed && elapsed - stateSavedAtElapsed in 0 until STATE_SAVE_MIN_INTERVAL_MS) return
+            stateSavedStatus = status.name
+            stateSavedSince = since
+            stateSavedAtElapsed = elapsed
+        }
         sp(ctx).edit()
             .putString(KEY_LAST_STATUS, status.name)
             .putLong(KEY_LAST_CHECKED, checkedAt)

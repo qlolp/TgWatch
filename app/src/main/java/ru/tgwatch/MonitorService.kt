@@ -169,6 +169,13 @@ class MonitorService : Service() {
             }
         }
 
+        /** Shared with event notifications so "Check" and "Stop" work from any alert. */
+        fun servicePending(ctx: Context, requestCode: Int, action: String): PendingIntent {
+            val intent = Intent(ctx, MonitorService::class.java).setAction(action)
+            val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            return PendingIntent.getForegroundService(ctx, requestCode, intent, flags)
+        }
+
         fun clearRestoredState() {
             state = State()
             lastEndpoints = emptyList()
@@ -395,15 +402,8 @@ class MonitorService : Service() {
         if (delayMs >= ALARM_MIN_DELAY_MS) scheduleAlarm(delayMs)
     }
 
-    private fun servicePending(requestCode: Int, action: String): PendingIntent {
-        val intent = Intent(this, MonitorService::class.java).setAction(action)
-        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        return if (Build.VERSION.SDK_INT >= 26) {
-            PendingIntent.getForegroundService(this, requestCode, intent, flags)
-        } else {
-            PendingIntent.getService(this, requestCode, intent, flags)
-        }
-    }
+    private fun servicePending(requestCode: Int, action: String): PendingIntent =
+        servicePending(this, requestCode, action)
 
     private fun alarmIntent(): PendingIntent = servicePending(3, ACTION_ALARM)
 

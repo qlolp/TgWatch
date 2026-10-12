@@ -3,7 +3,6 @@ package ru.tgwatch
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
-import android.app.ProgressDialog
 import android.content.Intent
 import android.net.Uri
 import android.text.InputType
@@ -132,11 +131,11 @@ class BackupUi(private val activity: Activity) {
             .setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
     }
 
-    @Suppress("DEPRECATION")
     private fun <T> work(title: String, block: () -> T, success: (T) -> Unit, failure: String) {
         if (busy) return
         busy = true
-        val progress = ProgressDialog(activity).apply { setMessage(title); setCancelable(false); show() }
+        val progress = AlertDialog.Builder(activity).setTitle(title).setCancelable(false)
+            .setView(android.widget.ProgressBar(activity)).create().apply { show() }
         dialogs.add(progress)
         Thread({
             val result = runCatching(block)

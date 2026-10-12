@@ -344,17 +344,22 @@ class MainActivity : Activity() {
     }
     private fun updateAlarmPatternLabel() { btnAlarmPattern.text = Lang.t("Сигнал вибрации: ${Prefs.alarmPattern(this).title}", "Vibration pattern: ${Prefs.alarmPattern(this).title}") }
 
+    /** The service publishes every result; the 1 s ticker only keeps the "ago" labels fresh. */
+    private val stateRefresh = StateRefresh { render() }
+
     override fun onResume() {
         super.onResume()
         Lang.update(this)
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
+        stateRefresh.register(this)
         ui.removeCallbacks(ticker)
         ui.post(ticker)
     }
 
     override fun onPause() {
         ui.removeCallbacks(ticker)
+        stateRefresh.unregister(this)
         super.onPause()
     }
 
