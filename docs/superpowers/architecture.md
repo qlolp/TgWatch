@@ -107,4 +107,4 @@ flowchart LR
 
 Оба audits должны завершиться успешно; недоступность не превращается в чистый результат. Trivy проверяет HIGH/CRITICAL с runtime package coverage, OSV — точные runtime/test Maven versions и неотозванные записи. SBOM отражает разрешённые JAR/AAR runtime dependencies, а не Android platform или test libraries. Публикации отделены от отменяемых checks; signing helper принимает только существующий private key с expected-certificate проверкой и не генерирует новый. Production continuity проверяется в CI, development-key upgrade этого не доказывает.
 
-Спецификация: [improvements 1.13.0](specs/2026-10-11-next-improvements-design.md). План: [implementation](plans/2026-10-11-next-improvements.md). Совместимость backup: [unified 1.11](specs/2026-10-10-unified-1.11-design.md). Команды и ограничения проверок: [CONTRIBUTING](../../CONTRIBUTING.md).
+Спецификация: [improvements 1.13.0](specs/2026-10-11-next-improvements-design.md). Совместимость backup: [unified 1.11](specs/2026-10-10-unified-1.11-design.md). Команды и ограничения проверок: [CONTRIBUTING](../../CONTRIBUTING.md).
