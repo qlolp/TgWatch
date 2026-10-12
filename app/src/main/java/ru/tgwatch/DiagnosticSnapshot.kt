@@ -87,11 +87,9 @@ data class DiagnosticSnapshot(
         private val VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,3}(\\.[0-9]{1,3})?")
         private val ENDPOINTS = mapOf(
             "api.telegram.org" to ProbeGroup.WEB, "web.telegram.org" to ProbeGroup.WEB,
-            "core.telegram.org" to ProbeGroup.WEB, "MTProto DC1" to ProbeGroup.MTPROTO,
-            "MTProto DC2" to ProbeGroup.MTPROTO, "MTProto DC3" to ProbeGroup.MTPROTO,
-            "MTProto DC4" to ProbeGroup.MTPROTO, "MTProto DC5" to ProbeGroup.MTPROTO,
+            "core.telegram.org" to ProbeGroup.WEB,
             "Yandex" to ProbeGroup.CONTROL, "Яндекс" to ProbeGroup.CONTROL,
             "Mail.ru" to ProbeGroup.CONTROL, "Google 204" to ProbeGroup.CONTROL,
-        )
+        ) + MtProtoEndpoints.all.associate { it.name to it.group }
     }
 }

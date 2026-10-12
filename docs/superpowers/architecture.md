@@ -1,4 +1,4 @@
-# Архитектура TgWatch 1.13.0
+# Архитектура TgWatch 1.15.0
 
 Android 8.0+; native Views и существующая foreground-служба. Чистые Kotlin policies и codecs отделены от Android-хранилища, Network/SAF и UI. Карта показывает потоки данных; наличие пути не заменяет отчёт о его проверке.
 
@@ -13,6 +13,12 @@ flowchart TD
     MT["MtProto · bounded req_pq_multi / resPQ"]
     HISTORY["History / HistoryStorage · durable-first replacement"]
     TIMELINE["Timeline · clock epochs, gaps, counts, MTTR"]
+    PREPARE["HistoryPreparationCache / HistoryDisplay · prepared history"]
+    LOADER["MainHistoryUi / LatestRequestLoader · bounded background work"]
+    INCIDENTS["IncidentActivity / OutageEpisodes · observed boundaries"]
+    EXTRAS["ExtraProbeCoordinator · isolated late diagnostics"]
+    MUTE["AlertMute · elapsed time + boot identity"]
+    WEBHOOK["WebhookDelivery · generation + 10s result deadline"]
     PREFS["Prefs / QuietHours / EventPreferences · minutes + independent events"]
     SUCCESS["LastSuccessStore / LastSuccessPolicy · published OK only"]
     PRESENT["StatusWidget / EventNotifications"]
@@ -48,7 +54,18 @@ flowchart TD
     PROBE --> SERVICE
     SERVICE --> HISTORY
     HISTORY --> TIMELINE
-    TIMELINE --> UI
+    HISTORY --> PREPARE
+    PREPARE --> LOADER
+    TIMELINE --> LOADER
+    LOADER --> UI
+    PREPARE --> INCIDENTS
+    SERVICE --> EXTRAS
+    EXTRAS --> PROBE
+    EXTRAS --> UI
+    UI --> MUTE
+    MUTE --> PRESENT
+    SERVICE --> WEBHOOK
+    WEBHOOK --> CREDENTIALS
     SERVICE --> SUCCESS
     SERVICE --> LOG
     SERVICE --> PRESENT
@@ -79,6 +96,8 @@ flowchart TD
 ## Границы поведения
 
 - MTProto — unauthenticated greeting без аккаунта и RPC. Парсер проверяет весь TL resPQ и canonical abridged frame ≤4096 bytes. Ответ с nonce подтверждает протокол, но не серверную аутентичность или доставку сообщения. NetworkProbe сохраняет общий бюджет Telegram 6 с и дополнительный бюджет controls при необходимости; отмена закрывает транспорт.
+- Пять DC имеют IPv4/IPv6-пробы в ограниченном 16-поточном primary pool. Telegram публикуется до EXTRA; отдельный трёхпоточный пул и поколения координатора не дают поздним информационным результатам менять статус, историю или оповещения.
+- Пауза оповещений считает elapsed time в пределах одной загрузки устройства; перезагрузка завершает её. Вебхук ограничивает ожидание результата 10 секундами, но зависший транспорт занимает физический слот до завершения. Его состояние доступно только в приватных настройках процесса.
 - История описывает ограниченные интервалы наблюдений. Gaps остаются UNKNOWN time; clock rollback создаёт новую эпоху. Счётчики проверок считаются по наблюдениям; MTTR — для полностью наблюдённого TG_DOWN, закрытого свежим OK в текущем окне. PARTIAL может продолжать эпизод; gaps, UNKNOWN/NO_NETWORK и clipping его исключают.
 - Backup переносит только разрешённые настройки, историю и журнал. Диагностический last OK, состояние службы, cooldowns и OS permissions исключены. Новый экспорт TGWB v2 содержит strict JSON, импорт читает оба старых формата 1.10; пароль экспорта 12–256 символов. Криптография аутентифицирует весь header/ciphertext; codec проверяет строгие типы/числа/лимиты до применения. Расшифрование/экспорт выполняются вне UI thread.
 - Restore после preview/подтверждения заменяет данные и оставляет monitoring остановленным. Оба старых private journal formats читаются при обновлении. Pending journal replay идемпотентно завершает прерванную замену до работы компонентов; это несколько durable записей с восстановлением после сбоя, а не обещание одной общей файловой транзакции Android. Неверный пароль и malformed input не создают transaction и не останавливают действующий monitoring.

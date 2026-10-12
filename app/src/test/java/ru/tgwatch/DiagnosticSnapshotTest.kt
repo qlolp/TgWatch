@@ -40,6 +40,24 @@ class DiagnosticSnapshotTest {
         val output = snapshot().copy(appVersion = "secret@example.org 10.0.0.1").toJson()
         assertEquals("unknown", JSONObject(output).getJSONObject("app").getString("version"))
     }
+    @Test fun bundledDualStackDcNamesAreExportedWithoutAddressesOrDetails() {
+        val outcomes = MtProtoEndpoints.all.map {
+            ProbeOutcome(it.name, it.group, true, 42, "SECRET_DETAIL ${it.address}")
+        } + listOf(
+            ProbeOutcome("MTProto DC1 (IPv6)", ProbeGroup.EXTRA, true, detail = "wrong group"),
+            ProbeOutcome("2001:db8::dead", ProbeGroup.MTPROTO, false, detail = "unknown address"))
+        val output = snapshot(outcomes).toJson()
+        val exported = JSONObject(output).getJSONArray("endpoints")
+        assertEquals(10, exported.length())
+        assertEquals(MtProtoEndpoints.all.map { it.name }.toSet(),
+            (0 until exported.length()).map { exported.getJSONObject(it).getString("endpoint") }.toSet())
+        assertTrue((0 until exported.length()).all {
+            exported.getJSONObject(it).getString("group") == "MTPROTO"
+        })
+        for (privateValue in MtProtoEndpoints.all.map { it.address } + listOf("SECRET_DETAIL", "2001:db8::dead")) {
+            assertFalse(privateValue, output.contains(privateValue))
+        }
+    }
     @Test fun reportSectionsCannotContainRawHistoryLogPreferencesOrIdentifiers() {
         val json = JSONObject(snapshot().toJson())
         assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling"),

@@ -180,9 +180,9 @@ class ExtraProbeWorkerIsolationTest {
             val after = checkedBatch(probe, coordinator, transport)
             assertEquals("OK", after.status)
             assertEquals(baseline.reason, after.reason)
-            assertEquals(8, after.results.size)
+            assertEquals(3 + MtProtoEndpoints.all.size, after.results.size)
             assertTrue(after.results.all { it.reachable })
-            assertEquals(5, after.results.count { it.group == ProbeGroup.MTPROTO && it.detail.contains("resPQ") })
+            assertEquals(MtProtoEndpoints.all.size, after.results.count { it.group == ProbeGroup.MTPROTO && it.detail.contains("resPQ") })
             awaitIdle(pool)
 
             val repeatStart = System.nanoTime()
@@ -199,7 +199,7 @@ class ExtraProbeWorkerIsolationTest {
             val down = checkedBatch(probe, coordinator, transport)
             assertEquals("Controls retain their workers while extras are stuck", "TG_DOWN", down.status)
             assertEquals(3, transport.controlCalls.get())
-            assertEquals(8, down.results.count { it.group == ProbeGroup.WEB || it.group == ProbeGroup.MTPROTO })
+            assertEquals(3 + MtProtoEndpoints.all.size, down.results.count { it.group == ProbeGroup.WEB || it.group == ProbeGroup.MTPROTO })
             assertEquals(-1L, down.latencyMs)
         } finally {
             transport.gate?.release?.countDown()
@@ -220,9 +220,9 @@ class ExtraProbeWorkerIsolationTest {
         val result = coordinator.submit<ProbeReport> { probe.check(extras) }
         try {
             val allStarted = gate.started.await(2, TimeUnit.SECONDS)
-            assertTrue("Every Telegram endpoint operation must run; only ${gate.operations.size}/8 started: ${gate.operations}",
+            assertTrue("Every Telegram endpoint operation must run; started ${gate.operations.size}: ${gate.operations}",
                 allStarted)
-            assertEquals(8, gate.operations.toSet().size)
+            assertEquals(3 + MtProtoEndpoints.all.size, gate.operations.toSet().size)
         } finally {
             gate.release.countDown()
         }
@@ -237,7 +237,7 @@ class ExtraProbeWorkerIsolationTest {
     }
 
     private class TelegramGate {
-        val started = CountDownLatch(8)
+        val started = CountDownLatch(3 + MtProtoEndpoints.all.size)
         val release = CountDownLatch(1)
         val operations = Collections.synchronizedList(mutableListOf<String>())
         fun enter(address: String) {

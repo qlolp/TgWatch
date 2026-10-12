@@ -25,7 +25,8 @@ in-app connection diagnostics, under their own heading, and are excluded from
 this report. Their results are excluded from Telegram classification, latency,
 reason and alerts. They run with a five-second overall budget on three separate
 bounded workers, with no buffered queue. Telegram/control probes retain their own
-eight workers. A stuck extra transport cannot occupy that pool; the service
+sixteen workers, accommodating the thirteen IPv4/IPv6 Telegram endpoints and
+three controls. A stuck extra transport cannot occupy that pool; the service
 reuses both pools and shuts them down when it is destroyed. Transport cancellation
 still depends on the underlying operation responding to interruption or closure.
 
