@@ -48,7 +48,7 @@ jobs:
         run: bash scripts/scan-sbom.sh app/build/reports/sbom/TgWatch.sbom.cdx.json app/build/reports/sbom/TgWatch.trivy.json
       - name: SBOM and vulnerability scan reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-reports
           path: |
@@ -58,7 +58,7 @@ jobs:
             app/build/reports/sbom/TgWatch.trivy.log
       - name: Resolved dependency graphs and OSV audit report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-reports
           path: |
@@ -66,7 +66,7 @@ jobs:
             app/build/reports/dependencies/osv-report.json
       - name: Upload test and lint reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-reports
           path: app/build/reports/
@@ -82,7 +82,7 @@ jobs:
           for key in ('tests', 'failures', 'errors', 'skipped'):
               print(f'{key}: {sum(int(s.get(key, 0)) for s in suites)}')
           PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: TgWatch-debug-test-only
           path: app/build/outputs/apk/debug/*.apk
@@ -241,7 +241,7 @@ jobs:
             fi'
       - name: Signed upgrade reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: signed-upgrade-reports
           path: signed-upgrade/
@@ -318,7 +318,7 @@ jobs:
         run: python3 scripts/report-android-tests.py app/build/outputs/androidTest-results/connected
       - name: Android reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-reports-${{ matrix.api }}
           path: |
