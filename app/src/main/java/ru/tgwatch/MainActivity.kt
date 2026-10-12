@@ -561,6 +561,9 @@ class MainActivity : Activity() {
                 MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { Lang.t("Проверяю веб-ресурсы и MTProto", "Checking web resources and MTProto") }
             } + if (s.lastVibrationAt > 0L) Lang.t("\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}", "\nLast vibration: ${timeStr(s.lastVibrationAt)}") else ""
         }
+        val mutedUntil = Prefs.alertsMutedUntil(this, now)
+        if (running && mutedUntil > 0L) tvReason.append(Lang.t("\nОповещения заглушены до ${timeStr(mutedUntil)}",
+            "\nAlerts muted until ${timeStr(mutedUntil)}"))
         ivStatus.contentDescription = tvTitle.text
         animateCardColor(color)
 

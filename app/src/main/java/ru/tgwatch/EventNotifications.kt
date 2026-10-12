@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 
@@ -23,6 +24,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         const val PARTIAL_ID = 4
         const val SUMMARY_ID = 5
         const val SUMMARY_CHANNEL = "daily_summary_v1"
+        private const val CHECK_NOW_REQUEST = 6
         fun channel(event: String) = when(event) {
             "TG_DOWN" -> SOUND_CHANNEL; "PARTIAL" -> PARTIAL_CHANNEL; "RECOVERY" -> RECOVERY_CHANNEL
             else -> error("Unknown event")
@@ -93,6 +95,16 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             .setSmallIcon(icon).setContentTitle(title).setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text)).setAutoCancel(true)
             .setContentIntent(open).setCategory(Notification.CATEGORY_STATUS)
+        if (channel == outageChannel || channel == partialChannel) {
+            // Problem alerts only. Same check-now path as the ongoing status notification's "Check" action.
+            val checkNow = PendingIntent.getForegroundService(ctx, CHECK_NOW_REQUEST,
+                Intent(ctx, MonitorService::class.java).setAction(MonitorService.ACTION_CHECK_NOW),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            builder.addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_ok),
+                Lang.t("Проверить сейчас", "Check now"), checkNow).build())
+            builder.addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_pause),
+                Lang.t("Заглушить на час", "Mute for 1 hour"), AlertActionReceiver.mutePending(ctx)).build())
+        }
         // Suppress child alerts even if the user later changes this channel's sound.
         if (!audible || channel == SUMMARY_CHANNEL) builder.setGroup("tgwatch_silent_events")
             .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)

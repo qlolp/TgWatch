@@ -27,11 +27,16 @@ class EventNotificationTest {
             assertEquals(Lang.t("Telegram снова доступен", "Telegram is back"), recovery.extras.getString(Notification.EXTRA_TITLE))
             assertTrue(recovery.extras.getString(Notification.EXTRA_TEXT)!!.contains(recoveryDurationStr(1_044_000)))
             assertEquals(EventNotifications.SILENT_CHANNEL, recovery.channelId)
+            assertNull("Recovery needs no check/mute actions", recovery.actions)
             assertEquals(Notification.GROUP_ALERT_SUMMARY, recovery.groupAlertBehavior)
             assertNull(manager.getNotificationChannel(recovery.channelId).sound)
             events.outage("Контрольный сайт отвечает", sound = true, allowed = true)
             val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
             assertEquals(EventNotifications.SOUND_CHANNEL, outage.channelId)
+            assertEquals(listOf(Lang.t("Проверить сейчас", "Check now"), Lang.t("Заглушить на час", "Mute for 1 hour")),
+                outage.actions.map { it.title.toString() })
+            if (Build.VERSION.SDK_INT >= 31) assertTrue("Alert actions must not be mutable by other apps",
+                outage.actions.all { it.actionIntent.isImmutable })
             assertNotNull(manager.getNotificationChannel(outage.channelId).sound)
             awaitAbsent(manager, EventNotifications.RECOVERY_ID)
             events.recovered(RecoveryEvent(2000), sound = false, allowed = true)
@@ -47,6 +52,7 @@ class EventNotificationTest {
             events.partial("В тихие часы",sound=true,allowed=false)
             val quietPartial = awaitNotification(manager,EventNotifications.PARTIAL_ID)
             assertEquals(EventNotifications.SILENT_CHANNEL,quietPartial.channelId)
+            assertEquals(2, quietPartial.actions.size)
             assertEquals(Notification.GROUP_ALERT_SUMMARY,quietPartial.groupAlertBehavior)
         } finally {
             manager.cancel(EventNotifications.RECOVERY_ID)
@@ -54,6 +60,37 @@ class EventNotificationTest {
             manager.cancel(EventNotifications.PARTIAL_ID)
         }
     }
+    @Test fun muteActionSilencesAlertsForAnHourAndClearsTheAlert() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val ctx = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= 33) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
+                .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")).use { it.readBytes() }
+        }
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        val settings = Prefs.sp(ctx)
+        val previous = settings.all["alerts_muted_until"] as? Long
+        val log = EventLog.all(ctx).toList()
+        try {
+            settings.edit().remove("alerts_muted_until").commit()
+            assertEquals(0L, Prefs.alertsMutedUntil(ctx))
+            EventNotifications(ctx, manager).outage("Test", sound = false, allowed = true)
+            val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
+            val before = System.currentTimeMillis()
+            outage.actions[1].actionIntent.send()
+            awaitAbsent(manager, EventNotifications.OUTAGE_ID)
+            val until = Prefs.alertsMutedUntil(ctx)
+            assertTrue("Mute must last one hour from the tap", until >= before + AlertMute.DURATION_MS &&
+                until <= System.currentTimeMillis() + AlertMute.DURATION_MS)
+            assertFalse("Muted alerts use the quiet-hours suppression", Prefs.alertsAllowed(ctx))
+            assertEquals(0L, Prefs.alertsMutedUntil(ctx, until))
+        } finally {
+            manager.cancel(EventNotifications.OUTAGE_ID)
+            settings.edit().apply { if (previous == null) remove("alerts_muted_until") else putLong("alerts_muted_until", previous) }.commit()
+            EventLog.replace(ctx, log)
+        }
+    }
+
     @Test fun dailySummaryIsQuietAndOptIn() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val ctx = instrumentation.targetContext
