@@ -14,9 +14,61 @@
 - **P1** — заметно вредит батарее, доступности, безопасности релиза или надёжности.
 - **P2** — качество кода, UX, документация, ускорение CI.
 
-Уже в работе: draft-PR #14 («1.13: Tasker API, extra probes, Glance, webhooks, targetSdk 35»).
-Пункты, которые он закрывает (targetSdk 35, ktlint, fastlane/F-Droid, automation API), здесь
-не дублируются; там, где предложение пересекается, указано отличие.
+Уже в работе на момент ревью был draft-PR #14 («1.13: Tasker API, extra probes, Glance,
+webhooks, targetSdk 35»); он закрыт и частично перенесён в 1.13.0. Статус предложений
+после выхода 1.13.0 и 1.13.1 — ниже, в начале отчёта.
+
+---
+
+## Статус после 1.13.0 и 1.13.1 (обновлено 12 октября 2026)
+
+После ревью смержены три PR: #16 («1.13: Android 15, automation, diagnostics + best of #14»,
+релиз `v1.13.0`), #17 (**«1.13.1: fixes from the Cline code audit»** — исправления по этому
+отчёту) и #18 (CI-отчётность по androidTest, чистка завершённых планов). Часть предложений
+принята как есть, часть решена иначе и с аргументацией, часть остаётся открытой.
+
+| Пункт | Статус | Что сделано |
+|---|---|---|
+| 1. Подмена ответов, контр-сайты | 🟡 иначе | Аргумент принят: все пробы — HTTPS с проверкой хоста и системным trust store, перехватчик без сертификата Telegram падает в TLS до чтения HTTP-кода. Закреплено тестом `interceptedTelegramHostsCannotConfirmWebReachability` (`EndpointFallbackTest`). Остаточный риск — только MITM с установленным CA (pinning нет) |
+| 2. IPv6-адреса DC | ⬜ | Каталог остался из пяти IPv4 (`MtProtoEndpoints.kt`); в `docs/development-roadmap.md` отклонён лишь удалённый `dc.json`, про IPv6 не сказано |
+| 3. `USE_EXACT_ALARM` | ⬜ | Разрешение в манифесте прежнее; на API 33+ `canScheduleExactAlarms()` всегда `true`, пункт чеклиста недостижим, риск для Play сохраняется |
+| 4. `isStale` | ✅ иначе | Мёртвые параметры убраны вместо прокидывания: результат судится по интервалу, который он сам назначил (профиль + сон + backoff). Monotonic clock внедряемый, есть `StateStalenessTest` |
+| 5. Запись на каждую проверку | ⬜ | `Prefs.saveLastState` и `LastSuccessStore.record` (синхронный `commit()`) вызываются на каждом результате |
+| 6. Миграция настроек | ✅ | Успешный `moveSharedPreferencesFrom` больше не повторяется (`OneTimeMigrationTest`) |
+| 7. Watchdog каждые 3 минуты | ✅ иначе | После каждой завершённой проверки будильник отодвигается за следующую проверку: будит только когда проверки перестали приходить |
+| 8. Контраст и обрезка | ✅ | Плашки затемнены до 4,9–5,9:1 (`#0878AD`, `#B45300`, `#596673`), `maxLines=1`/`ellipsize` убраны, тач-таргеты `minHeight=48dp` |
+| 9. Тикер 1 Гц | ⬜ | `render()` остался с 1 Гц; дешевле (`DailyStatsCache`), но `ACTION_STATE_CHANGED` UI не слушает |
+| 10. Baseline обновления `v1.10.47` | ⬜ | Workflow по-прежнему качает `v1.10.47` с зашитыми sha256/фингерпринтом (`.github/workflows/build-apk.yml:168-179`), хотя вышли `v1.13.0` и `v1.13.1` |
+| 11. Секреты, права, actions | 🟡 | Добавлены preflight до подписи и публикация по тегу `v*`; SHA-пиннинг (кроме `setup-trivy`), GitHub Environment и Dependabot не добавлены |
+| 12. Перепроверка APK при публикации | 🟡 | `release-policy.py` существенно строже (SemVer-код, ancestry, монотонность, повторный preflight перед единственной мутацией), но `TgWatch.apk.sha256` не сверяется с APK внутри политики |
+| 13. Wrapper и зависимости | ⬜ | Нет `distributionSha256Sum`, `verification-metadata.xml`, wrapper-validation, `--require-hashes` для pip |
+| 14. Экспортированные получатели | ✅ | `BootReceiver` не экспортируется, клик виджета ушёл в неэкспортируемый `WidgetClickReceiver` |
+| 15. Проверка при включении экрана | ✅ | `ACTION_SCREEN_ON` → проверка, если последний результат в процессе старше 30 с |
+| 16. `User-Agent: TgWatch/1.9` | ⬜ | Строка прежняя (`NetworkProbe.kt`) |
+| 17. R8 | ⬜ | Вместо него добавлен Detekt с baseline; minify не включён |
+| 18. Версия в нескольких местах | ✅ | `version.properties`, детерминированный код `major*1000000 + minor*1000 + patch`, теги `v1.13.0`/`v1.13.1`, публикация по тегу |
+| 19. Кэш CI | ⬜ | `gradle.properties` без caching/configuration cache, `--no-daemon` сохранён |
+| 20. Robolectric, фаззинг, покрытие | 🟡 | Robolectric осознанно отложен (`docs/development-roadmap.md`), зато добавлены `ResourceTranslationTest`, `UiAccessibilityTest`, `StateStalenessTest`, `WebhookPolicyTest` и другие |
+| 21. Воспроизводимость аудита | ⬜ | OSV и Trivy по-прежнему ходят в сеть в момент проверки |
+| 22. Документация | 🟡 | `docs/README.en.md`, `docs/diagnostics.md`, `docs/development-roadmap.md`, удалены завершённые планы, версии в README выровнены |
+| 23. Сводка при выключенном мониторинге | 🟡 | Добавлены dedupe по последней доставке и учёт тихих часов/DST; `Prefs.isEnabled` по-прежнему не проверяется |
+| 24. Действия в тревожных уведомлениях | ⬜ | `EventNotifications` по-прежнему без `addAction` |
+| 25. Deprecated API | ⬜ | `ProgressDialog` и `startActivityForResult` на месте |
+| 26. Парность строк `Lang.t` | 🟡 | `ResourceTranslationTest` проверяет парность `values`/`values-ru` и формат-аргументы; строки, собираемые в коде через `Lang.t`, не покрыты |
+| 27. `fontScale` графика | ✅ | `textSize` через `COMPLEX_UNIT_SP` |
+| 28. Мелочи (`SecureRandom` и пр.) | ⬜ | — |
+
+### Обновлённый приоритет того, что осталось
+
+1. **P0: `USE_EXACT_ALARM`** (п.3) — прямо может заблокировать публикацию в Google Play.
+2. **P0: IPv6-адреса DC** (п.2) — точность на IPv6-only сетях; это единственное из открытого,
+   что влияет на достоверность результата.
+3. **P1: baseline обновления `v1.10.47`** (п.10) — с новыми SemVer-тегами заметнее: проверка
+   обновления не покрывает реальный предыдущий релиз.
+4. **P1: запись на каждую проверку** (п.5) — батарея и износ флеша.
+5. **P1: supply chain** (п.11–13) — SHA-пиннинг actions, GitHub Environment, `distributionSha256Sum`,
+   dependency verification, Dependabot.
+6. **P2:** п.9 (событийный UI), 16 (User-Agent), 17 (R8), 19 (кэш CI), 21, 23–25, 28.
 
 ---
 
