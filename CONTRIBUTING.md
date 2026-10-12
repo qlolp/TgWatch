@@ -1,9 +1,9 @@
-# Разработка TgWatch 1.12
+# Разработка TgWatch
 
 Перед изменением поведения прочитайте [README](README.md), [архитектуру](docs/superpowers/architecture.md)
 и [unified 1.11 spec](docs/superpowers/specs/2026-10-10-unified-1.11-design.md). Приложение
 наблюдает доступность без аккаунта, телефона и доступа к переписке. Минимум Android API 26,
-target API 34; native UI, Direct Boot, настройки и seven-day history сохраняются.
+target API 35; native UI, Direct Boot, настройки и seven-day history сохраняются.
 
 ## Сборка и проверки
 
@@ -19,7 +19,7 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`version.properties` задаёт SemVer `1.13.0`; код `1013000` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.13.1`; код `1013001` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,

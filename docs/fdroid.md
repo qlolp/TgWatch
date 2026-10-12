@@ -2,7 +2,7 @@
 
 `metadata/ru.tgwatch.yml` is a disabled candidate recipe for the existing
 `ru.tgwatch` application. It has not been submitted to F-Droid, accepted,
-or built by F-Droid. The `v1.13.0` source tag must exist on main before its
+or built by F-Droid. The `v1.13.1` source tag must exist on main before its
 build can be enabled. The project is MIT licensed and has no proprietary
 application SDK; repository inclusion and source/dependency review remain
 F-Droid's decisions.
@@ -11,8 +11,8 @@ F-Droid's decisions.
 
 The source pins Gradle 8.10.2, Android Gradle Plugin 8.7.3, Kotlin 2.0.21,
 JDK 17, compile/target SDK 35, and detekt 1.23.8. The checked-in
-`version.properties` is the version authority: 1.13.0 maps to Android code
-1013000 (`major * 1000000 + minor * 1000 + patch`). Minor/patch are 0..999.
+`version.properties` is the version authority: 1.13.1 maps to Android code
+1013001 (`major * 1000000 + minor * 1000 + patch`). Minor/patch are 0..999.
 CI run numbers do not affect APK versions. Release assembly needs no signing
 credentials; absent `TGWATCH_KEYSTORE_PATH` it produces an unsigned APK.
 
@@ -28,7 +28,7 @@ The F-Droid Gradle recipe selects the app's release variant. In a separate
 fdroiddata checkout, copy the candidate metadata, verify the tag and code,
 remove the build's `disable` field only after reviewing it, then run the
 installed fdroidserver's `fdroid readmeta`, `fdroid lint ru.tgwatch`, and
-`fdroid build --test ru.tgwatch:1013000`. These commands are preparation for
+`fdroid build --test ru.tgwatch:1013001`. These commands are preparation for
 review; a local Android build does not establish F-Droid compatibility.
 Automatic update discovery is deliberately disabled because the Gradle code
 is computed from a properties file; a reviewed recipe must teach the update
@@ -39,7 +39,7 @@ checker that mapping before enabling it.
 Title, short/full descriptions and per-version changelogs live in
 `fastlane/metadata/android/{en-US,ru-RU}/`, which F-Droid reads from the source
 tree. A changelog file is named after the computed version code, for example
-`changelogs/1013000.txt` for 1.13.0 (at most 500 characters). The candidate
+`changelogs/1013001.txt` for 1.13.1 (at most 500 characters). The candidate
 recipe's `Summary` matches the English short description; a script test keeps
 both, the length limits and the current changelog in place.
 
