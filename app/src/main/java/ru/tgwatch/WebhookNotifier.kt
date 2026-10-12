@@ -5,29 +5,23 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
  * Opt-in POST of one status line to a user-owned HTTPS endpoint (for example an ntfy.sh topic).
  * One background thread, at most one request in flight, bounded timeouts, no redirects.
- * The address is never logged; failures log only the exception class.
+ * No address, body or transport exception is logged.
  */
 object WebhookNotifier {
-    enum class TestResult { SENT, FAILED, BUSY, NOT_CONFIGURED }
+    enum class TestResult { SENT, FAILED, TIMED_OUT, BUSY, NOT_CONFIGURED }
 
-    private const val TAG = "TgWatch"
     private const val IDLE_THREAD_SECONDS = 30L
-    private const val NO_RESPONSE = -1
     @Volatile private var coordinator: WebhookCoordinator? = null
     private val io = ThreadPoolExecutor(1, 1, IDLE_THREAD_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue(1),
         { r -> Thread(r, "tg-webhook").apply { isDaemon = true } }).apply { allowCoreThreadTimeOut(true) }
+    private val transport = WebhookTransport(io)
     @Volatile private var userAgent: String? = null
 
     /** Called by the monitor for every published result; returns immediately. */
@@ -36,8 +30,8 @@ object WebhookNotifier {
     fun onPublished(ctx: Context, status: MonitorService.Status) {
         try {
             coordinator(ctx).onPublished(status.name)
-        } catch (e: RuntimeException) {
-            Log.w(TAG, "webhook skipped: ${e.javaClass.simpleName}")
+        } catch (_: RuntimeException) {
+            // Optional delivery must never interrupt the monitor.
         }
     }
 
@@ -53,54 +47,15 @@ object WebhookNotifier {
     /** Address or switch changed: the next change is reported regardless of earlier posts. */
     fun reset() { coordinator?.reset() }
 
+    internal fun health(ctx: Context): WebhookHealth = coordinator(ctx).health()
+
     private fun coordinator(ctx: Context): WebhookCoordinator = coordinator ?: synchronized(this) {
         coordinator ?: ctx.applicationContext.let { app ->
             WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(app) },
-                SystemClock::elapsedRealtime, { url, body, finished -> submit(app, url, body, finished) })
+                SystemClock::elapsedRealtime,
+                { url, body, finished -> transport.submit(url, body, userAgent(app), finished) },
+                cancelTransport = transport::cancel)
         }.also { coordinator = it }
-    }
-
-    // Any failure becomes "not delivered"; only the exception class is logged, never the address.
-    @Suppress("TooGenericExceptionCaught")
-    private fun submit(ctx: Context, url: String, body: String, finished: (Int) -> Unit): Boolean {
-        val agent = userAgent(ctx)
-        return try {
-            io.execute {
-                var code = NO_RESPONSE
-                try {
-                    code = post(url, body, agent)
-                } catch (e: IOException) {
-                    Log.w(TAG, "webhook failed: ${e.javaClass.simpleName}")
-                } catch (e: RuntimeException) {
-                    Log.w(TAG, "webhook failed: ${e.javaClass.simpleName}")
-                } finally {
-                    finished(code)
-                }
-            }
-            true
-        } catch (_: RejectedExecutionException) {
-            false
-        }
-    }
-
-    private fun post(url: String, body: String, agent: String): Int {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.connectTimeout = WebhookPolicy.TIMEOUT_MS
-            connection.readTimeout = WebhookPolicy.TIMEOUT_MS
-            connection.instanceFollowRedirects = false
-            connection.useCaches = false
-            connection.doOutput = true
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
-            connection.setRequestProperty("User-Agent", agent)
-            val bytes = body.toByteArray(Charsets.UTF_8)
-            connection.setFixedLengthStreamingMode(bytes.size)
-            connection.outputStream.use { it.write(bytes) }
-            return connection.responseCode
-        } finally {
-            connection.disconnect()
-        }
     }
 
     private fun userAgent(ctx: Context): String = userAgent ?: WebhookPolicy.userAgent(try {
@@ -110,19 +65,48 @@ object WebhookNotifier {
     }).also { userAgent = it }
 }
 
-/** Android-independent orchestration, shared by monitor delivery and explicit test sends. */
+/** Android-independent orchestration; the settings monitor protects admission, result and physical identity. */
 internal class WebhookCoordinator(
     private val configurationLock: Any,
     private val configuration: () -> WebhookConfiguration,
     private val nowElapsed: () -> Long,
-    private val submit: (String, String, (Int) -> Unit) -> Boolean
+    private val submit: (String, String, (Int) -> Unit) -> Boolean,
+    private val schedule: (Long, () -> Unit) -> (() -> Unit) = WebhookDeadlines::schedule,
+    private val cancelTransport: () -> Unit = {}
 ) {
     private val gate = WebhookGate()
     private var configured: WebhookConfiguration? = null
+    private var generation = 0L
+    private var active: Attempt? = null
+    private var lastHealth = WebhookHealth()
+
+    private class Attempt(val request: WebhookGate.Request, val generation: Long, val started: Long,
+        val done: ((WebhookNotifier.TestResult) -> Unit)?) {
+        var result: WebhookNotifier.TestResult? = null
+        var cancelDeadline: (() -> Unit)? = null
+        private var cancellationRequested = false
+
+        @Suppress("TooGenericExceptionCaught")
+        fun cancel(transport: () -> Unit) {
+            if (!cancellationRequested) {
+                cancellationRequested = true
+                try {
+                    transport()
+                } catch (_: RuntimeException) {
+                    // Best-effort cancellation cannot prevent settings changes or strand the result.
+                }
+            }
+        }
+    }
 
     fun reset() = synchronized(configurationLock) {
         configured = configuration()
-        gate.reset()
+        invalidate()
+    }
+
+    fun health(): WebhookHealth = synchronized(configurationLock) {
+        synchronizeConfiguration(configuration())
+        lastHealth.copy(inFlight = active != null)
     }
 
     fun onPublished(status: String) {
@@ -153,32 +137,91 @@ internal class WebhookCoordinator(
         }
     }
 
-    /** Caller holds the settings monitor through admission and queueing, never through network I/O. */
+    /** Caller holds settings monitor; submit/cancel only enqueue work and never perform network I/O. */
     @Suppress("TooGenericExceptionCaught")
     private fun dispatch(request: WebhookGate.Request, url: String, body: String,
         done: ((WebhookNotifier.TestResult) -> Unit)? = null) {
-        val completed: (Int) -> Unit = { code ->
-            val accepted = synchronized(configurationLock) {
-                synchronizeConfiguration(configuration())
-                gate.finished(request, WebhookPolicy.delivered(code))
-            }
-            if (accepted) done?.invoke(if (WebhookPolicy.delivered(code)) WebhookNotifier.TestResult.SENT
-                else WebhookNotifier.TestResult.FAILED)
+        val attempt = Attempt(request, generation, nowElapsed(), done)
+        active = attempt
+        lastHealth = lastHealth.copy(lastAttemptElapsed = attempt.started, outcome = WebhookOutcome.SENDING)
+        try {
+            attempt.cancelDeadline = schedule(WebhookPolicy.RESULT_DEADLINE_MS) { deadline(attempt) }
+            if (!submit(url, body) { complete(attempt, it) }) complete(attempt, NO_RESPONSE)
+        } catch (_: RuntimeException) {
+            complete(attempt, NO_RESPONSE)
         }
-        val queued = try {
-            submit(url, body, completed)
-        } catch (e: RuntimeException) {
-            completed(-1)
-            throw e
-        }
-        if (!queued) completed(-1)
     }
 
-    /** Delivery/rate history belongs to a configuration; physical in-flight identity outlives it. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun deadline(attempt: Attempt): Unit = synchronized(configurationLock) {
+        if (active === attempt && attempt.result == null) {
+            val remaining = WebhookPolicy.RESULT_DEADLINE_MS - (nowElapsed() - attempt.started)
+            if (remaining > 0) {
+                try {
+                    attempt.cancelDeadline = schedule(remaining) { deadline(attempt) }
+                } catch (_: RuntimeException) {
+                    report(attempt, WebhookNotifier.TestResult.FAILED)
+                    if (active === attempt) attempt.cancel(cancelTransport)
+                }
+            } else {
+                synchronizeConfiguration(configuration())
+                report(attempt, WebhookNotifier.TestResult.TIMED_OUT)
+                if (active === attempt) attempt.cancel(cancelTransport)
+            }
+        }
+    }
+
+    private fun complete(attempt: Attempt, code: Int) = synchronized(configurationLock) {
+        if (active === attempt) {
+            synchronizeConfiguration(configuration())
+            val result = when {
+                nowElapsed() - attempt.started >= WebhookPolicy.RESULT_DEADLINE_MS ->
+                    WebhookNotifier.TestResult.TIMED_OUT
+                WebhookPolicy.delivered(code) -> WebhookNotifier.TestResult.SENT
+                else -> WebhookNotifier.TestResult.FAILED
+            }
+            // Publish only once; a late success must never rewrite timeout or suppress a retry.
+            if (attempt.result == null) report(attempt, result)
+            if (active === attempt) {
+                gate.finished(attempt.request, attempt.result == WebhookNotifier.TestResult.SENT)
+                active = null
+            }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun report(attempt: Attempt, result: WebhookNotifier.TestResult) {
+        attempt.result = result
+        attempt.cancelDeadline?.invoke()
+        attempt.cancelDeadline = null
+        if (attempt.generation == generation) {
+            lastHealth = lastHealth.copy(outcome = when (result) {
+                WebhookNotifier.TestResult.SENT -> WebhookOutcome.SENT
+                WebhookNotifier.TestResult.TIMED_OUT -> WebhookOutcome.TIMED_OUT
+                else -> WebhookOutcome.FAILED
+            }, lastSuccessElapsed = if (result == WebhookNotifier.TestResult.SENT) nowElapsed()
+                else lastHealth.lastSuccessElapsed)
+        }
+        try {
+            attempt.done?.invoke(result)
+        } catch (_: RuntimeException) {
+            // A UI consumer cannot strand the physical slot or prevent cancellation.
+        }
+    }
+
+    private fun invalidate() {
+        generation++
+        gate.reset()
+        lastHealth = WebhookHealth()
+        active?.cancel(cancelTransport)
+    }
+
     private fun synchronizeConfiguration(current: WebhookConfiguration) {
         if (configured != current) {
             configured = current
-            gate.reset()
+            invalidate()
         }
     }
+
+    private companion object { const val NO_RESPONSE = -1 }
 }

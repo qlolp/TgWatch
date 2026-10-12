@@ -34,6 +34,9 @@ Full outages, partial availability and recovery have independent notification
 and sound settings. Quiet hours support minute precision and follow local time.
 Outage and partial alerts offer "Check now" and "Mute for 1 hour"; a mute
 silences alert sound and vibration like quiet hours and stays on this device.
+The timer follows elapsed time across clock corrections and process restarts;
+a device reboot ends it. "Resume alerts" cancels the timer while preserving quiet
+hours, event preferences and Android notification channels.
 An optional daily summary reports the last 24 hours while monitoring is on.
 The home-screen widget and Quick Settings tile offer the current status and a
 manual check.
@@ -43,6 +46,11 @@ time does not silently become a Telegram outage. Uptime is calculated by time;
 check counts and mean recovery time are separate metrics. Clock-epoch metadata
 is excluded from check counts and the chart. A temporary storage write failure
 is repaired by saving the complete retained snapshot on the next successful write.
+History preparation is cached; the main screen loads statistics and chart buckets
+off the UI thread. Incident cards list the latest 100 episodes in the selected
+day/week window, distinguish outage/partial/offline/unknown time, and mark clipped
+starts and unobserved recovery. Explicit sharing exports only episode times and
+duration totals. See [1.15.0](releases/1.15.0.md).
 
 ## Backup, automation and diagnostics
 
@@ -68,11 +76,17 @@ Optional, off by default: informational HTTPS checks of Matrix, WhatsApp Web and
 one custom `https://` address appear only in connection diagnostics. Their
 results are excluded from Telegram classification and alerts, and use three
 separate workers so a stuck extra probe cannot occupy Telegram/control workers.
+Telegram's result is published first; later EXTRA results only enrich diagnostics
+for the same check and network.
 A [webhook](automation.md#webhook-alert)
 (for example an ntfy.sh topic) can receive one short line when the published
 status changes. Its address is treated as a credential and kept out of backups
 and diagnostics. Address changes invalidate stale send decisions; an older
 request may finish without changing the new address's delivery history.
+Webhook results have a 10-second total deadline. Cancellation is requested at
+expiry, while a noncooperative transport retains the single physical slot.
+The private settings screen shows sanitized delivery health for the current
+process, without exposing or exporting the address or exception details.
 
 ## Install and develop
 

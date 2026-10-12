@@ -130,9 +130,17 @@ posts a fixed test line, even while the switch is off.
   the current status. Delivery is best effort: a NO_NETWORK post usually cannot
   leave the device.
 - One background thread, at most one request in flight, 5-second connect and
-  read timeouts. Posting never blocks or changes monitoring, notifications or
-  history. These are per-operation timeouts, not a total HTTP deadline. The
-  decision state is per process.
+  read timeouts and a 10-second total result deadline measured with elapsed time.
+  The deadline reports timeout once and requests cancellation. DNS or a stuck
+  transport may ignore it: the physical slot is retained until the operation
+  really ends, so a second request is not admitted in the meantime. Posting
+  never blocks or changes monitoring, notifications or history.
+  The decision state and delivery health are per process.
+- Private settings display the last attempt, last successful delivery, a
+  sanitized outcome and whether a physical request is still in flight.
+  The health display contains no address, token, response body or raw exception;
+  it is not backed up or uploaded. Changing settings isolates older results
+  from the current configuration's health.
 - Saving an address or changing the enabled setting invalidates older send
   snapshots atomically. A request already admitted to the old address may finish,
   but its completion cannot update the new address's delivery/rate history or

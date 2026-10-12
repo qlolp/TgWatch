@@ -4,7 +4,9 @@ import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.os.UserManager
+import android.provider.Settings
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -43,6 +45,9 @@ object Prefs {
     private const val KEY_LAST_VIBE = "last_vibe"
     // Device-local; BackupManager exports only its explicit settings list.
     private const val KEY_ALERTS_MUTED_UNTIL = "alerts_muted_until"
+    private const val KEY_ALERT_MUTE_BOOT = "alert_mute_boot"
+    private const val KEY_ALERT_MUTE_STARTED = "alert_mute_started_elapsed"
+    private const val KEY_ALERT_MUTE_UNTIL = "alert_mute_until_elapsed"
 
     const val DEFAULT_INTERVAL_SEC = 30
     const val DEFAULT_QUIET_START = 23
@@ -83,7 +88,7 @@ object Prefs {
 
     /** Не вибрировать в тихие часы, пока оповещения заглушены, и в системном «не беспокоить». */
     fun alertsAllowed(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
-        if (inQuietHoursNow(ctx, now) || alertsMutedUntil(ctx, now) > 0L) return false
+        if (inQuietHoursNow(ctx, now) || alertMuteRemaining(ctx, now) > 0L) return false
         return try {
             val filter = (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .currentInterruptionFilter
@@ -253,12 +258,56 @@ object Prefs {
             .apply()
     }
 
-    /** Deadline of the "Mute for 1 hour" alert action, or 0 when alerts are not muted. */
-    fun alertsMutedUntil(ctx: Context, now: Long = System.currentTimeMillis()): Long =
-        sp(ctx).getLong(KEY_ALERTS_MUTED_UNTIL, 0L).takeIf { AlertMute.active(it, now) } ?: 0L
+    /** Display-only wall-clock projection; suppression and expiry use elapsedRealtime. */
+    @Synchronized
+    fun alertsMutedUntil(ctx: Context, now: Long = System.currentTimeMillis()): Long {
+        val remaining = alertMuteRemaining(ctx, now)
+        return if (remaining > 0) now.coerceAtMost(Long.MAX_VALUE - remaining) + remaining else 0L
+    }
 
-    fun muteAlerts(ctx: Context, now: Long = System.currentTimeMillis()) {
-        sp(ctx).edit().putLong(KEY_ALERTS_MUTED_UNTIL, AlertMute.until(now)).commit()
+    @Synchronized
+    private fun alertMuteRemaining(ctx: Context, now: Long): Long =
+        AlertMute.remaining(alertMuteStore(ctx), now, SystemClock.elapsedRealtime(), bootCount(ctx))
+
+    /** The wall-clock argument is retained for existing callers; the new timer ignores clock corrections. */
+    @Suppress("UNUSED_PARAMETER")
+    @Synchronized
+    fun muteAlerts(ctx: Context, now: Long = System.currentTimeMillis()): Boolean =
+        AlertMute.mute(alertMuteStore(ctx), SystemClock.elapsedRealtime(), bootCount(ctx))
+
+    @Synchronized
+    fun clearAlertMute(ctx: Context): Boolean = AlertMute.clear(alertMuteStore(ctx))
+
+    private fun bootCount(ctx: Context): Int? = try {
+        Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT).takeIf { it >= 0 }
+    } catch (_: Settings.SettingNotFoundException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    private fun alertMuteStore(ctx: Context): AlertMute.Store = object : AlertMute.Store {
+        private val settings = sp(ctx)
+        override fun read(): AlertMute.State {
+            val values = settings.all
+            return AlertMute.State(values[KEY_ALERT_MUTE_BOOT] as? Int,
+                values[KEY_ALERT_MUTE_STARTED] as? Long ?: 0L,
+                values[KEY_ALERT_MUTE_UNTIL] as? Long ?: 0L,
+                values[KEY_ALERTS_MUTED_UNTIL] as? Long ?: 0L)
+        }
+
+        override fun write(state: AlertMute.State): Boolean {
+            val edit = settings.edit().remove(KEY_ALERTS_MUTED_UNTIL)
+            if (state.bootCount == null) {
+                edit.remove(KEY_ALERT_MUTE_BOOT).remove(KEY_ALERT_MUTE_STARTED).remove(KEY_ALERT_MUTE_UNTIL)
+            } else {
+                edit.putInt(KEY_ALERT_MUTE_BOOT, state.bootCount).putLong(KEY_ALERT_MUTE_STARTED, state.startedElapsed)
+                    .putLong(KEY_ALERT_MUTE_UNTIL, state.untilElapsed)
+            }
+            return edit.commit()
+        }
     }
 
     fun inQuietHoursNow(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {

@@ -100,4 +100,14 @@
     <string name="dialog_remove">Remove</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="extra_probe_custom_url_hint">https://example.org/status</string>
+    <string name="alerts_resume">Resume alerts</string>
+    <string name="alerts_resumed">Pause canceled. Quiet hours and notification settings still apply.</string>
+    <string name="alert_mute_save_failed">Could not save the alert pause change</string>
+    <string name="history_loading">Preparing history…</string>
+    <string name="history_load_failed">History is temporarily unavailable</string>
+    <string name="incidents_title">Incident cards</string>
+    <string name="incidents_hint">Latest 100 episodes in this period. Gaps and lost internet are shown separately; onset or recovery may be unobserved. Sharing includes only times and duration totals.</string>
+    <string name="incidents_empty">No outage or partial availability was observed in this period.</string>
+    <string name="incident_share">Share this episode</string>
+    <string name="incident_share_unavailable">No app is available for sharing</string>
 </resources>

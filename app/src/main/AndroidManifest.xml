@@ -46,6 +46,9 @@
         <activity
             android:name=".AutomationSettingsActivity"
             android:exported="false" />
+        <activity
+            android:name=".IncidentActivity"
+            android:exported="false" />
         <receiver
             android:name=".AutomationReceiver"
             android:directBootAware="false"

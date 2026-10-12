@@ -150,8 +150,16 @@ class NetworkProbe(
 ) {
     init { require(pool !== extraPool) { "EXTRA probes require a separate executor" } }
 
-    /** [extras] run after Telegram/control probes in their own bounded batch; see [ExtraProbes]. */
+    /** Compatibility API: waits for both batches. Services publish [checkPrimary] before requesting extras. */
     fun check(extras: List<ProbeEndpoint> = emptyList()): ProbeReport {
+        val primary = checkPrimary()
+        return primary.copy(results = primary.results + checkExtras(extras))
+    }
+
+    fun checkExtras(extras: List<ProbeEndpoint>): List<ProbeOutcome> =
+        ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS).run(extras.filter { it.group == ProbeGroup.EXTRA }, ::probe)
+
+    fun checkPrimary(): ProbeReport {
         val telegram = listOf(
             ProbeEndpoint("api.telegram.org", ProbeGroup.WEB, "https://api.telegram.org/"),
             ProbeEndpoint("web.telegram.org", ProbeGroup.WEB, "https://web.telegram.org/"),
@@ -166,10 +174,6 @@ class NetworkProbe(
                 ProbeEndpoint("Google 204", ProbeGroup.CONTROL, "https://www.gstatic.com/generate_204"),
             )
             results += ProbeBatch(pool).run(controls, ::probe)
-        }
-        val informational = extras.filter { it.group == ProbeGroup.EXTRA }
-        if (informational.isNotEmpty()) {
-            results += ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS).run(informational, ::probe)
         }
         return ProbeReport(results)
     }

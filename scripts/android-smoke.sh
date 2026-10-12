@@ -43,8 +43,7 @@ await_observation() {
 # The always-run reporter must never mistake a previous run for fresh results.
 rm -rf -- app/build/outputs/androidTest-results/connected
 bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
-adb root
-adb wait-for-device
+python3 scripts/adb-readiness.py
 mkdir -p app/build/reports/androidTests/ui-screenshots
 adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
@@ -54,8 +53,7 @@ git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
 (cd "$legacy_dir" && bash ./gradlew assembleDebug --no-daemon)
 if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
 adb install -g "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
-adb root
-adb wait-for-device
+python3 scripts/adb-readiness.py
 adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell am force-stop ru.tgwatch
 minute=$(( $(date +%s) / 60 - 3 ))
@@ -94,14 +92,7 @@ check_crashes
 before=$(last_check)
 adb shell locksettings set-pin 1234
 adb reboot
-adb wait-for-device
-for attempt in $(seq 1 90); do
-  if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
-  sleep 2
-done
-[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]
-adb root
-adb wait-for-device
+python3 scripts/adb-readiness.py --timeout 180
 adb shell dumpsys user | grep -q RUNNING_LOCKED
 await_observation "$before"
 adb shell input keyevent KEYCODE_WAKEUP

@@ -34,6 +34,8 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_URL = 0x00a71005
         const val ID_WEBHOOK_SET = 0x00a71006
         const val ID_WEBHOOK_TEST = 0x00a71007
+        const val ID_WEBHOOK_HEALTH = 0x00a71008
+        private const val HEALTH_REFRESH_MS = 1_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
         private const val CLIP_LIFETIME_MS = 45_000L
@@ -59,6 +61,15 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var webhookUrlView: TextView
     private lateinit var webhookTest: Button
     private var refreshing = false
+    private lateinit var webhookHealth: TextView
+    private val healthHandler = Handler(Looper.getMainLooper())
+    private val healthRefresh = object : Runnable {
+        override fun run() {
+            webhookHealth.text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
+                android.os.SystemClock.elapsedRealtime())
+            healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
+        }
+    }
 
     // Native view construction and listeners are kept together to make token storage rules visible.
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -112,6 +123,7 @@ class AutomationSettingsActivity : Activity() {
         button(column, R.string.webhook_set_url).apply { id = ID_WEBHOOK_SET }.setOnClickListener { editWebhookUrl() }
         webhookTest = button(column, R.string.webhook_test).apply { id = ID_WEBHOOK_TEST }
         webhookTest.setOnClickListener { sendWebhookTest() }
+        webhookHealth = text(R.string.webhook_title).apply { id = ID_WEBHOOK_HEALTH }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
         // Android 15 uses edge-to-edge; apply fresh padding instead of accumulating insets.
@@ -162,7 +174,16 @@ class AutomationSettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::toggle.isInitialized) refresh()
+        if (::toggle.isInitialized) {
+            refresh()
+            healthHandler.removeCallbacks(healthRefresh)
+            healthHandler.post(healthRefresh)
+        }
+    }
+
+    override fun onPause() {
+        healthHandler.removeCallbacks(healthRefresh)
+        super.onPause()
     }
 
     private fun refresh() {
@@ -181,6 +202,8 @@ class AutomationSettingsActivity : Activity() {
         webhookUrlView.text = if (webhook == null) getString(R.string.webhook_url_unset)
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
+        webhookHealth.text = WebhookHealthText.format(WebhookNotifier.health(this),
+            android.os.SystemClock.elapsedRealtime())
     }
 
     /** The current address is never prefilled; dialogs are secure windows of their own. */
@@ -220,12 +243,16 @@ class AutomationSettingsActivity : Activity() {
         webhookTest.isEnabled = false
         WebhookNotifier.sendTest(this) { result ->
             if (!isDestroyed) {
-                Toast.makeText(this, when (result) {
+                val message = if (result == WebhookNotifier.TestResult.TIMED_OUT)
+                    Lang.t("Время ожидания webhook истекло", "Webhook timed out")
+                else getString(when (result) {
                     WebhookNotifier.TestResult.SENT -> R.string.webhook_test_sent
-                    WebhookNotifier.TestResult.FAILED -> R.string.webhook_test_failed
+                    WebhookNotifier.TestResult.FAILED, WebhookNotifier.TestResult.TIMED_OUT ->
+                        R.string.webhook_test_failed
                     WebhookNotifier.TestResult.BUSY -> R.string.webhook_test_busy
                     WebhookNotifier.TestResult.NOT_CONFIGURED -> R.string.webhook_url_required
-                }, Toast.LENGTH_SHORT).show()
+                })
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 refresh()
             }
         }
@@ -267,6 +294,8 @@ class AutomationSettingsActivity : Activity() {
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
 
-    private fun storageError() = Toast.makeText(this, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }
+
+private fun Activity.storageError() =
+    Toast.makeText(this, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()

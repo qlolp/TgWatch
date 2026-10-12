@@ -56,6 +56,6 @@ object WebhookSettings {
     /** Even a failed disk commit can replace SharedPreferences' in-memory configuration. */
     private fun committed(editor: SharedPreferences.Editor): Boolean {
         generation++
-        return editor.commit()
+        return editor.commit().also { WebhookNotifier.reset() }
     }
 }

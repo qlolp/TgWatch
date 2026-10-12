@@ -27,4 +27,8 @@ class AlertMuteTest {
         assertTrue(AlertMute.active(until, now))
         assertFalse("A wall-clock correction must not extend the mute", AlertMute.active(until, now - 60_000L))
     }
+
+    @Test fun overflowingWallDifferenceIsNotAValidLegacyWindow() {
+        assertFalse(AlertMute.active(Long.MAX_VALUE, Long.MIN_VALUE))
+    }
 }
