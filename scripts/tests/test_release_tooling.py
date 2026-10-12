@@ -504,14 +504,15 @@ class WorkflowTests(unittest.TestCase):
 
 
 class LockedRequirementsTests(unittest.TestCase):
-    def check(self, requirements, lock):
+    def check(self, requirements, lock, *, source_requirements=None):
         script = SCRIPTS / "lock-requirements.py"
         self.assertTrue(script.is_file(), "Missing requirements lock generator/checker")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, destination = root / "requirements.txt", root / "requirements.lock"
             source.write_text(requirements)
-            destination.write_text(lock)
+            manifest = requirements if source_requirements is None else source_requirements
+            destination.write_text("# Source requirements SHA256: " + hashlib.sha256(manifest.encode()).hexdigest() + "\n" + lock)
             return subprocess.run([sys.executable, str(script), "--check", str(source), str(destination)],
                                   text=True, capture_output=True)
 
@@ -537,6 +538,15 @@ class LockedRequirementsTests(unittest.TestCase):
         result = self.check("jsonschema==4.23.0\n", "jsonschema==4.23.0\n")
         self.assertNotEqual(0, result.returncode)
         self.assertIn("hash", result.stderr.lower())
+
+    def test_removing_direct_requirement_requires_regenerating_lock(self):
+        original = "jsonschema==4.23.0\nPyYAML==6.0.2\n"
+        result = self.check("PyYAML==6.0.2\n",
+                            "jsonschema==4.23.0 \\\n    --hash=sha256:" + "a" * 64 + "\n" +
+                            "PyYAML==6.0.2 \\\n    --hash=sha256:" + "b" * 64 + "\n",
+                            source_requirements=original)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("regenerate", result.stderr.lower())
 
 
 class SignedUpgradeWorkflowTests(unittest.TestCase):
