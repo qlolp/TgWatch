@@ -35,7 +35,7 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_SET = 0x00a71006
         const val ID_WEBHOOK_TEST = 0x00a71007
         const val ID_WEBHOOK_HEALTH = 0x00a71008
-        private const val HEALTH_REFRESH_MS = 1_000L
+        private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
         private const val CLIP_LIFETIME_MS = 45_000L
@@ -65,8 +65,9 @@ class AutomationSettingsActivity : Activity() {
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
-            webhookHealth.text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
+            val text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
                 android.os.SystemClock.elapsedRealtime())
+            if (webhookHealth.text.toString() != text) webhookHealth.text = text
             healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
         }
     }
@@ -150,9 +151,11 @@ class AutomationSettingsActivity : Activity() {
         }
         webhookToggle.setOnCheckedChangeListener { _, enabled ->
             if (!refreshing) {
-                if (!WebhookSettings.setEnabled(this, enabled)) {
-                    val message = if (enabled) R.string.webhook_url_required else R.string.automation_storage_error
-                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                when (WebhookSettings.setEnabledResult(this, enabled)) {
+                    WebhookSettings.WriteResult.SAVED -> Unit
+                    WebhookSettings.WriteResult.INVALID ->
+                        Toast.makeText(this, R.string.webhook_url_required, Toast.LENGTH_SHORT).show()
+                    WebhookSettings.WriteResult.STORAGE_FAILED -> storageError()
                 }
                 refresh()
             }
@@ -191,7 +194,8 @@ class AutomationSettingsActivity : Activity() {
         refreshing = true
         toggle.isChecked = token != null
         refreshing = false
-        tokenView.text = token ?: getString(R.string.automation_disabled)
+        tokenView.text = if (token == null) getString(R.string.automation_disabled)
+            else getString(R.string.automation_token_hidden, AutomationPolicy.TOKEN_LENGTH)
         copy.isEnabled = token != null
         regenerate.isEnabled = token != null
         val webhook = WebhookSettings.url(this)
@@ -202,8 +206,8 @@ class AutomationSettingsActivity : Activity() {
         webhookUrlView.text = if (webhook == null) getString(R.string.webhook_url_unset)
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
-        webhookHealth.text = WebhookHealthText.format(WebhookNotifier.health(this),
-            android.os.SystemClock.elapsedRealtime())
+        val text = WebhookHealthText.format(WebhookNotifier.health(this), android.os.SystemClock.elapsedRealtime())
+        if (webhookHealth.text.toString() != text) webhookHealth.text = text
     }
 
     /** The current address is never prefilled; dialogs are secure windows of their own. */
@@ -230,8 +234,11 @@ class AutomationSettingsActivity : Activity() {
                 refresh()
             }
             .setPositiveButton(R.string.dialog_save) { _, _ ->
-                if (!WebhookSettings.setUrl(this, input.text.toString())) {
-                    Toast.makeText(this, R.string.webhook_url_invalid, Toast.LENGTH_LONG).show()
+                when (WebhookSettings.setUrlResult(this, input.text.toString())) {
+                    WebhookSettings.WriteResult.SAVED -> Unit
+                    WebhookSettings.WriteResult.INVALID ->
+                        Toast.makeText(this, R.string.webhook_url_invalid, Toast.LENGTH_LONG).show()
+                    WebhookSettings.WriteResult.STORAGE_FAILED -> storageError()
                 }
                 refresh()
             }.create()

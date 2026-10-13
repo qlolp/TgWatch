@@ -31,7 +31,7 @@ class StatusTileService : TileService() {
         override fun run() {
             if (!listening) return
             refresh()
-            ui.postDelayed(this, 2_000L)
+            ui.postDelayed(this, REFRESH_MS)
         }
     }
 
@@ -51,7 +51,7 @@ class StatusTileService : TileService() {
         }
         refresh()
         ui.removeCallbacks(ticker)
-        ui.postDelayed(ticker, 2_000L)
+        ui.postDelayed(ticker, REFRESH_MS)
     }
 
     override fun onStopListening() {
@@ -126,6 +126,11 @@ class StatusTileService : TileService() {
             tile.label = "Telegram: $subtitle"
         }
         tile.updateTile()
+    }
+
+    private companion object {
+        // State broadcasts remain immediate; polling only advances the age/staleness label.
+        const val REFRESH_MS = 15_000L
     }
 }
 

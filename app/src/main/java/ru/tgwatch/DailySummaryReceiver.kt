@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.util.Log
 import java.util.Calendar
@@ -14,7 +15,11 @@ import java.util.Calendar
 class DailySummaryReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action == ACTION) post(context, force = false)
+        if (intent?.action == ACTION) {
+            val pending = goAsync()
+            dispatcher.submit({ current -> post(context.applicationContext, force = false, isCurrent = current) },
+                finish = { pending?.finish() })
+        }
         // Time and timezone changes move the wall-clock target, so every delivery re-arms.
         schedule(context)
     }
@@ -25,27 +30,47 @@ class DailySummaryReceiver : BroadcastReceiver() {
 
         // Device-local delivery state; BackupManager exports only its explicit settings list.
         private const val LAST_DELIVERY = "daily_summary_last_at"
+        private val dispatcher = SummaryDispatcher(failed = { e ->
+            Log.w(TAG, "daily summary failed: ${e.javaClass.simpleName}")
+        })
+
+        /** Completion runs on a worker/deadline timer, or on the caller when rejected. */
+        fun postAsync(ctx: Context, force: Boolean, complete: (Boolean) -> Unit = {}): Boolean {
+            val application = ctx.applicationContext
+            return dispatcher.submit({ current -> post(application, force, current) }, complete)
+        }
 
         /** Manual preview bypasses opt-in/monitoring/deduplication, while permission/channel blocks still apply. */
-        @Synchronized fun post(ctx: Context, force: Boolean): Boolean {
+        @Synchronized fun post(ctx: Context, force: Boolean, isCurrent: () -> Boolean = { true }): Boolean {
             val now = System.currentTimeMillis()
             val settings = Prefs.sp(ctx)
             // Stopped monitoring stays quiet: no scheduled summary until the user starts it again.
-            val scheduled = DailySummary.due(force, Prefs.dailySummary(ctx), Prefs.isEnabled(ctx),
-                alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L)))
-            if (!scheduled) return false
+            if (!eligible(ctx, force, settings, now, isCurrent)) return false
             return try {
                 val text = DailySummary.text(History.stats(ctx, 1, now))
-                if (text == null) false else {
-                    val posted = EventNotifications(ctx, ctx.getSystemService(NotificationManager::class.java))
-                        .summary(text.title, text.body)
-                    if (posted && !force) settings.edit().putLong(LAST_DELIVERY, now).commit()
-                    posted
-                }
+                if (text == null) false else publish(ctx, force, settings, text, isCurrent)
             } catch (e: Exception) {
                 Log.w(TAG, "daily summary", e)
                 false
             }
+        }
+
+        private fun eligible(ctx: Context, force: Boolean, settings: SharedPreferences, now: Long,
+            isCurrent: () -> Boolean): Boolean = DailySummary.due(force, Prefs.dailySummary(ctx), Prefs.isEnabled(ctx),
+                alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L))) &&
+            !BackupManager.hasPending(ctx) && isCurrent()
+
+        private fun publish(ctx: Context, force: Boolean, settings: SharedPreferences, text: DailySummary.Text,
+            isCurrent: () -> Boolean): Boolean {
+            val notifications = EventNotifications(ctx, ctx.getSystemService(NotificationManager::class.java))
+            var postingAt = 0L
+            val posted = notifications.summary(text.title, text.body) {
+                postingAt = System.currentTimeMillis()
+                // Both history and Android notification preparation may have waited.
+                eligible(ctx, force, settings, postingAt, isCurrent)
+            }
+            if (posted && !force) settings.edit().putLong(LAST_DELIVERY, postingAt).commit()
+            return posted
         }
 
         private fun alreadyDelivered(now: Long, last: Long): Boolean {

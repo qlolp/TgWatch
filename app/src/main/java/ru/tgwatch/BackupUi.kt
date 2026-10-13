@@ -7,6 +7,7 @@ import android.app.ProgressDialog
 import android.content.Intent
 import android.net.Uri
 import android.text.InputType
+import android.view.WindowManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -111,6 +112,7 @@ class BackupUi(private val activity: Activity) {
                 else { dialog.dismiss(); action(pass) }
             }
         }
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.show()
         dialogs.add(dialog)
     }

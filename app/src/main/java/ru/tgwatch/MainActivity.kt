@@ -303,8 +303,12 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnDailySummaryTime).setOnClickListener { pickDailySummaryTime() }
         findViewById<Button>(R.id.btnDailySummaryNow).setOnClickListener {
             requestNotificationPermissionIfNeeded()
-            if (!DailySummaryReceiver.post(this, force = true))
-                Toast.makeText(this, R.string.summary_unavailable, Toast.LENGTH_LONG).show()
+            DailySummaryReceiver.postAsync(this, force = true) { posted ->
+                runOnUiThread {
+                    if (!posted && !isFinishing && !isDestroyed)
+                        Toast.makeText(this, R.string.summary_unavailable, Toast.LENGTH_LONG).show()
+                }
+            }
         }
 
         ExtraProbesUi(this, ::notifyServiceSettingsChanged)

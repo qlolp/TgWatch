@@ -12,6 +12,7 @@ import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.Switch
+import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -105,6 +106,7 @@ class AutomationIntegrationTest {
         assertEquals(AutomationReceiver.RESULT_INVALID, request("ru.tgwatch.action.START", token).first)
         val stopped = request(AutomationReceiver.ACTION_CHECK_NOW, token)
         assertEquals(AutomationReceiver.RESULT_STOPPED, stopped.first)
+        assertNull("A stopped request must not consume the manual-check throttle", AutomationSettings.lastCheckElapsed(ctx))
         assertFalse(MonitorService.running)
         assertFalse(Prefs.isEnabled(ctx))
         val state = request(AutomationReceiver.ACTION_GET_STATE, token)
@@ -114,6 +116,31 @@ class AutomationIntegrationTest {
         assertTrue(state.second!!.getBoolean("stale"))
         assertEquals(1, state.second!!.getInt("api_version"))
         assertFalse(MonitorService.running)
+    }
+
+    @Test fun stoppingServiceAfterThePreliminaryGuardDoesNotConsumeTheCheckBudget() {
+        AutomationSettings.setEnabled(ctx, true)
+        val token = AutomationSettings.token(ctx)!!
+        val service = MonitorService()
+        val activeField = MonitorService::class.java.getDeclaredField("activeService").apply { isAccessible = true }
+        val runningField = MonitorService::class.java.getDeclaredField("running").apply { isAccessible = true }
+        val stoppingField = MonitorService::class.java.getDeclaredField("stopping").apply { isAccessible = true }
+        val previousService = activeField.get(null)
+        val previousRunning = runningField.getBoolean(null)
+        assertNull("The real service must already be stopped before installing this race fixture", previousService)
+        try {
+            stoppingField.setBoolean(service, true)
+            activeField.set(null, service)
+            runningField.setBoolean(null, true)
+            Prefs.setEnabled(ctx, true)
+            assertEquals(AutomationReceiver.RESULT_STOPPED, request(AutomationReceiver.ACTION_CHECK_NOW, token).first)
+            assertNull("A service refusing handoff must leave the next check's budget untouched",
+                AutomationSettings.lastCheckElapsed(ctx))
+        } finally {
+            activeField.set(null, previousService)
+            runningField.setBoolean(null, previousRunning)
+            Prefs.setEnabled(ctx, false)
+        }
     }
 
     @Test fun screenCopiesOnlyOnDemandAndDoesNotSaveToken() {
@@ -133,6 +160,13 @@ class AutomationIntegrationTest {
                 assertFalse(copy.isEnabled)
                 toggle.performClick()
                 val token = AutomationSettings.token(ctx)!!
+                val tokenView = activity.findViewById<TextView>(AutomationSettingsActivity.ID_TOKEN)
+                assertFalse("The bearer token must not be rendered", tokenView.text.toString().contains(token))
+                val tokenNode = tokenView.createAccessibilityNodeInfo()
+                assertFalse("Accessibility text must not contain the bearer token",
+                    tokenNode.text?.toString()?.contains(token) == true)
+                assertFalse("Accessibility descriptions must not contain the bearer token",
+                    tokenNode.contentDescription?.toString()?.contains(token) == true)
                 copy.performClick()
                 val clipboard = activity.getSystemService(ClipboardManager::class.java)
                 val clip = clipboard.primaryClip

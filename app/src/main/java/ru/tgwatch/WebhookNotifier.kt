@@ -84,7 +84,8 @@ internal class WebhookCoordinator(
         val done: ((WebhookNotifier.TestResult) -> Unit)?) {
         var result: WebhookNotifier.TestResult? = null
         var cancelDeadline: (() -> Unit)? = null
-        private var cancellationRequested = false
+        var cancellationRequested = false
+            private set
 
         @Suppress("TooGenericExceptionCaught")
         fun cancel(transport: () -> Unit) {
@@ -106,7 +107,9 @@ internal class WebhookCoordinator(
 
     fun health(): WebhookHealth = synchronized(configurationLock) {
         synchronizeConfiguration(configuration())
-        lastHealth.copy(inFlight = active != null)
+        lastHealth.copy(inFlight = active != null, transportBlocked = active?.let {
+            it.cancellationRequested || it.result == WebhookNotifier.TestResult.TIMED_OUT
+        } == true)
     }
 
     fun onPublished(status: String) {

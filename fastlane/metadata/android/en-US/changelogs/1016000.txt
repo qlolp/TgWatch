@@ -1,0 +1,1 @@
+Interrupted checks preserve the previous result and retry promptly. History statistics and daily summaries run in the background. Automation tokens are masked; blocked webhook delivery and storage failures are explicit. Sensitive dialogs prevent screenshots. Release verification and compatible dependencies are updated.

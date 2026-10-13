@@ -28,4 +28,5 @@
     <string name="webhook_test_sent">Тестовое сообщение доставлено.</string>
     <string name="webhook_test_failed">Тестовое сообщение не доставлено.</string>
     <string name="webhook_test_busy">Выполняется другой запрос. Повторите через несколько секунд.</string>
+    <string name="automation_token_hidden">•••••••• · Длина (символов): %1$d</string>
 </resources>

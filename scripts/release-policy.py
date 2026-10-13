@@ -6,15 +6,22 @@ Historical scan evidence stays unchanged. Version tags must match source,
 be reachable from main, and advance both SemVer and Android installation order.
 """
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
+import time
 
+from apk_verification import verify_apk_identity, verify_checksum, verify_production_signature
 from scan_report import verify_report
 from audit_report import verify_osv, verify_runtime_inventory
 from jsonschema.exceptions import ValidationError
+
+GH_COMMAND_TIMEOUT = 120
+PUBLISHED_VERIFY_TIMEOUT = 300
 
 
 def semver(version):
@@ -47,8 +54,8 @@ def read_version(path):
     return entries[0]
 
 
-def gh(*args):
-    result = subprocess.run(["gh", *args], text=True, capture_output=True)
+def gh(*args, timeout=GH_COMMAND_TIMEOUT):
+    result = subprocess.run(["gh", *args], text=True, capture_output=True, timeout=timeout)
     if result.returncode:
         raise RuntimeError(f"gh {args[0]} failed: {result.stderr.strip()}")
     return result.stdout
@@ -60,7 +67,7 @@ def api(endpoint, *options):
 
 def optional_api(endpoint):
     result = subprocess.run(["gh", "api", endpoint],
-                            text=True, capture_output=True)
+                            text=True, capture_output=True, timeout=GH_COMMAND_TIMEOUT)
     if result.returncode:
         # A missing latest is normal for the first release; auth/network errors are not.
         if "HTTP 404" in result.stderr:
@@ -165,6 +172,32 @@ def commit_for_tag(repo, tag, allow_missing=False):
     raise ValueError("Release tag does not resolve to a commit")
 
 
+class PublishedAssetVerificationError(RuntimeError):
+    """Publication happened; verification must never repair its immutable assets."""
+
+
+class ReleaseCreationUnknownError(RuntimeError):
+    """A create request may have reached GitHub before the client failed."""
+
+
+def verify_published_assets(repo, tag, expected_hashes):
+    try:
+        deadline = time.monotonic() + PUBLISHED_VERIFY_TIMEOUT
+        with tempfile.TemporaryDirectory(prefix="tgwatch-published-") as directory:
+            out = Path(directory)
+            for name, expected in expected_hashes.items():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(["gh", "release", "download", tag], PUBLISHED_VERIFY_TIMEOUT)
+                gh("release", "download", tag, "--repo", repo, "--pattern", name, "--dir", str(out),
+                   timeout=min(GH_COMMAND_TIMEOUT, remaining))
+                if hashlib.sha256((out / name).read_bytes()).hexdigest() != expected:
+                    raise ValueError(f"Published {name} differs from the validated upload")
+            verify_checksum(out / "TgWatch.apk", out / "TgWatch.apk.sha256")
+    except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+        raise PublishedAssetVerificationError(str(error)) from error
+
+
 def publish(args):
     version = read_version(args.version_file)
     tag = preflight(args.repo, version, args.sha, args.ref)
@@ -181,6 +214,10 @@ def publish(args):
     required = {"TgWatch.apk", "TgWatch.apk.sha256", "TgWatch.osv.json", "TgWatch.dependencies.json", "TgWatch.sbom.cdx.json", "TgWatch.trivy.json"}
     if set(by_name) != required:
         raise ValueError("Unified release needs complete APK/checksum, SBOM, Trivy and full dependency/OSV evidence")
+    expected_hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in assets}
+    verify_checksum(by_name["TgWatch.apk"], by_name["TgWatch.apk.sha256"])
+    verify_production_signature(by_name["TgWatch.apk"], args.apksigner)
+    verify_apk_identity(by_name["TgWatch.apk"], version, code, args.aapt2)
     inventory = json.loads(by_name["TgWatch.dependencies.json"].read_text())
     bom = json.loads(by_name["TgWatch.sbom.cdx.json"].read_text())
     verify_osv(json.loads(by_name["TgWatch.osv.json"].read_text()), inventory)
@@ -189,9 +226,15 @@ def publish(args):
         raise ValueError("Trivy HIGH/CRITICAL findings block release publication")
     # Repeat preflight immediately before the sole mutation; CI serializes publishers.
     preflight(args.repo, version, args.sha, args.ref)
-    gh("release", "create", tag, *map(str, assets), "--repo", args.repo,
-       "--target", args.sha, "--title", f"TG Монитор {version}",
-       "--notes-file", args.notes, "--latest=true")
+    if any(hashlib.sha256(path.read_bytes()).hexdigest() != expected_hashes[path.name] for path in assets):
+        raise ValueError("Release assets changed during validation; publication refused")
+    try:
+        gh("release", "create", tag, *map(str, assets), "--repo", args.repo,
+           "--target", args.sha, "--title", f"TG Монитор {version}",
+           "--notes-file", args.notes, "--latest=true")
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as error:
+        raise ReleaseCreationUnknownError(str(error)) from error
+    verify_published_assets(args.repo, tag, expected_hashes)
     print(f"Published {tag}, Android code {code}, latest=true")
 
 
@@ -204,9 +247,18 @@ def main():
     parser.add_argument("--sha", required=True)
     parser.add_argument("--notes")
     parser.add_argument("--assets", nargs="+")
+    parser.add_argument("--apksigner", default="apksigner", help="Android SDK signature verifier")
+    parser.add_argument("--aapt2", default="aapt2", help="Android SDK manifest inspector")
     try:
         publish(parser.parse_args())
-    except (ValueError, RuntimeError, KeyError, TypeError, OSError, ValidationError) as error:
+    except ReleaseCreationUnknownError as error:
+        print(f"Release creation result is unknown; inspect the tag/release read-only and preserve any existing assets: {error}", file=sys.stderr)
+        return 1
+    except PublishedAssetVerificationError as error:
+        print(f"Release was created, but published asset verification failed; it remains immutable: {error}", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError, KeyError, TypeError, OSError, ValidationError,
+            subprocess.TimeoutExpired) as error:
         print(f"Release policy refused publication: {error}", file=sys.stderr)
         return 1
     return 0

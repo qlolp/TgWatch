@@ -5,7 +5,8 @@ Access is disabled by default. Each token contains 256 random bits encoded as
 64 lowercase hexadecimal characters. Regenerate replaces the token immediately;
 disable removes it, and re-enabling creates a fresh token. Update your tasks
 after either operation. The settings screen prevents screenshots and automatic
-view-state/autofill storage. Copy is explicit, marks the clipboard sensitive on
+view-state/autofill storage. The screen shows a mask and the token length; the
+bearer token never enters displayed text or the accessibility tree. Copy is explicit, marks the clipboard sensitive on
 supported Android versions, and attempts to clear the same token after 45 seconds
 or when access is disabled/regenerated. Background clipboard restrictions can
 prevent that cleanup; Android 13+ also expires clipboard entries itself.
@@ -33,7 +34,10 @@ or starts a stopped service. GET_STATE only reads a current/persisted snapshot.
 Use an **ordered broadcast** to receive the result. No implicit reply or state
 broadcast is emitted by this API. An ordinary broadcast can request CHECK_NOW but
 does not return its result. Results are synchronous; CHECK_NOW success means the
-request was queued, not that a new network result is ready. A stop or restore can
+request was queued, not that a new network result is ready. The rate budget is
+persisted only after the existing service accepts admission; a stopped or
+unavailable handoff does not spend it. A failed durable write fails closed.
+A stop or restore can
 cancel a queued check. Poll GET_STATE later to observe freshness.
 
 | Result code | Meaning |
@@ -140,7 +144,9 @@ posts a fixed test line, even while the switch is off.
   sanitized outcome and whether a physical request is still in flight.
   The health display contains no address, token, response body or raw exception;
   it is not backed up or uploaded. Changing settings isolates older results
-  from the current configuration's health.
+  from the current configuration's health. If a cancelled or timed-out physical
+  request has not ended, the screen explicitly shows that delivery is blocked.
+  Changing settings cannot erase that condition or admit a second request.
 - Saving an address or changing the enabled setting invalidates older send
   snapshots atomically. A request already admitted to the old address may finish,
   but its completion cannot update the new address's delivery/rate history or

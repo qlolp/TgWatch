@@ -50,6 +50,24 @@ adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)
 git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
+# Verify the immutable legacy Gradle distribution before it executes.
+# This URL uses the same reviewed Gradle 8.10.2 checksum as the current wrapper.
+python3 - "$legacy_dir/gradle/wrapper/gradle-wrapper.properties" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+content = path.read_text()
+entries = [line.strip().split('=', 1) for line in content.splitlines()
+           if line.strip() and not line.lstrip().startswith('#') and '=' in line]
+urls = [value for key, value in entries if key == 'distributionUrl']
+expected_url = r'https\://services.gradle.org/distributions/gradle-8.10.2-bin.zip'
+expected_hash = '31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26'
+hashes = [value for key, value in entries if key == 'distributionSha256Sum']
+if urls != [expected_url] or (hashes and hashes != [expected_hash]):
+    raise ValueError('Immutable legacy Gradle distribution does not match its trusted pin')
+if not hashes:
+    path.write_text(content + '\ndistributionSha256Sum=' + expected_hash + '\n')
+PY
 (cd "$legacy_dir" && bash ./gradlew assembleDebug --no-daemon)
 if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
 adb install -g "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"

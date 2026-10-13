@@ -7,7 +7,7 @@ target API 35; native UI, Direct Boot, настройки и seven-day history �
 
 ## Сборка и проверки
 
-Нужны JDK 17, Android SDK Platform 35 и Build Tools 35.0.0, Python 3, принятые лицензии SDK.
+Нужны JDK 17, Android SDK Platform 35 и Build Tools 35.0.0, Python 3.11+, принятые лицензии SDK.
 Используйте закреплённые Kotlin/AGP и Gradle Wrapper. SDK задаётся через `ANDROID_HOME` либо
 неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
@@ -19,7 +19,13 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
-`version.properties` задаёт SemVer `1.15.0`; код `1015000` вычисляется одинаково локально и
+Проверки legacy Gradle Wrapper читают неизменяемый исторический коммит: клонируйте
+репозиторий с полной историей, либо выполните `git fetch --unshallow` для shallow clone.
+CI запускает ту же unittest-suite через `python3 scripts/report-python-tests.py`:
+код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
+а отсутствие обнаруженных тестов не считается успехом.
+
+`version.properties` задаёт SemVer `1.16.0`; код `1016000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,

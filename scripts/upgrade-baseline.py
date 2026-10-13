@@ -12,6 +12,8 @@ import re
 import subprocess
 import sys
 
+from apk_verification import verify_apk_identity, verify_checksum
+
 
 def _release_policy():
     spec = importlib.util.spec_from_file_location(
@@ -74,19 +76,6 @@ def select_baseline(releases, current_version):
     return best
 
 
-def verify_checksum(apk: Path, checksum: Path):
-    match = re.fullmatch(r"([0-9a-fA-F]{64})(?:\s+\*?([^\s]+))?", checksum.read_text().strip())
-    if not match:
-        raise ValueError("Checksum asset is not a single SHA256 line")
-    expected, recorded = match.group(1).lower(), match.group(2)
-    if recorded and recorded != apk.name:
-        raise ValueError(f"Checksum names {recorded}, not {apk.name}")
-    actual = hashlib.sha256(apk.read_bytes()).hexdigest()
-    if actual != expected:
-        raise ValueError(f"APK checksum mismatch: expected {expected}, got {actual}")
-    return actual
-
-
 def verify_download(path, asset):
     if path.stat().st_size != asset["size"]:
         raise ValueError(f"Downloaded {path.name} size differs from release metadata")
@@ -96,26 +85,7 @@ def verify_download(path, asset):
 
 
 def verify_apk_version(apk, tag, aapt2):
-    result = subprocess.run([str(aapt2), "dump", "badging", str(apk)],
-                            text=True, capture_output=True, timeout=30)
-    if result.returncode:
-        raise RuntimeError(f"APK could not be inspected: {result.stderr.strip()}")
-    packages = re.findall(r"^package: (.+)$", result.stdout, re.M)
-    if len(packages) != 1:
-        raise ValueError("APK has no single package metadata line")
-    fields = re.findall(r"([A-Za-z]+)='([^']*)'", packages[0])
-    values = {}
-    for key in ("name", "versionName", "versionCode"):
-        matches = [value for field, value in fields if field == key]
-        if len(matches) != 1:
-            raise ValueError(f"APK requires exactly one {key} field")
-        values[key] = matches[0]
-    if values["name"] != "ru.tgwatch":
-        raise ValueError("APK package does not match ru.tgwatch")
-    if values["versionName"] != tag[1:]:
-        raise ValueError(f"APK versionName does not match baseline tag {tag}")
-    if values["versionCode"] != str(_release_policy().tag_code(tag)):
-        raise ValueError(f"APK versionCode does not match baseline tag {tag}")
+    verify_apk_identity(apk, tag[1:], _release_policy().tag_code(tag), aapt2)
 
 
 def download(repo, tag, asset, destination):

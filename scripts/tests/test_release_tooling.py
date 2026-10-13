@@ -44,7 +44,9 @@ class ToolFixture:
         audit = {"checked_at": "2026-10-10T00:00:00+00:00", "source": "https://api.osv.dev/v1/query",
                  "packages": [dict(package, vulnerabilities=[]) for package in packages]}
         self.files = []
-        for name, data in (("TgWatch.apk", b"apk"), ("TgWatch.apk.sha256", b"checksum"),
+        apk_fixture = b"APK fixture inspected by external Android tool mocks"
+        checksum = hashlib.sha256(apk_fixture).hexdigest() + "  TgWatch.apk\n"
+        for name, data in (("TgWatch.apk", apk_fixture), ("TgWatch.apk.sha256", checksum.encode()),
                            ("TgWatch.sbom.cdx.json", json.dumps(BOM).encode()),
                            ("TgWatch.dependencies.json", json.dumps({"packages": packages}).encode()),
                            ("TgWatch.osv.json", json.dumps(audit).encode()),
@@ -65,7 +67,11 @@ if args[0] == 'api':
         if state['latest'] is None: print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)
         print(json.dumps(state['latest']))
     elif '/releases?' in endpoint: print(json.dumps(state['releases']))
-    elif '/compare/' in endpoint: print(json.dumps({'status': state.get('main_status', 'ahead')}))
+    elif '/compare/' in endpoint:
+        comparisons = sum('/compare/' in line for line in Path(os.environ['MOCK_LOG']).read_text().splitlines())
+        if state.get('mutate_on_compare') and comparisons == 2:
+            Path(os.environ['MOCK_STATE']).parent.joinpath(state['mutate_on_compare']).write_bytes(b'changed after validation')
+        print(json.dumps({'status': state.get('main_status', 'ahead')}))
     elif '/git/ref/tags/' in endpoint:
         if state.get('tag_missing'): print('HTTP 404: Not Found', file=sys.stderr); sys.exit(1)
         print(json.dumps({'object': state.get('tag_object', {'type':'commit', 'sha':state.get('tag_shas', {}).get(endpoint.rsplit('/', 1)[-1], state['sha'])})}))
@@ -81,6 +87,20 @@ elif args[:2] == ['secret', 'list']:
     print('\\n'.join(state.get('secrets', [])))
 elif args[:2] in (['release', 'create'], ['secret', 'set']): pass
 else: raise AssertionError(args)
+''')
+        self.mock("apksigner", '''import json, os, sys
+from pathlib import Path
+state = json.loads(Path(os.environ['MOCK_STATE']).read_text())
+if state.get('signature_error'): print('Invalid APK signature', file=sys.stderr); sys.exit(1)
+print('Signer #1 certificate SHA-256 digest: ' + state.get('certificate',
+      'ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1'))
+if state.get('extra_signer'): print('Signer #2 certificate SHA-256 digest: ' + 'b' * 64)
+''')
+        self.mock("aapt2", '''import json, os, sys
+from pathlib import Path
+state = json.loads(Path(os.environ['MOCK_STATE']).read_text())
+if state.get('aapt_error'): print('Invalid APK manifest', file=sys.stderr); sys.exit(1)
+print(state.get('badging', "package: name='ru.tgwatch' versionCode='1013000' versionName='1.13.0'"))
 ''')
 
     def mock(self, name, body):
@@ -500,7 +520,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn("toIntOrNull()?.plus(100)", text)
         self.assertIn("2147483647", text)
         self.assertNotIn("GITHUB_RUN_NUMBER", text)
-        self.assertIn('testImplementation("org.json:json:20240303")', text)
+        self.assertRegex(text, r'testImplementation\("org\.json:json:[0-9]{8}"\)')
+        self.assertNotRegex(text, r'(?m)^\s*(?:implementation|api|runtimeOnly)\("org\.json:json:')
 
 
 class LockedRequirementsTests(unittest.TestCase):
@@ -669,7 +690,7 @@ class FinalSignedApkWorkflowTests(unittest.TestCase):
                 path = tools / executable
                 path.write_text("#!/usr/bin/env python3\nprint(" + repr(output) + ")\n")
                 path.chmod(0o755)
-            env = dict(os.environ, APK_SHA256=original, ANDROID_HOME=str(root / "sdk"))
+            env = dict(os.environ, APK_SHA256=original, ANDROID_HOME=str(root / "sdk"), BUILD_TOOLS="35.0.0")
             return subprocess.run(["bash", "-c", guard["run"]], cwd=root, env=env, text=True, capture_output=True)
 
     def test_original_signed_apk_can_pass_publication_guard(self):

@@ -23,10 +23,10 @@ RepoType: git
 Repo: https://github.com/qlolp/TgWatch.git
 
 Builds:
-  - versionName: 1.15.0
-    versionCode: 1015000
+  - versionName: 1.16.0
+    versionCode: 1016000
     disable: Packaging candidate; verify the published tag and F-Droid build first
-    commit: v1.15.0
+    commit: v1.16.0
     subdir: app
     gradle:
       - "yes"
