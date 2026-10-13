@@ -44,7 +44,9 @@ class ToolFixture:
         audit = {"checked_at": "2026-10-10T00:00:00+00:00", "source": "https://api.osv.dev/v1/query",
                  "packages": [dict(package, vulnerabilities=[]) for package in packages]}
         self.files = []
-        for name, data in (("TgWatch.apk", b"apk"), ("TgWatch.apk.sha256", b"checksum"),
+        apk_bytes = b"apk"
+        for name, data in (("TgWatch.apk", apk_bytes),
+                           ("TgWatch.apk.sha256", (hashlib.sha256(apk_bytes).hexdigest() + "  TgWatch.apk\n").encode()),
                            ("TgWatch.sbom.cdx.json", json.dumps(BOM).encode()),
                            ("TgWatch.dependencies.json", json.dumps({"packages": packages}).encode()),
                            ("TgWatch.osv.json", json.dumps(audit).encode()),
@@ -108,6 +110,14 @@ else: raise AssertionError(args)
 
 
 class ReleaseTests(ToolFixture, unittest.TestCase):
+    def test_checksum_mismatch_blocks_publication(self):
+        self.fixture["tag_missing"] = True
+        (self.work / "TgWatch.apk.sha256").write_text("0" * 64 + "  TgWatch.apk\n")
+        result = self.run_release()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("checksum", result.stderr.lower())
+        self.assertEqual([], self.created())
+
     def test_first_release_is_latest(self):
         self.fixture["tag_missing"] = True
         result = self.run_release()

@@ -86,6 +86,10 @@ class MonitorService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val VIBRATION_GAP_MS = AlertRules.GAP_MS
         private const val NETWORK_GRACE_MS = 4_000L
+        /** An interrupted or superseded check produced no evidence and must not read as a result. */
+        private const val ABORTED_RETRY_MS = 10_000L
+        /** Stalest relative label accepted before the notification and widget are redrawn. */
+        private const val NOTIFICATION_REFRESH_MS = 60_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
 
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
@@ -214,13 +218,30 @@ class MonitorService : Service() {
     private var lastVibrationMono = -1L
     @Volatile private var lastProgressMono = 0L
     @Volatile private var checkStartedMono = 0L
+    @Volatile private var checkInterrupted = false
+    /** Set by the check that is publishing right now; read only inside handleResult. */
+    @Volatile private var resultAborted = false
+    @Volatile private var checkRevision = 0L
+    private var notifiedStatus: Status? = null
+    private var notifiedCheckedAt = -1L
+    private var notifiedAtMono = 0L
     private val healthHandler = Handler(android.os.Looper.getMainLooper())
     private val healthTick = object : Runnable {
         override fun run() {
             if (destroyed) return
-            postNotification(state)
-            StatusWidget.updateAll(this@MonitorService)
             ensureProgress()
+            // Every check already republishes; the tick only keeps relative labels fresh
+            // and must not poke the launcher or the notification service every 15 s.
+            val current = state
+            val now = SystemClock.elapsedRealtime()
+            if (current.status != notifiedStatus || current.checkedAt != notifiedCheckedAt ||
+                now - notifiedAtMono >= NOTIFICATION_REFRESH_MS) {
+                postNotification(current)
+                StatusWidget.updateAll(this@MonitorService)
+                notifiedStatus = current.status
+                notifiedCheckedAt = current.checkedAt
+                notifiedAtMono = now
+            }
             healthHandler.postDelayed(this, 15_000L)
         }
     }
@@ -228,6 +249,7 @@ class MonitorService : Service() {
         val now = SystemClock.elapsedRealtime()
         // Primary checks have a 12-second network budget. If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
+            checkInterrupted = true
             workerThread.interrupt()
         } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
             scheduleCheck(0L)
@@ -466,37 +488,57 @@ class MonitorService : Service() {
         if (!acceptsRunningCheck(this)) return
         // An interrupt from the health monitor must not poison the following check.
         Thread.interrupted()
+        checkInterrupted = false
         extraCoordinator.invalidate()
         checkStartedMono = SystemClock.elapsedRealtime()
         val revision = checkSchedule.begin()
+        checkRevision = revision
+        resultAborted = false
         acquireWakeLockForCheck()
+        var aborted = false
         try {
             val result = performCheck()
             if (!acceptsRunningCheck(this)) return
             if (revision == checkSchedule.revision) {
                 handleResult(result)
                 startExtras(result)
+            } else {
+                // The network changed while the probes ran, so this result describes neither
+                // connection: keep the previous state and let the queued check answer.
+                aborted = true
+                resultAborted = true
+                handleResult(result.copy(status = Status.UNKNOWN,
+                    reason = Lang.t("Сеть изменилась во время проверки", "Network changed during the check")))
             }
-            else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics, result.outcomes))
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
-            if (acceptsRunningCheck(this)) handleResult(Probe(Status.UNKNOWN, -1,
-                Lang.t("Проверка не завершена: ${describeProbeError(e)}",
+            if (acceptsRunningCheck(this)) {
+                aborted = abortedByInterrupt(e)
+                resultAborted = aborted
+                handleResult(Probe(Status.UNKNOWN, -1, if (aborted)
+                    Lang.t("Проверка прервана, результат не получен", "The check was interrupted before a result")
+                else Lang.t("Проверка не завершена: ${describeProbeError(e)}",
                     "Check did not finish: ${describeProbeError(e)}")))
+            }
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
             checkStartedMono = 0L
+            checkInterrupted = false
+            resultAborted = false
             releaseWakeLock()
         }
         if (acceptsRunningCheck(this)) {
-            checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+            checkSchedule.afterCheck(revision, if (aborted) ABORTED_RETRY_MS else state.expectedIntervalSec * 1000L)
             // Re-arming replaces the pending watchdog: it wakes the phone only when checks stop landing.
             WatchdogReceiver.schedule(this, ServiceHealth.watchdogDelayMs(state.expectedIntervalSec))
         }
     }
 
+    /** True when the check ended because this process interrupted it, not because it failed. */
+    private fun abortedByInterrupt(failure: Exception): Boolean =
+        checkInterrupted || Thread.currentThread().isInterrupted || failure is InterruptedException
+
     private fun performCheck(): Probe {
-        val revision = checkSchedule.revision
         var network = cm.activeNetwork
         if (network == null) {
             Thread.sleep(NETWORK_GRACE_MS)
@@ -514,7 +556,7 @@ class MonitorService : Service() {
         if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)) {
             return Probe(Status.NO_NETWORK, -1, Lang.t("Требуется вход в сеть Wi-Fi", "Wi-Fi sign-in required"), Lang.t("Сеть: $transport; captive portal", "Network: $transport; captive portal"))
         }
-        val token = extraCoordinator.begin(revision, selected.networkHandle)
+        val token = extraCoordinator.begin(checkRevision, selected.networkHandle)
         val probe = NetworkProbe(probeExecutor, extraProbeExecutor,
             { url -> selected.openConnection(url) as HttpURLConnection },
             { selected.socketFactory.createSocket() })
@@ -559,6 +601,7 @@ class MonitorService : Service() {
     }
 
     @Synchronized private fun handleResult(p: Probe) {
+        val aborted = resultAborted
         if (!acceptsRunningCheck(this)) return
         lastEndpoints = p.outcomes.toList()
         val now = System.currentTimeMillis()
@@ -604,7 +647,7 @@ class MonitorService : Service() {
             newState.latencyMs, newState.reason, newState.lastVibrationAt, newState.diagnostics, newState.expectedIntervalSec,
         )
 
-        History.record(
+        if (!aborted) History.record(
             this, now,
             when (p.status) {
                 Status.OK -> History.Kind.OK
@@ -616,25 +659,13 @@ class MonitorService : Service() {
             p.latencyMs, newState.expectedIntervalSec,
         )
 
-        val recovery = if (p.status == Status.OK) History.recovery(this, now,
+        // A check without evidence must not clear a confirmed outage, ring as a recovery
+        // or reach the webhook; the notification itself still shows the unknown state.
+        val recovery = if (!aborted && p.status == Status.OK) History.recovery(this, now,
             partialAlert || Prefs.notifyFor(this, "PARTIAL")) else null
-        try {
-            if (p.status !in setOf(Status.TG_DOWN, Status.PARTIAL)) eventNotifications.clearOutage()
-            if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
-            if ((changed || sound) && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
-                eventNotifications.outage(p.reason, sound, alertsAllowed)
-            if ((changed || sound) && p.status == Status.PARTIAL && Prefs.notifyFor(this, "PARTIAL"))
-                eventNotifications.partial(p.reason, sound, alertsAllowed)
-            if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this, "TG_DOWN")) eventNotifications.clearOutage()
-            if (p.status == Status.PARTIAL && !Prefs.notifyFor(this, "PARTIAL")) eventNotifications.clearOutage()
-            if (recovery != null) {
-                if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
-                    Prefs.soundFor(this, "RECOVERY"), alertsAllowed)
-                if (Prefs.vibrateOnRecovery(this) && alertsAllowed) Vibe.recovery(this)
-            }
-        } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
+        if (!aborted) publishAlerts(p, changed, sound, alertsAllowed, recovery)
 
-        if (changed) {
+        if (changed && !aborted) {
             val downFor = recovery?.let { Lang.t(" (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})", " (observed outage ${recoveryDurationStr(it.durationMs)})") }.orEmpty()
             EventLog.add(
                 this,
@@ -650,7 +681,38 @@ class MonitorService : Service() {
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
-        WebhookNotifier.onPublished(this, newState.status)
+        if (!aborted) WebhookNotifier.onPublished(this, newState.status)
+    }
+
+    /** Alert delivery for a check that produced evidence; an aborted check never gets here. */
+    private fun publishAlerts(p: Probe, changed: Boolean, sound: Boolean, allowed: Boolean,
+        recovery: RecoveryEvent?) {
+        try {
+            if (p.status !in setOf(Status.TG_DOWN, Status.PARTIAL)) eventNotifications.clearOutage()
+            if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
+            publishUnreachable(p, changed, sound, allowed)
+            publishRecovery(recovery, allowed)
+        } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
+    }
+
+    /** Outage and partial alerts follow the per-event switches; a disabled event clears silently. */
+    private fun publishUnreachable(p: Probe, changed: Boolean, sound: Boolean, allowed: Boolean) {
+        val status = p.status
+        if (status == Status.TG_DOWN || status == Status.PARTIAL) {
+            if (!Prefs.notifyFor(this, status.name)) {
+                eventNotifications.clearOutage()
+            } else if (changed || sound) {
+                if (status == Status.TG_DOWN) eventNotifications.outage(p.reason, sound, allowed)
+                else eventNotifications.partial(p.reason, sound, allowed)
+            }
+        }
+    }
+
+    private fun publishRecovery(recovery: RecoveryEvent?, allowed: Boolean) {
+        if (recovery == null) return
+        if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
+            Prefs.soundFor(this, "RECOVERY"), allowed)
+        if (Prefs.vibrateOnRecovery(this) && allowed) Vibe.recovery(this)
     }
 
     private fun broadcastState() {

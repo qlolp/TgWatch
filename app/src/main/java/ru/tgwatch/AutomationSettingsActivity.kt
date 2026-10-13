@@ -29,6 +29,7 @@ class AutomationSettingsActivity : Activity() {
     companion object {
         const val ID_ENABLE = 0x00a71001
         const val ID_COPY = 0x00a71002
+        const val ID_REVEAL = 0x00a71004
         const val ID_TOKEN = 0x00a71003
         const val ID_WEBHOOK_ENABLE = 0x00a71004
         const val ID_WEBHOOK_URL = 0x00a71005
@@ -56,6 +57,8 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var tokenView: TextView
     private lateinit var copy: Button
+    private lateinit var reveal: Button
+    private var tokenRevealed = false
     private lateinit var regenerate: Button
     private lateinit var webhookToggle: Switch
     private lateinit var webhookUrlView: TextView
@@ -107,6 +110,13 @@ class AutomationSettingsActivity : Activity() {
             setPadding(0, dp(TOKEN_PADDING_DP), 0, dp(TOKEN_PADDING_DP))
             textSize = BODY_TEXT_SP
             column.addView(this)
+        }
+        reveal = button(column, R.string.automation_token_show).apply {
+            id = ID_REVEAL
+            setOnClickListener {
+                tokenRevealed = !tokenRevealed
+                refresh()
+            }
         }
         copy = button(column, R.string.automation_copy).apply { id = ID_COPY }
         regenerate = button(column, R.string.automation_regenerate)
@@ -188,10 +198,15 @@ class AutomationSettingsActivity : Activity() {
 
     private fun refresh() {
         val token = AutomationSettings.token(this)
+        // Screen readers and window-content services read the view tree: keep the secret out of it.
+        if (token == null) tokenRevealed = false
+        val visible = if (tokenRevealed) token else token?.let { getString(R.string.automation_token_hidden) }
         refreshing = true
         toggle.isChecked = token != null
         refreshing = false
-        tokenView.text = token ?: getString(R.string.automation_disabled)
+        tokenView.text = visible ?: getString(R.string.automation_disabled)
+        reveal.isEnabled = token != null
+        reveal.setText(if (tokenRevealed) R.string.automation_token_hide else R.string.automation_token_show)
         copy.isEnabled = token != null
         regenerate.isEnabled = token != null
         val webhook = WebhookSettings.url(this)

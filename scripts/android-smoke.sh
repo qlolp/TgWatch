@@ -50,6 +50,11 @@ adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)
 git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
+# That commit predates the pinned checksum, so pin the same distribution it downloads.
+if grep -q "gradle-8.10.2-bin.zip" "$legacy_dir/gradle/wrapper/gradle-wrapper.properties" &&
+   ! grep -q "distributionSha256Sum" "$legacy_dir/gradle/wrapper/gradle-wrapper.properties"; then
+  printf "\ndistributionSha256Sum=31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26\n" >> "$legacy_dir/gradle/wrapper/gradle-wrapper.properties"
+fi
 (cd "$legacy_dir" && bash ./gradlew assembleDebug --no-daemon)
 if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
 adb install -g "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
