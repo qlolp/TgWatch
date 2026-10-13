@@ -87,6 +87,7 @@ class MonitorService : Service() {
         private const val VIBRATION_GAP_MS = AlertRules.GAP_MS
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
+        private const val INTERRUPTED_RETRY_MS = 10_000L
 
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
         private const val ALARM_MIN_DELAY_MS = 5_000L
@@ -95,6 +96,7 @@ class MonitorService : Service() {
         private val COLOR_FAIL = Color.rgb(0xE5, 0x39, 0x35)
         private val COLOR_OFFLINE = Color.rgb(0xF5, 0x7C, 0x00)
         private val COLOR_STALE = Color.rgb(0x8A, 0x96, 0xA3)
+        private val EMPTY_NOTIFICATION_STATS = TimeStats(0, 0, 0, 0, 0, 0, 0, -1)
 
         @Volatile
         var running = false
@@ -113,20 +115,23 @@ class MonitorService : Service() {
             activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
 
         /** Queue against this service instance only; never create or resurrect a service. */
-        fun requestRunningCheck(ctx: Context): Boolean {
+        fun requestRunningCheck(ctx: Context, admission: () -> Boolean = { true }): Boolean {
             val service = activeService ?: return false
             return synchronized(service) {
                 if (service.acceptsRunningCheck(ctx)) {
+                    var admitted = false
+                    // The queued task cannot acquire this lock until durable admission completes.
                     val queued = service.worker.post {
                         synchronized(service) {
-                            if (service.acceptsRunningCheck(ctx)) {
+                            if (admitted && service.acceptsRunningCheck(ctx)) {
                                 service.offlineBackoff.reset()
                                 service.scheduleCheck(0L)
                             }
                         }
                     }
-                    if (queued) service.scheduleDiagnostics.manual(service.checkStartedMono > 0L)
-                    queued
+                    if (queued) admitted = admission()
+                    if (admitted) service.scheduleDiagnostics.manual(service.checkStartedMono > 0L)
+                    admitted
                 } else false
             }
         }
@@ -198,6 +203,12 @@ class MonitorService : Service() {
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
     private val notificationStats = DailyStatsCache()
+    private val statisticsRunnable = Runnable {
+        if (!destroyed) {
+            refreshNotificationStats()
+            postNotification(state)
+        }
+    }
 
     private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
         !destroyed && !stopping && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
@@ -220,6 +231,7 @@ class MonitorService : Service() {
             if (destroyed) return
             postNotification(state)
             StatusWidget.updateAll(this@MonitorService)
+            scheduleStatisticsRefresh()
             ensureProgress()
             healthHandler.postDelayed(this, 15_000L)
         }
@@ -469,34 +481,45 @@ class MonitorService : Service() {
         extraCoordinator.invalidate()
         checkStartedMono = SystemClock.elapsedRealtime()
         val revision = checkSchedule.begin()
+        var retryDelayMs: Long? = null
         acquireWakeLockForCheck()
         try {
-            val result = performCheck()
+            val result = performCheck(revision)
+            if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
             if (!acceptsRunningCheck(this)) return
-            if (revision == checkSchedule.revision) {
-                handleResult(result)
-                startExtras(result)
-            }
-            else handleResult(Probe(Status.UNKNOWN, -1, Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), result.diagnostics, result.outcomes))
+            publishCheckedResult(result, revision)
+            lastProgressMono = SystemClock.elapsedRealtime()
+        } catch (_: InterruptedException) {
+            // No completed observation: retain the prior state/alerts and let freshness expire.
+            Thread.currentThread().interrupt()
+            retryDelayMs = INTERRUPTED_RETRY_MS
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (e: Exception) {
-            if (acceptsRunningCheck(this)) handleResult(Probe(Status.UNKNOWN, -1,
-                Lang.t("Проверка не завершена: ${describeProbeError(e)}",
-                    "Check did not finish: ${describeProbeError(e)}")))
+            if (Thread.currentThread().isInterrupted) retryDelayMs = INTERRUPTED_RETRY_MS
+            else if (acceptsRunningCheck(this)) {
+                try {
+                    publishCheckedResult(Probe(Status.UNKNOWN, -1,
+                        Lang.t("Проверка не завершена: ${describeProbeError(e)}",
+                            "Check did not finish: ${describeProbeError(e)}")), revision)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    retryDelayMs = INTERRUPTED_RETRY_MS
+                }
+            }
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
             checkStartedMono = 0L
             releaseWakeLock()
         }
         if (acceptsRunningCheck(this)) {
-            checkSchedule.afterCheck(revision, state.expectedIntervalSec * 1000L)
+            checkSchedule.afterCheck(revision, retryDelayMs ?: state.expectedIntervalSec * 1000L)
             // Re-arming replaces the pending watchdog: it wakes the phone only when checks stop landing.
             WatchdogReceiver.schedule(this, ServiceHealth.watchdogDelayMs(state.expectedIntervalSec))
         }
     }
 
-    private fun performCheck(): Probe {
-        val revision = checkSchedule.revision
+    @Suppress("ReturnCount") // Early returns distinguish absent, switching, captive and changed Android networks.
+    private fun performCheck(revision: Long): Probe {
         var network = cm.activeNetwork
         if (network == null) {
             Thread.sleep(NETWORK_GRACE_MS)
@@ -530,6 +553,18 @@ class MonitorService : Service() {
             Lang.t("Сеть изменилась во время проверки", "Network changed during the check"), details, report.results)
         return Probe(Status.valueOf(report.status), report.latencyMs, report.reason, details, report.results,
             ExtraCheck(token, probe, Prefs.extraProbeEndpoints(this)))
+    }
+
+    /** Network callbacks and primary publication share this lock, including revision validation. */
+    @Synchronized private fun publishCheckedResult(result: Probe, revision: Long) {
+        if (!acceptsRunningCheck(this)) return
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
+        if (revision == checkSchedule.revision) {
+            handleResult(result)
+            startExtras(result)
+        } else handleResult(Probe(Status.UNKNOWN, -1,
+            Lang.t("Сеть изменилась во время проверки", "Network changed during the check"),
+            result.diagnostics, result.outcomes))
     }
 
     private fun outcomeLine(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +
@@ -647,6 +682,7 @@ class MonitorService : Service() {
                 }
             )
         }
+        refreshNotificationStats(now)
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
@@ -700,11 +736,27 @@ class MonitorService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
+            scheduleStatisticsRefresh()
             true
         } catch (e: Exception) {
             Log.e(TAG, "startForeground failed", e)
             false
         }
+    }
+
+    private fun scheduleStatisticsRefresh() {
+        if (destroyed || !notificationStats.needsRefresh(History.version, System.currentTimeMillis())) return
+        worker.removeCallbacks(statisticsRunnable)
+        worker.post(statisticsRunnable)
+    }
+
+    private fun refreshNotificationStats(now: Long = System.currentTimeMillis()) {
+        val revision = History.version
+        notificationStats.get(revision, now) { History.stats(this, now = now) }
+        // Loading/migration/retention can advance History.version inside the first read.
+        val refreshedRevision = History.version
+        if (refreshedRevision != revision)
+            notificationStats.get(refreshedRevision, now) { History.stats(this, now = now) }
     }
 
     private fun postNotification(s: State) {
@@ -730,7 +782,7 @@ class MonitorService : Service() {
 
         val now = System.currentTimeMillis()
         val stale = s.isStale(now)
-        val dailyStats = notificationStats.get(History.version, now) { History.stats(this, now = now) }
+        val dailyStats = currentNotificationStats()
         val uptime = dailyStats.uptimePercent
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
 
@@ -798,6 +850,8 @@ class MonitorService : Service() {
         }
         return builder.build()
     }
+
+    private fun currentNotificationStats(): TimeStats = notificationStats.peek() ?: EMPTY_NOTIFICATION_STATS
 
     private fun applyNotificationProgress(builder: Notification.Builder, stats: TimeStats) {
         NotificationProgress.percent(stats)?.let {

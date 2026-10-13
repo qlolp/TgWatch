@@ -78,14 +78,14 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         manager.notify(PARTIAL_ID,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
     }
-    fun summary(title: String, text: String): Boolean {
+    fun summary(title: String, text: String, canPost: () -> Boolean = { true }): Boolean {
         if (!manager.areNotificationsEnabled() || blocked(SUMMARY_CHANNEL)) {
             manager.cancel(SUMMARY_ID)
             return false
         }
-        manager.notify(SUMMARY_ID, notification(title, text, true, R.drawable.ic_stat_ok,
-            SUMMARY_CHANNEL))
-        return true
+        val prepared = notification(title, text, true, R.drawable.ic_stat_ok, SUMMARY_CHANNEL)
+        // Notification/channel/PendingIntent preparation can block; recheck immediately before admission.
+        return if (canPost()) { manager.notify(SUMMARY_ID, prepared); true } else false
     }
     private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {

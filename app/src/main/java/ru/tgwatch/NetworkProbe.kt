@@ -87,6 +87,7 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         }
     }
     fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> {
+        checkCoordinator()
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         val queue = ExecutorCompletionService<ProbeOutcome>(pool)
         val handles = mutableListOf<Triple<Future<ProbeOutcome>, ProbeCancellation, Lease>>()
@@ -118,15 +119,21 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
                 val done = queue.poll(left, TimeUnit.NANOSECONDS) ?: return@repeat
                 results += done.get()
             }
-        } catch (_: InterruptedException) {
+        } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
+            throw e
         } finally {
             handles.forEach { (future, cancellation, lease) ->
                 future.cancel(true); lease.cancelBeforeStart(); cancellation.close()
             }
         }
+        checkCoordinator()
         return endpoints.map { ep -> results.firstOrNull { it.endpoint == ep.name }
             ?: ProbeOutcome(ep.name, ep.group, false, -1, Lang.t("Общий срок ожидания истёк", "Overall time limit expired")) }
+    }
+
+    private fun checkCoordinator() {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
     }
 }
 

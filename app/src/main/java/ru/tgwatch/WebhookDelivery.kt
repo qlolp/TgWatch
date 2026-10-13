@@ -15,7 +15,9 @@ internal data class WebhookHealth(
     val lastAttemptElapsed: Long? = null,
     val lastSuccessElapsed: Long? = null,
     val outcome: WebhookOutcome = WebhookOutcome.IDLE,
-    val inFlight: Boolean = false
+    val inFlight: Boolean = false,
+    /** Physical cancellation is pending; configuration replacement cannot clear this condition. */
+    val transportBlocked: Boolean = false
 )
 
 internal enum class WebhookOutcome { IDLE, SENDING, SENT, FAILED, TIMED_OUT }

@@ -45,15 +45,18 @@ class AutomationReceiver : BroadcastReceiver() {
                         return
                     }
                     val elapsed = SystemClock.elapsedRealtime()
-                    if (!AutomationPolicy.checkAllowed(elapsed, AutomationSettings.lastCheckElapsed(context))) {
-                        reply(RESULT_RATE_LIMITED)
-                        return
-                    }
-                    // Write the throttle before handing off work; a disk failure fails closed.
-                    if (!AutomationSettings.recordCheck(context, elapsed) ||
-                        !MonitorService.requestRunningCheck(context)) {
-                        reply(RESULT_STOPPED)
-                        return
+                    when (AutomationCheckAdmission.request(elapsed, AutomationSettings.lastCheckElapsed(context),
+                        { admission -> MonitorService.requestRunningCheck(context, admission) },
+                        { AutomationSettings.recordCheck(context, elapsed) })) {
+                        AutomationCheckAdmission.Result.ACCEPTED -> Unit
+                        AutomationCheckAdmission.Result.RATE_LIMITED -> {
+                            reply(RESULT_RATE_LIMITED)
+                            return
+                        }
+                        AutomationCheckAdmission.Result.UNAVAILABLE -> {
+                            reply(RESULT_STOPPED)
+                            return
+                        }
                     }
                 }
                 reply(RESULT_OK, stateResult(context))

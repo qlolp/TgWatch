@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.text.InputFilter
 import android.text.InputType
+import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -60,6 +62,8 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             filters = arrayOf(InputFilter.LengthFilter(ExtraProbes.MAX_CUSTOM_URL_LENGTH))
             setSingleLine(true)
+            isSaveEnabled = false
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
         }
         val padding = (DIALOG_PADDING_DP * activity.resources.displayMetrics.density).toInt()
         val frame = LinearLayout(activity).apply {
@@ -67,7 +71,7 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
             addView(input, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
-        AlertDialog.Builder(activity).setTitle(R.string.extra_probe_custom)
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.extra_probe_custom)
             .setMessage(R.string.extra_probe_custom_url_message).setView(frame)
             .setNegativeButton(R.string.dialog_cancel, null)
             .setNeutralButton(R.string.dialog_remove) { _, _ ->
@@ -84,7 +88,10 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
                     Toast.makeText(activity, R.string.extra_probe_custom_url_invalid, Toast.LENGTH_LONG).show()
                 }
                 update()
-            }.show()
+            }.create()
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        dialog.setOnDismissListener { input.text.clear() }
+        dialog.show()
     }
 
     private companion object {

@@ -2,7 +2,7 @@
 
 `metadata/ru.tgwatch.yml` is a disabled candidate recipe for the existing
 `ru.tgwatch` application. It has not been submitted to F-Droid, accepted,
-or built by F-Droid. The `v1.15.0` source tag must exist on main before its
+or built by F-Droid. The `v1.16.0` source tag must exist on main before its
 build can be enabled. The project is MIT licensed and has no proprietary
 application SDK; repository inclusion and source/dependency review remain
 F-Droid's decisions.
@@ -11,8 +11,8 @@ F-Droid's decisions.
 
 The source pins Gradle 8.10.2, Android Gradle Plugin 8.7.3, Kotlin 2.0.21,
 JDK 17, compile/target SDK 35, and detekt 1.23.8. The checked-in
-`version.properties` is the version authority: 1.15.0 maps to Android code
-1015000 (`major * 1000000 + minor * 1000 + patch`). Minor/patch are 0..999.
+`version.properties` is the version authority: 1.16.0 maps to Android code
+1016000 (`major * 1000000 + minor * 1000 + patch`). Minor/patch are 0..999.
 CI run numbers do not affect APK versions. Release assembly needs no signing
 credentials; absent `TGWATCH_KEYSTORE_PATH` it produces an unsigned APK.
 
@@ -28,7 +28,7 @@ The F-Droid Gradle recipe selects the app's release variant. In a separate
 fdroiddata checkout, copy the candidate metadata, verify the tag and code,
 remove the build's `disable` field only after reviewing it, then run the
 installed fdroidserver's `fdroid readmeta`, `fdroid lint ru.tgwatch`, and
-`fdroid build --test ru.tgwatch:1015000`. These commands are preparation for
+`fdroid build --test ru.tgwatch:1016000`. These commands are preparation for
 review; a local Android build does not establish F-Droid compatibility.
 Automatic update discovery is deliberately disabled because the Gradle code
 is computed from a properties file; a reviewed recipe must teach the update

@@ -61,9 +61,9 @@ class WebhookDeliveryBehaviorTest {
         val f = Fixture()
         f.coordinator.sendTest { f.results.add(it) }
         f.changeConfiguration()
-        assertEquals(WebhookHealth(inFlight = true), f.coordinator.health())
+        assertEquals(WebhookHealth(inFlight = true, transportBlocked = true), f.coordinator.health())
         f.advanceToDeadline()
-        assertEquals(WebhookHealth(inFlight = true), f.coordinator.health())
+        assertEquals(WebhookHealth(inFlight = true, transportBlocked = true), f.coordinator.health())
         f.requests.single()(204)
         assertEquals(WebhookHealth(), f.coordinator.health())
         assertEquals(listOf(WebhookNotifier.TestResult.TIMED_OUT), f.results)

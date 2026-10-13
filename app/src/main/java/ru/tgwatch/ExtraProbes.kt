@@ -11,7 +11,7 @@ object ExtraProbes {
     /** Separate, shorter budget after the Telegram/control batches. */
     const val BATCH_TIMEOUT_MS = 5_000L
 
-    /** A public HTTPS address without credentials, query or fragment; null when invalid. */
+    /** An HTTPS address without credentials, query or fragment; null when invalid. */
     fun normalizeCustomUrl(raw: String?): String? =
         HttpsUrlPolicy.normalize(raw, MAX_CUSTOM_URL_LENGTH, allowQuery = false)
 

@@ -15,11 +15,14 @@ internal object WebhookHealthText {
         val attempt = age(health.lastAttemptElapsed, nowElapsed)
         val success = age(health.lastSuccessElapsed, nowElapsed)
         val flight = if (health.inFlight) Lang.t("да", "yes") else Lang.t("нет", "no")
+        val block = if (health.transportBlocked) "\n" + Lang.t(
+            "Доставка заблокирована: предыдущий запрос ещё не завершён",
+            "Delivery blocked: the previous request has not finished") else ""
         return Lang.t("Доставка webhook (в этом процессе)", "Webhook delivery (this process)") + "\n" +
             Lang.t("Последняя попытка: ", "Last attempt: ") + attempt + "\n" +
             Lang.t("Последний успех: ", "Last success: ") + success + "\n" +
             Lang.t("Результат: ", "Outcome: ") + outcome + "\n" +
-            Lang.t("Запрос ещё выполняется: ", "Request still running: ") + flight
+            Lang.t("Запрос ещё выполняется: ", "Request still running: ") + flight + block
     }
 
     private fun age(at: Long?, now: Long): String = if (at == null) Lang.t("нет", "none") else {
