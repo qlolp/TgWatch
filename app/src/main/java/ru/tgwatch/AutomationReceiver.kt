@@ -49,9 +49,13 @@ class AutomationReceiver : BroadcastReceiver() {
                         reply(RESULT_RATE_LIMITED)
                         return
                     }
-                    // Write the throttle before handing off work; a disk failure fails closed.
-                    if (!AutomationSettings.recordCheck(context, elapsed) ||
-                        !MonitorService.requestRunningCheck(context)) {
+                    // Spend the throttle only for a check that was accepted: a stopped or
+                    // pending service must not eat the next caller attempt.
+                    if (!MonitorService.requestRunningCheck(context)) {
+                        reply(RESULT_STOPPED)
+                        return
+                    }
+                    if (!AutomationSettings.recordCheck(context, elapsed)) {
                         reply(RESULT_STOPPED)
                         return
                     }

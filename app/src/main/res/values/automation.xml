@@ -5,6 +5,9 @@
     <string name="automation_description">Allow explicit CHECK_NOW and GET_STATE requests with a private access token. Checks only work while monitoring is running. Anyone holding the token can use this access; share it only with a trusted automation app.</string>
     <string name="automation_disabled">Automation is disabled. Enabling it creates a new access token.</string>
     <string name="automation_token">Access token</string>
+    <string name="automation_token_hidden">Access token is hidden. Tap Show to read it, or copy it directly.</string>
+    <string name="automation_token_show">Show token</string>
+    <string name="automation_token_hide">Hide token</string>
     <string name="automation_copy">Copy token</string>
     <string name="automation_regenerate">Regenerate token</string>
     <string name="automation_regenerate_title">Replace access token?</string>

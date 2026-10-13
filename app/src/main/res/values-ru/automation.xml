@@ -5,6 +5,9 @@
     <string name="automation_description">Разрешить явные запросы CHECK_NOW и GET_STATE с приватным токеном доступа. Проверки работают только при запущенном мониторинге. Любой обладатель токена получает этот доступ; передавайте его только доверенному приложению автоматизации.</string>
     <string name="automation_disabled">Автоматизация отключена. При включении будет создан новый токен доступа.</string>
     <string name="automation_token">Токен доступа</string>
+    <string name="automation_token_hidden">Токен скрыт. Нажмите «Показать», чтобы увидеть его, или скопируйте кнопкой ниже.</string>
+    <string name="automation_token_show">Показать токен</string>
+    <string name="automation_token_hide">Скрыть токен</string>
     <string name="automation_copy">Копировать токен</string>
     <string name="automation_regenerate">Пересоздать токен</string>
     <string name="automation_regenerate_title">Заменить токен доступа?</string>
