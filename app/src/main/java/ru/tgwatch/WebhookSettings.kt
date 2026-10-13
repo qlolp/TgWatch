@@ -37,17 +37,28 @@ object WebhookSettings {
     @Synchronized internal fun configuration(ctx: Context): WebhookConfiguration =
         WebhookConfiguration(url(ctx), enabled(ctx), generation)
 
+    /** Why a write did or did not happen, so the screen can name the real cause. */
+    enum class SaveResult { OK, INVALID_URL, LOCKED, DISK }
+
     /** Enabling requires a saved valid address. */
-    @Synchronized fun setEnabled(ctx: Context, value: Boolean): Boolean =
-        unlocked(ctx) && (!value || url(ctx) != null) &&
-            committed(store(ctx).edit().putBoolean(KEY_ENABLED, value))
+    @Synchronized fun enable(ctx: Context, value: Boolean): SaveResult = when {
+        !unlocked(ctx) -> SaveResult.LOCKED
+        value && url(ctx) == null -> SaveResult.INVALID_URL
+        committed(store(ctx).edit().putBoolean(KEY_ENABLED, value)) -> SaveResult.OK
+        else -> SaveResult.DISK
+    }
 
     /** Invalid input changes nothing. */
-    @Synchronized fun setUrl(ctx: Context, raw: String): Boolean {
+    @Synchronized fun save(ctx: Context, raw: String): SaveResult {
         val url = WebhookPolicy.normalizeUrl(raw)
-        return url != null && unlocked(ctx) &&
-            committed(store(ctx).edit().putString(KEY_URL, url))
+        return when {
+            url == null -> SaveResult.INVALID_URL
+            !unlocked(ctx) -> SaveResult.LOCKED
+            committed(store(ctx).edit().putString(KEY_URL, url)) -> SaveResult.OK
+            else -> SaveResult.DISK
+        }
     }
+
 
     /** Removes the address and turns the webhook off. */
     @Synchronized fun clear(ctx: Context): Boolean =

@@ -94,8 +94,8 @@
     <string name="extra_probe_custom">Также проверять свой HTTPS-адрес</string>
     <string name="extra_probe_custom_url_unset">Задать свой HTTPS-адрес</string>
     <string name="extra_probe_custom_url_set">Свой адрес: %1$s</string>
-    <string name="extra_probe_custom_url_message">Публичный адрес https:// до 256 символов, без логина, параметров запроса и #фрагмента. Он входит в зашифрованную резервную копию.</string>
-    <string name="extra_probe_custom_url_invalid">Введите публичный адрес https:// без логина, параметров запроса и #фрагмента.</string>
+    <string name="extra_probe_custom_url_message">Адрес https:// до 256 символов, без логина, параметров запроса и #фрагмента. Он может быть локальным и попадает в зашифрованную копию на устройстве и в экспортируемые копии.</string>
+    <string name="extra_probe_custom_url_invalid">Введите адрес https:// без логина, параметров запроса и #фрагмента.</string>
     <string name="dialog_save">Сохранить</string>
     <string name="dialog_remove">Удалить</string>
     <string name="dialog_cancel">Отмена</string>

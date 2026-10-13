@@ -58,15 +58,15 @@ class WebhookSettingsIntegrationTest {
     @Test fun addressIsOptInValidatedPrivateAndExcludedFromBackupAndDiagnostics() {
         assertFalse("Off by default", WebhookSettings.enabled(ctx))
         assertNull(WebhookSettings.activeUrl(ctx))
-        assertFalse("Cannot enable without an address", WebhookSettings.setEnabled(ctx, true))
-        assertFalse(WebhookSettings.setUrl(ctx, "http://ntfy.sh/topic"))
-        assertFalse(WebhookSettings.setUrl(ctx, "https://user:pw@ntfy.sh/topic"))
+        assertFalse("Cannot enable without an address", WebhookSettings.enable(ctx, true) == WebhookSettings.SaveResult.OK)
+        assertFalse(WebhookSettings.save(ctx, "http://ntfy.sh/topic") == WebhookSettings.SaveResult.OK)
+        assertFalse(WebhookSettings.save(ctx, "https://user:pw@ntfy.sh/topic") == WebhookSettings.SaveResult.OK)
         assertNull(WebhookSettings.url(ctx))
 
-        assertTrue(WebhookSettings.setUrl(ctx, " $secret "))
+        assertTrue(WebhookSettings.save(ctx, " $secret ") == WebhookSettings.SaveResult.OK)
         assertEquals(secret, WebhookSettings.url(ctx))
         assertNull("Saved but still off", WebhookSettings.activeUrl(ctx))
-        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        assertTrue(WebhookSettings.enable(ctx, true) == WebhookSettings.SaveResult.OK)
         assertEquals(secret, WebhookSettings.activeUrl(ctx))
         assertEquals("Device-protected callers still read credential storage",
             secret, WebhookSettings.activeUrl(ctx.createDeviceProtectedStorageContext()))
@@ -84,14 +84,14 @@ class WebhookSettingsIntegrationTest {
 
     @Test fun successfulSettingsWritesAdvanceTheGenerationButInvalidInputDoesNot() {
         val initial = WebhookSettings.configuration(ctx)
-        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        assertTrue(WebhookSettings.save(ctx, secret) == WebhookSettings.SaveResult.OK)
         val saved = WebhookSettings.configuration(ctx)
         assertTrue(saved.generation > initial.generation)
         assertEquals(secret, saved.url)
         assertFalse(saved.enabled)
-        assertFalse(WebhookSettings.setUrl(ctx, "http://example.org/invalid"))
+        assertFalse(WebhookSettings.save(ctx, "http://example.org/invalid") == WebhookSettings.SaveResult.OK)
         assertEquals(saved, WebhookSettings.configuration(ctx))
-        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        assertTrue(WebhookSettings.enable(ctx, true) == WebhookSettings.SaveResult.OK)
         val enabled = WebhookSettings.configuration(ctx)
         assertTrue(enabled.generation > saved.generation)
         assertTrue(enabled.enabled)
@@ -104,15 +104,15 @@ class WebhookSettingsIntegrationTest {
 
     @Test fun coordinatorRejectsACapturedAddressAfterARealStorageWriteWithoutALaterReset() {
         val replacement = "https://example.org/replacement"
-        assertTrue(WebhookSettings.setUrl(ctx, secret))
-        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        assertTrue(WebhookSettings.save(ctx, secret) == WebhookSettings.SaveResult.OK)
+        assertTrue(WebhookSettings.enable(ctx, true) == WebhookSettings.SaveResult.OK)
         var replaceAfterRead = true
         val posted = mutableListOf<String>()
         val coordinator = WebhookCoordinator(WebhookSettings, {
             WebhookSettings.configuration(ctx).also {
                 if (replaceAfterRead) {
                     replaceAfterRead = false
-                    assertTrue(WebhookSettings.setUrl(ctx, replacement))
+                    assertTrue(WebhookSettings.save(ctx, replacement) == WebhookSettings.SaveResult.OK)
                 }
             }
         }, { 0L }, { url, _, _ -> posted.add(url); true })
@@ -125,14 +125,14 @@ class WebhookSettingsIntegrationTest {
 
     @Test fun realSettingsChangesKeepTheOldPhysicalRequestCountedAndTheNewHistoryFresh() {
         val replacement = "https://example.org/replacement"
-        assertTrue(WebhookSettings.setUrl(ctx, secret))
-        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        assertTrue(WebhookSettings.save(ctx, secret) == WebhookSettings.SaveResult.OK)
+        assertTrue(WebhookSettings.enable(ctx, true) == WebhookSettings.SaveResult.OK)
         val posted = mutableListOf<String>()
         val completions = mutableListOf<(Int) -> Unit>()
         val coordinator = WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(ctx) }, { 0L },
             { url, _, finished -> posted.add(url); completions.add(finished); true })
         coordinator.onPublished("TG_DOWN")
-        assertTrue(WebhookSettings.setUrl(ctx, replacement))
+        assertTrue(WebhookSettings.save(ctx, replacement) == WebhookSettings.SaveResult.OK)
         coordinator.onPublished("TG_DOWN")
         assertEquals(listOf(secret), posted)
 

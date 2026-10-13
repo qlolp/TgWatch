@@ -18,12 +18,14 @@ class StatusWidget : AppWidgetProvider() {
         ids.forEach { manager.updateAppWidget(it, views) }
     }
 
+    @Suppress("TooGenericExceptionCaught") // A denied foreground start is not fatal here.
     override fun onEnabled(ctx: Context) {
         super.onEnabled(ctx)
         if (Prefs.isEnabled(ctx) && !MonitorService.running) {
             try {
                 MonitorService.start(ctx)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w("TgWatch", "widget start: " + e.javaClass.simpleName)
             }
         }
         WatchdogReceiver.schedule(ctx)
@@ -43,14 +45,17 @@ class StatusWidget : AppWidgetProvider() {
             }
         }
 
+        @Suppress("TooGenericExceptionCaught") // Best-effort start; failures are logged.
         internal fun handleClick(ctx: Context) {
             if (Prefs.isEnabled(ctx)) {
                 try {
                     MonitorService.send(ctx, MonitorService.ACTION_CHECK_NOW)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w("TgWatch", "widget check: " + e.javaClass.simpleName)
                     try {
                         MonitorService.start(ctx)
-                    } catch (_: Exception) {
+                    } catch (startFailure: Exception) {
+                        Log.w("TgWatch", "widget start: " + startFailure.javaClass.simpleName)
                         openApp(ctx)
                     }
                 }

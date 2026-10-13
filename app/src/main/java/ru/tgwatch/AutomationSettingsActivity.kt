@@ -36,7 +36,14 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_SET = 0x00a71006
         const val ID_WEBHOOK_TEST = 0x00a71007
         const val ID_WEBHOOK_HEALTH = 0x00a71008
-        private const val HEALTH_REFRESH_MS = 1_000L
+        private const val HEALTH_REFRESH_MS = 5_000L
+
+        /** A rejected address and a failed write need different advice. */
+        fun webhookMessage(result: WebhookSettings.SaveResult): Int = when (result) {
+            WebhookSettings.SaveResult.INVALID_URL -> R.string.webhook_url_invalid
+            WebhookSettings.SaveResult.LOCKED, WebhookSettings.SaveResult.DISK,
+            WebhookSettings.SaveResult.OK -> R.string.automation_storage_error
+        }
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
         private const val CLIP_LIFETIME_MS = 45_000L
@@ -68,8 +75,10 @@ class AutomationSettingsActivity : Activity() {
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
-            webhookHealth.text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
+            val text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
                 android.os.SystemClock.elapsedRealtime())
+            // Assigning an unchanged string would re-announce a focused node to screen readers.
+            if (text != webhookHealth.text.toString()) webhookHealth.text = text
             healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
         }
     }
@@ -160,9 +169,9 @@ class AutomationSettingsActivity : Activity() {
         }
         webhookToggle.setOnCheckedChangeListener { _, enabled ->
             if (!refreshing) {
-                if (!WebhookSettings.setEnabled(this, enabled)) {
-                    val message = if (enabled) R.string.webhook_url_required else R.string.automation_storage_error
-                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                val toggleResult = WebhookSettings.enable(this, enabled)
+                if (toggleResult != WebhookSettings.SaveResult.OK) {
+                    Toast.makeText(this, webhookMessage(toggleResult), Toast.LENGTH_SHORT).show()
                 }
                 refresh()
             }
@@ -245,8 +254,9 @@ class AutomationSettingsActivity : Activity() {
                 refresh()
             }
             .setPositiveButton(R.string.dialog_save) { _, _ ->
-                if (!WebhookSettings.setUrl(this, input.text.toString())) {
-                    Toast.makeText(this, R.string.webhook_url_invalid, Toast.LENGTH_LONG).show()
+                val saved = WebhookSettings.save(this, input.text.toString())
+                if (saved != WebhookSettings.SaveResult.OK) {
+                    Toast.makeText(this, webhookMessage(saved), Toast.LENGTH_LONG).show()
                 }
                 refresh()
             }.create()

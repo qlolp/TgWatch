@@ -3,6 +3,8 @@ package ru.tgwatch
 import android.app.Activity
 import android.app.AlertDialog
 import android.text.InputFilter
+import android.view.View
+import android.view.WindowManager
 import android.text.InputType
 import android.widget.Button
 import android.widget.EditText
@@ -54,8 +56,9 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
 
     private fun edit(enableAfterSave: Boolean) {
         val input = EditText(activity).apply {
-            setText(Prefs.extraCustomUrl(activity))
+            // Never prefilled: the path may be a secret and this window is not protected.
             setHint(R.string.extra_probe_custom_url_hint)
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             filters = arrayOf(InputFilter.LengthFilter(ExtraProbes.MAX_CUSTOM_URL_LENGTH))
@@ -67,7 +70,7 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
             addView(input, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
-        AlertDialog.Builder(activity).setTitle(R.string.extra_probe_custom)
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.extra_probe_custom)
             .setMessage(R.string.extra_probe_custom_url_message).setView(frame)
             .setNegativeButton(R.string.dialog_cancel, null)
             .setNeutralButton(R.string.dialog_remove) { _, _ ->
@@ -84,7 +87,10 @@ class ExtraProbesUi(private val activity: Activity, private val settingsChanged:
                     Toast.makeText(activity, R.string.extra_probe_custom_url_invalid, Toast.LENGTH_LONG).show()
                 }
                 update()
-            }.show()
+            }.create()
+        // The typed address must not appear in recents or a screenshot.
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        dialog.show()
     }
 
     private companion object {

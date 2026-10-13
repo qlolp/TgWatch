@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.os.UserManager
+import android.util.Log
 import android.widget.Toast
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -39,6 +40,7 @@ object LocalDiagnostics {
         return true
     }
 
+    @Suppress("TooGenericExceptionCaught") // SAF can fail in many ways; the class is logged.
     private fun write(activity: Activity, uri: Uri) {
         val ctx = activity.applicationContext
         Thread({
@@ -48,7 +50,11 @@ object LocalDiagnostics {
                 ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
                     ?: error("No output stream")
                 true
-            } catch (_: Exception) { false }
+            } catch (e: Exception) {
+                // The class alone separates a denied write from a broken snapshot.
+                Log.w("TgWatch", "diagnostic export: " + e.javaClass.simpleName)
+                false
+            }
             finally { writing.set(false) }
             activity.runOnUiThread {
                 if (!activity.isFinishing && !activity.isDestroyed) {

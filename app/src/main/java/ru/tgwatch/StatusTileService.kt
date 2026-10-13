@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.util.Log
 
 /**
  * Плитка в быстрых настройках шторки: показывает статус Telegram.
@@ -64,13 +65,15 @@ class StatusTileService : TileService() {
         super.onStopListening()
     }
 
+    @Suppress("TooGenericExceptionCaught") // A denied check must still open the app.
     override fun onClick() {
         super.onClick()
         if (MonitorService.running) {
             try {
                 MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
                 ui.postDelayed({ refresh() }, 400L)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w("TgWatch", "tile check: " + e.javaClass.simpleName)
                 openApp()
             }
         } else {

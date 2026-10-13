@@ -94,8 +94,8 @@
     <string name="extra_probe_custom">Also check my HTTPS address</string>
     <string name="extra_probe_custom_url_unset">Set my HTTPS address</string>
     <string name="extra_probe_custom_url_set">My address: %1$s</string>
-    <string name="extra_probe_custom_url_message">A public https:// address, up to 256 characters, without a login, query or #fragment. It is included in encrypted backups.</string>
-    <string name="extra_probe_custom_url_invalid">Enter a public https:// address without a login, query or #fragment.</string>
+    <string name="extra_probe_custom_url_message">An https:// address, up to 256 characters, without a login, query or #fragment. It may be a local address, and it is stored in encrypted backups on this device and in exported copies.</string>
+    <string name="extra_probe_custom_url_invalid">Enter an https:// address without a login, query or #fragment.</string>
     <string name="dialog_save">Save</string>
     <string name="dialog_remove">Remove</string>
     <string name="dialog_cancel">Cancel</string>

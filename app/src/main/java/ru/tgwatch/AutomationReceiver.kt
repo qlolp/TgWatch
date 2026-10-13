@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 
 /** Explicit requests only; no reply broadcasts or service-start path. */
 class AutomationReceiver : BroadcastReceiver() {
@@ -25,7 +26,7 @@ class AutomationReceiver : BroadcastReceiver() {
     }
 
     // Early security/lifecycle guards keep denied requests from reaching any operation.
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "TooGenericExceptionCaught") // Every refusal is a fixed result code.
     override fun onReceive(context: Context, intent: Intent) {
         if (isOrderedBroadcast) {
             setResultExtras(null)
@@ -57,8 +58,10 @@ class AutomationReceiver : BroadcastReceiver() {
                 }
                 reply(RESULT_OK, stateResult(context))
             }
-        } catch (_: Exception) {
-            // Malformed parcelables and inaccessible credential storage disclose no state.
+        } catch (e: Exception) {
+            // Malformed parcelables and inaccessible credential storage disclose no state,
+            // but the failure class must stay visible in the log.
+            Log.w("TgWatch", "automation request: " + e.javaClass.simpleName)
             reply(RESULT_INVALID)
         }
     }
