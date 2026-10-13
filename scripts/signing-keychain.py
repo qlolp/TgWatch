@@ -166,8 +166,17 @@ def main():
         secrets = {'TGWATCH_KEYSTORE_BASE64': base64.b64encode(store.read_bytes()),
             'TGWATCH_KEYSTORE_PASSWORD': password.encode(), 'TGWATCH_KEY_PASSWORD': password.encode(),
             'TGWATCH_KEY_ALIAS': b'tgwatch'}
-        for name, value in secrets.items():
-            subprocess.run(['gh', 'secret', 'set', name, '--repo', PRODUCTION_REPOSITORY], input=value, check=True)
+        uploaded = []
+        try:
+            for name, value in secrets.items():
+                subprocess.run(['gh', 'secret', 'set', name, '--repo', PRODUCTION_REPOSITORY], input=value, check=True)
+                uploaded.append(name)
+        except subprocess.CalledProcessError as error:
+            # Secrets cannot be read back, so a half-finished upload must be named explicitly.
+            done = ', '.join(uploaded) if uploaded else 'none'
+            raise RuntimeError(
+                f'Secrets desynchronized: uploaded {done} before the failure. '
+                'Re-run configure with the same keystore before publishing an update.') from error
         print(f'Signing secrets configured with existing certificate {fingerprint}.')
 
 

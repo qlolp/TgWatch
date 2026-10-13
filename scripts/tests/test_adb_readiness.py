@@ -31,6 +31,10 @@ mode=s['mode']
 if a==['root']:
     if mode=='denied': print('adbd cannot run as root in production builds',file=sys.stderr);sys.exit(1)
     if mode=='unknown': print('unexpected failure',file=sys.stderr);sys.exit(1)
+    if mode=='unauthorized_once' and n==1:
+        print('error: device unauthorized. This adb server version is not allowed',file=sys.stderr);sys.exit(1)
+    if mode=='wedged':
+        print('error: device offline',file=sys.stderr);sys.exit(1)
     if mode=='unknown_closed': print('filesystem resource is closed',file=sys.stderr);sys.exit(1)
     if mode=='hang': time.sleep(10)
     if mode=='device_not_found' and n==1:
@@ -38,6 +42,8 @@ if a==['root']:
     if mode=='closed' and n==1 or mode=='always_closed':
         print('adb: unable to connect for root: closed',file=sys.stderr);sys.exit(1)
     print('restarting adbd as root')
+elif a==['kill-server']:
+    print('* daemon not running; starting now at tcp:5037')
 elif a==['wait-for-device']:
     if mode=='always_closed': time.sleep(10)
 elif a==['shell','id','-u']:
@@ -91,6 +97,18 @@ class AdbReadinessTests(unittest.TestCase):
         result, calls, _ = self.run_fixture("late_boot")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertGreaterEqual(calls.count(["shell", "getprop", "sys.boot_completed"]), 2)
+
+    def test_transient_unauthorized_is_retried_until_ready(self):
+        result, calls, _ = self.run_fixture("unauthorized_once")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertGreaterEqual(calls.count(["root"]), 2)
+        self.assertNotIn(["kill-server"], calls)
+
+    def test_wedged_transport_restarts_the_server_once_and_then_fails(self):
+        result, calls, _ = self.run_fixture("wedged")
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual(1, calls.count(["kill-server"]), calls)
+        self.assertIn("did not complete within the deadline", result.stderr)
 
     def test_permanent_root_denial_fails_without_retry(self):
         result, calls, elapsed = self.run_fixture("denied")
