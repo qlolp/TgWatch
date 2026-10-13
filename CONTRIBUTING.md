@@ -13,6 +13,10 @@ target API 35; native UI, Direct Boot, настройки и seven-day history �
 
 ```bash
 python3 -m pip install --require-hashes -r scripts/requirements-release.lock
+
+После изменения Gradle-зависимостей дополните проверку хэшей:
+`bash ./gradlew --write-verification-metadata sha256 detekt testDebugUnitTest lintDebug assembleDebug assembleRelease assembleDebugAndroidTest dependencyInventory generateReleaseSbom`
+и закоммитьте `gradle/verification-metadata.xml`: сборки проверяют артефакты по нему.
 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/test_dependency_audit.py
 python3 scripts/test_signing_keychain.py

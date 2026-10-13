@@ -1,0 +1,155 @@
+--- a/.github/workflows/build-apk.yml
++++ b/.github/workflows/build-apk.yml
+@@ -12,6 +12,9 @@
+         default: false
+ permissions:
+   contents: read
++env:
++  # Single source for the SDK build tools used by signing and version checks.
++  BUILD_TOOLS: "35.0.0"
+ jobs:
+   build:
+     runs-on: ubuntu-latest
+@@ -22,8 +25,15 @@
+       cancel-in-progress: true
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++        with:
++          persist-credentials: false
+       - name: Validate Gradle wrapper
+         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
++      - name: Check the pinned build tools are present
++        run: |
++          set -euo pipefail
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
+       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+         with:
+           distribution: temurin
+@@ -37,7 +47,7 @@
+           python3 scripts/test_dependency_audit.py
+           python3 scripts/test_signing_keychain.py
+       - name: Unit tests, Android lint and APKs
+-        run: bash ./gradlew detekt testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
++        run: bash ./gradlew detekt testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace --dependency-verification=strict
+       - name: Audit all exact resolved runtime and test dependencies against OSV
+         run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
+       - name: Install pinned Trivy scanner
+@@ -109,6 +119,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
++          persist-credentials: false
++        with:
+           fetch-depth: 0
+       - name: Validate source tag, main ancestry and monotonic publication before signing
+         env:
+@@ -120,6 +132,11 @@
+             --sha "$(git rev-parse HEAD)" --ref "$GITHUB_REF" --preflight
+       - name: Validate Gradle wrapper
+         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
++      - name: Check the pinned build tools are present
++        run: |
++          set -euo pipefail
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
+       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+         with:
+           distribution: temurin
+@@ -161,7 +178,7 @@
+           umask 077
+           printf '%s' "$TGWATCH_KEYSTORE_BASE64" | base64 --decode > "$TGWATCH_KEYSTORE_PATH"
+           bash ./gradlew assembleRelease generateReleaseSbom --no-daemon
+-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
++          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
+           sha256sum TgWatch.apk > TgWatch.apk.sha256
+           echo "apk_sha256=$(cut -d' ' -f1 TgWatch.apk.sha256)" >> "$GITHUB_OUTPUT"
+@@ -181,7 +198,7 @@
+           import hashlib, pathlib
+           assert hashlib.sha256(pathlib.Path('previous/TgWatch.apk').read_bytes()).hexdigest() == 'efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1'
+           PY
+-          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
++          signer="$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner"
+           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
+           "$signer" verify --print-certs TgWatch.apk > release-signature.txt
+           diff <(grep 'Signer #1 certificate SHA-256 digest:' previous-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
+@@ -199,15 +216,20 @@
+         run: |
+           set -euo pipefail
+           python3 scripts/upgrade-baseline.py --repo "$GITHUB_REPOSITORY" \
+-            --out previous-latest --aapt2 "$ANDROID_HOME/build-tools/35.0.0/aapt2" \
++            --out previous-latest --aapt2 "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/aapt2" \
+             --github-output "$GITHUB_OUTPUT"
+       - name: Verify production signing identity of the latest predecessor
+         if: steps.latest_baseline.outputs.available == 'true'
+         run: |
+           set -euo pipefail
+-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs previous-latest/TgWatch.apk > latest-signature.txt
++          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --print-certs previous-latest/TgWatch.apk > latest-signature.txt
+           grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' latest-signature.txt
+           diff <(grep 'Signer #1 certificate SHA-256 digest:' latest-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
++      - name: Check the pinned build tools are present
++        run: |
++          set -euo pipefail
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
+       - name: Enable KVM for signed upgrade
+         run: |
+           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+@@ -254,9 +276,9 @@
+           test -n "$APK_SHA256"
+           echo "$APK_SHA256  TgWatch.apk" | sha256sum -c -
+           [ "$(cut -d' ' -f1 TgWatch.apk.sha256)" = "$APK_SHA256" ]
+-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs TgWatch.apk > publish-signature.txt
++          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/apksigner" verify --print-certs TgWatch.apk > publish-signature.txt
+           grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' publish-signature.txt
+-          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging TgWatch.apk > publish-badging.txt
++          "$ANDROID_HOME/build-tools/${{ env.BUILD_TOOLS }}/aapt2" dump badging TgWatch.apk > publish-badging.txt
+           python3 - <<'PY'
+           import pathlib, re
+           versions = [line.split('=', 1)[1] for line in pathlib.Path('version.properties').read_text().splitlines()
+@@ -271,6 +293,12 @@
+           for key, value in expected.items():
+               assert re.findall(rf"\b{key}='([^']*)'", packages[0]) == [value], f'APK {key} mismatch'
+           PY
++      - name: Refuse to publish from a modified or unexpected workspace
++        run: |
++          set -euo pipefail
++          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
++          git diff --exit-code -- scripts version.properties docs/review
++          test -z "$(git status --porcelain -- scripts version.properties)"
+       - name: Publish versioned release
+         env:
+           GH_TOKEN: ${{ github.token }}
+@@ -294,9 +322,16 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+         with:
++          persist-credentials: false
++        with:
+           fetch-depth: 0
+       - name: Validate Gradle wrapper
+         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
++      - name: Check the pinned build tools are present
++        run: |
++          set -euo pipefail
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
++          test -x "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
+       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+         with:
+           distribution: temurin
+@@ -325,3 +360,13 @@
+             app/build/reports/androidTests/
+             app/build/outputs/androidTest-results/connected/
+             smoke-logcat.txt
++
++      - name: Re-download and verify the published assets
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: |
++          set -euo pipefail
++          version=$(sed -n 's/^version=//p' version.properties)
++          mkdir -p published
++          gh release download "v$version" --repo "$GITHUB_REPOSITORY" --dir published
++          (cd published && sha256sum -c TgWatch.apk.sha256)
