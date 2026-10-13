@@ -1,0 +1,1 @@
+GET_STATE serves a one-second cache and builds fresh snapshots off the main thread. Polling no longer hammers prefs on every request; excessive recomputation returns the existing rate-limit result.

@@ -37,6 +37,18 @@ class AutomationPolicyTest {
         assertFalse(AutomationPolicy.checkAllowed(Long.MAX_VALUE, Long.MAX_VALUE - 1))
     }
 
+    @Test fun stateSnapshotsUseAShortCacheAndComputeGap() {
+        assertTrue(AutomationPolicy.stateCacheFresh(1_500, 1_000))
+        assertFalse(AutomationPolicy.stateCacheFresh(2_000, 1_000))
+        assertFalse(AutomationPolicy.stateCacheFresh(999, 1_000))
+        assertFalse(AutomationPolicy.stateCacheFresh(1_000, null))
+        assertTrue(AutomationPolicy.stateComputeAllowed(100, null))
+        assertFalse(AutomationPolicy.stateComputeAllowed(299, 100))
+        assertTrue(AutomationPolicy.stateComputeAllowed(300, 100))
+        assertFalse(AutomationPolicy.stateComputeAllowed(99, 100))
+        assertFalse(AutomationPolicy.stateComputeAllowed(-1, null))
+    }
+
     @Test fun stoppedAndUnobservedStatesAreStale() {
         assertTrue(AutomationPolicy.stale(false, 1000, 2000, 30))
         assertTrue(AutomationPolicy.stale(true, 0, 2000, 30))
