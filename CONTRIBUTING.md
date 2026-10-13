@@ -19,6 +19,12 @@ python3 scripts/test_signing_keychain.py
 bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease generateReleaseSbom dependencyInventory
 ```
 
+Проверки legacy Gradle Wrapper читают неизменяемый исторический коммит: клонируйте
+репозиторий с полной историей, либо выполните `git fetch --unshallow` для shallow clone.
+CI запускает ту же unittest-suite через `python3 scripts/report-python-tests.py`:
+код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
+а отсутствие обнаруженных тестов не считается успехом.
+
 `version.properties` задаёт SemVer `1.16.0`; код `1016000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
