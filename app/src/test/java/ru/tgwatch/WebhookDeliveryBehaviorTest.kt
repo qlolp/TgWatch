@@ -153,6 +153,34 @@ class WebhookDeliveryBehaviorTest {
         repeat(2) { assertFalse(transport.submit("https://example.org", "private", "test") { fail() }) }
     }
 
+    @Test fun stuckAttemptIsDroppedOnlyAfterTheGracePeriodAndThePostIsRetried() {
+        val f = Fixture()
+        f.coordinator.sendTest { f.results.add(it) }
+        f.advanceToDeadline()
+        assertTrue(f.coordinator.health().inFlight)
+        assertEquals(0, f.abandonCount)
+        repeat(50) { f.coordinator.onPublished("TG_DOWN") }
+        assertEquals("The slot stays held for the whole grace period", 1, f.requests.size)
+        f.advanceToGrace()
+        assertEquals(1, f.abandonCount)
+        assertFalse(f.coordinator.health().inFlight)
+        f.now += WebhookPolicy.TEST_GAP_MS
+        f.coordinator.sendTest { f.results.add(it) }
+        assertEquals("The interrupted post is offered again on a free slot", 2, f.requests.size)
+        assertTrue(f.coordinator.health().inFlight)
+    }
+
+    @Test fun lateCompletionCancelsThePendingAbandon() {
+        val f = Fixture()
+        f.coordinator.sendTest { f.results.add(it) }
+        f.advanceToDeadline()
+        f.requests.single()(204)
+        assertEquals("A completion before the grace must cancel the abandoned timer", 0, f.abandonCount)
+        assertEquals(0, f.timer.pending.size)
+        assertFalse(f.coordinator.health().inFlight)
+        assertEquals(WebhookOutcome.TIMED_OUT, f.coordinator.health().outcome)
+    }
+
     @Test fun slowDnsIgnoringInterruptKeepsSlotUntilOpenActuallyReturns() = blockedTransport(dns = true)
 
     @Test fun slowResponseIgnoringDisconnectKeepsSlotAndReportsOnlyTimeout() = blockedTransport(dns = false)
@@ -274,8 +302,12 @@ class WebhookDeliveryBehaviorTest {
             if (dns) awaitIgnoringInterrupt(entered, release)
             connection
         }, Executor { it.run() })
-        val f = Fixture { url, body, done -> transport.submit(url, body, "test") { done(it); finished.countDown() } }
+        var submits = 0
+        val f = Fixture { url, body, done ->
+            transport.submit(url, body, "test") { done(it); finished.countDown() }.also { if (it) submits++ }
+        }
         f.cancel = transport::cancel
+        f.abandon = transport::abandon
         try {
             f.coordinator.sendTest { f.results.add(it) }
             assertTrue(entered.await(2, TimeUnit.SECONDS))
@@ -283,11 +315,18 @@ class WebhookDeliveryBehaviorTest {
             assertEquals(listOf(WebhookNotifier.TestResult.TIMED_OUT), f.results)
             assertTrue(f.coordinator.health().inFlight)
             repeat(100) { f.changeConfiguration(); f.coordinator.onPublished("TG_DOWN") }
+            // Cancellation was asked for, but the worker still holds the physical slot.
             assertFalse(transport.submit("https://example.org/new", "body", "test") { fail() })
+            assertEquals(1, submits)
+            // After the grace period the slot is abandoned and delivery can resume.
+            f.advanceToGrace()
+            assertEquals(1, f.abandonCount)
+            assertFalse(f.coordinator.health().inFlight)
+            f.changeConfiguration()
+            f.coordinator.onPublished("TG_DOWN")
+            assertEquals("A dropped attempt must not block later delivery", 2, submits)
             release.countDown()
             assertTrue(finished.await(2, TimeUnit.SECONDS))
-            assertEquals(listOf(WebhookNotifier.TestResult.TIMED_OUT), f.results)
-            assertFalse(f.coordinator.health().inFlight)
             assertTrue(connection.disconnected)
         } finally {
             release.countDown()
@@ -316,17 +355,20 @@ class WebhookDeliveryBehaviorTest {
         var now = 0L
         var config = WebhookConfiguration("https://example.org/private-topic", true, 0)
         var cancelCount = 0
+        var abandonCount = 0
         var cancel: () -> Unit = {}
+        var abandon: () -> Unit = {}
         var accept = true
         val timer = FakeTimer()
         val results = mutableListOf<WebhookNotifier.TestResult>()
         val requests = mutableListOf<(Int) -> Unit>()
         val coordinator = WebhookCoordinator(Any(), { config }, { now }, { url, body, done ->
             submit?.invoke(url, body, done) ?: if (accept) { requests.add(done); true } else false
-        }, timer::schedule, { cancelCount++; cancel() })
+        }, timer::schedule, { cancelCount++; cancel() }, { abandonCount++; abandon() })
 
         fun changeConfiguration() { config = config.copy(generation = config.generation + 1); coordinator.reset() }
         fun advanceToDeadline() { now += WebhookPolicy.RESULT_DEADLINE_MS; timer.fire() }
+        fun advanceToGrace() { now += WebhookPolicy.ABANDON_GRACE_MS; timer.fire() }
     }
 
     private class FakeTimer {

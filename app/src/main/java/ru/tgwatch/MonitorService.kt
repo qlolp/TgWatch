@@ -202,6 +202,8 @@ class MonitorService : Service() {
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
     private val notificationStats = DailyStatsCache()
+    /** Only the worker writes this; the main thread just reads the last value. */
+    @Volatile private var notificationStatsValue: TimeStats? = null
 
     private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
         !destroyed && !stopping && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
@@ -316,6 +318,8 @@ class MonitorService : Service() {
         workerThread = HandlerThread("tg-check")
         workerThread.start()
         worker = Handler(workerThread.looper)
+        // The first notification is already on screen; fill in the percentage when it is ready.
+        worker.post { refreshDailyStats(republish = true) }
 
         running = true
         lastProgressMono = SystemClock.elapsedRealtime()
@@ -497,6 +501,8 @@ class MonitorService : Service() {
         acquireWakeLockForCheck()
         var aborted = false
         try {
+            // Aggregate before publishing so the notification carries the current percentage.
+            refreshDailyStats(republish = false)
             val result = performCheck()
             if (!acceptsRunningCheck(this)) return
             if (revision == checkSchedule.revision) {
@@ -537,6 +543,15 @@ class MonitorService : Service() {
     /** True when the check ended because this process interrupted it, not because it failed. */
     private fun abortedByInterrupt(failure: Exception): Boolean =
         checkInterrupted || Thread.currentThread().isInterrupted || failure is InterruptedException
+
+    /** History parsing and aggregation stay on the check worker; the UI only reads the result. */
+    private fun refreshDailyStats(republish: Boolean) {
+        val now = System.currentTimeMillis()
+        val value = notificationStats.get(History.version, now) { History.stats(this, now = now) }
+        val changed = value != notificationStatsValue
+        notificationStatsValue = value
+        if (republish && changed) healthHandler.post { postNotification(state) }
+    }
 
     private fun performCheck(): Probe {
         var network = cm.activeNetwork
@@ -792,8 +807,7 @@ class MonitorService : Service() {
 
         val now = System.currentTimeMillis()
         val stale = s.isStale(now)
-        val dailyStats = notificationStats.get(History.version, now) { History.stats(this, now = now) }
-        val uptime = dailyStats.uptimePercent
+        val uptime = notificationUptimePercent()
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
 
         val (title, text, channel, icon, color, colorized) = when {
@@ -854,14 +868,18 @@ class MonitorService : Service() {
                     Icon.createWithResource(this, R.drawable.ic_stat_pause), Lang.t("Остановить", "Stop"), stop
                 ).build()
             )
-        applyNotificationProgress(builder, dailyStats)
+        applyNotificationProgress(builder)
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }
         return builder.build()
     }
 
-    private fun applyNotificationProgress(builder: Notification.Builder, stats: TimeStats) {
+    /** Reading the last aggregated value keeps history parsing and I/O off the main thread. */
+    private fun notificationUptimePercent(): Double = notificationStatsValue?.uptimePercent ?: -1.0
+
+    private fun applyNotificationProgress(builder: Notification.Builder) {
+        val stats = notificationStatsValue ?: return
         NotificationProgress.percent(stats)?.let {
             builder.setProgress(NotificationProgress.MAX_PERCENT, it, false)
         }

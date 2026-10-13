@@ -58,6 +58,17 @@ internal class WebhookTransport(
         }
     }
 
+    /**
+     * Give up on a transport that ignored cancellation: the next submit opens a fresh call.
+     * The stranded worker keeps running, but its late completion can no longer free or
+     * occupy a slot owned by a newer call.
+     */
+    @Synchronized fun abandon(): Boolean {
+        if (active == null) return false
+        active = null
+        return true
+    }
+
     @Synchronized fun cancel() {
         val call = active ?: return
         if (call.cancelled) return

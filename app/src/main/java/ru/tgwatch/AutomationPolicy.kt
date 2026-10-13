@@ -9,6 +9,8 @@ object AutomationPolicy {
     const val ACTION_GET_STATE = "ru.tgwatch.automation.GET_STATE"
     const val TOKEN_LENGTH = 64
     const val CHECK_GAP_MS = 10_000L
+    /** A holder of the token cannot drive repeated reads of private state through this API. */
+    const val STATE_GAP_MS = 1_000L
 
     fun validAction(action: String?): Boolean =
         action == ACTION_CHECK_NOW || action == ACTION_GET_STATE
@@ -26,6 +28,10 @@ object AutomationPolicy {
     fun checkAllowed(elapsed: Long, lastElapsed: Long?): Boolean = elapsed >= 0L &&
         (lastElapsed == null ||
             (lastElapsed >= 0L && elapsed >= lastElapsed && elapsed - lastElapsed >= CHECK_GAP_MS))
+
+    fun stateAllowed(elapsed: Long, lastElapsed: Long?, minGapMs: Long = STATE_GAP_MS): Boolean =
+        elapsed >= 0L && (lastElapsed == null ||
+            (lastElapsed >= 0L && elapsed >= lastElapsed && elapsed - lastElapsed >= minGapMs))
 
     fun stale(running: Boolean, checkedAt: Long, now: Long, expectedIntervalSec: Int): Boolean =
         !running || ProbeRules.isStale(checkedAt, now, expectedIntervalSec)

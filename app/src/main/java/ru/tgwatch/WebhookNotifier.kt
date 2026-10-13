@@ -54,7 +54,7 @@ object WebhookNotifier {
             WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(app) },
                 SystemClock::elapsedRealtime,
                 { url, body, finished -> transport.submit(url, body, userAgent(app), finished) },
-                cancelTransport = transport::cancel)
+                cancelTransport = transport::cancel, abandonTransport = transport::abandon)
         }.also { coordinator = it }
     }
 
@@ -66,13 +66,16 @@ object WebhookNotifier {
 }
 
 /** Android-independent orchestration; the settings monitor protects admission, result and physical identity. */
+@Suppress("LongParameterList", "TooManyFunctions") // One state machine, explicitly wired
+// at its single composition point; splitting it would spread the monitor protocol.
 internal class WebhookCoordinator(
     private val configurationLock: Any,
     private val configuration: () -> WebhookConfiguration,
     private val nowElapsed: () -> Long,
     private val submit: (String, String, (Int) -> Unit) -> Boolean,
     private val schedule: (Long, () -> Unit) -> (() -> Unit) = WebhookDeadlines::schedule,
-    private val cancelTransport: () -> Unit = {}
+    private val cancelTransport: () -> Unit = {},
+    private val abandonTransport: () -> Unit = {}
 ) {
     private val gate = WebhookGate()
     private var configured: WebhookConfiguration? = null
@@ -84,6 +87,7 @@ internal class WebhookCoordinator(
         val done: ((WebhookNotifier.TestResult) -> Unit)?) {
         var result: WebhookNotifier.TestResult? = null
         var cancelDeadline: (() -> Unit)? = null
+        var cancelAbandon: (() -> Unit)? = null
         private var cancellationRequested = false
 
         @Suppress("TooGenericExceptionCaught")
@@ -166,8 +170,25 @@ internal class WebhookCoordinator(
             } else {
                 synchronizeConfiguration(configuration())
                 report(attempt, WebhookNotifier.TestResult.TIMED_OUT)
-                if (active === attempt) attempt.cancel(cancelTransport)
+                if (active === attempt) {
+                    attempt.cancel(cancelTransport)
+                    // A stuck transport must not own the slot forever: drop it after the grace.
+                    try {
+                        attempt.cancelAbandon = schedule(WebhookPolicy.ABANDON_GRACE_MS) { abandon(attempt) }
+                    } catch (_: RuntimeException) {
+                        abandon(attempt)
+                    }
+                }
             }
+        }
+    }
+
+    private fun abandon(attempt: Attempt) = synchronized(configurationLock) {
+        if (active === attempt) {
+            attempt.cancelAbandon = null
+            gate.finished(attempt.request, false)
+            active = null
+            abandonTransport()
         }
     }
 
@@ -183,6 +204,8 @@ internal class WebhookCoordinator(
             // Publish only once; a late success must never rewrite timeout or suppress a retry.
             if (attempt.result == null) report(attempt, result)
             if (active === attempt) {
+                attempt.cancelAbandon?.invoke()
+                attempt.cancelAbandon = null
                 gate.finished(attempt.request, attempt.result == WebhookNotifier.TestResult.SENT)
                 active = null
             }

@@ -10,6 +10,8 @@ object WebhookPolicy {
     const val TIMEOUT_MS = 5_000
     /** Total monotonic budget for a result, including queued work and DNS. */
     const val RESULT_DEADLINE_MS = 10_000L
+    /** A transport that ignores cancellation owns the single slot at most this much longer. */
+    const val ABANDON_GRACE_MS = RESULT_DEADLINE_MS
     /** Minimum time between two posts of the same status; the first post of a status is immediate. */
     const val MIN_GAP_MS = 60_000L
     const val TEST_GAP_MS = 10_000L

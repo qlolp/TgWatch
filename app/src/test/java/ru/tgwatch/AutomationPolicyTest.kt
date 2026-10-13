@@ -20,6 +20,18 @@ class AutomationPolicyTest {
         assertFalse(AutomationPolicy.authorized(true, token, "x".repeat(64)))
     }
 
+    @Test fun stateReadsAreRateLimitedButNeverBlockedByAnOlderClock() {
+        val gap = AutomationPolicy.STATE_GAP_MS
+        assertTrue(AutomationPolicy.stateAllowed(0L, null))
+        assertTrue(AutomationPolicy.stateAllowed(gap, 0L))
+        assertFalse(AutomationPolicy.stateAllowed(gap - 1, 0L))
+        assertFalse(AutomationPolicy.stateAllowed(-1L, null))
+        assertFalse(AutomationPolicy.stateAllowed(5L, Long.MIN_VALUE))
+        // A monotonic clock must not run backwards inside one process.
+        assertFalse(AutomationPolicy.stateAllowed(1L, 1_000L))
+        assertTrue(AutomationPolicy.stateAllowed(1_000L, 500L, minGapMs = 500L))
+    }
+
     @Test fun actionAllowlistIsExact() {
         assertTrue(AutomationPolicy.validAction(AutomationPolicy.ACTION_CHECK_NOW))
         assertTrue(AutomationPolicy.validAction(AutomationPolicy.ACTION_GET_STATE))

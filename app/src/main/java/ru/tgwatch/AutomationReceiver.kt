@@ -19,6 +19,9 @@ class AutomationReceiver : BroadcastReceiver() {
         const val RESULT_INVALID = 2
         const val RESULT_STOPPED = 3
         const val RESULT_RATE_LIMITED = 4
+
+        /** Process-scoped: the API answers outside callers, never its own schedule. */
+        @Volatile private var lastStateElapsed = Long.MIN_VALUE
     }
 
     // Early security/lifecycle guards keep denied requests from reaching any operation.
@@ -39,25 +42,17 @@ class AutomationReceiver : BroadcastReceiver() {
                     reply(RESULT_INVALID)
                     return
                 }
-                if (intent.action == ACTION_CHECK_NOW) {
-                    if (!Prefs.isEnabled(context) || !MonitorService.running || BackupManager.hasPending(context)) {
-                        reply(RESULT_STOPPED)
-                        return
-                    }
-                    val elapsed = SystemClock.elapsedRealtime()
-                    if (!AutomationPolicy.checkAllowed(elapsed, AutomationSettings.lastCheckElapsed(context))) {
+                when (intent.action) {
+                    ACTION_GET_STATE -> if (!stateReadAllowed()) {
                         reply(RESULT_RATE_LIMITED)
                         return
                     }
-                    // Spend the throttle only for a check that was accepted: a stopped or
-                    // pending service must not eat the next caller attempt.
-                    if (!MonitorService.requestRunningCheck(context)) {
-                        reply(RESULT_STOPPED)
-                        return
-                    }
-                    if (!AutomationSettings.recordCheck(context, elapsed)) {
-                        reply(RESULT_STOPPED)
-                        return
+                    ACTION_CHECK_NOW -> {
+                        val result = checkResult(context)
+                        if (result != RESULT_OK) {
+                            reply(result)
+                            return
+                        }
                     }
                 }
                 reply(RESULT_OK, stateResult(context))
@@ -66,6 +61,30 @@ class AutomationReceiver : BroadcastReceiver() {
             // Malformed parcelables and inaccessible credential storage disclose no state.
             reply(RESULT_INVALID)
         }
+    }
+
+    /** The check is queued only for a live monitor within its rate limit; anything else is refused. */
+    private fun checkResult(context: Context): Int {
+        val elapsed = SystemClock.elapsedRealtime()
+        val ready = Prefs.isEnabled(context) && MonitorService.running && !BackupManager.hasPending(context)
+        val allowed = AutomationPolicy.checkAllowed(elapsed, AutomationSettings.lastCheckElapsed(context))
+        return when {
+            !ready -> RESULT_STOPPED
+            !allowed -> RESULT_RATE_LIMITED
+            // Spend the throttle only for a check that was accepted: a failed queue or a failed
+            // write must not eat the next attempt.
+            !MonitorService.requestRunningCheck(context) -> RESULT_STOPPED
+            !AutomationSettings.recordCheck(context, elapsed) -> RESULT_STOPPED
+            else -> RESULT_OK
+        }
+    }
+
+    /** Reads touch private state; without a limit a holder could drive them in a loop. */
+    private fun stateReadAllowed(): Boolean {
+        val elapsed = SystemClock.elapsedRealtime()
+        if (!AutomationPolicy.stateAllowed(elapsed, lastStateElapsed)) return false
+        lastStateElapsed = elapsed
+        return true
     }
 
     private fun reply(code: Int, extras: Bundle? = null) {
