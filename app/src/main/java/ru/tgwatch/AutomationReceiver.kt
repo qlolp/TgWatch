@@ -94,6 +94,8 @@ class AutomationReceiver : BroadcastReceiver() {
     }
 
     private fun scheduleStateCompute(ctx: Context, elapsed: Long) {
+        // PendingResult must carry the ordered reply; BroadcastReceiver.setResult is not
+        // safe once onReceive returns and work continues on another thread.
         val pending = goAsync()
         try {
             stateIo.execute {
@@ -101,17 +103,17 @@ class AutomationReceiver : BroadcastReceiver() {
                     val nowElapsed = SystemClock.elapsedRealtime()
                     val snapshot = stateSnapshot(ctx)
                     AutomationStateCache.endCompute(nowElapsed, snapshot)
-                    reply(RESULT_OK, snapshot.toBundle())
+                    pending.setResult(RESULT_OK, null, snapshot.toBundle())
                 } catch (_: Exception) {
                     AutomationStateCache.endCompute(SystemClock.elapsedRealtime(), null)
-                    reply(RESULT_INVALID)
+                    pending.setResult(RESULT_INVALID, null, null)
                 } finally {
                     pending.finish()
                 }
             }
         } catch (_: RejectedExecutionException) {
             AutomationStateCache.endCompute(elapsed, null)
-            reply(RESULT_INVALID)
+            pending.setResult(RESULT_INVALID, null, null)
             pending.finish()
         }
     }
