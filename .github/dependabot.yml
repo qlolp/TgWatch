@@ -12,6 +12,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Minor toolchain updates arrive as one PR: AGP 8.13 alone needs a newer Gradle,
+    # so separate PRs for AGP, Kotlin and the wrapper cannot pass CI one by one.
+    groups:
+      toolchain:
+        patterns: ["com.android.application", "org.jetbrains.kotlin*", "gradle-wrapper"]
     # Major toolchain upgrades need one coordinated migration (Gradle, AGP, Kotlin,
     # build-tools and the release guards all move together); see docs/review.
     ignore:

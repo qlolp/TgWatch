@@ -51,7 +51,7 @@ adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-
 legacy_dir=$(mktemp -d)
 git archive fef8aef77da5a8b5d2363ef2167deab3a3d4d4d2 | tar -x -C "$legacy_dir"
 # Verify the immutable legacy Gradle distribution before it executes.
-# This URL uses the same reviewed Gradle 8.10.2 checksum as the current wrapper.
+# This URL uses the Gradle 8.10.2 checksum reviewed when it was the project wrapper (up to 1.17.1).
 python3 - "$legacy_dir/gradle/wrapper/gradle-wrapper.properties" <<'PY'
 from pathlib import Path
 import sys

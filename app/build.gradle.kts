@@ -2,6 +2,7 @@ import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -59,13 +60,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isReturnDefaultValues = true }
     lint {
         abortOnError = true
         // Existing native UI still has inline copy; new Android target is checked in source.
         disable += setOf("GradleDependency", "HardcodedText")
     }
+}
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 dependencies {
     testImplementation("junit:junit:4.13.2")
@@ -155,4 +158,11 @@ detekt {
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))
     baseline = rootProject.file("config/detekt/baseline.xml")
     source.setFrom(files("src/main/java"))
+}
+// detekt 1.23 runs its own embedded Kotlin compiler; keep the Kotlin Gradle plugin's
+// version alignment from pulling the project's newer Kotlin onto detekt's classpath.
+configurations.matching { it.name == "detekt" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+    }
 }
