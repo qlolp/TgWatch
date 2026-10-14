@@ -342,7 +342,7 @@ jobs:
               signed-upgrade/legacy/upgrade-after-prefs.xml|signed-upgrade/latest/upgrade-after-prefs.xml) ;;
               signed-upgrade/legacy/upgrade-after-history.csv|signed-upgrade/latest/upgrade-after-history.csv) ;;
               signed-upgrade/legacy/release-screen.png|signed-upgrade/latest/release-screen.png) ;;
-              *) echo 'Unexpected untracked publication input.' >&2; exit 1 ;;
+              *) printf 'Unexpected untracked publication input: %q\n' "$path" >&2; exit 1 ;;
             esac
           done < "$untracked_list"
       - name: Re-verify the signed APK before publication
@@ -452,7 +452,7 @@ jobs:
               signed-upgrade/legacy/upgrade-after-prefs.xml|signed-upgrade/latest/upgrade-after-prefs.xml) ;;
               signed-upgrade/legacy/upgrade-after-history.csv|signed-upgrade/latest/upgrade-after-history.csv) ;;
               signed-upgrade/legacy/release-screen.png|signed-upgrade/latest/release-screen.png) ;;
-              *) echo 'Unexpected untracked publication input.' >&2; exit 1 ;;
+              *) printf 'Unexpected untracked publication input: %q\n' "$path" >&2; exit 1 ;;
             esac
           done < "$untracked_list"
           version=$(sed -n 's/^version=//p' version.properties)
