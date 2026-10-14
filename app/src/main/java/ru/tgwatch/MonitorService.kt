@@ -203,6 +203,7 @@ class MonitorService : Service() {
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
     private val notificationStats = DailyStatsCache()
+    private val notificationGate = RedrawGate()
     private val statisticsRunnable = Runnable {
         if (!destroyed) {
             refreshNotificationStats()
@@ -229,8 +230,8 @@ class MonitorService : Service() {
     private val healthTick = object : Runnable {
         override fun run() {
             if (destroyed) return
-            postNotification(state)
-            StatusWidget.updateAll(this@MonitorService)
+            postNotification(state, periodic = true)
+            StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
             ensureProgress()
             healthHandler.postDelayed(this, 15_000L)
@@ -280,8 +281,12 @@ class MonitorService : Service() {
     }
 
     /** Unlocking after sleep should not show a result from the long screen-off interval. */
-    private val screenOnReceiver = object : BroadcastReceiver() {
+    private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                checkAlarm.screenOff(SystemClock.elapsedRealtime())
+                return
+            }
             if (checkStartedMono == 0L &&
                 ProbeRules.refreshOnScreenOn(state.checkedElapsed, SystemClock.elapsedRealtime())) {
                 scheduleCheck(0L)
@@ -316,8 +321,9 @@ class MonitorService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "registerDefaultNetworkCallback", e)
         }
-        // SCREEN_ON is a protected system broadcast, so no export flag is needed.
-        registerReceiver(screenOnReceiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+        // SCREEN_ON/OFF are protected system broadcasts, so no export flag is needed.
+        val screen = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
+        registerReceiver(screenReceiver, screen)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -384,7 +390,7 @@ class MonitorService : Service() {
             Log.w(TAG, "unregisterNetworkCallback", e)
         }
         try {
-            unregisterReceiver(screenOnReceiver)
+            unregisterReceiver(screenReceiver)
         } catch (e: Exception) {
             Log.w(TAG, "unregisterReceiver", e)
         }
@@ -449,12 +455,14 @@ class MonitorService : Service() {
 
     private fun alarmIntent(): PendingIntent = servicePending(3, ACTION_ALARM)
 
+    private val checkAlarm = CheckAlarm(::armAlarm, ::disarmAlarm, { pm.isInteractive })
+
     private fun scheduleAlarm(delayMs: Long) {
-        if (!Prefs.keepAwake(this)) {
-            cancelAlarm()
-            return
-        }
-        val at = SystemClock.elapsedRealtime() + delayMs
+        if (Prefs.keepAwake(this)) checkAlarm.schedule(SystemClock.elapsedRealtime(), delayMs)
+        else cancelAlarm()
+    }
+
+    private fun armAlarm(at: Long) {
         try {
             if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
                 am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, alarmIntent())
@@ -466,7 +474,9 @@ class MonitorService : Service() {
         }
     }
 
-    private fun cancelAlarm() {
+    private fun cancelAlarm() = checkAlarm.cancel()
+
+    private fun disarmAlarm() {
         try {
             am.cancel(alarmIntent())
         } catch (e: Exception) {
@@ -729,7 +739,9 @@ class MonitorService : Service() {
     }
 
     private fun goForeground(): Boolean {
-        val notification = buildNotification(state)
+        val view = notificationView(state)
+        val notification = buildNotification(view)
+        notificationGate.shouldDraw(view, SystemClock.elapsedRealtime())
         return try {
             if (Build.VERSION.SDK_INT >= 34) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -759,34 +771,29 @@ class MonitorService : Service() {
             notificationStats.get(refreshedRevision, now) { History.stats(this, now = now) }
     }
 
-    private fun postNotification(s: State) {
+    /** [periodic] — тик раз в 15 с: одинаковое содержимое повторно не отправляем в шторку. */
+    private fun postNotification(s: State, periodic: Boolean = false) {
         if (destroyed) return
+        val view = notificationView(s)
+        if (!notificationGate.shouldDraw(view, SystemClock.elapsedRealtime()) && periodic) return
         try {
-            nm.notify(NOTIFICATION_ID, buildNotification(s))
+            nm.notify(NOTIFICATION_ID, buildNotification(view))
         } catch (e: Exception) {
             Log.w(TAG, "notify", e)
         }
         if (destroyed) nm.cancel(NOTIFICATION_ID)
     }
 
-    private fun buildNotification(s: State): Notification {
-        val piFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        val openApp = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            piFlags
-        )
-        val checkNow = servicePending(1, ACTION_CHECK_NOW)
-        val stop = servicePending(2, ACTION_STOP)
+    private fun buildNotification(s: State): Notification = buildNotification(notificationView(s))
 
-        val now = System.currentTimeMillis()
+    /** Всё, что видно в постоянном уведомлении: по этому ключу тик решает, нужна ли перерисовка. */
+    private fun notificationView(s: State, now: Long = System.currentTimeMillis()): NotifView {
         val stale = s.isStale(now)
         val dailyStats = currentNotificationStats()
         val uptime = dailyStats.uptimePercent
         val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
 
-        val (title, text, channel, icon, color, colorized) = when {
+        val notif = when {
             s.status == Status.UNKNOWN -> Notif(
                 if (s.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю связь с Telegram…", "Checking the connection to Telegram…"),
                 s.reason.ifEmpty { CHECK_URL }, CHANNEL_OK,
@@ -817,19 +824,38 @@ class MonitorService : Service() {
                 CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true
             )
         }
+        return NotifView(
+            notif,
+            whenMs = if (s.bad && !stale) s.since else if (s.checkedAt > 0L) s.checkedAt else now,
+            chronometer = s.bad && !stale,
+            progress = NotificationProgress.percent(dailyStats),
+        )
+    }
 
-        val builder = Notification.Builder(this, channel)
-            .setSmallIcon(icon)
-            .setColor(color)
-            .setColorized(colorized)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText(text))
+    private fun buildNotification(view: NotifView): Notification {
+        val piFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val openApp = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            piFlags
+        )
+        val checkNow = servicePending(1, ACTION_CHECK_NOW)
+        val stop = servicePending(2, ACTION_STOP)
+        val n = view.notif
+
+        val builder = Notification.Builder(this, n.channel)
+            .setSmallIcon(n.icon)
+            .setColor(n.color)
+            .setColorized(n.colorized)
+            .setContentTitle(n.title)
+            .setContentText(n.text)
+            .setStyle(Notification.BigTextStyle().bigText(n.text))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
-            .setWhen(if (s.bad && !stale) s.since else if (s.checkedAt > 0L) s.checkedAt else System.currentTimeMillis())
-            .setUsesChronometer(s.bad && !stale)
+            .setWhen(view.whenMs)
+            .setUsesChronometer(view.chronometer)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(openApp)
@@ -844,7 +870,7 @@ class MonitorService : Service() {
                     Icon.createWithResource(this, R.drawable.ic_stat_pause), Lang.t("Остановить", "Stop"), stop
                 ).build()
             )
-        applyNotificationProgress(builder, dailyStats)
+        view.progress?.let { builder.setProgress(NotificationProgress.MAX_PERCENT, it, false) }
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }
@@ -852,12 +878,6 @@ class MonitorService : Service() {
     }
 
     private fun currentNotificationStats(): TimeStats = notificationStats.peek() ?: EMPTY_NOTIFICATION_STATS
-
-    private fun applyNotificationProgress(builder: Notification.Builder, stats: TimeStats) {
-        NotificationProgress.percent(stats)?.let {
-            builder.setProgress(NotificationProgress.MAX_PERCENT, it, false)
-        }
-    }
 
     private data class Notif(
         val title: String,
@@ -867,6 +887,8 @@ class MonitorService : Service() {
         val color: Int,
         val colorized: Boolean,
     )
+
+    private data class NotifView(val notif: Notif, val whenMs: Long, val chronometer: Boolean, val progress: Int?)
 
     // --------------------------------------------------------------- wake lock
 

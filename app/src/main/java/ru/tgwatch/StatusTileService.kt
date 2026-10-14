@@ -64,13 +64,15 @@ class StatusTileService : TileService() {
         super.onStopListening()
     }
 
+    @Suppress("TooGenericExceptionCaught") // Any refused command is recorded, then the app opens instead.
     override fun onClick() {
         super.onClick()
         if (MonitorService.running) {
             try {
                 MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
                 ui.postDelayed({ refresh() }, 400L)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                LaunchFailures.record(this, LaunchFailures.Source.TILE, e)
                 openApp()
             }
         } else {
