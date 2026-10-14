@@ -3,6 +3,8 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.process.ExecOperations
+import javax.inject.Inject
 
 plugins {
     id("com.android.application")
@@ -133,6 +135,10 @@ tasks.register("dependencyInventory") {
     }
 }
 
+// Project.exec is deprecated and removed in Gradle 9; tasks get ExecOperations injected instead.
+interface InjectedExec { @get:Inject val exec: ExecOperations }
+val injectedExec = objects.newInstance<InjectedExec>()
+
 // Hash the exact resolved JAR/AAR bytes and validate the CycloneDX runtime graph.
 tasks.register("generateReleaseSbom") {
     dependsOn("dependencyInventory")
@@ -144,7 +150,7 @@ tasks.register("generateReleaseSbom") {
     inputs.dir(rootProject.file("scripts/schemas"))
     outputs.file(sbom)
     doLast {
-        project.exec {
+        injectedExec.exec.exec {
             commandLine("python3", rootProject.file("scripts/generate-sbom.py"), inventory.get().asFile, sbom.get().asFile)
         }
     }

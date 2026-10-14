@@ -78,6 +78,6 @@ private object SummaryDeadlines {
         .apply { removeOnCancelPolicy = true }
     fun schedule(timeoutMs: Long, expired: () -> Unit): () -> Unit {
         val task = timer.schedule(expired, timeoutMs, TimeUnit.MILLISECONDS)
-        return { task.cancel(false); Unit }
+        return { task.cancel(false) }
     }
 }

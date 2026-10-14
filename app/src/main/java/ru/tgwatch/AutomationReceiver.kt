@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
@@ -28,7 +29,7 @@ class AutomationReceiver : BroadcastReceiver() {
     }
 
     // Early security/lifecycle guards keep denied requests from reaching any operation.
-    @Suppress("ReturnCount")
+    @Suppress("ReturnCount", "TooGenericExceptionCaught") // Catch is a best-effort boundary that logs the class only.
     override fun onReceive(context: Context, intent: Intent) {
         if (isOrderedBroadcast) {
             setResultExtras(null)
@@ -73,8 +74,9 @@ class AutomationReceiver : BroadcastReceiver() {
             } else {
                 reply(RESULT_OK)
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Malformed parcelables and inaccessible credential storage disclose no state.
+            Log.w("TgWatch", "automation request: ${e.javaClass.simpleName}")
             reply(RESULT_INVALID)
         }
     }

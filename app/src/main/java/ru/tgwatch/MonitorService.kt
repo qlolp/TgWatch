@@ -569,12 +569,11 @@ class MonitorService : Service() {
     @Synchronized private fun publishCheckedResult(result: Probe, revision: Long) {
         if (!acceptsRunningCheck(this)) return
         if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
-        if (revision == checkSchedule.revision) {
-            handleResult(result)
-            startExtras(result)
-        } else handleResult(Probe(Status.UNKNOWN, -1,
-            Lang.t("Сеть изменилась во время проверки", "Network changed during the check"),
-            result.diagnostics, result.outcomes))
+        // A result from a network that has since changed is no observation: keep the prior state,
+        // history and alerts. afterCheck() runs the replacement check one second later.
+        if (revision != checkSchedule.revision) return
+        handleResult(result)
+        startExtras(result)
     }
 
     private fun outcomeLine(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +

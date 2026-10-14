@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.os.UserManager
+import android.util.Log
 import android.widget.Toast
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -39,6 +40,7 @@ object LocalDiagnostics {
         return true
     }
 
+    @Suppress("TooGenericExceptionCaught") // Best-effort boundary; only the exception class is logged.
     private fun write(activity: Activity, uri: Uri) {
         val ctx = activity.applicationContext
         Thread({
@@ -48,8 +50,10 @@ object LocalDiagnostics {
                 ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
                     ?: error("No output stream")
                 true
-            } catch (_: Exception) { false }
-            finally { writing.set(false) }
+            } catch (e: Exception) {
+                // The class only: messages from providers can carry document paths.
+                Log.w("TgWatch", "diagnostics export: ${e.javaClass.simpleName}"); false
+            } finally { writing.set(false) }
             activity.runOnUiThread {
                 if (!activity.isFinishing && !activity.isDestroyed) {
                     Lang.update(activity)
@@ -68,7 +72,8 @@ object LocalDiagnostics {
         val current = MonitorService.state
         return DiagnosticSnapshot(
             appVersion = app.versionName.orEmpty(),
-            appVersionCode = if (Build.VERSION.SDK_INT >= 28) app.longVersionCode else app.versionCode.toLong(),
+            appVersionCode = if (Build.VERSION.SDK_INT >= 28) app.longVersionCode
+                else @Suppress("DEPRECATION") app.versionCode.toLong(),
             sdkInt = Build.VERSION.SDK_INT, running = MonitorService.running, status = current,
             stale = !MonitorService.running || current.checkedAt <= 0 ||
                 current.isStale(System.currentTimeMillis()),

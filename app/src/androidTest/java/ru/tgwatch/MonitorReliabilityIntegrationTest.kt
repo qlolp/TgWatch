@@ -218,15 +218,16 @@ class MonitorReliabilityIntegrationTest {
 
     @Test fun publicationRejectsARevisionThatChangedAfterTheProbes() {
         val service = service()
-        seedOutage()
+        val previous = seedOutage()
+        val history = History.snapshot(ctx)
         val schedule = CheckSchedule({}, {})
         field("checkSchedule").set(service, schedule)
         val revision = schedule.begin()
         schedule.networkChanged(800L)
         publish(service, MonitorService.Status.OK, revision)
-        assertEquals(MonitorService.Status.UNKNOWN, MonitorService.state.status)
-        assertEquals(Lang.t("Сеть изменилась во время проверки", "Network changed during the check"),
-            MonitorService.state.reason)
+        assertEquals(previous, MonitorService.state)
+        assertEquals(history, History.snapshot(ctx))
+        assertNotNull(awaitNotification(EventNotifications.OUTAGE_ID))
     }
 
     @Test fun quittingWorkerRejectsBeforeChargingManualAdmission() {

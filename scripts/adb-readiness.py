@@ -33,7 +33,10 @@ def ensure_ready(command, timeout, command_timeout, interval):
         re.compile(r"\b(?:adb|error): closed\b"),
     )
     device_not_found = re.compile(r"\bdevice\s+(?:'[^']+'|\"[^\"]+\"|[^\s:]+)\s+not found\b")
-    refused_errors = ("cannot run as root", "permission denied", "unauthorized")
+    refused_errors = ("cannot run as root", "permission denied")
+    # A freshly booted emulator can report "unauthorized" until adbd loads the host key.
+    unauthorized = re.compile(r"\bunauthorized\b")
+    seen = {"unauthorized": False}
 
     def call(arguments):
         remaining = deadline - time.monotonic()
@@ -48,7 +51,10 @@ def ensure_ready(command, timeout, command_timeout, interval):
             raise ReadinessError("ADB executable could not be started") from error
         message = (result.stdout + result.stderr).lower()
         if any(value in message for value in refused_errors):
-            raise ReadinessError("ADB refused root access or device authorization")
+            raise ReadinessError("ADB refused root access")
+        if result.returncode and unauthorized.search(message):
+            seen["unauthorized"] = True
+            return result
         if result.returncode and not (any(pattern.search(message) for pattern in reconnect_errors) or
                                       device_not_found.search(message)):
             raise ReadinessError(f"ADB command failed without a reconnect error (exit {result.returncode})")
@@ -67,6 +73,8 @@ def ensure_ready(command, timeout, command_timeout, interval):
         remaining = deadline - time.monotonic()
         if remaining > 0:
             time.sleep(min(interval, remaining))
+    if seen["unauthorized"]:
+        raise ReadinessError("ADB device stayed unauthorized until the deadline")
     raise ReadinessError("ADB root and boot readiness did not complete within the deadline")
 
 

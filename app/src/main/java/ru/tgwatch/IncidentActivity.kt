@@ -108,7 +108,7 @@ class IncidentActivity : Activity() {
             display.at / MINUTE_MS == System.currentTimeMillis() / MINUTE_MS
         if (fresh && !BackupManager.hasPending(this)) {
             adapter.clear()
-            adapter.addAll(display!!.cards)
+            adapter.addAll(display.cards)
             empty.setText(R.string.incidents_empty)
         } else {
             requested = null

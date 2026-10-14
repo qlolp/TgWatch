@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -30,8 +31,9 @@ object WebhookNotifier {
     fun onPublished(ctx: Context, status: MonitorService.Status) {
         try {
             coordinator(ctx).onPublished(status.name)
-        } catch (_: RuntimeException) {
-            // Optional delivery must never interrupt the monitor.
+        } catch (e: RuntimeException) {
+            // Optional delivery must never interrupt the monitor; log the class, never the address.
+            Log.w("TgWatch", "webhook publish: ${e.javaClass.simpleName}")
         }
     }
 
