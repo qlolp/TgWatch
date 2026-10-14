@@ -61,11 +61,11 @@ class DiagnosticSnapshotTest {
     @Test fun reportSectionsCannotContainRawHistoryLogPreferencesOrIdentifiers() {
         val json = JSONObject(snapshot().toJson())
         assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling"),
-            json.keySet())
-        assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keySet())
+            json.keyNames())
+        assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keyNames())
         assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent"),
-            json.getJSONObject("last_24_hours").keySet())
-        assertEquals(setOf("sdk_int"), json.getJSONObject("os").keySet())
+            json.getJSONObject("last_24_hours").keyNames())
+        assertEquals(setOf("sdk_int"), json.getJSONObject("os").keyNames())
         assertFalse(json.has("history"))
         assertFalse(json.has("log"))
         assertFalse(json.has("preferences"))
@@ -76,3 +76,6 @@ class DiagnosticSnapshotTest {
         assertFalse(json.has("doze_caused_delays"))
     }
 }
+
+// android.jar's org.json has no keySet(); since Kotlin 2.4 tests compile against it first.
+private fun JSONObject.keyNames(): Set<String> = keys().asSequence().toSet()
