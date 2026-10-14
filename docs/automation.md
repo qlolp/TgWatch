@@ -29,7 +29,7 @@ or starts a stopped service. GET_STATE only reads a current/persisted snapshot.
 | Action | Behavior |
 | --- | --- |
 | `ru.tgwatch.automation.CHECK_NOW` | Queue a manual check on the existing enabled monitor. At most one request per 10 seconds of monotonic elapsed time, including process recreation within one boot. Stop and restore guards are checked again on the worker. |
-| `ru.tgwatch.automation.GET_STATE` | Return the bounded current snapshot without starting a monitor or performing a network request. |
+| `ru.tgwatch.automation.GET_STATE` | Return the bounded current snapshot without starting a monitor or performing a network request. Fresh snapshots are built off the main thread; a one-second process-local cache serves polling clients without repeated prefs/journal reads. |
 
 Use an **ordered broadcast** to receive the result. No implicit reply or state
 broadcast is emitted by this API. An ordinary broadcast can request CHECK_NOW but
@@ -46,7 +46,7 @@ cancel a queued check. Poll GET_STATE later to observe freshness.
 | `1` | Unauthorized or automation disabled; no extras. |
 | `2` | Invalid action/component/input; no extras. |
 | `3` | Monitoring stopped/disabled, restore pending, or check handoff unavailable; no extras. |
-| `4` | CHECK_NOW rate limited; no extras. |
+| `4` | Rate limited: CHECK_NOW within its 10-second budget, or GET_STATE recomputation within the 200 ms compute gap without a fresh one-second cache; no extras. |
 
 Result data is null. Only success includes these result extras:
 

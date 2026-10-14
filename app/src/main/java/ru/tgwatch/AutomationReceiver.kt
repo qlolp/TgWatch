@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 
 /** Explicit requests only; no reply broadcasts or service-start path. */
 class AutomationReceiver : BroadcastReceiver() {
@@ -19,6 +21,10 @@ class AutomationReceiver : BroadcastReceiver() {
         const val RESULT_INVALID = 2
         const val RESULT_STOPPED = 3
         const val RESULT_RATE_LIMITED = 4
+
+        private val stateIo = Executors.newSingleThreadExecutor { task ->
+            Thread(task, "tg-automation-state").apply { isDaemon = true }
+        }
     }
 
     // Early security/lifecycle guards keep denied requests from reaching any operation.
@@ -30,6 +36,8 @@ class AutomationReceiver : BroadcastReceiver() {
             resultCode = RESULT_UNAUTHORIZED
         }
         try {
+            val app = context.applicationContext
+            var deliverSnapshot = intent.action == ACTION_GET_STATE
             synchronized(AutomationSettings) {
                 val supplied = intent.getStringExtra(EXTRA_TOKEN)
                 if (!AutomationPolicy.authorized(AutomationSettings.enabled(context),
@@ -48,7 +56,7 @@ class AutomationReceiver : BroadcastReceiver() {
                     when (AutomationCheckAdmission.request(elapsed, AutomationSettings.lastCheckElapsed(context),
                         { admission -> MonitorService.requestRunningCheck(context, admission) },
                         { AutomationSettings.recordCheck(context, elapsed) })) {
-                        AutomationCheckAdmission.Result.ACCEPTED -> Unit
+                        AutomationCheckAdmission.Result.ACCEPTED -> deliverSnapshot = isOrderedBroadcast
                         AutomationCheckAdmission.Result.RATE_LIMITED -> {
                             reply(RESULT_RATE_LIMITED)
                             return
@@ -59,11 +67,54 @@ class AutomationReceiver : BroadcastReceiver() {
                         }
                     }
                 }
-                reply(RESULT_OK, stateResult(context))
+            }
+            if (deliverSnapshot) {
+                deliverState(app)
+            } else {
+                reply(RESULT_OK)
             }
         } catch (_: Exception) {
             // Malformed parcelables and inaccessible credential storage disclose no state.
             reply(RESULT_INVALID)
+        }
+    }
+
+    private fun deliverState(ctx: Context) {
+        val elapsed = SystemClock.elapsedRealtime()
+        val cached = AutomationStateCache.take(elapsed)
+        when {
+            cached != null -> reply(RESULT_OK, cached.toBundle())
+            !isOrderedBroadcast -> reply(RESULT_OK)
+            !AutomationStateCache.beginCompute(elapsed) -> {
+                val raced = AutomationStateCache.take(elapsed)
+                if (raced != null) reply(RESULT_OK, raced.toBundle()) else reply(RESULT_RATE_LIMITED)
+            }
+            else -> scheduleStateCompute(ctx, elapsed)
+        }
+    }
+
+    private fun scheduleStateCompute(ctx: Context, elapsed: Long) {
+        // PendingResult must carry the ordered reply; BroadcastReceiver.setResult is not
+        // safe once onReceive returns and work continues on another thread.
+        val pending = goAsync()
+        try {
+            stateIo.execute {
+                try {
+                    val nowElapsed = SystemClock.elapsedRealtime()
+                    val snapshot = stateSnapshot(ctx)
+                    AutomationStateCache.endCompute(nowElapsed, snapshot)
+                    pending.setResult(RESULT_OK, null, snapshot.toBundle())
+                } catch (_: Exception) {
+                    AutomationStateCache.endCompute(SystemClock.elapsedRealtime(), null)
+                    pending.setResult(RESULT_INVALID, null, null)
+                } finally {
+                    pending.finish()
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            AutomationStateCache.endCompute(elapsed, null)
+            pending.setResult(RESULT_INVALID, null, null)
+            pending.finish()
         }
     }
 
@@ -72,7 +123,7 @@ class AutomationReceiver : BroadcastReceiver() {
         setResult(code, null, extras)
     }
 
-    private fun stateResult(ctx: Context): Bundle {
+    private fun stateSnapshot(ctx: Context): AutomationStateSnapshot {
         val running = MonitorService.running && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
         val state = if (running) MonitorService.state else Prefs.loadLastState(ctx) ?: MonitorService.State()
         val checkedAt = state.checkedAt.coerceAtLeast(0L)
@@ -82,12 +133,11 @@ class AutomationReceiver : BroadcastReceiver() {
         } else {
             AutomationPolicy.stale(running, checkedAt, now, state.expectedIntervalSec)
         }
-        return Bundle().apply {
-            putString("status", state.status.name)
-            putLong("checked_at_ms", checkedAt)
-            putBoolean("stale", stale)
-            putBoolean("running", running)
-            putInt("api_version", API_VERSION)
-        }
+        return AutomationStateSnapshot(
+            status = state.status.name,
+            checkedAtMs = checkedAt,
+            stale = stale,
+            running = running,
+        )
     }
 }

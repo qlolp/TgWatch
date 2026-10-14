@@ -33,10 +33,12 @@ class AutomationIntegrationTest {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         ctx.getSharedPreferences(AutomationSettings.FILE, Context.MODE_PRIVATE).edit().clear().commit()
+        AutomationStateCache.clear()
     }
     @After fun clean() {
         AutomationSettings.setEnabled(ctx, false)
         Prefs.setEnabled(ctx, previousEnabled)
+        AutomationStateCache.clear()
     }
 
     @Test fun credentialsAreOptInPrivateAndOutsidePortableBackup() {
@@ -116,6 +118,10 @@ class AutomationIntegrationTest {
         assertTrue(state.second!!.getBoolean("stale"))
         assertEquals(1, state.second!!.getInt("api_version"))
         assertFalse(MonitorService.running)
+        val cached = request(AutomationReceiver.ACTION_GET_STATE, token)
+        assertEquals("A second GET_STATE within the cache window must still succeed",
+            AutomationReceiver.RESULT_OK, cached.first)
+        assertEquals(state.second!!.getString("status"), cached.second!!.getString("status"))
     }
 
     @Test fun stoppingServiceAfterThePreliminaryGuardDoesNotConsumeTheCheckBudget() {

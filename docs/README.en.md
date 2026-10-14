@@ -98,10 +98,10 @@ process, without exposing or exporting the address or exception details.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.16.0` (Android code `1016000`), Android target API35.
-Interrupted probes preserve the previous observation and retry promptly. Notification
-statistics and daily summaries run in the background; tokens are masked and blocked
-webhook delivery is explicit. See [1.16.0](releases/1.16.0.md).
+The source version is `1.17.0` (Android code `1017000`), Android target API35.
+`GET_STATE` serves a one-second cache and builds fresh snapshots off the main thread.
+See [1.17.0](releases/1.17.0.md). 1.16.0 kept interrupted probes, background statistics,
+masked tokens and explicit blocked webhook delivery ([1.16.0](releases/1.16.0.md)).
 Published versions and signed APKs are recorded on
 [GitHub Releases](https://github.com/qlolp/TgWatch/releases/latest). The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
