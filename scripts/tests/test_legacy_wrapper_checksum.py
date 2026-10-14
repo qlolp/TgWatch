@@ -32,8 +32,11 @@ class LegacyWrapperChecksumTests(unittest.TestCase):
             return result, path.read_text()
 
     def test_verified_legacy_gradle_url_receives_source_backed_checksum(self):
-        current = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
-        self.assertIn("distributionSha256Sum=" + EXPECTED_SHA256, current)
+        # The pin was reviewed with the 8.10.2 wrapper that the historical commit still uses.
+        reviewed = subprocess.run(["git", "show", "0bc790abaed90dde3b5bfd6d1bf22b905db00c93:gradle/wrapper/gradle-wrapper.properties"],
+                                  cwd=ROOT, check=True, text=True, capture_output=True).stdout
+        self.assertIn("distributionSha256Sum=" + EXPECTED_SHA256, reviewed)
+        self.assertIn(EXPECTED_SHA256, self.block())
         result, properties = self.run_check(self.legacy_properties())
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(1, properties.count("distributionSha256Sum=" + EXPECTED_SHA256))
