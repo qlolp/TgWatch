@@ -107,7 +107,7 @@ class UnifiedSigningTests(unittest.TestCase):
         self.keychain = mock.Mock()
         self.keychain.load.return_value = "fixture-only-password"
 
-    def configure(self, expected=True, api_error=False, private=True):
+    def configure(self, expected=True, api_error=False, private=True, fail_secret=None):
         fingerprint = "AB74727A44F59684045E7DB4C820BE309F886433A18A3C06F3439417F3ACBEF1"
         args = ["signing", "configure", str(self.store.parent)]
         if expected: args += ["--expected-certificate", fingerprint]
@@ -116,6 +116,8 @@ class UnifiedSigningTests(unittest.TestCase):
             if command[0] == "gh" and command[1:3] == ["secret", "list"]:
                 if api_error: raise subprocess.CalledProcessError(1, command)
                 return subprocess.CompletedProcess(command, 0, stdout="TGWATCH_KEYSTORE_BASE64\n")
+            if command[:3] == ["gh", "secret", "set"] and command[3] == fail_secret:
+                raise subprocess.CalledProcessError(1, command)
             if command[0] == "gh": return subprocess.CompletedProcess(command, 0)
             output = ("Entry type: " + ("PrivateKeyEntry" if private else "trustedCertEntry") + "\nSHA256: " + fingerprint)
             return subprocess.CompletedProcess(command, 0, stdout=output)
@@ -160,6 +162,13 @@ class UnifiedSigningTests(unittest.TestCase):
                         next(i for i, command in enumerate(commands) if command[:3] == ["gh", "secret", "set"]))
         self.assertFalse(any("-genkeypair" in command for command in commands))
         self.assertTrue(all("fixture-only-password" not in str(command) for command in commands))
+
+    def test_partial_secret_upload_names_what_is_out_of_sync(self):
+        with self.assertRaises(RuntimeError) as raised: self.configure(fail_secret="TGWATCH_KEY_PASSWORD")
+        message = str(raised.exception)
+        self.assertIn("TGWATCH_KEY_PASSWORD", message)
+        self.assertIn("TGWATCH_KEYSTORE_BASE64, TGWATCH_KEYSTORE_PASSWORD", message)
+        self.assertNotIn("fixture-only-password", message)
 
 
 class UnifiedWorkflowTests(unittest.TestCase):

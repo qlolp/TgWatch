@@ -166,8 +166,15 @@ def main():
         secrets = {'TGWATCH_KEYSTORE_BASE64': base64.b64encode(store.read_bytes()),
             'TGWATCH_KEYSTORE_PASSWORD': password.encode(), 'TGWATCH_KEY_PASSWORD': password.encode(),
             'TGWATCH_KEY_ALIAS': b'tgwatch'}
+        uploaded = []
         for name, value in secrets.items():
-            subprocess.run(['gh', 'secret', 'set', name, '--repo', PRODUCTION_REPOSITORY], input=value, check=True)
+            try:
+                subprocess.run(['gh', 'secret', 'set', name, '--repo', PRODUCTION_REPOSITORY], input=value, check=True)
+            except subprocess.CalledProcessError:
+                # The four secrets are only valid together: say which ones are now out of sync.
+                raise RuntimeError(f'Secret upload stopped at {name}; already replaced: {", ".join(uploaded) or "none"}. '
+                                   'Run the command again before publishing.') from None
+            uploaded.append(name)
         print(f'Signing secrets configured with existing certificate {fingerprint}.')
 
 

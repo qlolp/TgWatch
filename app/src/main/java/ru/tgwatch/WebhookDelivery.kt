@@ -30,7 +30,7 @@ internal object WebhookDeadlines {
 
     fun schedule(delayMs: Long, action: () -> Unit): () -> Unit {
         val future = timer.schedule(action, delayMs, TimeUnit.MILLISECONDS)
-        return { future.cancel(false); Unit }
+        return { future.cancel(false) }
     }
 }
 

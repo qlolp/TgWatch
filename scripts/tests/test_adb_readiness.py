@@ -33,6 +33,8 @@ if a==['root']:
     if mode=='unknown': print('unexpected failure',file=sys.stderr);sys.exit(1)
     if mode=='unknown_closed': print('filesystem resource is closed',file=sys.stderr);sys.exit(1)
     if mode=='hang': time.sleep(10)
+    if mode=='unauthorized' and n==1 or mode=='always_unauthorized':
+        print('error: device unauthorized.',file=sys.stderr);sys.exit(1)
     if mode=='device_not_found' and n==1:
         print("adb: device 'fixture-29' not found",file=sys.stderr);sys.exit(1)
     if mode=='closed' and n==1 or mode=='always_closed':
@@ -96,6 +98,18 @@ class AdbReadinessTests(unittest.TestCase):
         result, calls, elapsed = self.run_fixture("denied")
         self.assertNotEqual(0, result.returncode)
         self.assertEqual(1, calls.count(["root"]))
+        self.assertLess(elapsed, 2)
+
+    def test_transient_unauthorized_device_is_retried(self):
+        result, calls, _ = self.run_fixture("unauthorized")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertGreaterEqual(calls.count(["root"]), 2)
+
+    def test_lasting_unauthorized_device_fails_at_the_deadline_with_its_cause(self):
+        result, calls, elapsed = self.run_fixture("always_unauthorized", timeout=.3, command_timeout=.15)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("unauthorized", result.stderr)
+        self.assertGreaterEqual(calls.count(["root"]), 2)
         self.assertLess(elapsed, 2)
 
     def test_unknown_failure_is_not_hidden_by_retries(self):

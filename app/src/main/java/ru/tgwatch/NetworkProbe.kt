@@ -83,7 +83,7 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         private fun acquire(pool: ExecutorService, endpoint: ProbeEndpoint): Lease? = synchronized(occupied) {
             val key = "${endpoint.group}:${endpoint.name}:${endpoint.address}"
             val active = occupied.getOrPut(pool) { mutableSetOf() }
-            if (!active.add(key)) null else Lease { synchronized(occupied) { active.remove(key); Unit } }
+            if (!active.add(key)) null else Lease { synchronized(occupied) { active.remove(key) } }
         }
     }
     fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> {
