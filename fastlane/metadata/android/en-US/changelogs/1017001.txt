@@ -1,0 +1,1 @@
+The notification and widget redraw only when their content changes, and the check alarm no longer wakes the service needlessly while the screen is on. Failed starts from the widget and tile are logged without addresses or tokens.

@@ -98,9 +98,11 @@ process, without exposing or exporting the address or exception details.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.17.0` (Android code `1017000`), Android target API35.
-`GET_STATE` serves a one-second cache and builds fresh snapshots off the main thread.
-See [1.17.0](releases/1.17.0.md). 1.16.0 kept interrupted probes, background statistics,
+The source version is `1.17.1` (Android code `1017001`), Android target API35.
+The persistent notification and widget redraw only when their content changes, and the
+check alarm no longer fires needlessly while the screen is on. See [1.17.1](releases/1.17.1.md).
+`GET_STATE` serves a one-second cache and builds fresh snapshots off the main thread
+([1.17.0](releases/1.17.0.md)). 1.16.0 kept interrupted probes, background statistics,
 masked tokens and explicit blocked webhook delivery ([1.16.0](releases/1.16.0.md)).
 Published versions and signed APKs are recorded on
 [GitHub Releases](https://github.com/qlolp/TgWatch/releases/latest). The release workflow
