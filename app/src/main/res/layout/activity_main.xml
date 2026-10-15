@@ -79,6 +79,12 @@
                 android:layout_width="match_parent"
                 android:layout_marginTop="8dp"
                 android:text="@string/open_app_settings" />
+
+            <Button
+                android:id="@+id/btnOnboarding"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:text="@string/onboarding_open" />
         </LinearLayout>
 
         <LinearLayout

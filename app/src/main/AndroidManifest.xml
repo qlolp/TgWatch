@@ -47,6 +47,9 @@
             android:name=".AutomationSettingsActivity"
             android:exported="false" />
         <activity
+            android:name=".OnboardingActivity"
+            android:exported="false" />
+        <activity
             android:name=".IncidentActivity"
             android:exported="false" />
         <receiver

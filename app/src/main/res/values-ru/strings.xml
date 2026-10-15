@@ -110,4 +110,6 @@
     <string name="incidents_empty">В этом периоде не наблюдалось сбоев или частичной доступности.</string>
     <string name="incident_share">Поделиться эпизодом</string>
     <string name="incident_share_unavailable">Нет приложения для отправки сводки</string>
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_open">Мастер настройки</string>
 </resources>

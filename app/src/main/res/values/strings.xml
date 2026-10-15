@@ -110,4 +110,6 @@
     <string name="incidents_empty">No outage or partial availability was observed in this period.</string>
     <string name="incident_share">Share this episode</string>
     <string name="incident_share_unavailable">No app is available for sharing</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_open">Setup guide</string>
 </resources>

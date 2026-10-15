@@ -192,6 +192,17 @@ class UiAccessibilityTest {
                 val contrast = (maxOf(white, shade) + .05) / (minOf(white, shade) + .05)
                 assertTrue("${theme.resources.getResourceEntryName(background)} contrast $contrast", contrast >= 4.5)
             }
+            // On Android 12+ these come from the wallpaper (Material You); text must stay readable.
+            for (surface in listOf(R.color.bg, R.color.surface)) {
+                for (text in listOf(R.color.text_primary, R.color.text_secondary, R.color.link_color)) {
+                    val a = luminance(theme.getColor(text))
+                    val b = luminance(theme.getColor(surface))
+                    val contrast = (maxOf(a, b) + .05) / (minOf(a, b) + .05)
+                    val names = "${theme.resources.getResourceEntryName(text)} on " +
+                        theme.resources.getResourceEntryName(surface)
+                    assertTrue("$names contrast $contrast (night=$night)", contrast >= 4.5)
+                }
+            }
         }
     }
 }

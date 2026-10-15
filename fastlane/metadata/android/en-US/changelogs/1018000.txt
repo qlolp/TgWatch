@@ -1,0 +1,1 @@
+A short first-run guide explains what is checked and asks for notifications and battery access; it can be skipped. On Android 12+ the app uses Material You colors from your wallpaper.

@@ -1,6 +1,5 @@
 package ru.tgwatch
 
-import android.Manifest
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.app.Activity
@@ -9,7 +8,6 @@ import android.app.TimePickerDialog
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
@@ -297,12 +295,12 @@ class MainActivity : Activity() {
         swDailySummary.isChecked = Prefs.dailySummary(this)
         swDailySummary.setOnCheckedChangeListener { _, checked ->
             Prefs.setDailySummary(this, checked)
-            if (checked) requestNotificationPermissionIfNeeded()
+            if (checked) Onboarding.requestNotifications(this)
         }
         updateDailySummaryLabel()
         findViewById<Button>(R.id.btnDailySummaryTime).setOnClickListener { pickDailySummaryTime() }
         findViewById<Button>(R.id.btnDailySummaryNow).setOnClickListener {
-            requestNotificationPermissionIfNeeded()
+            Onboarding.requestNotifications(this)
             DailySummaryReceiver.postAsync(this, force = true) { posted ->
                 runOnUiThread {
                     if (!posted && !isFinishing && !isDestroyed)
@@ -329,6 +327,7 @@ class MainActivity : Activity() {
         btnSetupAlarm.setOnClickListener(openAlarm)
         btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
         findViewById<Button>(R.id.btnAppDetails).setOnClickListener { OemTips.openAppDetails(this) }
+        findViewById<Button>(R.id.btnOnboarding).setOnClickListener { OnboardingActivity.open(this) }
         findViewById<Button>(R.id.btnVibe).setOnClickListener { Vibe.alarm(this) }
         btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
@@ -339,7 +338,10 @@ class MainActivity : Activity() {
             tvOem.text = oem
         }
 
-        if (savedInstanceState == null) requestNotificationPermissionIfNeeded()
+        // Мастер первого запуска сам спросит разрешение на уведомления, даже если его пропустить.
+        if (savedInstanceState == null && !OnboardingActivity.openIfFirstRun(this)) {
+            Onboarding.requestNotifications(this)
+        }
     }
 
     private fun updateAdvancedSettings() {
@@ -447,14 +449,6 @@ class MainActivity : Activity() {
             }
             .setNegativeButton(Lang.t("Отмена", "Cancel"), null)
             .show()
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-        }
     }
 
     private fun openNotificationSettings() {
