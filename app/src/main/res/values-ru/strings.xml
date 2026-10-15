@@ -51,6 +51,7 @@
     <string name="vibrate_recovery">Короткая вибрация, когда связь вернулась</string>
     <string name="notify_outage">Уведомление о полном сбое Telegram</string>
     <string name="notify_partial">Уведомление о частичной доступности (PARTIAL)</string>
+    <string name="notify_slow">Тихое уведомление, если Telegram тормозит (дольше 1 с)</string>
     <string name="notify_recovery">Уведомление о восстановлении связи</string>
     <string name="sound_outage">Звук при полном сбое Telegram</string>
     <string name="sound_partial">Звук при частичной доступности</string>
@@ -112,4 +113,8 @@
     <string name="incident_share_unavailable">Нет приложения для отправки сводки</string>
     <string name="onboarding_skip">Пропустить</string>
     <string name="onboarding_open">Мастер настройки</string>
+    <string name="shortcut_check_short">Проверить</string>
+    <string name="shortcut_check_long">Проверить сейчас</string>
+    <string name="shortcut_mute_short">Тишина</string>
+    <string name="shortcut_mute_long">Тишина на час</string>
 </resources>

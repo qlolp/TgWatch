@@ -13,23 +13,29 @@ import android.content.Intent
 class AlertActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_MUTE) return
-        val now = System.currentTimeMillis()
-        if (!Prefs.muteAlerts(context, now)) {
-            EventLog.add(context, Lang.t("Не удалось сохранить заглушение оповещений", "Could not save alert mute"))
-            return
-        }
-        // The tapped alert has been handled; the ongoing status notification still shows the outage.
-        context.getSystemService(NotificationManager::class.java)?.let {
-            it.cancel(EventNotifications.OUTAGE_ID)
-            it.cancel(EventNotifications.PARTIAL_ID)
-        }
-        val until = timeStr(AlertMute.until(now))
-        EventLog.add(context, Lang.t("Оповещения заглушены до $until", "Alerts muted until $until"))
+        muteNow(context)
     }
 
     companion object {
         private const val ACTION_MUTE = "ru.tgwatch.action.MUTE_ALERTS"
         private const val REQUEST_CODE = 42
+
+        /** Mutes alerts for an hour (alert action and app-icon shortcut); returns the end time, or null. */
+        fun muteNow(context: Context): String? {
+            val now = System.currentTimeMillis()
+            if (!Prefs.muteAlerts(context, now)) {
+                EventLog.add(context, Lang.t("Не удалось сохранить заглушение оповещений", "Could not save alert mute"))
+                return null
+            }
+            // The alert has been handled; the ongoing status notification still shows the outage.
+            context.getSystemService(NotificationManager::class.java)?.let {
+                it.cancel(EventNotifications.OUTAGE_ID)
+                it.cancel(EventNotifications.PARTIAL_ID)
+            }
+            val until = timeStr(AlertMute.until(now))
+            EventLog.add(context, Lang.t("Оповещения заглушены до $until", "Alerts muted until $until"))
+            return until
+        }
 
         fun mutePending(ctx: Context): PendingIntent =
             PendingIntent.getBroadcast(

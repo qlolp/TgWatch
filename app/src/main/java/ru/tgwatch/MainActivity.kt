@@ -265,6 +265,7 @@ class MainActivity : Activity() {
         }
         eventSwitch(R.id.swNotifyOutage, "TG_DOWN", false)
         eventSwitch(R.id.swNotifyPartial, "PARTIAL", false)
+        eventSwitch(R.id.swNotifySlow, "SLOW", false)
         eventSwitch(R.id.swSoundPartial, "PARTIAL", true)
         eventSwitch(R.id.swSoundRecovery, "RECOVERY", true)
         fun channelButton(id: Int, event: String) {

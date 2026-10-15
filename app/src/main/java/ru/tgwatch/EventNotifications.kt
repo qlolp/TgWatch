@@ -24,6 +24,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         const val PARTIAL_ID = 4
         const val SUMMARY_ID = 5
         const val SUMMARY_CHANNEL = "daily_summary_v1"
+        const val SLOW_ID = 8
+        const val SLOW_CHANNEL = "events_slow_v1"
         private const val CHECK_NOW_REQUEST = 6
         fun channel(event: String) = when(event) {
             "TG_DOWN" -> SOUND_CHANNEL; "PARTIAL" -> PARTIAL_CHANNEL; "RECOVERY" -> RECOVERY_CHANNEL
@@ -40,6 +42,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             enableVibration(false)
         })
         manager.createNotificationChannel(NotificationChannel(SUMMARY_CHANNEL, Lang.t("Сводка за день", "Daily summary"),
+            NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
+        manager.createNotificationChannel(NotificationChannel(SLOW_CHANNEL, Lang.t("Telegram тормозит", "Telegram is slow"),
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
         val legacy = manager.getNotificationChannel(outageChannel)
         manager.createNotificationChannel(NotificationChannel(partialChannel,Lang.t("Частичная доступность", "Partially reachable"),
@@ -78,6 +82,16 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         manager.notify(PARTIAL_ID,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
     }
+    /** Silent: Telegram works, only slowly. Outage alerts replace it. */
+    fun slow(latencyMs: Long) {
+        if (blocked(SLOW_CHANNEL)) { clearSlow(); return }
+        manager.notify(SLOW_ID, notification(Lang.t("Telegram тормозит", "Telegram is slow"),
+            Lang.t("Серверы Telegram отвечают за $latencyMs мс несколько проверок подряд. " +
+                "Сообщения и медиа могут грузиться медленно.",
+                "Telegram servers have taken $latencyMs ms for several checks in a row. " +
+                "Messages and media may load slowly."), true, R.drawable.ic_stat_wait, SLOW_CHANNEL))
+    }
+    fun clearSlow() { manager.cancel(SLOW_ID) }
     fun summary(title: String, text: String, canPost: () -> Boolean = { true }): Boolean {
         if (!manager.areNotificationsEnabled() || blocked(SUMMARY_CHANNEL)) {
             manager.cancel(SUMMARY_ID)

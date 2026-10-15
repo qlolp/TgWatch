@@ -399,6 +399,9 @@
             <Switch android:id="@+id/swNotifyPartial" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:minHeight="48dp"
                 android:text="@string/notify_partial" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swNotifySlow" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/notify_slow" android:textColor="@color/text_primary" android:textSize="15sp" />
             <Switch
                 android:id="@+id/swNotifyRecovery"
                 android:layout_width="match_parent"
