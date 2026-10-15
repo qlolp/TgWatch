@@ -329,6 +329,7 @@ class MainActivity : Activity() {
         btnSetupAlarm.setOnClickListener(openAlarm)
         btnSetupApp.setOnClickListener { OemTips.openAppDetails(this) }
         findViewById<Button>(R.id.btnAppDetails).setOnClickListener { OemTips.openAppDetails(this) }
+        findViewById<Button>(R.id.btnOnboarding).setOnClickListener { OnboardingActivity.open(this) }
         findViewById<Button>(R.id.btnVibe).setOnClickListener { Vibe.alarm(this) }
         btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
@@ -339,7 +340,9 @@ class MainActivity : Activity() {
             tvOem.text = oem
         }
 
-        if (savedInstanceState == null) requestNotificationPermissionIfNeeded()
+        if (savedInstanceState == null) {
+            if (Onboarding.shouldShow(this)) OnboardingActivity.open(this) else requestNotificationPermissionIfNeeded()
+        }
     }
 
     private fun updateAdvancedSettings() {
