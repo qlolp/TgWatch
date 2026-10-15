@@ -51,6 +51,7 @@
     <string name="vibrate_recovery">Short vibration when the connection is back</string>
     <string name="notify_outage">Notify about a full Telegram outage</string>
     <string name="notify_partial">Notify when partially reachable (PARTIAL)</string>
+    <string name="notify_slow">Quiet notice when Telegram is slow (over 1 s)</string>
     <string name="notify_recovery">Notify when the connection is back</string>
     <string name="sound_outage">Sound for a full Telegram outage</string>
     <string name="sound_partial">Sound when partially reachable</string>
@@ -112,4 +113,8 @@
     <string name="incident_share_unavailable">No app is available for sharing</string>
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_open">Setup guide</string>
+    <string name="shortcut_check_short">Check</string>
+    <string name="shortcut_check_long">Check now</string>
+    <string name="shortcut_mute_short">Mute</string>
+    <string name="shortcut_mute_long">Mute alerts for 1 hour</string>
 </resources>

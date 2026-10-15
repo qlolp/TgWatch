@@ -199,6 +199,7 @@ class MonitorService : Service() {
     private lateinit var am: AlarmManager
     private lateinit var eventNotifications: EventNotifications
     private val offlineBackoff = OfflineBackoff()
+    private val slowAlert = SlowAlert()
     private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
@@ -676,6 +677,8 @@ class MonitorService : Service() {
                     Prefs.soundFor(this, "RECOVERY"), alertsAllowed)
                 if (Prefs.vibrateOnRecovery(this) && alertsAllowed) Vibe.recovery(this)
             }
+            SlowAlert.apply(this, eventNotifications, slowAlert.onCheck(p.status.name, p.latencyMs, mono),
+                p.status.name, p.latencyMs)
         } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
 
         if (changed) {

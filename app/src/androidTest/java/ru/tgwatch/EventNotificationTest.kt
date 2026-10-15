@@ -238,6 +238,31 @@ class EventNotificationTest {
         }
     }
 
+    @Test fun slowTelegramNoticeIsQuietAndHasItsOwnChannel() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val ctx = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= 33) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
+                .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")).use { it.readBytes() }
+        }
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        val events = EventNotifications(ctx, manager)
+        try {
+            events.slow(1500)
+            val slow = awaitNotification(manager, EventNotifications.SLOW_ID)
+            assertEquals(EventNotifications.SLOW_CHANNEL, slow.channelId)
+            assertEquals(Lang.t("Telegram тормозит", "Telegram is slow"), slow.extras.getString(Notification.EXTRA_TITLE))
+            assertTrue(slow.extras.getString(Notification.EXTRA_TEXT)!!.contains("1500"))
+            val channel = manager.getNotificationChannel(EventNotifications.SLOW_CHANNEL)
+            assertTrue("A slow Telegram is not an alarm", channel.importance <= NotificationManager.IMPORTANCE_LOW)
+            assertNull(channel.sound)
+            events.clearSlow()
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
+        } finally {
+            manager.cancel(EventNotifications.SLOW_ID)
+        }
+    }
+
     private fun awaitNotification(manager: NotificationManager, id: Int): Notification {
         repeat(40) {
             manager.activeNotifications.firstOrNull { it.id == id }?.let { return it.notification }

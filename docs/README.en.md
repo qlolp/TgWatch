@@ -98,7 +98,9 @@ process, without exposing or exporting the address or exception details.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.18.0` (Android code `1018000`), Android target API35.
+The source version is `1.19.0` (Android code `1019000`), Android target API35.
+A quiet notice warns when Telegram answers but slowly (over one second for several checks in a
+row), and long-pressing the app icon offers "Check" and "Mute". See [1.19.0](releases/1.19.0.md).
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed

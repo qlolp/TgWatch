@@ -1,0 +1,1 @@
+Quiet "Telegram is slow" notice when servers answer but take over a second for several checks. Long-press the app icon to check now or mute alerts for an hour.

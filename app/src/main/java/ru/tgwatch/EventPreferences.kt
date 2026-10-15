@@ -8,6 +8,7 @@ object EventPreferences {
     }
     fun notifyKey(event: String) = when(event) {
         "TG_DOWN" -> "notify_outage"; "PARTIAL" -> "notify_partial"; "RECOVERY" -> "notify_recovery"
+        "SLOW" -> "notify_slow"
         else -> error("Unknown event")
     }
     fun sound(event: String, values: Map<String,String>): Boolean =
