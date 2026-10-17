@@ -1,7 +1,8 @@
 package ru.tgwatch
 
 /** One credential-storage snapshot; generation distinguishes replacements with the same URL. */
-internal data class WebhookConfiguration(val url: String?, val enabled: Boolean, val generation: Long)
+internal data class WebhookConfiguration(val url: String?, val enabled: Boolean, val generation: Long,
+    val format: WebhookFormat = WebhookFormat.TEXT)
 
 /** Android-independent webhook rules: address validation, payload text and request identity. */
 object WebhookPolicy {
@@ -86,6 +87,16 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
                 inFlight = it
             }
             else -> null
+        }
+    }
+
+    /** Event tracking already established the measured baseline, including filtered initial failures. */
+    @Synchronized fun beginEvent(key: String, nowElapsed: Long): Request? {
+        if (inFlight != null || key == lastSent || !gapAllows(sentAt[key], nowElapsed, minGapMs)) return null
+        return Request(generation, key, lastSent).also {
+            lastSent = key
+            sentAt[key] = nowElapsed
+            inFlight = it
         }
     }
 

@@ -47,12 +47,16 @@ internal class WebhookTransport(
     }
     private var active: Call? = null
 
-    @Synchronized fun submit(url: String, body: String, agent: String, finished: (Int) -> Unit): Boolean {
+    fun submit(url: String, body: String, agent: String, finished: (Int) -> Unit): Boolean =
+        submit(url, WebhookBody("text/plain; charset=utf-8", body.toByteArray(Charsets.UTF_8)), agent, finished)
+
+    @Synchronized fun submit(url: String, body: WebhookBody, agent: String, finished: (Int) -> Unit): Boolean {
         if (active != null) return false
+        val captured = body.copy(bytes = body.bytes.copyOf())
         val call = Call()
         active = call
         return try {
-            io.execute { run(call, url, body, agent, finished) }
+            io.execute { run(call, url, captured, agent, finished) }
             true
         } catch (_: RejectedExecutionException) {
             active = null
@@ -75,7 +79,7 @@ internal class WebhookTransport(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun run(call: Call, url: String, body: String, agent: String, finished: (Int) -> Unit) {
+    private fun run(call: Call, url: String, body: WebhookBody, agent: String, finished: (Int) -> Unit) {
         var code = NO_RESPONSE
         call.worker = Thread.currentThread()
         try {
@@ -97,16 +101,16 @@ internal class WebhookTransport(
         }
     }
 
-    private fun post(connection: HttpURLConnection, body: String, agent: String): Int {
+    private fun post(connection: HttpURLConnection, body: WebhookBody, agent: String): Int {
         connection.connectTimeout = WebhookPolicy.TIMEOUT_MS
         connection.readTimeout = WebhookPolicy.TIMEOUT_MS
         connection.instanceFollowRedirects = false
         connection.useCaches = false
         connection.doOutput = true
         connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+        connection.setRequestProperty("Content-Type", body.contentType)
         connection.setRequestProperty("User-Agent", agent)
-        val bytes = body.toByteArray(Charsets.UTF_8)
+        val bytes = body.bytes
         connection.setFixedLengthStreamingMode(bytes.size)
         connection.outputStream.use { it.write(bytes) }
         return connection.responseCode

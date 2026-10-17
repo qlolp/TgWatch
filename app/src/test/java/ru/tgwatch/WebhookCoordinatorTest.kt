@@ -258,11 +258,11 @@ class WebhookCoordinatorTest {
         var maxActive = 0
             private set
 
-        fun submit(url: String, body: String, complete: (Int) -> Unit): Boolean {
+        fun submit(url: String, body: WebhookBody, complete: (Int) -> Unit): Boolean {
             if (!accept) return false
             active++
             maxActive = maxOf(maxActive, active)
-            requests.add(Request(url, body, complete) { active-- })
+            requests.add(Request(url, body.bytes.toString(Charsets.UTF_8), complete) { active-- })
             return true
         }
     }

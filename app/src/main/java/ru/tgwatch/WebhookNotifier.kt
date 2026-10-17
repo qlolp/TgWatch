@@ -2,6 +2,7 @@ package ru.tgwatch
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -11,7 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
- * Opt-in POST of one status line to a user-owned HTTPS endpoint (for example an ntfy.sh topic).
+ * Opt-in POST of a bounded event payload to a user-owned HTTPS endpoint (for example an ntfy.sh topic).
  * One background thread, at most one request in flight, bounded timeouts, no redirects.
  * No address, body or transport exception is logged.
  */
@@ -28,9 +29,9 @@ object WebhookNotifier {
     /** Called by the monitor for every published result; returns immediately. */
     // The monitor worker must never fail because of this optional adapter.
     @Suppress("TooGenericExceptionCaught")
-    fun onPublished(ctx: Context, status: MonitorService.Status) {
+    fun onPublished(ctx: Context, observation: WebhookObservation) {
         try {
-            coordinator(ctx).onPublished(status.name)
+            coordinator(ctx).onPublished(observation)
         } catch (e: RuntimeException) {
             // Optional delivery must never interrupt the monitor; log the class, never the address.
             Log.w("TgWatch", "webhook publish: ${e.javaClass.simpleName}")
@@ -72,18 +73,22 @@ internal class WebhookCoordinator(
     private val configurationLock: Any,
     private val configuration: () -> WebhookConfiguration,
     private val nowElapsed: () -> Long,
-    private val submit: (String, String, (Int) -> Unit) -> Boolean,
+    private val submit: (String, WebhookBody, (Int) -> Unit) -> Boolean,
     private val schedule: (Long, () -> Unit) -> (() -> Unit) = WebhookDeadlines::schedule,
     private val cancelTransport: () -> Unit = {}
 ) {
     private val gate = WebhookGate()
+    private var tracker = WebhookEventTracker()
+    private data class PendingEvent(val id: Long, val event: WebhookEvent)
+    private var sequence = 0L
+    private var latest: PendingEvent? = null
     private var configured: WebhookConfiguration? = null
     private var generation = 0L
     private var active: Attempt? = null
     private var lastHealth = WebhookHealth()
 
     private class Attempt(val request: WebhookGate.Request, val generation: Long, val started: Long,
-        val done: ((WebhookNotifier.TestResult) -> Unit)?) {
+        val done: ((WebhookNotifier.TestResult) -> Unit)?, val eventId: Long?) {
         var result: WebhookNotifier.TestResult? = null
         var cancelDeadline: (() -> Unit)? = null
         var cancellationRequested = false
@@ -114,15 +119,26 @@ internal class WebhookCoordinator(
         } == true)
     }
 
-    fun onPublished(status: String) {
+    fun onPublished(observation: WebhookObservation) {
         val captured = configuration()
         synchronized(configurationLock) {
             val current = configuration()
             synchronizeConfiguration(current)
+            if (captured != current || !tracker.accepts(observation)) return
+            val event = tracker.observe(observation)
+            if (event != null) latest = PendingEvent(++sequence, event)
+            else latest?.takeIf {
+                it.event.observation?.serviceId == observation.serviceId &&
+                    it.event.observation.status == WebhookStatuses.normalize(observation.status)
+            }?.let { latest = it.copy(event = it.event.copy(observation = observation)) }
+            val pending = latest
             val url = current.url?.takeIf { current.enabled }
-            val body = WebhookPolicy.payload(status)
-            if (captured == current && url != null && body != null) {
-                gate.begin(status, nowElapsed())?.let { dispatch(it, url, body) }
+            if (pending != null && url != null) {
+                val observation = checkNotNull(pending.event.observation)
+                val key = "${observation.serviceId}:${WebhookStatuses.normalize(observation.status)}"
+                gate.beginEvent(key, nowElapsed())?.let {
+                    dispatch(it, url, WebhookPayload.encode(pending.event, current.format), eventId = pending.id)
+                }
             }
         }
     }
@@ -137,16 +153,17 @@ internal class WebhookCoordinator(
             when {
                 url == null -> done(WebhookNotifier.TestResult.NOT_CONFIGURED)
                 request == null -> done(WebhookNotifier.TestResult.BUSY)
-                else -> dispatch(request, url, WebhookPolicy.testPayload(), done)
+                else -> dispatch(request, url, WebhookPayload.encode(
+                    WebhookEvent(WebhookEventKind.TEST, null, null), current.format), done)
             }
         }
     }
 
     /** Caller holds settings monitor; submit/cancel only enqueue work and never perform network I/O. */
     @Suppress("TooGenericExceptionCaught")
-    private fun dispatch(request: WebhookGate.Request, url: String, body: String,
-        done: ((WebhookNotifier.TestResult) -> Unit)? = null) {
-        val attempt = Attempt(request, generation, nowElapsed(), done)
+    private fun dispatch(request: WebhookGate.Request, url: String, body: WebhookBody,
+        done: ((WebhookNotifier.TestResult) -> Unit)? = null, eventId: Long? = null) {
+        val attempt = Attempt(request, generation, nowElapsed(), done, eventId)
         active = attempt
         lastHealth = lastHealth.copy(lastAttemptElapsed = attempt.started, outcome = WebhookOutcome.SENDING)
         try {
@@ -200,6 +217,7 @@ internal class WebhookCoordinator(
         attempt.cancelDeadline?.invoke()
         attempt.cancelDeadline = null
         if (attempt.generation == generation) {
+            if (result == WebhookNotifier.TestResult.SENT && attempt.eventId == latest?.id) latest = null
             lastHealth = lastHealth.copy(outcome = when (result) {
                 WebhookNotifier.TestResult.SENT -> WebhookOutcome.SENT
                 WebhookNotifier.TestResult.TIMED_OUT -> WebhookOutcome.TIMED_OUT
@@ -217,6 +235,8 @@ internal class WebhookCoordinator(
     private fun invalidate() {
         generation++
         gate.reset()
+        tracker = WebhookEventTracker()
+        latest = null
         lastHealth = WebhookHealth()
         active?.cancel(cancelTransport)
     }
@@ -229,4 +249,15 @@ internal class WebhookCoordinator(
     }
 
     private companion object { const val NO_RESPONSE = -1 }
+}
+
+/** Transport category only; never exposes SSIDs, addresses or Android Network handles. */
+internal object WebhookNetworks {
+    fun kind(caps: NetworkCapabilities): NetworkKind = when {
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> NetworkKind.VPN
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkKind.WIFI
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkKind.CELLULAR
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkKind.ETHERNET
+        else -> NetworkKind.OTHER
+    }
 }

@@ -12,6 +12,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WebhookDeliveryBehaviorTest {
+    @Test fun jsonTransportUsesTheCapturedBytesAndHeaders() {
+        val queued = mutableListOf<Runnable>()
+        val connection = FakeConnection()
+        val transport = WebhookTransport(Executor { queued.add(it) }, { connection })
+        val bytes = "{\"schema_version\":1}".toByteArray()
+        val expected = bytes.copyOf()
+        assertTrue(transport.submit("https://example.org", WebhookBody("application/json; charset=utf-8", bytes),
+            "TgWatch/test") { assertEquals(204, it) })
+        bytes.fill(0)
+        queued.single().run()
+        assertArrayEquals(expected, connection.output.toByteArray())
+        assertEquals("application/json; charset=utf-8", connection.getRequestProperty("Content-Type"))
+        assertEquals("POST", connection.requestMethod)
+        assertFalse(connection.instanceFollowRedirects)
+        assertEquals(5_000, connection.connectTimeout)
+        assertEquals(5_000, connection.readTimeout)
+    }
     @Test fun deadlineRequestsCancellationAndRetainsPhysicalSlotAcrossResetAndLateSuccess() {
         val f = Fixture()
         f.coordinator.sendTest { f.results.add(it) }
@@ -304,15 +321,16 @@ class WebhookDeliveryBehaviorTest {
     }
 
     private class FakeConnection(private val response: () -> Unit = {}) : HttpURLConnection(URL("https://example.org")) {
+        val output = ByteArrayOutputStream()
         var disconnected = false
         override fun connect() = Unit
         override fun disconnect() { disconnected = true }
         override fun usingProxy() = false
-        override fun getOutputStream() = ByteArrayOutputStream()
+        override fun getOutputStream() = output
         override fun getResponseCode(): Int { response(); return 204 }
     }
 
-    private class Fixture(private val submit: ((String, String, (Int) -> Unit) -> Boolean)? = null) {
+    private class Fixture(private val submit: ((String, WebhookBody, (Int) -> Unit) -> Boolean)? = null) {
         var now = 0L
         var config = WebhookConfiguration("https://example.org/private-topic", true, 0)
         var cancelCount = 0

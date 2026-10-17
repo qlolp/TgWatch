@@ -243,6 +243,7 @@ class MonitorService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
     private var lastVibrationMono = -1L
+    private var probeNetwork = NetworkKind.UNKNOWN
     @Volatile private var lastProgressMono = 0L
     @Volatile private var checkStartedMono = 0L
     private val healthHandler = Handler(android.os.Looper.getMainLooper())
@@ -571,6 +572,7 @@ class MonitorService : Service() {
 
     @Suppress("ReturnCount") // Early returns distinguish absent, switching, captive and changed Android networks.
     private fun performCheck(revision: Long): Probe {
+        probeNetwork = NetworkKind.UNKNOWN
         var network = cm.activeNetwork
         if (network == null) {
             Thread.sleep(NETWORK_GRACE_MS)
@@ -579,6 +581,7 @@ class MonitorService : Service() {
         val selected = network ?: return Probe(Status.NO_NETWORK, -1, Lang.t("Нет активной сети", "No active network"), Lang.t("Сеть: отсутствует", "Network: none"))
         val caps = cm.getNetworkCapabilities(selected)
             ?: return Probe(Status.UNKNOWN, -1, Lang.t("Сеть переключается", "Network is switching"))
+        probeNetwork = WebhookNetworks.kind(caps)
         val transport = buildList {
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("Wi-Fi")
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add(Lang.t("Мобильная", "Mobile"))
@@ -720,7 +723,9 @@ class MonitorService : Service() {
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
-        WebhookNotifier.onPublished(this, newState.status)
+        WebhookNotifier.onPublished(this, WebhookObservation("telegram", newState.status.name,
+            newState.checkedAt, newState.latencyMs.takeIf { it >= 0L }, probeNetwork, checkSchedule.revision,
+            measured = newState.status != Status.UNKNOWN, stale = newState.isStale(now)))
     }
 
     private fun broadcastState() {
