@@ -1,0 +1,40 @@
+<resources>
+    <item name="targetEndpointInput" type="id" />
+    <string name="target_select">Monitoring target</string>
+    <string name="target_settings">Target settings</string>
+    <string name="target_enabled">Monitor this target</string>
+    <string name="target_interval">Check every %1$d seconds</string>
+    <string name="target_notify_outage">Outage notifications</string>
+    <string name="target_notify_recovery">Recovery notifications</string>
+    <string name="target_notify_slow">Slow response notifications</string>
+    <string name="target_slow_threshold">Slow response threshold: %1$d ms</string>
+    <string name="target_endpoint_hint">HTTPS address; leave empty to keep it</string>
+    <string name="target_endpoint_help">Addresses stay on this device and are excluded from backups. Re-enter the address after restoring a backup.</string>
+    <string name="target_public_default">Use public Matrix default</string>
+    <string name="target_clear_endpoint">Clear address and stop this target</string>
+    <string name="target_save">Save</string>
+    <string name="target_cancel">Cancel</string>
+    <string name="target_saved">Target settings saved</string>
+    <string name="target_settings_failed">Could not apply this change. Check the address or retry the pending change.</string>
+    <string name="target_settings_busy">A settings operation is still in progress.</string>
+    <string name="target_retry">Finish pending address change</string>
+    <string name="target_start">Start %1$s</string>
+    <string name="target_stop">Stop %1$s</string>
+    <string name="target_off">%1$s monitoring is off</string>
+    <string name="target_title">%1$s: %2$s</string>
+    <string name="target_stale">Last measured: %1$s</string>
+    <string name="target_checked">Last check: %1$s</string>
+    <string name="target_latency">%1$d ms</string>
+    <string name="target_ok">reachable</string>
+    <string name="target_down">unreachable</string>
+    <string name="target_partial">partially reachable</string>
+    <string name="target_offline">no internet</string>
+    <string name="target_unknown">reachability unknown</string>
+    <string name="target_checking">Checking %1$s…</string>
+    <string name="target_idle_help">Start this target to check its reachability.</string>
+    <string name="target_pending_help">Finish the address change in target settings. Other targets continue independently.</string>
+    <string name="target_matrix_help">Checks the Matrix client API. Messages and accounts are not checked.</string>
+    <string name="target_whatsapp_help">Checks WhatsApp Web. Message delivery is not checked.</string>
+    <string name="target_custom_help">Checks whether the configured HTTPS endpoint responds successfully.</string>
+    <string name="target_history_failed">History could not be saved. The measured reachability result is unchanged.</string>
+</resources>

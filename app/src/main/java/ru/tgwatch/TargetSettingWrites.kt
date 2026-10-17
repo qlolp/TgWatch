@@ -7,20 +7,22 @@ import android.os.Looper
 /** Serial disk operations never hold the short publication/configuration monitor. */
 internal object TargetSettingWrites {
     private const val MAX_ENDPOINT_CHARS = 256
-    fun definition(ctx: Context, value: TargetDefinition): Boolean =
-        change(ctx, value.id) { TargetDefinitionUpdate.apply(ctx, value, it) }
+    fun definition(ctx: Context, value: TargetDefinition, expectedRevision: Long? = null): Boolean =
+        change(ctx, value.id, expectedRevision) { TargetDefinitionUpdate.apply(ctx, value, it) }
 
-    fun endpoint(ctx: Context, id: TargetId, raw: String): Boolean {
+    fun endpoint(ctx: Context, id: TargetId, raw: String, expectedRevision: Long? = null): Boolean {
         val normalized = HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
         val valid = id in setOf(TargetId.MATRIX, TargetId.CUSTOM) && (raw.isBlank() || normalized != null)
         if (!valid) return false
-        return change(ctx, id) { TargetConfigTransactions.change(ctx, id, normalized) }
+        return change(ctx, id, expectedRevision) { TargetConfigTransactions.change(ctx, id, normalized) }
     }
 
-    private fun change(ctx: Context, id: TargetId, operation: (TargetSettingsFence.Token) -> Unit): Boolean {
+    private fun change(ctx: Context, id: TargetId, expectedRevision: Long?,
+        operation: (TargetSettingsFence.Token) -> Unit): Boolean {
         check(Looper.myLooper() != Looper.getMainLooper())
         val token = synchronized(TargetPreferences) {
-            if (BackupManager.hasPending() || TargetConfigTransactions.isPending(id)) null
+            val current = expectedRevision == null || TargetPreferences.fence.snapshot(id).revision == expectedRevision
+            if (!current || BackupManager.hasPending() || TargetConfigTransactions.isPending(id)) null
             else TargetPreferences.fence.begin(id)
         } ?: return false
         AutomationReceiver.invalidateState()

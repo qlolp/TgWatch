@@ -93,6 +93,7 @@ class MainActivity : Activity() {
     private lateinit var advancedSettings: View
     private lateinit var btnAdvanced: Button
     private lateinit var backupUi: BackupUi
+    private lateinit var targetUi: TargetSelectionUi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -170,12 +171,6 @@ class MainActivity : Activity() {
         btnToggle = findViewById(R.id.btnToggle)
         btnCheck = findViewById(R.id.btnCheck)
         btnResumeAlerts = findViewById(R.id.btnResumeAlerts)
-        btnResumeAlerts.setOnClickListener {
-            val saved = Prefs.clearAlertMute(this)
-            Toast.makeText(this, if (saved) R.string.alerts_resumed else R.string.alert_mute_save_failed,
-                Toast.LENGTH_SHORT).show()
-            render()
-        }
         rgInterval = findViewById(R.id.rgInterval)
         swKeepAwake = findViewById(R.id.swKeepAwake)
         swVibrate = findViewById(R.id.swVibrate)
@@ -205,24 +200,6 @@ class MainActivity : Activity() {
             Lang.t("Версия ", "Version ") + packageManager.getPackageInfo(packageName, 0).versionName
         } catch (_: Exception) {
             ""
-        }
-
-        btnToggle.setOnClickListener {
-            if (MonitorService.running) {
-                Prefs.setEnabled(this, false)
-                MonitorService.stop(this)
-            } else {
-                Prefs.setEnabled(this, true)
-                startMonitor()
-            }
-            ui.postDelayed({ render() }, 300L)
-        }
-
-        btnCheck.setOnClickListener {
-            if (MonitorService.running) {
-                MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
-                Toast.makeText(this, Lang.t("Проверяю…", "Checking…"), Toast.LENGTH_SHORT).show()
-            }
         }
 
         rgInterval.check(intervalButtons[Prefs.intervalSec(this)] ?: R.id.rb15)
@@ -341,6 +318,9 @@ class MainActivity : Activity() {
             tvOem.text = oem
         }
 
+        targetUi = TargetSelectionUi(this, savedInstanceState, historyUi, ::render, ::animateCardColor)
+        historyUi.selectTarget(targetUi.selected)
+
         // First-run setup can finish or be skipped before the user explicitly starts monitoring.
         if (savedInstanceState == null) {
             if (firstRunGuide) OnboardingActivity.open(this) else Onboarding.requestNotifications(this)
@@ -370,6 +350,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        targetUi.close()
         historyUi.close()
         backupUi.close()
         colorAnimator?.cancel()
@@ -479,6 +460,90 @@ class MainActivity : Activity() {
 
     private val recoveryUi = RecoveryUi(this)
 
+    private fun renderTelegramStatus(s: MonitorService.State, now: Long, running: Boolean, stale: Boolean) {
+        var color = getColor(R.color.status_idle)
+        if (!running) {
+            ivStatus.setImageResource(R.drawable.ic_stat_pause)
+            tvTitle.text = Lang.t("Мониторинг выключен", "Monitoring is off")
+            tvSince.text = Lang.t("Проверки остановлены", "Checks are stopped")
+            tvReason.text = Lang.t("Нажми «Запустить», и приложение начнёт следить за Telegram.", "Tap “Start” and the app will begin monitoring Telegram.")
+        } else if (stale) {
+            color = getColor(R.color.status_idle)
+            renderTelegramStale(s, now)
+        } else {
+            color = renderTelegramCurrent(s, now)
+        }
+        val mutedUntil = Prefs.alertsMutedUntil(this, now)
+        btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
+        if (running && mutedUntil > 0L) tvReason.append(Lang.t("\nОповещения заглушены до ${timeStr(mutedUntil)}",
+            "\nAlerts muted until ${timeStr(mutedUntil)}"))
+        ivStatus.contentDescription = tvTitle.text
+        animateCardColor(color)
+
+        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) Lang.t("${s.latencyMs} мс", "${s.latencyMs} ms") else "—"
+        tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
+    }
+
+    private fun renderTelegramStale(s: MonitorService.State, now: Long) {
+        ivStatus.setImageResource(R.drawable.ic_stat_wait)
+        tvTitle.text = when (s.status) {
+            MonitorService.Status.OK -> Lang.t("Последний раз: доступен", "Last known: reachable")
+            MonitorService.Status.PARTIAL -> Lang.t("Последний раз: частично доступен", "Last known: partially reachable")
+            MonitorService.Status.TG_DOWN -> Lang.t("Последний раз: недоступен", "Last known: unreachable")
+            MonitorService.Status.NO_NETWORK -> Lang.t("Последний раз: нет сети", "Last known: no internet")
+            MonitorService.Status.UNKNOWN -> Lang.t("Проверяю…", "Checking…")
+        }
+        tvSince.text = Lang.t("Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку", "Checked ${agoStr(s.checkedAt, now)} — waiting for a fresh check")
+        tvReason.text = Lang.t("Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить».", "Monitoring is delayed. Android may have postponed the check; tap “Check now”.")
+    }
+
+    private fun renderTelegramCurrent(s: MonitorService.State, now: Long): Int {
+        var color = getColor(R.color.status_idle)
+        when (s.status) {
+            MonitorService.Status.OK -> {
+                color = getColor(R.color.status_ok)
+                ivStatus.setImageResource(R.drawable.ic_stat_ok)
+                tvTitle.text = Lang.t("Telegram отвечает", "Telegram is responding")
+            }
+            MonitorService.Status.PARTIAL -> {
+                color = getColor(R.color.status_offline)
+                ivStatus.setImageResource(R.drawable.ic_stat_wait)
+                tvTitle.text = Lang.t("Telegram частично доступен", "Telegram is partially reachable")
+            }
+            MonitorService.Status.TG_DOWN -> {
+                color = getColor(R.color.status_fail)
+                ivStatus.setImageResource(R.drawable.ic_stat_fail)
+                tvTitle.text = Lang.t("Telegram недоступен", "Telegram is unreachable")
+            }
+            MonitorService.Status.NO_NETWORK -> {
+                color = getColor(R.color.status_offline)
+                ivStatus.setImageResource(R.drawable.ic_stat_offline)
+                tvTitle.text = Lang.t("Нет интернета", "No internet")
+            }
+            MonitorService.Status.UNKNOWN -> {
+                ivStatus.setImageResource(R.drawable.ic_stat_wait)
+                tvTitle.text = if (s.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю…", "Checking…")
+            }
+        }
+        tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
+            if (s.checkedAt > 0) Lang.t("Проверено ${agoStr(s.checkedAt, now)}", "Checked ${agoStr(s.checkedAt, now)}") else Lang.t("Первая проверка идёт прямо сейчас", "First check in progress")
+        } else {
+            Lang.t("Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}", "For ${durationStr(now - s.since)} · since ${timeStr(s.since)}")
+        }
+        tvReason.text = telegramReason(s)
+        return color
+    }
+
+    private fun telegramReason(s: MonitorService.State): String {
+        return when (s.status) {
+            MonitorService.Status.OK -> Lang.t("MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется.", "MTProto and web resources are responding. Message delivery is not checked.")
+            MonitorService.Status.PARTIAL -> s.reason
+            MonitorService.Status.TG_DOWN -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
+            MonitorService.Status.NO_NETWORK -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
+            MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { Lang.t("Проверяю веб-ресурсы и MTProto", "Checking web resources and MTProto") }
+        } + if (s.lastVibrationAt > 0L) Lang.t("\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}", "\nLast vibration: ${timeStr(s.lastVibrationAt)}") else ""
+    }
+
     private fun render() {
         if (recoveryUi.preparing()) return
         if (BackupManager.hasPending()) {
@@ -492,7 +557,7 @@ class MainActivity : Activity() {
         }
         btnToggle.isEnabled = true
         val now = System.currentTimeMillis()
-        val running = MonitorService.running
+        val running = MonitorService.running && TargetPreferences.definition(this, TargetId.TELEGRAM).enabled
         val s = MonitorService.state
         val stale = running && s.isStale(now)
         val notifOk = notificationsAllowed()
@@ -501,78 +566,9 @@ class MainActivity : Activity() {
 
         renderSetup(notifOk, batteryOk, alarmOk)
 
-        btnToggle.text = if (running) Lang.t("Остановить", "Stop") else Lang.t("Запустить", "Start")
-        btnCheck.isEnabled = running
-
-        var color = getColor(R.color.status_idle)
-        if (!running) {
-            ivStatus.setImageResource(R.drawable.ic_stat_pause)
-            tvTitle.text = Lang.t("Мониторинг выключен", "Monitoring is off")
-            tvSince.text = Lang.t("Проверки остановлены", "Checks are stopped")
-            tvReason.text = Lang.t("Нажми «Запустить», и приложение начнёт следить за Telegram.", "Tap “Start” and the app will begin monitoring Telegram.")
-        } else if (stale) {
-            color = getColor(R.color.status_idle)
-            ivStatus.setImageResource(R.drawable.ic_stat_wait)
-            tvTitle.text = when (s.status) {
-                MonitorService.Status.OK -> Lang.t("Последний раз: доступен", "Last known: reachable")
-                MonitorService.Status.PARTIAL -> Lang.t("Последний раз: частично доступен", "Last known: partially reachable")
-                MonitorService.Status.TG_DOWN -> Lang.t("Последний раз: недоступен", "Last known: unreachable")
-                MonitorService.Status.NO_NETWORK -> Lang.t("Последний раз: нет сети", "Last known: no internet")
-                MonitorService.Status.UNKNOWN -> Lang.t("Проверяю…", "Checking…")
-            }
-            tvSince.text = Lang.t("Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку", "Checked ${agoStr(s.checkedAt, now)} — waiting for a fresh check")
-            tvReason.text = Lang.t("Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить».", "Monitoring is delayed. Android may have postponed the check; tap “Check now”.")
-        } else {
-            when (s.status) {
-                MonitorService.Status.OK -> {
-                    color = getColor(R.color.status_ok)
-                    ivStatus.setImageResource(R.drawable.ic_stat_ok)
-                    tvTitle.text = Lang.t("Telegram отвечает", "Telegram is responding")
-                }
-                MonitorService.Status.PARTIAL -> {
-                    color = getColor(R.color.status_offline)
-                    ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                    tvTitle.text = Lang.t("Telegram частично доступен", "Telegram is partially reachable")
-                }
-                MonitorService.Status.TG_DOWN -> {
-                    color = getColor(R.color.status_fail)
-                    ivStatus.setImageResource(R.drawable.ic_stat_fail)
-                    tvTitle.text = Lang.t("Telegram недоступен", "Telegram is unreachable")
-                }
-                MonitorService.Status.NO_NETWORK -> {
-                    color = getColor(R.color.status_offline)
-                    ivStatus.setImageResource(R.drawable.ic_stat_offline)
-                    tvTitle.text = Lang.t("Нет интернета", "No internet")
-                }
-                MonitorService.Status.UNKNOWN -> {
-                    ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                    tvTitle.text = if (s.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю…", "Checking…")
-                }
-            }
-            tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
-                if (s.checkedAt > 0) Lang.t("Проверено ${agoStr(s.checkedAt, now)}", "Checked ${agoStr(s.checkedAt, now)}") else Lang.t("Первая проверка идёт прямо сейчас", "First check in progress")
-            } else {
-                Lang.t("Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}", "For ${durationStr(now - s.since)} · since ${timeStr(s.since)}")
-            }
-            tvReason.text = when (s.status) {
-                MonitorService.Status.OK -> Lang.t("MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется.", "MTProto and web resources are responding. Message delivery is not checked.")
-                MonitorService.Status.PARTIAL -> s.reason
-                MonitorService.Status.TG_DOWN -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
-                MonitorService.Status.NO_NETWORK -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
-                MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { Lang.t("Проверяю веб-ресурсы и MTProto", "Checking web resources and MTProto") }
-            } + if (s.lastVibrationAt > 0L) Lang.t("\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}", "\nLast vibration: ${timeStr(s.lastVibrationAt)}") else ""
-        }
-        val mutedUntil = Prefs.alertsMutedUntil(this, now)
-        btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
-        if (running && mutedUntil > 0L) tvReason.append(Lang.t("\nОповещения заглушены до ${timeStr(mutedUntil)}",
-            "\nAlerts muted until ${timeStr(mutedUntil)}"))
-        ivStatus.contentDescription = tvTitle.text
-        animateCardColor(color)
-
-        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) Lang.t("${s.latencyMs} мс", "${s.latencyMs} ms") else "—"
-        tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
+        if (targetUi.selected == TargetId.TELEGRAM) renderTelegramStatus(s, now, running, stale)
         historyUi.refresh(historyDays, now)
-        if (tvDiagnostics.visibility == View.VISIBLE) {
+        if (tvDiagnostics.visibility == View.VISIBLE && targetUi.selected == TargetId.TELEGRAM) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { Lang.t("Диагностика появится после первой проверки.", "Diagnostics will appear after the first check.") } +
                 Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.")
         }
@@ -607,6 +603,7 @@ class MainActivity : Activity() {
             tvAlarm.text = Lang.t("Без точных будильников Android откладывает проверки во сне, и статус устаревает.", "Without exact alarms, Android postpones checks during sleep and the status goes stale.")
             btnAlarm.visibility = View.VISIBLE
         }
+        targetUi.render(now)
     }
 
     private fun renderSetup(notifOk: Boolean, batteryOk: Boolean, alarmOk: Boolean) {
@@ -632,10 +629,17 @@ class MainActivity : Activity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        targetUi.save(outState)
         outState.putInt("history_days", historyDays)
         outState.putBoolean("advanced_expanded", advancedExpanded)
         outState.putInt("export_days", exportDays)
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        targetUi.open(intent)
     }
 
     private fun safeStartExport() {

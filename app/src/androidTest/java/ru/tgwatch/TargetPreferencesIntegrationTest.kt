@@ -182,11 +182,32 @@ class TargetPreferencesIntegrationTest {
         assertFalse(TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled)
     }
 
-    private fun intercept(commit: (SharedPreferences.Editor) -> Boolean): Context = object : ContextWrapper(ctx) {
+    @Test fun queuedEnableCapturedBeforeStopCannotReenableTheGoal() {
+        val revision = TargetPreferences.fence.snapshot(TargetId.MATRIX).revision
+        TargetPreferences.stop(ctx, TargetId.MATRIX)
+        assertFalse(TargetSettingWrites.definition(ctx, TargetDefinition.default(TargetId.MATRIX).copy(enabled = true),
+            expectedRevision = revision))
+        assertFalse(TargetPreferences.definition(ctx, TargetId.MATRIX).enabled)
+    }
+
+    @Test fun failedPublicCommitLeavesMasterAndOtherGoalsPaused() {
+        Prefs.setEnabled(ctx, false)
+        val before = TargetPreferences.definitions(ctx)
+        val failOnce = AtomicBoolean(true)
+        val wrapped = intercept("tgwatch") { editor -> editor.commit() && !failOnce.getAndSet(false) }
+        assertFalse(TargetPreferences.setDefinition(wrapped, TargetDefinition.default(TargetId.MATRIX).copy(enabled = true)))
+        assertFalse(Prefs.isEnabled(ctx))
+        assertEquals(before, TargetPreferences.definitions(ctx))
+    }
+
+    private fun intercept(file: String = TargetPreferences.PRIVATE_FILE,
+        commit: (SharedPreferences.Editor) -> Boolean): Context = object : ContextWrapper(ctx) {
         override fun getApplicationContext(): Context = this
+        override fun createDeviceProtectedStorageContext(): Context =
+            if (file == "tgwatch") this else super.createDeviceProtectedStorageContext()
         override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
-            val store = super.getSharedPreferences(name, mode)
-            if (name != TargetPreferences.PRIVATE_FILE) return store
+            val store = if (file == "tgwatch" && name == file) Prefs.sp(ctx) else super.getSharedPreferences(name, mode)
+            if (name != file) return store
             return object : SharedPreferences by store {
                 override fun edit(): SharedPreferences.Editor {
                     val real = store.edit()

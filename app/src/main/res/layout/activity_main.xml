@@ -32,6 +32,24 @@
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
+        <TextView
+            style="@style/Body"
+            android:layout_marginTop="12dp"
+            android:labelFor="@+id/targetSelector"
+            android:text="@string/target_select" />
+
+        <Spinner
+            android:id="@id/targetSelector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp" />
+
+        <Button
+            android:id="@+id/btnTargetSettings"
+            style="@style/ButtonOutlined"
+            android:layout_width="match_parent"
+            android:text="@string/target_settings" />
+
         <!-- Чеклист первого запуска: без этого значок врёт -->
         <LinearLayout
             android:id="@+id/setupCard"

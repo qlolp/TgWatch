@@ -29,8 +29,9 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
     private var requested: HistoryDisplayKey? = null
     private var resumed = false
     private var days = 1
+    private var targetId = TargetId.TELEGRAM
     private val loader = LatestRequestLoader(worker, Executor { ui.post(it) },
-        { key: HistoryDisplayKey -> HistoryDisplay.load(app, key.days) }, ::show)
+        { key: HistoryDisplayKey -> HistoryDisplay.load(app, key.days, key.targetId) }, ::show)
 
     init {
         shareButton.isEnabled = false
@@ -49,6 +50,12 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
         uptime.text = "—"
     }
 
+    fun selectTarget(id: TargetId) {
+        targetId = id
+        selectPeriod(days)
+        chart.setData(ChartView.prepare(emptyList(), System.currentTimeMillis(), HOUR_MINUTES))
+    }
+
     fun invalidate() {
         requested = null
         loader.invalidate()
@@ -60,7 +67,8 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
         health.refresh(now)
         if (BackupManager.hasPending()) return
         days = selected
-        val key = HistoryDisplayKey(History.version, now / MINUTE_MS, days)
+        val key = HistoryDisplayKey(TargetHistoryPresentation.version(targetId), now / MINUTE_MS, days,
+            targetId, TargetPreferences.endpointRevision(app, targetId), TargetPersistence.active?.generationId)
         if (requested != key) {
             requested = key
             loader.request(key)
@@ -68,11 +76,13 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
     }
 
     private fun show(key: HistoryDisplayKey, result: Result<HistoryDisplay>) {
-        if (!resumed || activity.isFinishing || key.days != days) return
+        val selected = key.days == days && key.targetId == targetId
+        if (!resumed || activity.isFinishing || !selected) return
         if (BackupManager.hasPending()) { invalidate(); return }
         val value = result.getOrNull()
-        if (value == null || value.version != History.version ||
-            value.at / MINUTE_MS != System.currentTimeMillis() / MINUTE_MS) {
+        val current = key.endpointRevision == TargetPreferences.endpointRevision(app, targetId) &&
+            key.generation == TargetPersistence.active?.generationId
+        if (value == null || !current || !currentWindow(value)) {
             invalidate()
             if (value == null) {
                 summary.setText(R.string.history_load_failed)
@@ -89,9 +99,14 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
                     durationStr(measured.assessedMs), durationStr(measured.windowMs),
                     durationStr(measured.offlineMs), durationStr(measured.unknownMs))
             chart.setData(value.chart)
+            chart.contentDescription = TargetNames.label(targetId) + ": " + chart.contentDescription
             activity.findViewById<TextView>(R.id.tvChartTitle).setText(
                 if (key.days == 1) R.string.chart_last_hour else R.string.chart_last_week)
             shareButton.isEnabled = true
         }
     }
+
+    private fun currentWindow(value: HistoryDisplay): Boolean =
+        value.version == TargetHistoryPresentation.version(targetId) &&
+            value.at / MINUTE_MS == System.currentTimeMillis() / MINUTE_MS
 }
