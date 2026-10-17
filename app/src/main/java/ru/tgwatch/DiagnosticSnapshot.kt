@@ -17,12 +17,13 @@ data class DiagnosticSnapshot(
     val deviceIdleObserved: Boolean,
     val powerSave: Boolean,
     val userUnlocked: Boolean,
-    val dailyStats: TimeStats,
+    val dailyStats: TimeStats?,
     val endpoints: List<ProbeOutcome>,
     val scheduling: ScheduleDiagnostics.Snapshot,
+    val monitorHealth: MonitorHealth = MonitorHealth(),
 ) {
     fun toJson(): String {
-        val json = JSONObject().put("schema_version", 1)
+        val json = JSONObject().put("schema_version", 2)
             .put("app", JSONObject()
                 .put("version", appVersion.takeIf { VERSION.matches(it) } ?: "unknown")
                 .put("version_code", appVersionCode.coerceAtLeast(0)))
@@ -32,6 +33,7 @@ data class DiagnosticSnapshot(
             .put("last_24_hours", statsJson())
             .put("endpoints", endpointsJson())
             .put("scheduling", schedulingJson())
+            .put("monitor_health", healthJson())
         return json.toString(2).also { check(it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) }
     }
 
@@ -50,15 +52,29 @@ data class DiagnosticSnapshot(
         .put("stale", stale)
         .put("latency_ms", status.latencyMs.coerceIn(-1, MAX_LATENCY_MS))
 
-    private fun statsJson() = JSONObject()
-        .put("ok_ms", dailyStats.okMs.coerceAtLeast(0))
-        .put("down_ms", dailyStats.downMs.coerceAtLeast(0))
-        .put("partial_ms", dailyStats.partialMs.coerceAtLeast(0))
-        .put("offline_ms", dailyStats.offlineMs.coerceAtLeast(0))
-        .put("unknown_ms", dailyStats.unknownMs.coerceAtLeast(0))
-        .put("checks", dailyStats.checks.coerceAtLeast(0))
-        .put("outage_count", dailyStats.outageCount.coerceAtLeast(0))
-        .put("availability_percent", dailyStats.uptimePercent.takeIf { it.isFinite() && it >= 0 } ?: JSONObject.NULL)
+    private fun statsJson(): Any = dailyStats?.let { stats ->
+        val coverage = CoverageStats.from(stats, CoverageStats.DAY_MS)
+        JSONObject()
+            .put("ok_ms", stats.okMs.coerceAtLeast(0))
+            .put("down_ms", stats.downMs.coerceAtLeast(0))
+            .put("partial_ms", stats.partialMs.coerceAtLeast(0))
+            .put("offline_ms", stats.offlineMs.coerceAtLeast(0))
+            .put("unknown_ms", stats.unknownMs.coerceAtLeast(0))
+            .put("checks", stats.checks.coerceAtLeast(0))
+            .put("outage_count", stats.outageCount.coerceAtLeast(0))
+            .put("availability_percent", stats.uptimePercent.takeIf { it.isFinite() && it >= 0 } ?: JSONObject.NULL)
+            .put("coverage_percent", coverage.percent ?: JSONObject.NULL)
+            .put("assessed_ms", coverage.assessedMs)
+            .put("window_ms", coverage.windowMs)
+    } ?: JSONObject.NULL
+
+    private fun healthJson() = JSONObject()
+        .put("check_started_elapsed_ms", monitorHealth.checkStartedElapsed.coerceAtLeast(0))
+        .put("not_measured_count", monitorHealth.notMeasuredCount.coerceAtLeast(0))
+        .put("primary_busy", monitorHealth.primaryBusy.coerceIn(0, ProbeAdmission.PRIMARY_LIMIT))
+        .put("secondary_busy", monitorHealth.secondaryBusy.coerceIn(0, ProbeAdmission.SECONDARY_LIMIT))
+        .put("storage_failure", monitorHealth.storageFailure?.name ?: JSONObject.NULL)
+        .put("recovery_state", monitorHealth.recoveryState.name)
 
     private fun endpointsJson(): JSONArray {
         val outcomes = JSONArray()

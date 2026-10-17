@@ -9,7 +9,9 @@ The report is limited to 16 KiB and contains an explicit field allowlist:
 - Notification permission, exact-alarm permission, battery exemption, device
   idle observation, power-saving mode, and unlocked state.
 - Current status, last-check timestamp, freshness, and probe latency.
-- Last 24-hour aggregate status durations, checks, outages, and availability.
+- Last 24-hour aggregate status durations, checks, outages, availability and assessment coverage.
+- Cached monitor health: current check start, unstarted probes, occupied physical slots,
+  typed storage failure and recovery state.
 - Last completed probe's known endpoint names, group, reachability, and latency.
 - Scheduling counters for the latest service session.
 
@@ -29,6 +31,25 @@ sixteen workers, accommodating the thirteen IPv4/IPv6 Telegram endpoints and
 three controls. A stuck extra transport cannot occupy that pool; the service
 reuses both pools and shuts them down when it is destroyed. Transport cancellation
 still depends on the underlying operation responding to interruption or closure.
+
+## Availability, coverage and storage health
+
+The main screen calculates availability and coverage over the same selected day or
+week and history revision. Availability is OK / (OK + DOWN + PARTIAL); assessment
+coverage is (OK + DOWN + PARTIAL) / the full selected window. Offline and
+unobserved durations are shown separately. Twenty minutes of OK in one day means
+100% observed availability with only 20/1440 of the day assessed. No assessments
+mean insufficient data, rather than 0% or 100% availability. Current clock epochs
+are used so a clock rollback cannot double-count overlapping observations.
+
+Diagnostic schema version 2 adds `monitor_health` and `coverage_percent`,
+`assessed_ms`, `window_ms` to `last_24_hours`. On a typed history read/write
+failure, `last_24_hours` is null and `monitor_health.storage_failure` identifies
+READ, WRITE, REPAIR or BACKPRESSURE without exception text. The measured network
+state remains unchanged. The UI health ticker consumes cached counters without
+waiting for the history disk monitor. Occupancy includes physical transports that
+have not returned after logical cancellation; it does not claim those requests
+were completed or that Doze caused their delay.
 
 ## Scheduling observations
 

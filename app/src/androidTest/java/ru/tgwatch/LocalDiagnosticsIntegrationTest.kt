@@ -82,7 +82,7 @@ class LocalDiagnosticsIntegrationTest {
                 listOf("PRIVATE_TOKEN_PASSWORD", "account@example.org", "192.168.9.4",
                     "diagnostic_private_fixture", "reason", "diagnostics", "log", "token")
                     .forEach { assertFalse(it, contents.contains(it)) }
-                assertEquals(1, json.getInt("schema_version"))
+                assertEquals(2, json.getInt("schema_version"))
                 assertEquals(Build.VERSION.SDK_INT, json.getJSONObject("os").getInt("sdk_int"))
                 assertEquals("OK", json.getJSONObject("state").getString("status"))
                 assertEquals(checkedAt, json.getJSONObject("state").getLong("checked_at_ms"))

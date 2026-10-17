@@ -118,6 +118,15 @@ class MonitorService : Service() {
         fun schedulingDiagnostics(): ScheduleDiagnostics.Snapshot =
             activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
 
+        /** Cached counters only: this path never opens or waits for the history journal. */
+        fun healthSnapshot(): MonitorHealth {
+            val busy = ProbeAdmission.process.snapshot()
+            return MonitorHealth(activeService?.checkStartedMono ?: 0L,
+                lastEndpoints.count { it.measurement == ProbeMeasurement.NOT_MEASURED }, busy.primary, busy.secondary,
+                if (HistorySessions.backpressured) HistoryFailure.BACKPRESSURE else History.healthFailure,
+                RecoveryCoordinator.state)
+        }
+
         /** Queue against this service instance only; never create or resurrect a service. */
         fun requestRunningCheck(ctx: Context, admission: () -> Boolean = { true }): Boolean {
             val service = activeService ?: return false

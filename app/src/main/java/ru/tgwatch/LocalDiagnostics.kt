@@ -70,6 +70,7 @@ object LocalDiagnostics {
         val alarms = ctx.getSystemService(AlarmManager::class.java)
         val notifications = ctx.getSystemService(NotificationManager::class.java)
         val current = MonitorService.state
+        val stats = History.readStats(ctx)
         return DiagnosticSnapshot(
             appVersion = app.versionName.orEmpty(),
             appVersionCode = if (Build.VERSION.SDK_INT >= 28) app.longVersionCode
@@ -85,7 +86,8 @@ object LocalDiagnostics {
             batteryExempt = pm.isIgnoringBatteryOptimizations(ctx.packageName),
             deviceIdleObserved = pm.isDeviceIdleMode, powerSave = pm.isPowerSaveMode,
             userUnlocked = ctx.getSystemService(UserManager::class.java).isUserUnlocked,
-            dailyStats = History.stats(ctx), endpoints = MonitorService.endpointOutcomes(),
+            dailyStats = (stats as? HistoryRead.Ready)?.value, endpoints = MonitorService.endpointOutcomes(),
+            monitorHealth = MonitorService.healthSnapshot(),
             scheduling = MonitorService.schedulingDiagnostics(),
         )
     }

@@ -119,4 +119,19 @@
     <string name="shortcut_mute_long">Mute alerts for 1 hour</string>
     <string name="onboarding_notifications_ready">Notifications are allowed</string>
     <string name="onboarding_battery_ready">Battery restrictions are removed</string>
+    <string name="coverage_no_data">insufficient observations</string>
+    <string name="coverage_summary">Assessment coverage: %1$s (%2$s of %3$s)
+Offline: %4$s · Unobserved: %5$s</string>
+    <string name="monitor_health_title">Monitor health</string>
+    <string name="health_completed">Last measured: %1$s · %2$s</string>
+    <string name="health_fresh">fresh</string>
+    <string name="health_stale">stale or stopped</string>
+    <string name="health_check">Current check: %1$s</string>
+    <string name="health_idle">idle</string>
+    <string name="health_slots">Unstarted probes: %1$d
+Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
+    <string name="health_storage_ok">History: no recorded error</string>
+    <string name="health_storage_failed">History unavailable (%1$s)</string>
+    <string name="health_recovering">Preparing local storage</string>
+    <string name="health_recovery_failed">Storage recovery failed</string>
 </resources>

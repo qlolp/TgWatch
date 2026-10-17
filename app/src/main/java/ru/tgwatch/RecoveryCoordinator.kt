@@ -7,7 +7,8 @@ import java.util.concurrent.TimeUnit
 /** Process-owned workers remain bounded when a disk operation does not respond to interruption. */
 object HistorySessions {
     private val executor = Executors.newSingleThreadExecutor { task -> Thread(task, "tg-history") }
-    private var instance: HistorySessionQueue? = null
+    @Volatile private var instance: HistorySessionQueue? = null
+    val backpressured: Boolean get() = instance?.backpressured == true
     @Synchronized fun queue(ctx: Context): HistorySessionQueue {
         val app = ctx.applicationContext
         return instance ?: HistorySessionQueue(executor, {

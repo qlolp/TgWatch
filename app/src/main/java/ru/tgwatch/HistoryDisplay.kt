@@ -7,21 +7,26 @@ internal data class HistoryDisplay(
     val version: Long,
     val at: Long,
     val uptime: Double,
+    val coverage: CoverageStats,
     val summary: String,
     val chart: ChartView.Companion.Prepared,
 ) {
     companion object {
+        private const val MAX_DAYS = 7
         private const val WEEK_MINUTES = 7 * 24 * 60
         private const val HOUR_MINUTES = 60
 
         /** The history monitor keeps chart and aggregates on the same snapshot. */
         fun load(ctx: Context, days: Int): HistoryDisplay = synchronized(History) {
             val now = System.currentTimeMillis()
-            val uptime = History.stats(ctx, 1, now).uptimePercent
-            val summary = History.describeStats(History.stats(ctx, days, now), days)
+            val selectedDays = days.coerceIn(1, MAX_DAYS)
+            val stats = History.stats(ctx, selectedDays, now)
+            val uptime = stats.uptimePercent
+            val coverage = CoverageStats.from(stats, selectedDays * CoverageStats.DAY_MS)
+            val summary = History.describeStats(stats, selectedDays)
             val window = if (days == 1) HOUR_MINUTES else WEEK_MINUTES
             val chart = ChartView.prepare(History.lastMinutes(ctx, window, now), now, window)
-            HistoryDisplay(History.version, now, uptime, summary, chart)
+            HistoryDisplay(History.version, now, uptime, coverage, summary, chart)
         }
     }
 }

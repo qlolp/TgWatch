@@ -60,10 +60,10 @@ class DiagnosticSnapshotTest {
     }
     @Test fun reportSectionsCannotContainRawHistoryLogPreferencesOrIdentifiers() {
         val json = JSONObject(snapshot().toJson())
-        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling"),
+        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health"),
             json.keyNames())
         assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keyNames())
-        assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent"),
+        assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent", "coverage_percent", "assessed_ms", "window_ms"),
             json.getJSONObject("last_24_hours").keyNames())
         assertEquals(setOf("sdk_int"), json.getJSONObject("os").keyNames())
         assertFalse(json.has("history"))
@@ -74,6 +74,16 @@ class DiagnosticSnapshotTest {
         val json = JSONObject(snapshot().toJson()).getJSONObject("scheduling")
         assertTrue(json.has("idle_observed_arrivals"))
         assertFalse(json.has("doze_caused_delays"))
+    }
+    @Test fun unavailableHistoryIsExplicitRatherThanZeroAvailability() {
+        val json = JSONObject(snapshot().copy(dailyStats = null,
+            monitorHealth = MonitorHealth(storageFailure = HistoryFailure.WRITE)).toJson())
+        assertTrue(json.isNull("last_24_hours"))
+        val health = json.getJSONObject("monitor_health")
+        assertEquals("WRITE", health.getString("storage_failure"))
+        assertEquals(setOf("check_started_elapsed_ms", "not_measured_count", "primary_busy",
+            "secondary_busy", "storage_failure", "recovery_state"), health.keyNames())
+        assertFalse(json.toString().contains("exception"))
     }
 }
 

@@ -14,7 +14,7 @@ class ProbePermit internal constructor(private val release: () -> Unit) {
 }
 
 /** One bounded registry per process; replacing executors cannot forget live native requests. */
-class ProbeAdmission(private val primaryLimit: Int = 16, private val secondaryLimit: Int = 3) {
+class ProbeAdmission(private val primaryLimit: Int = PRIMARY_LIMIT, private val secondaryLimit: Int = SECONDARY_LIMIT) {
     init {
         require(primaryLimit >= 0 && secondaryLimit >= 0 && primaryLimit.toLong() + secondaryLimit > 0)
     }
@@ -43,5 +43,9 @@ class ProbeAdmission(private val primaryLimit: Int = 16, private val secondaryLi
 
     @Synchronized fun snapshot() = ProbeAdmissionSnapshot(primary, secondary)
 
-    companion object { val process = ProbeAdmission() }
+    companion object {
+        const val PRIMARY_LIMIT = 16
+        const val SECONDARY_LIMIT = 3
+        val process = ProbeAdmission()
+    }
 }

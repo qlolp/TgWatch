@@ -214,6 +214,11 @@
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/monitor_health_title" />
+            <TextView android:id="@+id/tvMonitorHealth" style="@style/Body" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
 
             <TextView
                 style="@style/CardTitle"
@@ -226,6 +231,8 @@
                 style="@style/Body"
                 android:layout_marginTop="8dp"
                 android:text="@string/history_empty" />
+
+            <TextView android:id="@+id/tvCoverage" style="@style/Body" android:layout_marginTop="8dp" />
 
             <Button
                 android:id="@+id/btnShareStats"

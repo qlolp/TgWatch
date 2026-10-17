@@ -119,4 +119,19 @@
     <string name="shortcut_mute_long">Тишина на час</string>
     <string name="onboarding_notifications_ready">Уведомления разрешены</string>
     <string name="onboarding_battery_ready">Ограничения батареи сняты</string>
+    <string name="coverage_no_data">недостаточно наблюдений</string>
+    <string name="coverage_summary">Оценка сервиса: %1$s (%2$s из %3$s)
+Без сети: %4$s · Без измерений: %5$s</string>
+    <string name="monitor_health_title">Здоровье мониторинга</string>
+    <string name="health_completed">Последнее измерение: %1$s · %2$s</string>
+    <string name="health_fresh">актуально</string>
+    <string name="health_stale">устарело или мониторинг остановлен</string>
+    <string name="health_check">Текущая проверка: %1$s</string>
+    <string name="health_idle">ожидание</string>
+    <string name="health_slots">Неначатых проб: %1$d
+Физические слоты: %2$d/16 основных · %3$d/3 дополнительных</string>
+    <string name="health_storage_ok">История: нет зарегистрированных ошибок</string>
+    <string name="health_storage_failed">История недоступна (%1$s)</string>
+    <string name="health_recovering">Подготовка локального хранилища</string>
+    <string name="health_recovery_failed">Не удалось восстановить хранилище</string>
 </resources>

@@ -46,7 +46,8 @@ object History {
     private var dirty = false
     private var lastCompacted = 0L
     private var physicalRows = 0
-    private var failure: HistoryFailure? = null
+    @Volatile private var failure: HistoryFailure? = null
+    val healthFailure: HistoryFailure? get() = failure
     private val compaction = HistoryCompaction()
     private val statsCache = mutableMapOf<String, TimeStats>()
     private val preparation = HistoryPreparationCache()
