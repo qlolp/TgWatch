@@ -246,7 +246,7 @@ jobs:
             local reports=$1 result=0;
             shift;
             "$@" || result=$?;
-            for report in signed-upgrade-logcat.txt upgrade-*.txt upgrade-*.xml upgrade-*.csv release-screen.png; do
+            for report in signed-upgrade-logcat.txt upgrade-*.txt upgrade-*.xml upgrade-*.csv upgrade-*.json release-screen.png; do
             if [ -f "$report" ]; then mv "$report" "$reports/"; fi;
             done;
             return "$result";
@@ -338,9 +338,9 @@ jobs:
               signed-upgrade/legacy/signed-upgrade-logcat.txt|signed-upgrade/latest/signed-upgrade-logcat.txt) ;;
               signed-upgrade/legacy/upgrade-before-prefs.xml|signed-upgrade/latest/upgrade-before-prefs.xml) ;;
               signed-upgrade/legacy/upgrade-seeded-prefs.xml|signed-upgrade/latest/upgrade-seeded-prefs.xml) ;;
-              signed-upgrade/legacy/upgrade-before-history.csv|signed-upgrade/latest/upgrade-before-history.csv) ;;
+              signed-upgrade/legacy/upgrade-before-targets.json|signed-upgrade/latest/upgrade-before-targets.json) ;;
               signed-upgrade/legacy/upgrade-after-prefs.xml|signed-upgrade/latest/upgrade-after-prefs.xml) ;;
-              signed-upgrade/legacy/upgrade-after-history.csv|signed-upgrade/latest/upgrade-after-history.csv) ;;
+              signed-upgrade/legacy/upgrade-after-targets.json|signed-upgrade/latest/upgrade-after-targets.json) ;;
               signed-upgrade/legacy/release-screen.png|signed-upgrade/latest/release-screen.png) ;;
               *) printf 'Unexpected untracked publication input: %q\n' "$path" >&2; exit 1 ;;
             esac
@@ -448,9 +448,9 @@ jobs:
               signed-upgrade/legacy/signed-upgrade-logcat.txt|signed-upgrade/latest/signed-upgrade-logcat.txt) ;;
               signed-upgrade/legacy/upgrade-before-prefs.xml|signed-upgrade/latest/upgrade-before-prefs.xml) ;;
               signed-upgrade/legacy/upgrade-seeded-prefs.xml|signed-upgrade/latest/upgrade-seeded-prefs.xml) ;;
-              signed-upgrade/legacy/upgrade-before-history.csv|signed-upgrade/latest/upgrade-before-history.csv) ;;
+              signed-upgrade/legacy/upgrade-before-targets.json|signed-upgrade/latest/upgrade-before-targets.json) ;;
               signed-upgrade/legacy/upgrade-after-prefs.xml|signed-upgrade/latest/upgrade-after-prefs.xml) ;;
-              signed-upgrade/legacy/upgrade-after-history.csv|signed-upgrade/latest/upgrade-after-history.csv) ;;
+              signed-upgrade/legacy/upgrade-after-targets.json|signed-upgrade/latest/upgrade-after-targets.json) ;;
               signed-upgrade/legacy/release-screen.png|signed-upgrade/latest/release-screen.png) ;;
               *) printf 'Unexpected untracked publication input: %q\n' "$path" >&2; exit 1 ;;
             esac

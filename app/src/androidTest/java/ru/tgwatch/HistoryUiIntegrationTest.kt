@@ -109,12 +109,20 @@ class HistoryUiIntegrationTest {
                 val button = activity.findViewById<Button>(R.id.btnResumeAlerts)
                 assertEquals(View.VISIBLE, button.visibility)
                 button.performClick()
-                assertEquals(0L, Prefs.alertsMutedUntil(ctx))
-                assertEquals(View.GONE, button.visibility)
-                assertTrue(Prefs.quietHoursEnabled(ctx))
-                assertFalse(Prefs.soundFor(ctx, "PARTIAL"))
-                preserved.forEach { (key, value) -> assertEquals("Unrelated setting $key", value, Prefs.sp(ctx).all[key]) }
             }
+            val deadline = SystemClock.elapsedRealtime() + 5_000
+            while ((Prefs.alertsMutedUntil(ctx) != 0L || TargetSettingsExecutor.busy(TargetId.TELEGRAM)) &&
+                SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25)
+            assertEquals(0L, Prefs.alertsMutedUntil(ctx))
+            var hidden = false
+            while (!hidden && SystemClock.elapsedRealtime() < deadline) {
+                scenario.onActivity { hidden = it.findViewById<Button>(R.id.btnResumeAlerts).visibility == View.GONE }
+                if (!hidden) SystemClock.sleep(25)
+            }
+            assertTrue("The completed settings write must hide Resume alerts", hidden)
+            assertTrue(Prefs.quietHoursEnabled(ctx))
+            assertFalse(Prefs.soundFor(ctx, "PARTIAL"))
+            preserved.forEach { (key, value) -> assertEquals("Unrelated setting $key", value, Prefs.sp(ctx).all[key]) }
         }
     }
 

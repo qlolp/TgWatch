@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Seed and verify the real published 1.10.47 signed upgrade without clearing data."""
 from pathlib import Path
+import importlib.util
 import sys
 import xml.etree.ElementTree as ET
 
@@ -38,10 +39,11 @@ def prefs(path):
 
 
 def verify(before_prefs, after_prefs, before_history, after_history):
-    before = set(Path(before_history).read_text().splitlines())
-    after = set(Path(after_history).read_text().splitlines())
-    assert before and before <= after, "Existing observations were lost during signed upgrade"
-    assert len(after) > len(before), "No observations recorded after upgrade"
+    spec = importlib.util.spec_from_file_location('target_snapshot', Path(__file__).with_name('target-snapshot.py'))
+    snapshots = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(snapshots)
+    before, after = snapshots.load_export(before_history), snapshots.load_export(after_history)
+    snapshots.assert_preserved(before, after)
     values = prefs(after_prefs)
     for name, (_, expected) in SEED.items():
         if name not in ("quiet_start_hour", "quiet_end_hour"):
@@ -53,8 +55,7 @@ def verify(before_prefs, after_prefs, before_history, after_history):
     assert (start, end) == (1380, 420), "Legacy quiet hours changed during minute migration"
     previous, checked = int(prefs(before_prefs)["last_checked"]), int(values["last_checked"])
     assert checked > previous, "Persisted status is not fresh after upgrade"
-    assert any(len(row.split(",")) == 5 and row.split(",")[0] == str(checked)
-               and row.split(",")[4].isdigit() for row in after), "Fresh timestamp has no matching history row"
+    assert snapshots.has_observation(after, 'telegram', checked), "Fresh Telegram timestamp has no matching current row"
 
 
 def main():
@@ -64,7 +65,7 @@ def main():
         verify(*sys.argv[2:])
         print("Published 1.10.47 -> signed release: history, independent event choices, legacy hours and fresh observation verified.")
     else:
-        print("Usage: upgrade-policy.py seed before.xml seeded.xml | verify before.xml after.xml before.csv after.csv", file=sys.stderr)
+        print("Usage: upgrade-policy.py seed before.xml seeded.xml | verify before.xml after.xml before.json after.json", file=sys.stderr)
         return 1
     return 0
 

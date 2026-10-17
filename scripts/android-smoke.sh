@@ -22,23 +22,14 @@ last_check() {
     sed -n 's/.*name="last_checked" value="\([0-9]*\)".*/\1/p' | tr -d '\r'
 }
 await_observation() {
-  local after=$1 value
-  for attempt in $(seq 1 45); do
-    value=$(last_check || true)
-    if [[ -n "$value" && "$value" -gt "$after" ]]; then
-      # Preferences precede History.record: the fresh timestamp must have its own row.
-      if adb shell dumpsys activity services ru.tgwatch | grep -q 'isForeground=true' &&
-          adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | tr -d '\r' |
-          awk -F, -v checked="$value" '$1 == checked && NF == 5 && $5 ~ /^[0-9]+$/ {found=1} END {exit !found}'; then
-        return 0
-      fi
-    fi
-    sleep 2
-  done
-  echo "No new foreground-service observation after $after" >&2
-  adb shell dumpsys activity services ru.tgwatch
-  adb logcat -d -s TgWatch AndroidRuntime
-  return 1
+  local after=$1
+  shift
+  python3 scripts/target-snapshot.py await --after "$after" --foreground \
+    --timeout "${TGWATCH_OBSERVATION_TIMEOUT:-90}" "$@"
+}
+assert_legacy_observation() {
+  python3 scripts/target-snapshot.py capture --out app/build/reports/androidTests/target-snapshot.json
+  python3 scripts/target-snapshot.py contains app/build/reports/androidTests/target-snapshot.json --at "$((minute * 60000))"
 }
 # The always-run reporter must never mistake a previous run for fresh results.
 rm -rf -- app/build/outputs/androidTest-results/connected
@@ -107,17 +98,17 @@ adb install -r -g app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation 0
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
-adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q "^$((minute * 60000)),"
+assert_legacy_observation
 # Connectivity loss and recovery must produce new persisted observations.
 before=$(last_check)
 adb shell svc wifi disable
 adb shell svc data disable
 sleep 6
-await_observation "$before"
+await_observation "$before" --status NO_NETWORK
 before=$(last_check)
 adb shell svc wifi enable
 adb shell svc data enable
-await_observation "$before"
+await_observation "$before" --exclude-status NO_NETWORK --exclude-status UNKNOWN
 before=$(last_check)
 adb shell dumpsys battery unplug
 adb shell input keyevent KEYCODE_SLEEP
@@ -151,7 +142,7 @@ done
 adb shell dumpsys user | grep -q RUNNING_UNLOCKED
 adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
-adb shell cat /data/user_de/0/ru.tgwatch/files/history-v2.csv | grep -q "^$((minute * 60000)),"
+assert_legacy_observation
 check_crashes
 # After all assertions, capture the real main screen for documentation.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch

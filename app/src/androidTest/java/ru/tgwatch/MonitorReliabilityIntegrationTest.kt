@@ -404,6 +404,7 @@ class MonitorReliabilityIntegrationTest {
         val now = System.currentTimeMillis()
         History.replaceSnapshot(ctx, listOf(Observation(now - 60_000, now, "OK", 12)))
         assertTrue(Prefs.sp(ctx).edit().putBoolean("enabled", true).putBoolean("daily_summary", true)
+            .putBoolean(TargetPreferences.key(TargetId.TELEGRAM, "enabled"), true)
             .remove("daily_summary_last_at").commit())
     }
 

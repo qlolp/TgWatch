@@ -1,5 +1,6 @@
 """Real XML/CSV signed-upgrade assertions without adb or signing credentials."""
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -32,8 +33,8 @@ class UpgradePolicyTests(unittest.TestCase):
         values["last_checked"].set("value", "200")
         tree.write(after)
         before_history, after_history = root / "before.csv", root / "after.csv"
-        before_history.write_text("100,200,ONLINE,10,1\n")
-        after_history.write_text("100,200,ONLINE,10,1\n200,300,TG_DOWN,20,1\n")
+        before_history.write_text("100,200,OK,10,1\n")
+        after_history.write_text("100,200,OK,10,1\n200,300,TG_DOWN,20,1\n")
         return before, after, before_history, after_history
 
     def test_independent_false_choices_and_legacy_hours_survive(self):
@@ -66,7 +67,26 @@ class UpgradePolicyTests(unittest.TestCase):
         policy = self.load()
         with tempfile.TemporaryDirectory() as directory:
             files = self.fixture(Path(directory), policy)
-            files[3].write_text("100,200,ONLINE,10,1\n150,200,TG_DOWN,20,1\n")
+            files[3].write_text("100,200,OK,10,1\n150,200,TG_DOWN,20,1\n")
+            with self.assertRaises(AssertionError): policy.verify(*files)
+
+    def test_canonical_target_snapshot_preserves_legacy_identity(self):
+        policy = self.load()
+        with tempfile.TemporaryDirectory() as directory:
+            files = self.fixture(Path(directory), policy)
+            def row(at, until, target='telegram'):
+                return dict(target_id=target, at_ms=at, until_ms=until, status='OK',
+                    latency_ms=10, clock_epoch=1, endpoint_revision=0)
+            before = dict(schema_version=1, captured_at_ms=200, source='legacy', generation=None,
+                observations=[row(100, 200)])
+            after = dict(schema_version=1, captured_at_ms=300, source='targets', generation='a' * 32,
+                observations=[row(100, 200), row(200, 300)])
+            files[2].write_text(json.dumps(before))
+            files[3].write_text(json.dumps(after))
+            policy.verify(*files)
+            # A new Matrix result with the same timestamp cannot validate the Telegram status.
+            after['observations'][-1]['target_id'] = 'matrix'
+            files[3].write_text(json.dumps(after))
             with self.assertRaises(AssertionError): policy.verify(*files)
 
 

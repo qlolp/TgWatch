@@ -25,6 +25,7 @@ class EventSettingsTest {
         try {
             files.forEach { pending ->
                 pending.writeBytes(sentinel)
+                BackupJournals.refresh(ctx) // Worker-side startup discovery; preference access remains memory-only.
                 assertSame("Normal settings access must remain a raw accessor", settings, Prefs.sp(ctx))
                 Prefs.quietStartMinute(ctx)
                 Prefs.soundFor(ctx, "TG_DOWN")
@@ -35,9 +36,11 @@ class EventSettingsTest {
                 Prefs.setEnabled(ctx, true)
                 assertEquals("A pending restore must prevent changing enabled", before["enabled"], settings.all["enabled"])
                 pending.delete()
+                BackupJournals.refresh(ctx)
             }
         } finally {
             files.forEach { it.delete() }
+            BackupJournals.refresh(ctx)
         }
     }
 

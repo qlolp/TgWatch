@@ -54,7 +54,7 @@ class ReleaseWorkspaceTests(unittest.TestCase):
     def test_clean_sources_with_explicit_generated_assets_are_allowed(self):
         def generate(root, git):
             for name in ("TgWatch.apk", "TgWatch.apk.sha256", "release-evidence/TgWatch.trivy.json",
-                         "previous-latest/tag.txt", "signed-upgrade/latest/upgrade-after-history.csv"):
+                         "previous-latest/tag.txt", "signed-upgrade/latest/upgrade-after-targets.json"):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("Generated artifact\n")

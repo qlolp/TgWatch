@@ -501,7 +501,9 @@ class WorkflowTests(unittest.TestCase):
 
     def test_smoke_matches_fresh_timestamp_and_signed_gate_remains(self):
         smoke = (SCRIPTS / "android-smoke.sh").read_text()
-        self.assertIn('$1 == checked', smoke)
+        self.assertIn('scripts/target-snapshot.py await', smoke)
+        self.assertIn("row['at_ms'] == checked_at", (SCRIPTS / 'target-snapshot.py').read_text())
+        self.assertIn('--status NO_NETWORK', smoke)
         workflow = (ROOT / ".github/workflows/build-apk.yml").read_text()
         self.assertIn("signed-upgrade-smoke.sh previous/TgWatch.apk TgWatch.apk", workflow)
         self.assertIn("efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1", workflow)
@@ -583,7 +585,7 @@ class SignedUpgradeWorkflowTests(unittest.TestCase):
         scripts, tools = self.work / "scripts", self.work / "bin"
         scripts.mkdir()
         tools.mkdir()
-        for name in ("signed-upgrade-smoke.sh", "upgrade-policy.py"):
+        for name in ("signed-upgrade-smoke.sh", "upgrade-policy.py", "target-snapshot.py"):
             (scripts / name).write_text((SCRIPTS / name).read_text())
         self.log, self.state = self.work / "calls.jsonl", self.work / "state.json"
         self.state.write_text(json.dumps({"installed": None, "checked": 0, "prefs": "", "history": ""}))
@@ -615,8 +617,12 @@ elif args[:3] == ['shell', 'am', 'start']:
     tree = ET.fromstring(state['prefs'])
     tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
     state['prefs'] = ET.tostring(tree, encoding='unicode')
-    state['history'] += str(state['checked']) + ',400,ONLINE,10,1\\n'
+    state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
 elif args[:3] == ['shell', 'am', 'force-stop']: pass
+elif args[:3] == ['shell', '-T', 'cat']:
+    if args[-1].endswith('targets-v1/active-generation'):
+        print('cat: No such file or directory', file=sys.stderr); sys.exit(1)
+    print(state['prefs'] if 'shared_prefs' in args[-1] else state['history'])
 elif args[:2] == ['shell', 'cat']:
     print(state['prefs'] if 'shared_prefs' in args[2] else state['history'])
 elif args[0] == 'pull':
@@ -631,7 +637,7 @@ path.write_text(json.dumps(state))
 ''')
         adb.chmod(0o755)
         self.env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"],
-                        UPGRADE_LOG=str(self.log), UPGRADE_STATE=str(self.state))
+                        UPGRADE_LOG=str(self.log), UPGRADE_STATE=str(self.state), TGWATCH_OBSERVATION_TIMEOUT="1")
 
     def run_paths(self, latest=True):
         script = self.script.replace("${{ steps.latest_baseline.outputs.available }}", str(latest).lower())
@@ -657,8 +663,8 @@ path.write_text(json.dumps(state))
             reports = self.work / "signed-upgrade" / path
             self.assertTrue((reports / "signed-upgrade-logcat.txt").is_file())
             self.assertTrue((reports / "upgrade-seeded-prefs.xml").is_file())
-            self.assertTrue((reports / "upgrade-before-history.csv").is_file())
-            self.assertTrue((reports / "upgrade-after-history.csv").is_file())
+            self.assertTrue((reports / "upgrade-before-targets.json").is_file())
+            self.assertTrue((reports / "upgrade-after-targets.json").is_file())
 
     def test_first_release_still_runs_legacy_gate(self):
         calls = self.run_paths(latest=False)
@@ -716,28 +722,33 @@ class AndroidSmokeTests(unittest.TestCase):
             root = Path(directory)
             adb = root / "adb"
             adb.write_text("#!/usr/bin/env python3\nimport sys\nargs=' '.join(sys.argv[1:])\n" +
-                           "if 'shared_prefs' in args: print('<long name=\"last_checked\" value=\"200\" />')\n" +
+                           "if 'shared_prefs' in args: print('<map><long name=\"last_checked\" value=\"200\" /></map>')\n" +
+                           "elif 'targets-v1/active-generation' in args: print('cat: No such file or directory', file=sys.stderr); sys.exit(1)\n" +
                            "elif 'history-v2.csv' in args: print(" + repr(history) + ")\n" +
                            "elif 'dumpsys activity services' in args: print(" + repr("isForeground=" + str(foreground).lower()) + ")\n")
             adb.chmod(0o755)
             prefix = (SCRIPTS / "android-smoke.sh").read_text().split("bash ./gradlew connectedDebugAndroidTest", 1)[0]
+            (root / "scripts").mkdir()
+            helper = (SCRIPTS / "target-snapshot.py").read_text()
             if mutate:
-                prefix = prefix.replace("$1 == checked", "$1 >= 0")
+                helper = helper.replace("row['at_ms'] == checked_at", "row['at_ms'] >= 0")
+            (root / "scripts" / "target-snapshot.py").write_text(helper)
             return subprocess.run(["bash"], input=prefix + '\nsleep() { :; }\nawait_observation 100\n',
-                                  cwd=root, env=dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"]),
+                                  cwd=root, env=dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"],
+                                                     TGWATCH_OBSERVATION_TIMEOUT="1"),
                                   text=True, capture_output=True)
 
     def test_fresh_timestamp_requires_its_matching_history_row(self):
-        result = self.run_observation("200,400,ONLINE,10,1")
+        result = self.run_observation("200,400,OK,10,1")
         self.assertEqual(0, result.returncode, result.stderr)
-        stale = self.run_observation("100,400,ONLINE,10,1")
+        stale = self.run_observation("100,400,OK,10,1")
         self.assertNotEqual(0, stale.returncode)
         # Mutation reproduces the old bug: any old row falsely satisfied the gate.
-        regression = self.run_observation("100,400,ONLINE,10,1", mutate=True)
+        regression = self.run_observation("100,400,OK,10,1", mutate=True)
         self.assertEqual(0, regression.returncode, regression.stderr)
 
     def test_history_row_does_not_replace_foreground_service_requirement(self):
-        result = self.run_observation("200,400,ONLINE,10,1", foreground=False)
+        result = self.run_observation("200,400,OK,10,1", foreground=False)
         self.assertNotEqual(0, result.returncode)
 
 
