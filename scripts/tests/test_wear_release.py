@@ -44,8 +44,8 @@ class WearReleaseTests(unittest.TestCase):
     def test_smoke_invokes_real_surface_tests_and_requires_executed_results(self):
         from wear_smoke_report import EXPECTED, verify
         transcript = '\n'.join(f'INSTRUMENTATION_STATUS: test={name}\nINSTRUMENTATION_STATUS_CODE: 0'
-                               for name in sorted(EXPECTED)) + '\nOK (4 tests)\n'
-        self.assertEqual(4, verify(transcript, 30)['executed'])
+                               for name in sorted(EXPECTED)) + f'\nOK ({len(EXPECTED)} tests)\n'
+        self.assertEqual(len(EXPECTED), verify(transcript, 30)['executed'])
         for bad in ('OK (0 tests)', transcript.replace('CODE: 0', 'CODE: -4', 1),
                     transcript.replace(sorted(EXPECTED)[0], 'unrelatedTest')):
             with self.assertRaises(ValueError):

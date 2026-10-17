@@ -4,7 +4,13 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.os.SystemClock
+import android.graphics.Rect
+import android.graphics.Bitmap
+import android.os.ParcelFileDescriptor
 import android.widget.Button
+import android.widget.TextView
+import java.io.File
+import java.io.FileOutputStream
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.wear.tiles.RequestBuilders
@@ -68,6 +74,45 @@ class WatchSurfacesTest {
             instrumentation.waitForIdleSync()
             assertEquals(before + 1, WatchExecution.process.requestCount.get())
         } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+    @Test fun roundLayoutAndTalkBackAtLargeFont() {
+        val scale = context.resources.configuration.fontScale
+        fun shell(command: String) {
+            ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
+                .use { it.readBytes() }
+        }
+        var activity: WatchActivity? = null
+        try {
+            shell("settings put system font_scale 2.0")
+            activity = instrumentation.startActivitySync(Intent(context, WatchActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as WatchActivity
+            val screen = activity
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
+                assertTrue(screen.resources.configuration.isScreenRound)
+                assertEquals(2f, screen.resources.configuration.fontScale, 0.01f)
+                val status = screen.findViewById<TextView>(R.id.watch_status)
+                assertTrue(status.text.isNotEmpty())
+                val button = screen.findViewById<Button>(R.id.watch_check)
+                assertTrue(button.text.isNotEmpty()) // Native Button text is its TalkBack label.
+                button.requestRectangleOnScreen(Rect(0, 0, button.width, button.height), true)
+            }
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
+                val button = screen.findViewById<Button>(R.id.watch_check)
+                val visible = Rect()
+                assertTrue(button.getGlobalVisibleRect(visible))
+                assertTrue(visible.height() >= (48 * screen.resources.displayMetrics.density).toInt())
+            }
+            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                try { FileOutputStream(File(context.filesDir, "wear-large-font.png")).use {
+                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                } } finally { bitmap.recycle() }
+            } ?: fail("Wear screenshot missing")
+        } finally {
+            activity?.let { instrumentation.runOnMainSync { it.finish() } }
+            shell("settings put system font_scale $scale")
+        }
     }
     private fun <T : ContextWrapper> attach(service: T): T {
         ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)

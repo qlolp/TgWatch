@@ -748,7 +748,7 @@ class AndroidSmokeTests(unittest.TestCase):
                            "elif 'history-v2.csv' in args: print(" + repr(history) + ")\n" +
                            "elif 'dumpsys activity services' in args: print(" + repr("isForeground=" + str(foreground).lower()) + ")\n")
             adb.chmod(0o755)
-            prefix = (SCRIPTS / "android-smoke.sh").read_text().split("bash ./gradlew connectedDebugAndroidTest", 1)[0]
+            prefix = (SCRIPTS / "android-smoke.sh").read_text().split("bash ./gradlew ", 1)[0]
             (root / "scripts").mkdir()
             helper = (SCRIPTS / "target-snapshot.py").read_text()
             if mutate:

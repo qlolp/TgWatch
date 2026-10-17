@@ -9,6 +9,7 @@ EXPECTED = {
     'standaloneLaunchIsPassiveAndManualCheckIsBounded',
     'tileAndComplicationNeverProbeOnRequestIncludingAmbient',
     'tapOpensOneManualCheckButForgedLaunchIsPassive',
+    'roundLayoutAndTalkBackAtLargeFont',
 }
 
 
