@@ -1,8 +1,12 @@
 package ru.tgwatch
 
 /** Per-target configuration fences and immutable snapshots; never performs storage or network I/O. */
-class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(TargetDefinition::default)) {
+class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(TargetDefinition::default),
+    private val wallClock: () -> Long = System::currentTimeMillis,
+    private val elapsedClock: () -> Long = { java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) }) {
     private val configurations = initial.associate { it.id to TargetConfiguration(it) }.toMutableMap()
+    private var networkRevision = 0L
+    val currentNetworkRevision: Long get() = synchronized(this) { networkRevision }
     private val snapshots = mutableMapOf<TargetId, TargetSnapshot>()
     init { require(initial.size == TargetId.entries.size && configurations.size == TargetId.entries.size) }
 
@@ -19,6 +23,26 @@ class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(Ta
         configurations[definition.id] = next
         snapshots.remove(definition.id)
         return next
+    }
+
+    @Synchronized fun install(configuration: TargetConfiguration) {
+        if (configurations[configuration.definition.id] != configuration) {
+            configurations[configuration.definition.id] = configuration
+            snapshots.remove(configuration.definition.id)
+        }
+    }
+
+    @Synchronized fun networkChanged(revision: Long) {
+        require(revision >= networkRevision)
+        networkRevision = revision
+    }
+
+    @Synchronized fun publish(attempt: TargetAttempt, report: TargetReport): Boolean {
+        if (!report.publishable || attempt.networkRevision != networkRevision) return false
+        val current = configurations.getValue(attempt.id)
+        val revision = Math.addExact(snapshots[attempt.id]?.revision ?: -1L, 1L)
+        return publish(TargetSnapshot(attempt.id, report.status, wallClock(), elapsedClock(),
+            current.definition.intervalSec, report.latencyMs, attempt.generation, revision, attempt.endpointRevision))
     }
 
     @Synchronized fun publish(snapshot: TargetSnapshot): Boolean {

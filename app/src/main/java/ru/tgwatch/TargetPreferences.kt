@@ -35,5 +35,8 @@ object TargetPreferences {
         return HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
     }
 
+    fun endpointRevision(ctx: Context, id: TargetId): Long =
+        Prefs.sp(ctx).getLong(key(id, "endpoint_revision"), 0L).coerceAtLeast(0L)
+
     internal fun key(id: TargetId, suffix: String) = "target.${id.wire}.$suffix"
 }

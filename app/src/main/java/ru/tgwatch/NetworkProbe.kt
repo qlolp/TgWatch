@@ -11,7 +11,8 @@ import javax.net.ssl.SSLException
 /** EXTRA results are informational only and never take part in Telegram classification. */
 enum class ProbeGroup { WEB, MTPROTO, CONTROL, EXTRA }
 enum class ProbeMeasurement { SUCCESS, FAILURE, NOT_MEASURED }
-data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: String)
+data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: String,
+    val httpMode: HttpProbeMode = HttpProbeMode.REACHABLE)
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
     val latencyMs: Long = -1, val detail: String,
     val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE)
@@ -176,8 +177,11 @@ class NetworkProbe(
     }
 
     fun checkExtras(extras: List<ProbeEndpoint>): List<ProbeOutcome> =
-        ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS, lane = ProbeLane.SECONDARY)
-            .run(extras.filter { it.group == ProbeGroup.EXTRA }, ::probe)
+        checkSecondary(extras.filter { it.group == ProbeGroup.EXTRA }, ExtraProbes.BATCH_TIMEOUT_MS)
+
+    fun checkSecondary(endpoints: List<ProbeEndpoint>, timeoutMs: Long): List<ProbeOutcome> =
+        ProbeBatch(extraPool, timeoutMs, lane = ProbeLane.SECONDARY)
+            .run(endpoints.filter { it.group == ProbeGroup.EXTRA || it.group == ProbeGroup.CONTROL }, ::probe)
 
     fun checkPrimary(): ProbeReport {
         val telegram = listOf(
@@ -203,23 +207,8 @@ class NetworkProbe(
             val ok = MtProto.probe(ep.address, openSocket, cancellation)
             return ProbeOutcome(ep.name, ep.group, ok, elapsed(start), if (ok) Lang.t("MTProto resPQ; nonce совпал", "MTProto resPQ; nonce matched") else Lang.t("Ответ MTProto не подтверждён", "MTProto response not confirmed"))
         }
-        fun request(method: String): Int {
-            cancellation.check()
-            val connection = openConnection(URL(ep.address))
-            cancellation.register { connection.disconnect() }
-            return try {
-                connection.connectTimeout = 3_000
-                connection.readTimeout = 3_000
-                connection.requestMethod = method
-                connection.instanceFollowRedirects = false
-                connection.useCaches = false
-                connection.setRequestProperty("User-Agent", "TgWatch/${BuildConfig.VERSION_NAME} (Android)")
-                connection.responseCode
-            } finally { connection.disconnect() }
-        }
-        var code = request("HEAD")
-        if (code == 405 || code == 501) code = request("GET")
-        return ProbeOutcome(ep.name, ep.group, ProbeRules.isReachableHttpCode(code), elapsed(start), "HTTP $code")
+        val http = HttpEndpointProbe(openConnection).check(ep, cancellation)
+        return ProbeOutcome(ep.name, ep.group, http.confirmed, elapsed(start), "HTTP ${http.code}")
     }
     private fun elapsed(start: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
     companion object {

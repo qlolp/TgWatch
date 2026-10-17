@@ -43,6 +43,10 @@ internal class CheckAlarm(
     }
 
     companion object {
+        fun nextDelay(nowElapsed: Long, primaryDue: Long?, secondaryDue: Long?): Long? =
+            listOfNotNull(primaryDue, secondaryDue).minOrNull()?.let { (it - nowElapsed).coerceAtLeast(0L) }
+
+
         /** Больше самой долгой проверки (30 с до принудительной отмены), чтобы таймер успел первым. */
         const val INTERACTIVE_PAD_MS = 60_000L
         const val MIN_DELAY_MS = 5_000L
