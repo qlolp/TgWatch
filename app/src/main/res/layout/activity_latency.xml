@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/latencyRoot" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:background="@color/bg" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+        <TextView style="@style/CardTitle" android:text="@string/latency_title" />
+        <TextView android:id="@+id/latencyMeaning" style="@style/Body" />
+        <Spinner android:id="@+id/latencyWindow" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minHeight="48dp"
+            android:contentDescription="@string/latency_window" />
+        <Spinner android:id="@+id/latencyEndpoint" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minHeight="48dp"
+            android:contentDescription="@string/latency_endpoint" />
+        <TextView android:id="@+id/latencySummary" style="@style/Body"
+            android:text="@string/history_loading" android:accessibilityLiveRegion="polite" />
+        <ru.tgwatch.LatencyChartView android:id="@+id/latencyChart" android:layout_width="match_parent"
+            android:layout_height="200dp" android:importantForAccessibility="no" />
+        <TextView android:id="@+id/latencyDcSummary" style="@style/Body" />
+        <Button android:id="@+id/latencySettings" style="@style/ButtonText" android:text="@string/latency_settings" />
+        <Button android:id="@+id/latencyDone" style="@style/ButtonText" android:text="@string/automation_done" />
+    </LinearLayout>
+</ScrollView>

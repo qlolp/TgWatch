@@ -8,7 +8,7 @@ import android.os.SystemClock
 internal class TargetSlowAlerts(private val ctx: Context, private val manager: NotificationManager,
     private val events: (TargetId) -> EventNotifications) {
     private class Entry(val threshold: Long) {
-        val facts = SlowAlert(threshold, threshold * CLEAR_NUMERATOR / CLEAR_DENOMINATOR)
+        val facts = TargetSlowAlert { TargetAlertSettings(slowThresholdMs = threshold) }
         val display = SlowAlertPresentation()
         var latency = -1L
     }
@@ -16,7 +16,7 @@ internal class TargetSlowAlerts(private val ctx: Context, private val manager: N
 
     fun onCheck(state: TargetSnapshot, definition: TargetDefinition, live: Boolean) {
         val entry = entry(definition)
-        entry.facts.onCheck(state.status.name, state.latencyMs ?: -1L, SystemClock.elapsedRealtime())
+        entry.facts.onCheck(state, true, SystemClock.elapsedRealtime())
         if (state.status == TargetStatus.OK && state.latencyMs != null) entry.latency = state.latencyMs
         reconcile(state, definition, live)
     }
@@ -33,7 +33,8 @@ internal class TargetSlowAlerts(private val ctx: Context, private val manager: N
         val fresh = if (state.checkedElapsedMs > 0L)
             !ProbeRules.isStale(state.checkedElapsedMs, SystemClock.elapsedRealtime(), state.expectedIntervalSec)
             else !ProbeRules.isStale(state.checkedAtMs, now, state.expectedIntervalSec)
-        val display = SlowDisplayState(entry.facts.active, enabled, muted, quiet, live && fresh)
+        val display = SlowDisplayState(entry.facts.active, enabled, muted, quiet,
+            live && fresh && state.status == TargetStatus.OK)
         when (entry.display.reconcile(display, SystemClock.elapsedRealtime())) {
             SlowDisplayAction.SHOW -> events(state.id).slow(entry.latency)
             SlowDisplayAction.CLEAR -> manager.cancel(TargetEventNotifications.id(state.id, "slow"))
@@ -45,14 +46,13 @@ internal class TargetSlowAlerts(private val ctx: Context, private val manager: N
         entries.remove(id)
         manager.cancel(TargetEventNotifications.id(id, "slow"))
     }
+    fun unmeasured(id: TargetId) {
+        entries[id]?.facts?.onCheck(TargetSnapshot(id), false, SystemClock.elapsedRealtime())
+    }
 
     private fun entry(definition: TargetDefinition): Entry {
         val previous = entries[definition.id]
         if (previous != null && previous.threshold != definition.alerts.slowThresholdMs) forget(definition.id)
         return entries.getOrPut(definition.id) { Entry(definition.alerts.slowThresholdMs) }
-    }
-    private companion object {
-        const val CLEAR_NUMERATOR = 3L
-        const val CLEAR_DENOMINATOR = 5L
     }
 }

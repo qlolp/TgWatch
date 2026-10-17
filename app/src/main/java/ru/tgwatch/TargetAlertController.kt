@@ -29,7 +29,7 @@ internal class TargetAlertController(private val ctx: Context, private val manag
     init { settings.registerOnSharedPreferenceChangeListener(listener) }
 
     @Synchronized fun onCheck(state: TargetSnapshot) {
-        val eligible = state.id != TargetId.TELEGRAM && state.status != TargetStatus.UNKNOWN
+        val eligible = state.id != TargetId.TELEGRAM
         if (closed || !eligible || stale(state)) return
         val definition = TargetPreferences.definition(ctx, state.id)
         if (!active() || !definition.enabled) { forget(state.id); return }
@@ -43,6 +43,7 @@ internal class TargetAlertController(private val ctx: Context, private val manag
         }
         slow.onCheck(state, definition, active())
     }
+    @Synchronized fun unmeasured(id: TargetId) { if (!closed) slow.unmeasured(id) }
 
     private fun outage(state: TargetSnapshot, previous: TargetSnapshot?, definition: TargetDefinition) {
         if (previous?.status != state.status && definition.alerts.notifyOutage) {

@@ -67,3 +67,7 @@ object TargetPreferences {
 
     internal fun key(id: TargetId, suffix: String) = "target.${id.wire}.$suffix"
 }
+
+/** Worker-only convenience; alert persistence stays with the alert settings adapter. */
+fun TargetPreferences.setSlowThreshold(ctx: Context, id: TargetId, thresholdMs: Long): Boolean =
+    TargetAlertPreferences.setSlowThreshold(ctx, id, thresholdMs)

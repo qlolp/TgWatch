@@ -146,4 +146,23 @@
     <string name="webhook_event_recovery">Сервис восстановлен</string>
     <string name="webhook_event_network_restored">Сеть восстановлена</string>
     <string name="target_convert_extra">Включить отдельную цель с настройками диагностики</string>
+    <string name="latency_title">Время ответа</string>
+    <string name="latency_window">Окно измерений</string>
+    <string name="latency_endpoint">Общий ряд или DC</string>
+    <string name="latency_settings">Порог предупреждения и настройки цели</string>
+    <string name="latency_hour">1 час</string>
+    <string name="latency_day">24 часа</string>
+    <string name="latency_week">7 дней</string>
+    <string name="latency_scalar">Подтверждённые ответы на проверку</string>
+    <string name="latency_all_dc">Все DC Telegram</string>
+    <string name="latency_tg_meaning">Лучший ответ MTProto на проверку. Это не скорость доставки сообщений и не задержка всех DC.</string>
+    <string name="latency_http_meaning">Полное время HTTP-пробы. Эта операция отличается от MTProto.</string>
+    <string name="latency_metrics">Выборок: %1$d · среднее %2$s · p50 %3$s · p95 %4$s</string>
+    <string name="latency_counts">Ошибок/неопределённых/без сети: %1$d · без задержки: %2$d · покрытие: %3$s</string>
+    <string name="latency_small_sample">Малая выборка (менее 20 подтверждённых ответов)</string>
+    <string name="latency_no_data">В этом окне нет подтверждённых измерений задержки</string>
+    <string name="latency_no_dc">В этом окне нет локальных данных по DC. Старая история и переносимые бэкапы не содержат рядов DC.</string>
+    <string name="latency_dc_metrics">%1$s · выборок %2$d · ошибок %3$d · без измерения %4$d · приближённое p50 %5$s · приближённое p95 %6$s</string>
+    <string name="latency_ms">%1$d мс</string>
+    <string name="latency_dc_local">Локальные 15-минутные интервалы; запись раз в 15 минут. При аварии несохранённые обновления могут пропасть. Пробелы и ошибки не означают нулевую задержку.</string>
 </resources>

@@ -105,6 +105,7 @@ class MainActivity : Activity() {
             shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), text)
         }
         applySystemBarInsets()
+        findViewById<Button>(R.id.btnLatency).setOnClickListener { LatencyActivity.open(this, targetUi.selected) }
         findViewById<Button>(R.id.btnIncidents).setOnClickListener {
             IncidentActivity.open(this, historyDays, targetUi.selected)
         }

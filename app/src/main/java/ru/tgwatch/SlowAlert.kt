@@ -4,7 +4,7 @@ package ru.tgwatch
  * «Telegram тормозит»: Telegram отвечает, но даже самый быстрый ответ MTProto несколько проверок
  * подряд медленнее порога. Снимается, только когда ответ заметно быстрее порога (гистерезис),
  * и повторяется не чаще [cooldownMs], чтобы уведомление не мигало на границе.
- * UNKNOWN и проверки без задержки ничего не меняют; любой сбой снимает предупреждение.
+ * UNKNOWN и проверки без задержки прерывают streak; подтверждённый сбой снимает предупреждение.
  */
 class SlowAlert(
     private val thresholdMs: Long = THRESHOLD_MS,
@@ -21,12 +21,12 @@ class SlowAlert(
 
     @Synchronized
     fun onCheck(status: String, latencyMs: Long, nowMono: Long): Action = when {
-        status == "UNKNOWN" -> Action.NONE
+        status == "UNKNOWN" -> { streak = 0; Action.NONE }
         status != "OK" -> {
             streak = 0
             clear()
         }
-        latencyMs < 0 -> Action.NONE
+        latencyMs < 0 -> { streak = 0; Action.NONE }
         latencyMs < thresholdMs -> {
             streak = 0
             if (latencyMs < clearBelowMs) clear() else Action.NONE

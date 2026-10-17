@@ -20,6 +20,7 @@ internal interface TargetMonitorHost {
     fun acquireWakeLock()
     fun onProgress()
     fun onPublished(snapshot: TargetSnapshot, report: TargetReport)
+    fun onUnmeasured(id: TargetId) {}
 }
 
 /** Android network/configuration adapter. The primary owner invokes this after Telegram publication. */
@@ -123,10 +124,18 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         try {
             val report = result.getOrNull()
             var published: TargetSnapshot? = null
-            if (!closed && host.isCurrent() && report != null) synchronized(TargetPreferences) {
+            if (!closed && host.isCurrent()) synchronized(TargetPreferences) {
                 refresh(notify = false)
-                if (network == cm.activeNetwork && repository.publish(attempt, report))
-                    published = repository.snapshot(attempt.id)
+                val configuration = repository.configuration(attempt.id)
+                val current = network == cm.activeNetwork &&
+                    attempt.networkRevision == repository.currentNetworkRevision &&
+                    attempt.generation == configuration.generation &&
+                    attempt.endpointRevision == configuration.endpointRevision
+                if (current) {
+                    if (report != null && repository.publish(attempt, report))
+                        published = repository.snapshot(attempt.id)
+                    else if (report?.publishable != true) host.onUnmeasured(attempt.id)
+                }
             }
             published?.let { host.onPublished(it, checkNotNull(report)) }
         } finally { schedule.finished(attempt.id, SystemClock.elapsedRealtime()) }

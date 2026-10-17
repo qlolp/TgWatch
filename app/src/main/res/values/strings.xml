@@ -146,4 +146,23 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="webhook_event_recovery">Service recovered</string>
     <string name="webhook_event_network_restored">Network restored</string>
     <string name="target_convert_extra">Enable independent target using diagnostic settings</string>
+    <string name="latency_title">Response time</string>
+    <string name="latency_window">Measurement window</string>
+    <string name="latency_endpoint">Scalar or DC series</string>
+    <string name="latency_settings">Alert threshold and target settings</string>
+    <string name="latency_hour">1 hour</string>
+    <string name="latency_day">24 hours</string>
+    <string name="latency_week">7 days</string>
+    <string name="latency_scalar">Confirmed responses per check</string>
+    <string name="latency_all_dc">All Telegram DCs</string>
+    <string name="latency_tg_meaning">Best MTProto response per check. This does not measure message delivery or the latency of all DCs.</string>
+    <string name="latency_http_meaning">Full HTTP probe time. It measures a different operation from MTProto.</string>
+    <string name="latency_metrics">Samples: %1$d · mean %2$s · p50 %3$s · p95 %4$s</string>
+    <string name="latency_counts">Errors/unknown/offline: %1$d · missing latency: %2$d · coverage: %3$s</string>
+    <string name="latency_small_sample">Small sample (fewer than 20 confirmed responses)</string>
+    <string name="latency_no_data">No confirmed latency samples in this window</string>
+    <string name="latency_no_dc">No local DC details in this window. Legacy history and portable backups contain no DC series.</string>
+    <string name="latency_dc_metrics">%1$s · samples %2$d · errors %3$d · not measured %4$d · approximate p50 %5$s · approximate p95 %6$s</string>
+    <string name="latency_ms">%1$d ms</string>
+    <string name="latency_dc_local">Local 15-minute buckets; checkpointed every 15 minutes. Unsaved updates can be lost on a crash. Gaps and failures are not zero latency.</string>
 </resources>

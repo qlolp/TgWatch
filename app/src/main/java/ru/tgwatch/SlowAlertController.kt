@@ -12,11 +12,14 @@ internal class SlowAlertController(
     private val running: () -> Boolean,
     private val log: (String) -> Unit,
 ) {
-    private val policy = SlowAlert()
+    private val policy = TargetSlowAlert { TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM).alerts }
     private val display = SlowAlertPresentation()
     private val settings = Prefs.sp(ctx)
     private val manager = ctx.getSystemService(NotificationManager::class.java)
     private var latencyMs = -1L
+    private var measuredStatus = "UNKNOWN"
+    private var measuredElapsed = 0L
+    private var expectedIntervalSec = TargetDefinition.DEFAULT_TELEGRAM_SEC
     private var closed = false
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         val muteChanged = key?.startsWith("alert_mute_") == true || key == "alerts_muted_until"
@@ -28,15 +31,28 @@ internal class SlowAlertController(
 
     @Synchronized fun onCheck(status: String, latency: Long, elapsed: Long) {
         if (closed) return
-        val action = policy.onCheck(status, latency, elapsed)
+        val snapshot = TargetSnapshot(TargetId.TELEGRAM, TargetStatus.fromWire(status) ?: TargetStatus.UNKNOWN,
+            latencyMs = latency.takeIf { it >= 0L })
+        val action = policy.onCheck(snapshot, true, elapsed)
+        measuredStatus = status
+        measuredElapsed = elapsed
+        expectedIntervalSec = MonitorService.state.expectedIntervalSec
         if (status == "OK" && latency >= 0) latencyMs = latency
         when (action) {
             SlowAlert.Action.ALERT -> log(Lang.t("Telegram тормозит: ответ за $latency мс",
                 "Telegram is slow: $latency ms response"))
-            SlowAlert.Action.CLEAR -> if (status == "OK")
+            SlowAlert.Action.CLEAR -> if (status == "OK" && latency >= 0L &&
+                latency < TargetSlowAlert.clearLevel(TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM)
+                    .alerts.slowThresholdMs))
                 log(Lang.t("Telegram больше не тормозит", "Telegram is no longer slow"))
             SlowAlert.Action.NONE -> Unit
         }
+        reconcile()
+    }
+
+    @Synchronized fun unmeasured() {
+        if (closed) return
+        policy.onCheck(TargetSnapshot(TargetId.TELEGRAM), false, SystemClock.elapsedRealtime())
         reconcile()
     }
 
@@ -49,8 +65,11 @@ internal class SlowAlertController(
         val muted = Prefs.alertsMutedUntil(ctx, now) > now
         val quiet = !Prefs.alertsAllowed(ctx, now) && !muted
         val live = running()
-        if (!live) policy.onCheck("STOPPED", -1L, SystemClock.elapsedRealtime())
-        val state = SlowDisplayState(policy.active, enabled, muted, quiet, live)
+        policy.refreshSettings()
+        if (!live) policy.clear(SystemClock.elapsedRealtime())
+        val fresh = measuredStatus == "OK" && measuredElapsed > 0L &&
+            !ProbeRules.isStale(measuredElapsed, SystemClock.elapsedRealtime(), expectedIntervalSec)
+        val state = SlowDisplayState(policy.active, enabled, muted, quiet, live && fresh)
         val action = display.reconcile(state, SystemClock.elapsedRealtime())
         if (action == SlowDisplayAction.SHOW) notifications.slow(latencyMs)
         if (action == SlowDisplayAction.CLEAR || state.blocked) notifications.clearSlow()

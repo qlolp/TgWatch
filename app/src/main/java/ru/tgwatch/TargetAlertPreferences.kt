@@ -6,6 +6,13 @@ import android.provider.Settings
 
 /** Per-goal transient mute timers are local to this boot and never part of portable target settings. */
 internal object TargetAlertPreferences {
+    fun setSlowThreshold(ctx: Context, id: TargetId, thresholdMs: Long): Boolean {
+        if (thresholdMs !in TargetAlertSettings.MIN_SLOW_MS..TargetAlertSettings.MAX_SLOW_MS ||
+            thresholdMs % TargetAlertSettings.SLOW_STEP_MS != 0L) return false
+        val before = TargetPreferences.storedDefinition(ctx, id)
+        val changed = before.copy(alerts = before.alerts.copy(slowThresholdMs = thresholdMs))
+        return TargetSettingWrites.definition(ctx, changed, TargetPreferences.fence.snapshot(id).revision)
+    }
     fun mute(ctx: Context, id: TargetId): Boolean =
         AlertMute.mute(store(ctx, id), SystemClock.elapsedRealtime(), boot(ctx))
     fun clear(ctx: Context, id: TargetId): Boolean = AlertMute.clear(store(ctx, id))

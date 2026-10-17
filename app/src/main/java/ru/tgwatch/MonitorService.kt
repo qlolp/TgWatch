@@ -420,6 +420,7 @@ class MonitorService : Service() {
                 broadcastState()
             }
         }
+        override fun onUnmeasured(id: TargetId) { targetAlertController?.unmeasured(id) }
     })
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -666,6 +667,7 @@ class MonitorService : Service() {
             lastProgressMono = SystemClock.elapsedRealtime()
         } catch (_: InterruptedException) {
             // No completed observation: retain the prior state/alerts and let freshness expire.
+            if (acceptsRunningCheck(this)) slowController?.unmeasured()
             Thread.currentThread().interrupt()
             retryDelayMs = INTERRUPTED_RETRY_MS
             lastProgressMono = SystemClock.elapsedRealtime()
@@ -726,6 +728,7 @@ class MonitorService : Service() {
             startExtras(result)
         } else {
             // Admission failure is monitor health, not a new observation about Telegram.
+            slowController?.unmeasured()
             lastEndpoints = result.outcomes.toList()
             val generation = TargetPersistence.active?.generationId
             val at = System.currentTimeMillis()
