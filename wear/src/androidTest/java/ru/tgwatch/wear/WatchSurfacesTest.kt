@@ -21,6 +21,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceSe
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.CountDownLatch
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -104,6 +105,14 @@ class WatchSurfacesTest {
                 assertTrue(button.getGlobalVisibleRect(visible))
                 assertTrue(visible.height() >= (48 * screen.resources.displayMetrics.density).toInt())
             }
+            // A measured/scrolled view can still have its previous buffer on screen.
+            val committed = CountDownLatch(1)
+            instrumentation.runOnMainSync {
+                screen.window.decorView.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+                screen.window.decorView.invalidate()
+            }
+            assertTrue("Scrolled frame must be submitted before capture", committed.await(15, TimeUnit.SECONDS))
+            instrumentation.uiAutomation.waitForIdle(300, 5_000)
             renderedScreenshot().let { bitmap ->
                 try {
                     FileOutputStream(File(context.filesDir, "wear-large-font.png")).use {

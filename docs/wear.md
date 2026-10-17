@@ -47,3 +47,12 @@ inventory, OSV report, CycloneDX SBOM and Trivy report alongside the six phone f
 Both apps use the same source version and existing production signing identity.
 Local debug APKs have a different certificate. The F-Droid candidate covers only
 the phone package; Wear catalog acceptance is not implied.
+
+## Device screenshots
+
+Actual Wear OS3/API30 emulator captures from1.19.0: the normal screen, and the
+check action after scrolling at200% font scale. Status remains text-readable;
+large text uses the scroll view rather than shrinking the user's chosen font.
+
+![Watch status](screenshots/wear.png)
+![Scrolled check action at200% font scale](screenshots/wear-large-font.png)
