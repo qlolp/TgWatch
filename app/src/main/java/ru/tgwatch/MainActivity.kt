@@ -480,7 +480,10 @@ class MainActivity : Activity() {
         false
     }
 
+    private val recoveryUi = RecoveryUi(this)
+
     private fun render() {
+        if (recoveryUi.preparing()) return
         if (BackupManager.hasPending(this)) {
             btnToggle.isEnabled = false
             btnCheck.isEnabled = false

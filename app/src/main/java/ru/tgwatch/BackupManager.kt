@@ -2,8 +2,6 @@ package ru.tgwatch
 
 import android.content.Context
 import android.os.Looper
-import android.system.Os
-import android.system.OsConstants
 import java.io.File
 
 /** Portable data crosses this boundary only after full schema/authentication validation. */
@@ -25,7 +23,8 @@ object BackupManager {
         .filesDir, "restore.pending")
 
     private fun hasJournal(ctx: Context): Boolean = pending(ctx).exists() || publishedPending(ctx).exists()
-    fun hasPending(ctx: Context): Boolean = replacingHistory || hasJournal(ctx)
+    fun hasPending(ctx: Context): Boolean = replacingHistory || hasJournal(ctx) ||
+        RecoveryCoordinator.state != RecoveryState.READY
 
     /** One `now` stamps the copy and clips the predicted coverage tail it must not carry. */
     @Synchronized fun snapshot(ctx: Context, now: Long = System.currentTimeMillis()): BackupSnapshot =
@@ -83,36 +82,16 @@ object BackupManager {
 
     /** Called at process startup before any component, or by a background restore worker. */
     @Synchronized fun recoverPending(ctx: Context): Boolean {
-        if (!hasPending(ctx)) return false
+        if (!hasJournal(ctx)) return false
         check(Prefs.sp(ctx).edit().putBoolean("enabled", false).commit())
         WatchdogReceiver.cancel(ctx)
         MonitorService.stopAndAwait(ctx)
-        RestoreTransaction(pending(ctx)).migrateLegacy(publishedPending(ctx),
-            { bytes -> BackupCodec.encode(PortableBackupCodec.decodePublishedPayload(bytes)) },
-            { bytes -> BackupCodec.decode(bytes) })
-        return RestoreTransaction(pending(ctx)).recover { payload ->
-            val restored = BackupCodec.decode(payload)
-            History.replaceSnapshot(ctx, restored.observations)
-            val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false)
-            (settingKeys + transientKeys).forEach { edit.remove(it) }
-            restored.settings.forEach { (key, value) ->
-                when (value) {
-                    is Boolean -> edit.putBoolean(key, value)
-                    is Int -> edit.putInt(key, value)
-                    is String -> edit.putString(key, value)
-                    else -> error("Invalid setting")
-                }
-            }
-            check(edit.commit()) { "Could not restore settings" }
-            EventLog.replace(ctx, restored.log)
-            LastSuccessStore.clear(ctx)
-            MonitorService.clearRestoredState()
-            val preferencesDirectory = File(ctx.applicationContext.createDeviceProtectedStorageContext()
-                .dataDir, "shared_prefs")
-            val descriptor = Os.open(preferencesDirectory.absolutePath, OsConstants.O_RDONLY, 0)
-            try { Os.fsync(descriptor) } finally { Os.close(descriptor) }
-            StatusWidget.updateAll(ctx)
-            DailySummaryReceiver.schedule(ctx)
-        }
+        var recovered = false
+        HistorySessions.queue(ctx).exclusive {
+            recovered = BackupRecovery(settingKeys + transientKeys).recover(ctx, pending(ctx), publishedPending(ctx))
+        }.get()
+        if (RecoveryCoordinator.state == RecoveryState.FAILED) RecoveryCoordinator.start(ctx)
+        return recovered
     }
+
 }

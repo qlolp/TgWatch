@@ -67,6 +67,7 @@ class MonitorReliabilityIntegrationTest {
 
     @After fun restore() {
         fixtureService?.let { service ->
+            HistorySessions.queue(ctx).close(field("historySession").getLong(service), System.currentTimeMillis()).get()
             (field("extraCoordinator").get(service) as ExtraProbeCoordinator).close()
             (field("probeExecutor").get(service) as ExecutorService).shutdownNow()
             (field("extraProbeExecutor").get(service) as ExecutorService).shutdownNow()
@@ -135,7 +136,9 @@ class MonitorReliabilityIntegrationTest {
         val preferences = Prefs.sp(ctx).all.toMap()
         val pending = AtomicLong(-1)
         field("checkSchedule").set(service, CheckSchedule({}, pending::set))
-        val admitted = CountDownLatch(14) // One occupied worker plus thirteen primary endpoints.
+        // A prior real service may still own physical endpoint permits after cancellation.
+        // Interrupt after the first admitted probe is queued behind our occupied worker.
+        val admitted = CountDownLatch(2)
         val occupied = CountDownLatch(1)
         val release = CountDownLatch(1)
         val pool = object : ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, LinkedBlockingQueue<Runnable>()) {
@@ -151,7 +154,7 @@ class MonitorReliabilityIntegrationTest {
             catch (e: InvocationTargetException) { failure.set(e.cause) }
         }
         try {
-            assertTrue("The primary batch must start before it is interrupted", admitted.await(2, TimeUnit.SECONDS))
+            assertTrue("The probe batch must admit work before it is interrupted", admitted.await(2, TimeUnit.SECONDS))
             coordinator.interrupt()
             coordinator.join(2000)
             assertFalse(coordinator.isAlive)
@@ -383,6 +386,7 @@ class MonitorReliabilityIntegrationTest {
         val service = MonitorService()
         ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
             .apply { isAccessible = true }.invoke(service, context)
+        field("historySession").setLong(service, HistorySessions.queue(ctx).open())
         field("cm").set(service, ctx.getSystemService(ConnectivityManager::class.java))
         field("pm").set(service, ctx.getSystemService(PowerManager::class.java))
         field("nm").set(service, manager)
@@ -413,6 +417,7 @@ class MonitorReliabilityIntegrationTest {
             .newInstance(status, 12L, "measured result", "primary diagnostics", emptyList<ProbeOutcome>(), null)
         type.getDeclaredMethod("publishCheckedResult", probeType, Long::class.javaPrimitiveType)
             .apply { isAccessible = true }.invoke(service, probe, revision)
+        HistorySessions.queue(ctx).exclusive {}.get(5, TimeUnit.SECONDS)
     }
 
     private fun failingLastSuccessContext(): Context {

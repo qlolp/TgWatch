@@ -28,6 +28,7 @@ import java.net.HttpURLConnection
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -140,12 +141,12 @@ class MonitorService : Service() {
         }
 
         fun start(ctx: Context) {
-            if (BackupManager.hasPending(ctx)) return
+            if (BackupManager.hasPending(ctx) && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             ctx.startForegroundService(Intent(ctx, MonitorService::class.java).setAction(ACTION_START))
         }
 
         fun send(ctx: Context, action: String) {
-            if (BackupManager.hasPending(ctx)) return
+            if (BackupManager.hasPending(ctx) && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             val intent = Intent(ctx, MonitorService::class.java).setAction(action)
             if (running) {
                 ctx.startService(intent)
@@ -162,8 +163,7 @@ class MonitorService : Service() {
         /** Wait for history/log teardown, not merely the early running=false publication. */
         fun stopAndAwait(ctx: Context, timeoutMs: Long = 10_000L) {
             if (Looper.myLooper() == Looper.getMainLooper()) {
-                check(activeService == null) { "Cannot await a live service on the main thread" }
-                return // Application startup, before service creation.
+                error("Cannot await service/history teardown on the main thread")
             }
             val captured = AtomicReference<MonitorService?>()
             val requested = CountDownLatch(1)
@@ -177,6 +177,15 @@ class MonitorService : Service() {
             captured.get()?.let {
                 check(it.stopped.await((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0),
                     TimeUnit.MILLISECONDS)) { "Service teardown timed out" }
+            }
+            HistorySessions.awaitClosed(ctx, deadline - SystemClock.elapsedRealtime())
+        }
+
+        private val resumeAfterRecovery: () -> Unit = {
+            Handler(Looper.getMainLooper()).post {
+                activeService?.takeUnless { it.destroyed || it.stopping }?.let {
+                    it.onStartCommand(Intent(it, MonitorService::class.java).setAction(ACTION_START), 0, 0)
+                }
             }
         }
 
@@ -193,6 +202,7 @@ class MonitorService : Service() {
         }
     }
 
+    private var historySession = 0L
     private lateinit var workerThread: HandlerThread
     private val stopped = CountDownLatch(1)
     private lateinit var worker: Handler
@@ -207,15 +217,11 @@ class MonitorService : Service() {
     @Volatile private var stopping = false
     private val notificationStats = DailyStatsCache()
     private val notificationGate = RedrawGate()
-    private val statisticsRunnable = Runnable {
-        if (!destroyed) {
-            refreshNotificationStats()
-            postNotification(state)
-        }
-    }
+    private val statisticsPending = AtomicBoolean()
 
     private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
-        !destroyed && !stopping && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
+        !destroyed && !stopping && RecoveryCoordinator.state == RecoveryState.READY &&
+        Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
 
     /**
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
@@ -233,6 +239,7 @@ class MonitorService : Service() {
     private val healthTick = object : Runnable {
         override fun run() {
             if (destroyed) return
+            if (RecoveryCoordinator.state == RecoveryState.FAILED) { stopSelf(); return }
             postNotification(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
@@ -302,6 +309,7 @@ class MonitorService : Service() {
     override fun onCreate() {
         super.onCreate()
         activeService = this
+        historySession = HistorySessions.queue(this).open()
         nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -337,17 +345,16 @@ class MonitorService : Service() {
 
         val action = intent?.action
         recordRequestedTrigger(action)
-        if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (action == ACTION_STOP) Prefs.setEnabled(this, false)
+        if (awaitingRecovery()) return START_NOT_STICKY
+        if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (!Prefs.isEnabled(this) || BackupManager.hasPending(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
 
         if (action == ACTION_HEALTH) ensureProgress()
-        val first = !loopStarted
-        loopStarted = true
-        if (first) EventLog.add(this, Lang.t("Мониторинг запущен", "Monitoring started"))
+        val first = beginLoop()
         if (action == ACTION_ALARM) {
             scheduleDiagnostics.arrived(SystemClock.elapsedRealtime(), pm.isDeviceIdleMode, checkStartedMono > 0L)
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
@@ -361,6 +368,22 @@ class MonitorService : Service() {
         }
 
         return START_STICKY
+    }
+
+    private fun beginLoop(): Boolean {
+        val first = !loopStarted
+        loopStarted = true
+        if (first) HistorySessions.queue(this).submit(historySession) {
+            EventLog.add(this, Lang.t("Мониторинг запущен", "Monitoring started"))
+        }
+        return first
+    }
+
+    private fun awaitingRecovery(): Boolean {
+        val current = RecoveryCoordinator.state
+        if (current == RecoveryState.INITIALIZING && !stopping) RecoveryCoordinator.whenReady(resumeAfterRecovery)
+        if (current == RecoveryState.FAILED || stopping) stopSelf()
+        return current != RecoveryState.READY || stopping
     }
 
     @Synchronized private fun recordRequestedTrigger(action: String?) {
@@ -400,10 +423,9 @@ class MonitorService : Service() {
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         nm.cancel(NOTIFICATION_ID)
-        if (loopStarted) EventLog.add(this, Lang.t("Мониторинг остановлен", "Monitoring stopped"))
-        if (loopStarted) History.endSession(this)
+        HistorySessions.queue(this).close(historySession, System.currentTimeMillis())
         if (!Prefs.isEnabled(this)) {
-            Prefs.clearLastState(this)
+            if (loopStarted) Prefs.clearLastState(this)
             WatchdogReceiver.cancel(this)
         } else {
             // Процесс умирает, а мониторинг всё ещё нужен — watchdog поднимет службу.
@@ -650,27 +672,23 @@ class MonitorService : Service() {
             expectedIntervalSec = offlineBackoff.next(p.status.name,
                 Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive)),
         )
-        LastSuccessStore.record(this, newState.status.name, newState.checkedAt)
         state = newState
         Prefs.saveLastState(
             this, newState.status, newState.checkedAt, newState.since,
             newState.latencyMs, newState.reason, newState.lastVibrationAt, newState.diagnostics, newState.expectedIntervalSec,
         )
 
-        History.record(
-            this, now,
-            when (p.status) {
-                Status.OK -> History.Kind.OK
-                Status.NO_NETWORK -> History.Kind.OFFLINE
-                Status.TG_DOWN -> History.Kind.FAIL
-                Status.PARTIAL -> History.Kind.PARTIAL
-                Status.UNKNOWN -> History.Kind.UNKNOWN
-            },
-            p.latencyMs, newState.expectedIntervalSec,
-        )
+        MonitorHistory.publish(this, historySession,
+            HistoryPublication(newState, changed, partialAlert || Prefs.notifyFor(this, "PARTIAL")), { recovery ->
+                synchronized(this) {
+                    if (acceptsRunningCheck(this) && state === newState) {
+                        if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
+                            Prefs.soundFor(this, "RECOVERY"), Prefs.alertsAllowed(this))
+                        if (Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this)) Vibe.recovery(this)
+                    }
+                }
+            }, { refreshNotificationStats(now) })
 
-        val recovery = if (p.status == Status.OK) History.recovery(this, now,
-            partialAlert || Prefs.notifyFor(this, "PARTIAL")) else null
         try {
             if (p.status !in setOf(Status.TG_DOWN, Status.PARTIAL)) eventNotifications.clearOutage()
             if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
@@ -680,27 +698,8 @@ class MonitorService : Service() {
                 eventNotifications.partial(p.reason, sound, alertsAllowed)
             if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this, "TG_DOWN")) eventNotifications.clearOutage()
             if (p.status == Status.PARTIAL && !Prefs.notifyFor(this, "PARTIAL")) eventNotifications.clearOutage()
-            if (recovery != null) {
-                if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
-                    Prefs.soundFor(this, "RECOVERY"), alertsAllowed)
-                if (Prefs.vibrateOnRecovery(this) && alertsAllowed) Vibe.recovery(this)
-            }
-        } catch (e: Exception) { Log.w(TAG, "recovery alert", e) }
+        } catch (e: Exception) { Log.w(TAG, "event alert", e) }
 
-        if (changed) {
-            val downFor = recovery?.let { Lang.t(" (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})", " (observed outage ${recoveryDurationStr(it.durationMs)})") }.orEmpty()
-            EventLog.add(
-                this,
-                when (p.status) {
-                    Status.OK -> Lang.t("MTProto и веб отвечают, ${p.latencyMs} мс$downFor", "MTProto and web are responding, ${p.latencyMs} ms$downFor")
-                    Status.PARTIAL -> Lang.t("Telegram частично доступен: ${p.reason}", "Telegram is partially reachable: ${p.reason}")
-                    Status.TG_DOWN -> Lang.t("Telegram НЕДОСТУПЕН: ${p.reason}", "Telegram is UNREACHABLE: ${p.reason}")
-                    Status.NO_NETWORK -> Lang.t("Нет интернета: ${p.reason}", "No internet: ${p.reason}")
-                    Status.UNKNOWN -> Lang.t("Статус неизвестен", "Status unknown")
-                }
-            )
-        }
-        refreshNotificationStats(now)
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
@@ -765,18 +764,24 @@ class MonitorService : Service() {
     }
 
     private fun scheduleStatisticsRefresh() {
-        if (destroyed || !notificationStats.needsRefresh(History.version, System.currentTimeMillis())) return
-        worker.removeCallbacks(statisticsRunnable)
-        worker.post(statisticsRunnable)
+        val refreshDue = notificationStats.needsRefresh(History.version, System.currentTimeMillis())
+        if (!acceptsRunningCheck(this) || !refreshDue) return
+        if (!statisticsPending.compareAndSet(false, true)) return
+        val admitted = HistorySessions.queue(this).submit(historySession) {
+            try {
+                if (acceptsRunningCheck(this)) {
+                    refreshNotificationStats()
+                    postNotification(state)
+                }
+            } finally { statisticsPending.set(false) }
+        }
+        if (!admitted) statisticsPending.set(false)
     }
 
     private fun refreshNotificationStats(now: Long = System.currentTimeMillis()) {
-        val revision = History.version
-        notificationStats.get(revision, now) { History.stats(this, now = now) }
-        // Loading/migration/retention can advance History.version inside the first read.
-        val refreshedRevision = History.version
-        if (refreshedRevision != revision)
-            notificationStats.get(refreshedRevision, now) { History.stats(this, now = now) }
+        if (!notificationStats.needsRefresh(History.version, now)) return
+        val read = History.readStats(this, now = now)
+        if (read is HistoryRead.Ready) notificationStats.get(History.version, now) { read.value }
     }
 
     /** [periodic] — тик раз в 15 с: одинаковое содержимое повторно не отправляем в шторку. */
