@@ -19,6 +19,7 @@ class ClockBoundaryIntegrationTest {
     private var oldLog: List<String>? = null
 
     @Before fun saveFixture() {
+        HistoryTestStorage.awaitReady()
         assertFalse(BackupManager.hasPending())
         oldSettings = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)

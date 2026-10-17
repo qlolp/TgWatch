@@ -13,7 +13,8 @@ internal object TargetArchive {
             if (id == TargetId.TELEGRAM) rows.filter { it.endpointRevision != revision } +
                 telegram.map { TargetObservation(TargetPersistence.publicRow(it), revision) }
             else clip(TargetPersistence.storage().recordedRows(id,
-                TargetPreferences.endpointRevision(ctx, id), now).valueOrThrow(), now)
+                TargetPreferences.endpointRevision(ctx, id), now).valueOrThrow(), now,
+                    TargetPreferences.endpointRevision(ctx, id))
         }
         TargetBackupSnapshot(now, BackupManager.snapshot(ctx, now).settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY,
             TargetPreferences.definitions(ctx), rows, EventLog.all(ctx).toList())
@@ -27,19 +28,21 @@ internal object TargetArchive {
             val current = History.snapshot(ctx, now)
             store.read(id).filter { it.endpointRevision != revision } +
                 current.map { TargetObservation(TargetPersistence.publicRow(it), revision) }
-        } else clip(store.recordedRows(id, revision, now).valueOrThrow(), now)
+        } else clip(store.recordedRows(id, revision, now).valueOrThrow(), now, revision)
     }
 
-    private fun clip(rows: List<TargetObservation>, now: Long): List<TargetObservation> =
+    private fun clip(rows: List<TargetObservation>, now: Long, activeRevision: Long): List<TargetObservation> =
         rows.groupBy { it.endpointRevision }.flatMap { (revision, cohort) ->
-            val epoch = cohort.maxOfOrNull { it.row.clockEpoch } ?: 0L
-            val clipped = cohort.mapNotNull { value ->
-                val row = value.row
-                if (row.clockEpoch != epoch || row.isEpochMetadata) value
-                else if (row.at >= now) null else value.copy(row = row.copy(until = minOf(row.until, now)))
+            if (revision != activeRevision) cohort else {
+                val epoch = cohort.maxOfOrNull { it.row.clockEpoch } ?: 0L
+                val clipped = cohort.mapNotNull { value ->
+                    val row = value.row
+                    if (row.clockEpoch != epoch || row.isEpochMetadata) value
+                    else if (row.at >= now) null else value.copy(row = row.copy(until = minOf(row.until, now)))
+                }
+                if (cohort.isNotEmpty() && clipped.none { it.row.clockEpoch == epoch })
+                    clipped + TargetObservation(Observation(now, now, "UNKNOWN", clockEpoch = epoch), revision)
+                else clipped
             }
-            if (cohort.isNotEmpty() && clipped.none { it.row.clockEpoch == epoch })
-                clipped + TargetObservation(Observation(now, now, "UNKNOWN", clockEpoch = epoch), revision)
-            else clipped
         }
 }

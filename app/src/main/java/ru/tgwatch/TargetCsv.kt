@@ -88,18 +88,21 @@ object TargetCsv {
 
     private fun window(source: List<TargetObservation>, from: Long, until: Long): List<TargetObservation> {
         if (source.isEmpty()) return listOf(TargetObservation(Observation(until, until, "UNKNOWN")))
+        val currentRevision = source.maxOf { it.endpointRevision }
         return source.groupBy { it.endpointRevision }.flatMap { (revision, cohort) ->
-            val epoch = cohort.maxOf { it.row.clockEpoch }
-            val kept = cohort.mapNotNull { value ->
-                val row = value.row
-                when {
-                    row.clockEpoch != epoch || row.isEpochMetadata -> value
-                    row.at >= until || row.until <= from -> null
-                    else -> value.copy(row = row.copy(at = maxOf(row.at, from), until = minOf(row.until, until)))
+            if (revision != currentRevision) cohort else {
+                val epoch = cohort.maxOf { it.row.clockEpoch }
+                val kept = cohort.mapNotNull { value ->
+                    val row = value.row
+                    when {
+                        row.clockEpoch != epoch || row.isEpochMetadata -> value
+                        row.at >= until || row.until <= from -> null
+                        else -> value.copy(row = row.copy(at = maxOf(row.at, from), until = minOf(row.until, until)))
+                    }
                 }
+                if (kept.any { it.row.clockEpoch == epoch }) kept else
+                    kept + TargetObservation(Observation(until, until, "UNKNOWN", clockEpoch = epoch), revision)
             }
-            if (kept.any { it.row.clockEpoch == epoch }) kept else
-                kept + TargetObservation(Observation(until, until, "UNKNOWN", clockEpoch = epoch), revision)
         }
     }
 }

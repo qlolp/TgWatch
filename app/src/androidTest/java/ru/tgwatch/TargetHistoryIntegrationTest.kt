@@ -162,6 +162,22 @@ class TargetHistoryIntegrationTest {
         assertFalse(Prefs.isEnabled(ctx))
     }
 
+    @Test fun backupAndCsvRetainArchivedEndpointRowsAfterWallClockRollback() {
+        val now = System.currentTimeMillis()
+        val id = TargetId.CUSTOM
+        val archived = TargetObservation(Observation(now + 60_000, now + 120_000, "DOWN", 50), 0)
+        val current = TargetObservation(Observation(now - 1_000, now, "OK", 20), 1)
+        assertTrue(Prefs.sp(ctx).edit().putLong(TargetPreferences.key(id, "endpoint_revision"), 1).commit())
+        HistorySessions.queue(ctx).exclusive { TargetPersistence.storage().replaceRows(id,
+            listOf(archived, current)) }.get()
+        val backup = BackupManager.snapshotTargets(ctx, now)
+        assertTrue("Backup must retain observations archived under the former endpoint",
+            backup.observations.getValue(id).contains(archived))
+        val csv = TargetCsv.encode(mapOf(id to TargetArchive.rows(ctx, id, now)), now - 86_400_000, now)
+        assertTrue("CSV must retain the same archived endpoint observation",
+            TargetCsv.parse(csv).getValue(id).contains(archived))
+    }
+
     private fun restore(store: SharedPreferences, data: Map<String, *>) {
         val edit = store.edit().clear()
         data.forEach { (key, value) -> when (value) {

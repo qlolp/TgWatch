@@ -18,6 +18,12 @@ class TargetCsvTest {
         assertFalse(csv.contains("https://"))
         assertTrue(csv.contains(",matrix,2"))
     }
+    @Test fun archivedEndpointFutureClockRowsSurviveExport() {
+        val archived = TargetObservation(row.copy(at = 10_000, until = 11_000), 0)
+        val current = TargetObservation(row.copy(kind = "OK"), 1)
+        val csv = TargetCsv.encode(mapOf(TargetId.CUSTOM to listOf(archived, current)), 1_000, 2_000)
+        assertTrue(TargetCsv.parse(csv).getValue(TargetId.CUSTOM).contains(archived))
+    }
     @Test fun legacyCsvStillImportsIntoTelegramOnly() {
         val legacy = Timeline.csv(listOf(row.copy(kind = "TG_DOWN")), 1_000, 2_000)
         val parsed = TargetCsv.parse(legacy)
