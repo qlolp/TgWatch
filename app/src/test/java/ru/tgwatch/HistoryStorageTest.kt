@@ -5,6 +5,17 @@ import org.junit.Test
 import java.nio.file.Files
 
 class HistoryStorageTest {
+    @Test fun appendedJournalCountsPhysicalRowsWithoutBlankSeparators() {
+        val dir = Files.createTempDirectory("tg-row-count").toFile()
+        try {
+            val file = java.io.File(dir, "history.csv")
+            HistoryStorage.write(file, listOf(Observation(0, 1, "OK")))
+            repeat(3) { HistoryStorage.append(file, Observation(it + 1L, it + 2L, "OK")) }
+            val read = HistoryFileReader.readCounted(file)
+            assertEquals(4, read.physicalRows)
+            assertEquals(4, read.rows.size)
+        } finally { dir.deleteRecursively() }
+    }
     @Test fun failedLegacyMigrationKeepsHealthyDestinationUsableAndPending() {
         val dir = Files.createTempDirectory("tg-migration").toFile()
         try {

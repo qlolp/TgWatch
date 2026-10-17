@@ -90,7 +90,7 @@ class HistoryPersistenceIntegrationTest {
         obstruct()
         History.record(ctx, now + 1000, History.Kind.FAIL, -1)
         recover()
-        History.flush(ctx)
+        History.flush(ctx, now + 1000)
         assertEquals(listOf(now, now + 1000), HistoryStorage.read(file).map { it.at })
         // A clean record must append; a redundant full repair would fail here.
         assertTrue(File(file.parentFile, file.name + ".tmp").mkdir())
@@ -125,8 +125,8 @@ class HistoryPersistenceIntegrationTest {
         }
         History.replaceSnapshot(ctx, rows)
         History.record(ctx, now + 1000, History.Kind.OK, 12)
-        assertEquals(65_000, HistoryStorage.read(file).size)
-        assertEquals(History.snapshot(ctx), HistoryStorage.read(file))
+        assertTrue(HistoryStorage.read(file).size <= 66_024)
+        assertEquals(History.snapshot(ctx), Timeline.retained(HistoryStorage.read(file), now - 7 * 86_400_000L))
         assertEquals(65_000, reload().size)
     }
 

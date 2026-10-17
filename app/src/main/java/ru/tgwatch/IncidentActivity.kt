@@ -113,7 +113,10 @@ class IncidentActivity : Activity() {
         } else {
             requested = null
             loader.invalidate()
-            if (display == null) empty.setText(R.string.history_load_failed)
+            if (display == null) {
+                adapter.clear()
+                empty.setText(R.string.history_load_failed)
+            }
         }
     }
 

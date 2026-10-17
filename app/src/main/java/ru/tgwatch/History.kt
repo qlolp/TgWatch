@@ -38,12 +38,16 @@ object History {
         val avgLatencyMs: Long, val unmonitoredMinutes: Int)
 
     private const val FILE = "history-v2.csv"
+    private const val MAX_APPEND_BYTES = 128L
     private const val KEEP_MS = 7 * 24 * 60 * 60_000L
     private var samples = mutableListOf<Observation>()
     private var loaded = false
     private var migrated = false
     private var dirty = false
     private var lastCompacted = 0L
+    private var physicalRows = 0
+    private var failure: HistoryFailure? = null
+    private val compaction = HistoryCompaction()
     private val statsCache = mutableMapOf<String, TimeStats>()
     private val preparation = HistoryPreparationCache()
     private var appliedPreparation: HistoryPreparationCache.Prepared? = null
@@ -54,19 +58,24 @@ object History {
     private fun file(ctx: Context) = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, FILE)
     private fun load(ctx: Context) {
         if (!loaded) {
-            samples = HistoryStorage.read(file(ctx)).toMutableList()
+            val stored = HistoryFileReader.readCounted(file(ctx))
+            samples = stored.rows.toMutableList()
+            physicalRows = stored.physicalRows
             preparation.clear()
             appliedPreparation = null
             statsCache.clear()
             dirty = false
             loaded = true
             lastCompacted = System.currentTimeMillis()
+            compaction.savedReplacement(lastCompacted)
+            failure = null
         }
         // Retry after unlock. Do not mark migration complete or delete the source on failure.
         if (!migrated && ctx.getSystemService(UserManager::class.java).isUserUnlocked) {
             val dp = ctx.applicationContext.createDeviceProtectedStorageContext().filesDir
             val marker = File(dp, "history-migrated-v2")
             val legacy = File(ctx.applicationContext.filesDir, "history.csv")
+            val hadMarker = marker.exists()
             val result = HistoryStorage.migrateLegacy(legacy, file(ctx), marker, samples)
             if (samples != result.samples) {
                 preparation.clear()
@@ -76,6 +85,7 @@ object History {
             }
             samples = result.samples.toMutableList()
             migrated = result.complete
+            if (result.complete && !hadMarker) physicalRows = samples.size
         }
     }
     private fun prune(now: Long) {
@@ -83,7 +93,7 @@ object History {
         if (prepared === appliedPreparation) return
         if (prepared.rows != samples) {
             samples = prepared.rows.toMutableList()
-            dirty = true
+            compaction.onPruned(now)
             version++
             statsCache.clear()
             preparation.acceptRevision(version)
@@ -98,11 +108,15 @@ object History {
             samples = rolled.toMutableList()
             dirty = true
             version++
-            flush(ctx)
+            // The epoch marker must fit the logical cap before its durable replacement.
+            prune(now)
+            flush(ctx, now)
         }
     }
     private fun ready(ctx: Context): Boolean = try { load(ctx); true } catch (e: Exception) {
-        Log.w("TgWatch", "history unavailable; preserving existing data", e); false
+        failure = HistoryFailure.READ
+        Log.w("TgWatch", "history unavailable; preserving existing data", e)
+        false
     }
     @Synchronized fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long, expectedSec: Int = 30) {
         if (!ready(ctx)) return
@@ -116,19 +130,26 @@ object History {
         // Adding a row can exceed the row cap or replace a same-time epoch marker.
         prune(now)
         try {
-            if (dirty || now - lastCompacted > 6 * 60 * 60_000L || now < lastCompacted) {
+            if (dirty || compaction.needsReplacement(now, physicalRows + 1, file(ctx).length() + MAX_APPEND_BYTES)) {
                 HistoryStorage.write(file(ctx), samples)
                 dirty = false
                 lastCompacted = now
+                physicalRows = samples.size
+                compaction.savedReplacement(now)
                 appendSync.saved(status, SystemClock.elapsedRealtime(), true)
             } else {
                 val elapsed = SystemClock.elapsedRealtime()
                 val sync = appendSync.needsSync(status, elapsed)
                 HistoryStorage.append(file(ctx), samples.last(), sync)
+                physicalRows++
+                compaction.savedAppend()
                 appendSync.saved(status, elapsed, sync)
             }
+            failure = null
         } catch (e: Exception) {
             dirty = true
+            compaction.failedWrite()
+            failure = HistoryFailure.WRITE
             Log.w("TgWatch", "history save", e)
         }
     }
@@ -142,10 +163,23 @@ object History {
         }.toMutableList()
         dirty = true
         version++
-        flush(ctx)
+        flush(ctx, now)
     }
-    @Synchronized fun stats(ctx: Context, days: Int = 1, now: Long = System.currentTimeMillis()): TimeStats {
-        if (!ready(ctx)) return Timeline.stats(emptyList(), now - days.coerceIn(1,7) * 86_400_000L, now)
+    @Synchronized fun stats(ctx: Context, days: Int = 1, now: Long = System.currentTimeMillis()): TimeStats =
+        readStats(ctx, days, now).valueOrThrow()
+
+    @Synchronized fun readStats(ctx: Context, days: Int = 1,
+        now: Long = System.currentTimeMillis()): HistoryRead<TimeStats> {
+        if (!ready(ctx)) {
+            val last = statsCache.entries.lastOrNull { it.key.endsWith(":${days.coerceIn(1, 7)}") }?.value
+            return HistoryRead.Unavailable(last, failure ?: HistoryFailure.READ)
+        }
+        val value = computeStats(ctx, days, now)
+        val problem = failure
+        return if (problem == null) HistoryRead.Ready(value) else HistoryRead.Unavailable(value, problem)
+    }
+
+    private fun computeStats(ctx: Context, days: Int, now: Long): TimeStats {
         ensureClock(ctx, now)
         prune(now)
         val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1,7)}"
@@ -156,12 +190,17 @@ object History {
             .also { statsCache[cacheKey] = it }
     }
     @Synchronized fun incidents(ctx: Context, days: Int = 7,
-        now: Long = System.currentTimeMillis()): List<OutageEpisode> {
-        if (!ready(ctx)) return emptyList()
+        now: Long = System.currentTimeMillis()): List<OutageEpisode> = readIncidents(ctx, days, now).valueOrThrow()
+
+    @Synchronized fun readIncidents(ctx: Context, days: Int = 7,
+        now: Long = System.currentTimeMillis()): HistoryRead<List<OutageEpisode>> {
+        if (!ready(ctx)) return HistoryRead.Unavailable(null, failure ?: HistoryFailure.READ)
         ensureClock(ctx, now)
         prune(now)
         val checks = preparation.prepare(samples, version, now - KEEP_MS).checks
-        return OutageEpisodes.derivePrepared(checks, now - days.coerceIn(1, 7) * 86_400_000L, now)
+        val value = OutageEpisodes.derivePrepared(checks, now - days.coerceIn(1, 7) * 86_400_000L, now)
+        val problem = failure
+        return if (problem == null) HistoryRead.Ready(value) else HistoryRead.Unavailable(value, problem)
     }
     @Synchronized fun uptimePercent(ctx: Context): Double = stats(ctx).uptimePercent
     @Synchronized fun recovery(ctx: Context, checkedAt: Long, partialEnabled: Boolean): RecoveryEvent? =
@@ -219,6 +258,9 @@ object History {
         migrated = true
         dirty = false
         lastCompacted = now
+        physicalRows = samples.size
+        compaction.savedReplacement(now)
+        failure = null
         appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
         statsCache.clear()
         version++
@@ -255,7 +297,7 @@ object History {
         append(Lang.t("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n", "MTTR covers fully observed Telegram outages between OK checks; PARTIAL can extend an outage, while gaps and lost internet are excluded.\n"))
         append(Lang.t("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.", "Checks: ${s.checks}. Time between checks is estimated; gaps are excluded from the percentage."))
     }
-    @Synchronized fun flush(ctx: Context) {
+    @Synchronized fun flush(ctx: Context, now: Long = System.currentTimeMillis()) {
         if (!loaded) return
         dirty = true
         preparation.clear()
@@ -263,8 +305,16 @@ object History {
         try {
             HistoryStorage.write(file(ctx), samples)
             dirty = false
+            lastCompacted = now
+            physicalRows = samples.size
+            compaction.savedReplacement(lastCompacted)
+            failure = null
             appendSync.saved(samples.lastOrNull()?.kind, SystemClock.elapsedRealtime(), true)
-        } catch (e: Exception) { Log.w("TgWatch", "history flush", e) }
+        } catch (e: Exception) {
+            compaction.failedWrite()
+            failure = HistoryFailure.WRITE
+            Log.w("TgWatch", "history flush", e)
+        }
     }
 }
 

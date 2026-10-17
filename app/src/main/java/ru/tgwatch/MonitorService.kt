@@ -89,6 +89,7 @@ class MonitorService : Service() {
         private const val VIBRATION_GAP_MS = AlertRules.GAP_MS
         private const val NETWORK_GRACE_MS = 4_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 60_000L
+        private const val UNMEASURED_RETRY_MS = 1_000L
         private const val INTERRUPTED_RETRY_MS = 10_000L
 
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
@@ -580,7 +581,7 @@ class MonitorService : Service() {
         } else {
             // Admission failure is monitor health, not a new observation about Telegram.
             lastEndpoints = result.outcomes.toList()
-            checkSchedule.request(1_000L)
+            checkSchedule.request(UNMEASURED_RETRY_MS)
         }
     }
 

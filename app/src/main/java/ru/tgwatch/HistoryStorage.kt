@@ -1,14 +1,7 @@
 package ru.tgwatch
 
-import android.system.Os
-import android.system.OsConstants
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.channels.FileChannel
-import java.nio.file.StandardOpenOption
 
 /** File I/O is separate from Android context so migration and crash-safe writes can be tested. */
 object HistoryStorage {
@@ -43,7 +36,7 @@ object HistoryStorage {
     fun migrateLegacy(legacy: File, destination: File, marker: File, current: List<Observation>): Migration {
         if (marker.exists()) return Migration(current, true)
         return try {
-            val merged = merge(readLegacy(legacy), current)
+            val merged = Timeline.retained(merge(readLegacy(legacy), current), Long.MIN_VALUE)
             write(destination, merged)
             marker.writeText("legacy minute estimates imported")
             Migration(merged, true)
@@ -52,56 +45,32 @@ object HistoryStorage {
             Migration(current, false)
         }
     }
-    fun read(file: File): List<Observation> {
-        if (!file.exists()) return emptyList()
-        // I/O errors propagate: an unreadable file must never be treated as empty.
-        return file.readLines().mapNotNull { line ->
-            val p = line.split(',')
-            if (p.size !in 4..5) return@mapNotNull null
-            val at = p[0].toLongOrNull() ?: return@mapNotNull null
-            val until = p[1].toLongOrNull() ?: return@mapNotNull null
-            val latency = p[3].toLongOrNull() ?: return@mapNotNull null
-            val epoch = if (p.size == 5) p[4].toLongOrNull() ?: return@mapNotNull null else 0L
-            val row = Observation(at, until, p[2], latency, epoch)
-            if (!validObservation(row)) return@mapNotNull null
-            row
-        }
-    }
+    fun read(file: File): List<Observation> = HistoryFileReader.readCounted(file).rows
     fun merge(older: List<Observation>, newer: List<Observation>): List<Observation> =
         Timeline.unique(older + newer).sortedWith(compareBy({ it.clockEpoch }, { it.at }))
 
-    fun write(file: File, samples: List<Observation>) {
+    fun write(file: File, samples: List<Observation>, io: HistoryFileOperations = SystemHistoryFileOperations) {
+        validateSnapshot(samples)
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
         FileOutputStream(tmp).use { stream ->
             stream.write(samples.joinToString("\n") { encode(it) }.toByteArray(Charsets.UTF_8))
-            stream.fd.sync()
+            io.syncFile(stream.fd)
         }
-        try {
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: AtomicMoveNotSupportedException) {
-            // Same-filesystem rename replaces atomically on Android/Linux; never delete first.
-            check(tmp.renameTo(file)) { "Cannot atomically replace history" }
-        }
-        syncDirectory(file.absoluteFile.parentFile!!)
+        io.replace(tmp, file)
+        io.syncDirectory(file.absoluteFile.parentFile!!)
     }
     /** Persist rename/creation metadata too; unsupported or failed sync must reach the caller. */
-    internal fun syncDirectory(directory: File) {
-        if (System.getProperty("java.vm.name") == "Dalvik") {
-            val descriptor = Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
-            try { Os.fsync(descriptor) } finally { Os.close(descriptor) }
-        } else {
-            FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { it.force(true) }
-        }
-    }
-    fun append(file: File, sample: Observation, sync: Boolean = false) {
+    internal fun syncDirectory(directory: File) = SystemHistoryFileOperations.syncDirectory(directory)
+    fun append(file: File, sample: Observation, sync: Boolean = false,
+        io: HistoryFileOperations = SystemHistoryFileOperations) {
         file.parentFile?.mkdirs()
         val created = !file.exists()
         FileOutputStream(file, true).use { stream ->
             stream.write("\n${encode(sample)}\n".toByteArray(Charsets.UTF_8))
-            if (sync) stream.fd.sync()
+            if (sync) io.syncFile(stream.fd)
         }
-        if (created && sync) syncDirectory(file.absoluteFile.parentFile!!)
+        if (created && sync) io.syncDirectory(file.absoluteFile.parentFile!!)
     }
     private fun encode(s: Observation) = "${s.at},${s.until},${s.kind},${s.latencyMs},${s.clockEpoch}"
     fun readLegacy(file: File): List<Observation> {
@@ -119,7 +88,7 @@ object HistoryStorage {
     }
 }
 
-private fun validObservation(row: Observation): Boolean {
+internal fun validObservation(row: Observation): Boolean {
     val validIdentity = row.at >= 0 && row.clockEpoch >= 0
     val validResult = row.kind in Timeline.kinds && row.latencyMs >= -1
     val validCoverage = row.isEpochMetadata ||
