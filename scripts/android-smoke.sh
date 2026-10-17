@@ -125,16 +125,15 @@ await_observation "$before"
 # Collect pre-reboot evidence: reboot clears the Android log buffers.
 check_crashes
 before=$(last_check)
+adb shell locksettings set-disabled false
 adb shell locksettings set-pin 1234
 adb reboot
 python3 scripts/adb-readiness.py --timeout 180
 adb shell dumpsys user | grep -q RUNNING_LOCKED
 await_observation "$before"
-adb shell input keyevent KEYCODE_WAKEUP
-adb shell input keyevent 82
-adb shell input text 1234
-adb shell input keyevent 66
-sleep 3
+python3 scripts/adb-unlock-smoke.py
+# Never clear the credential to make a failed PIN attempt look like an unlock.
+adb shell dumpsys user | grep -q RUNNING_UNLOCKED
 adb shell locksettings clear --old 1234
 adb shell wm dismiss-keyguard
 for attempt in $(seq 1 10); do
