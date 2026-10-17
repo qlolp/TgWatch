@@ -216,7 +216,7 @@ class MonitorReliabilityIntegrationTest {
         assertNotNull(awaitNotification(EventNotifications.OUTAGE_ID))
     }
 
-    @Test fun publicationRejectsARevisionThatChangedAfterTheProbes() {
+    @Test fun cancelledGenerationDoesNotAppend() {
         val service = service()
         val previous = seedOutage()
         val history = History.snapshot(ctx)
@@ -227,6 +227,28 @@ class MonitorReliabilityIntegrationTest {
         publish(service, MonitorService.Status.OK, revision)
         assertEquals(previous, MonitorService.state)
         assertEquals(history, History.snapshot(ctx))
+        assertNotNull(awaitNotification(EventNotifications.OUTAGE_ID))
+    }
+
+    @Test fun unmeasuredBatchDoesNotAppend() {
+        val service = service()
+        val previous = seedOutage()
+        val history = History.snapshot(ctx)
+        val preferences = Prefs.sp(ctx).all.toMap()
+        val pending = AtomicLong(-1L)
+        val schedule = CheckSchedule({}, pending::set)
+        field("checkSchedule").set(service, schedule)
+        val probeType = Class.forName("ru.tgwatch.MonitorService\$Probe")
+        val outcomes = listOf(ProbeOutcome("busy", ProbeGroup.MTPROTO, false, -1,
+            "not measured", ProbeMeasurement.NOT_MEASURED))
+        val probe = probeType.declaredConstructors.first { it.parameterCount == 6 }.apply { isAccessible = true }
+            .newInstance(MonitorService.Status.UNKNOWN, -1L, "not measured", "busy probes", outcomes, null)
+        type.getDeclaredMethod("publishCheckedResult", probeType, Long::class.javaPrimitiveType)
+            .apply { isAccessible = true }.invoke(service, probe, schedule.begin())
+        assertEquals(previous, MonitorService.state)
+        assertEquals(history, History.snapshot(ctx))
+        assertEquals(preferences, Prefs.sp(ctx).all)
+        assertEquals(1_000L, pending.get())
         assertNotNull(awaitNotification(EventNotifications.OUTAGE_ID))
     }
 

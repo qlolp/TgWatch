@@ -61,7 +61,9 @@ class MonitorService : Service() {
     }
 
     private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
-        val outcomes: List<ProbeOutcome> = emptyList(), val extraCheck: ExtraCheck? = null)
+        val outcomes: List<ProbeOutcome> = emptyList(), val extraCheck: ExtraCheck? = null) {
+        val publishable get() = outcomes.isEmpty() || ProbeReport(outcomes).publishable
+    }
 
     private data class ExtraCheck(val token: ExtraProbeCoordinator.Token, val probe: NetworkProbe,
         val endpoints: List<ProbeEndpoint>)
@@ -572,6 +574,12 @@ class MonitorService : Service() {
         // A result from a network that has since changed is no observation: keep the prior state,
         // history and alerts. afterCheck() runs the replacement check one second later.
         if (revision != checkSchedule.revision) return
+        if (!result.publishable) {
+            // Admission failure is monitor health, not a new observation about Telegram.
+            lastEndpoints = result.outcomes.toList()
+            checkSchedule.request(INTERRUPTED_RETRY_MS)
+            return
+        }
         handleResult(result)
         startExtras(result)
     }

@@ -10,11 +10,15 @@ import javax.net.ssl.SSLException
 
 /** EXTRA results are informational only and never take part in Telegram classification. */
 enum class ProbeGroup { WEB, MTPROTO, CONTROL, EXTRA }
+enum class ProbeMeasurement { SUCCESS, FAILURE, NOT_MEASURED }
 data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: String)
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
-    val latencyMs: Long = -1, val detail: String)
+    val latencyMs: Long = -1, val detail: String,
+    val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE)
 
 data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean = true) {
+    val publishable: Boolean get() = !connected || hasPositiveEvidence(results) ||
+        hasCompleteMeasurements(results)
     val status get() = classify(results, connected)
     val latencyMs get() = results.filter { it.reachable && it.group == ProbeGroup.MTPROTO }
         .minOfOrNull { it.latencyMs } ?: -1L
@@ -28,6 +32,12 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
         else -> Lang.t("Доступность не определена: ни один адрес не подтвердил связь", "Reachability unknown: no address confirmed a connection")
     }
     companion object {
+        private val PRIMARY_GROUPS = setOf(ProbeGroup.WEB, ProbeGroup.MTPROTO)
+        private fun hasPositiveEvidence(results: List<ProbeOutcome>) =
+            results.any { it.group in PRIMARY_GROUPS && it.reachable }
+        private fun hasCompleteMeasurements(results: List<ProbeOutcome>) =
+            results.any { it.group in PRIMARY_GROUPS } &&
+                results.none { it.group in PRIMARY_GROUPS && it.measurement == ProbeMeasurement.NOT_MEASURED }
         fun classify(results: List<ProbeOutcome>, connected: Boolean): String {
             if (!connected) return "NO_NETWORK"
             val web = results.any { it.group == ProbeGroup.WEB && it.reachable }
@@ -35,6 +45,7 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
             return when {
                 web && mt -> "OK"
                 web || mt -> "PARTIAL"
+                !hasCompleteMeasurements(results) -> "UNKNOWN"
                 results.any { it.group == ProbeGroup.CONTROL && it.reachable } -> "TG_DOWN"
                 else -> "UNKNOWN"
             }
@@ -92,25 +103,30 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         val queue = ExecutorCompletionService<ProbeOutcome>(pool)
         val handles = mutableListOf<Triple<Future<ProbeOutcome>, ProbeCancellation, Lease>>()
         val results = mutableListOf<ProbeOutcome>()
+        val started = ConcurrentHashMap.newKeySet<String>()
         try {
             endpoints.forEach { endpoint ->
                 val lease = acquire(pool, endpoint)
                 if (lease == null) {
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
+                    results += notMeasured(endpoint, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                     return@forEach
                 }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Проверка отменена", "Check cancelled"))
-                        try { cancellation.check(); operation(endpoint, cancellation) }
+                        if (!lease.start()) return@Callable notMeasured(endpoint, Lang.t("Проверка отменена", "Check cancelled"))
+                        try {
+                            cancellation.check()
+                            started.add(endpoint.name)
+                            operation(endpoint, cancellation)
+                        }
                         catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }
                         finally { cancellation.close(); lease.finish() }
                     })
                     handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
                     lease.cancelBeforeStart()
-                    results += ProbeOutcome(endpoint.name, endpoint.group, false, -1, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
+                    results += notMeasured(endpoint, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                 }
             }
             repeat(handles.size) {
@@ -129,8 +145,12 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         }
         checkCoordinator()
         return endpoints.map { ep -> results.firstOrNull { it.endpoint == ep.name }
-            ?: ProbeOutcome(ep.name, ep.group, false, -1, Lang.t("Общий срок ожидания истёк", "Overall time limit expired")) }
+            ?: ProbeOutcome(ep.name, ep.group, false, -1, Lang.t("Общий срок ожидания истёк", "Overall time limit expired"),
+                if (ep.name in started) ProbeMeasurement.FAILURE else ProbeMeasurement.NOT_MEASURED) }
     }
+
+    private fun notMeasured(endpoint: ProbeEndpoint, detail: String) =
+        ProbeOutcome(endpoint.name, endpoint.group, false, -1, detail, ProbeMeasurement.NOT_MEASURED)
 
     private fun checkCoordinator() {
         if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
