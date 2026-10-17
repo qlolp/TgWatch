@@ -50,6 +50,19 @@ class AndroidReportingTests(unittest.TestCase):
         self.assertNotIn(secret, output)
         self.assertIn('ru.tgwatch.Test.fails (java.lang.AssertionError)', output)
 
+    def test_safe_case_source_location_without_failure_body(self):
+        secret = 'private-token-value'
+        self.write('<testsuite><testcase classname="ru.tgwatch.StatusShareIntegrationTest" name="fails">'
+                   f'<failure>{secret}&#10;'
+                   ' at ru.tgwatch.Other.secret(Secret.java:99)&#10;'
+                   ' at ru.tgwatch.StatusShareIntegrationTest.helperRead(StatusShareIntegrationTest.kt:166)'
+                   '</failure></testcase></testsuite>')
+        output = self.run_report()
+        self.assertIn('StatusShareIntegrationTest.kt:166', output)
+        self.assertNotIn(secret, output)
+        self.assertNotIn('Secret.java', output)
+        self.assertEqual(1, output.count('::error'))
+
     def test_unsafe_identifiers_and_exception_types_are_redacted(self):
         secret = 'token=secret-password'
         self.write('<testsuite><testcase classname="ru.tgwatch.Test&#10;::error::injected" '
@@ -135,6 +148,35 @@ class SmokeAnnotationTests(unittest.TestCase):
             self.assertNotIn('bash ./gradlew', result.stderr)
             self.assertIn('EXIT trap preserved', (root / 'smoke-logcat.txt').read_text())
             self.assertFalse(stale.exists())
+
+
+    def test_permission_cycle_reinstalls_inputs_after_runner_uninstalls_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'gradlew').write_text('#!/usr/bin/env bash\nexit 0\n')
+            helper = root / 'python3'
+            helper.write_text('#!/usr/bin/env bash\nexit 0\n')
+            helper.chmod(0o755)
+            adb = root / 'adb'
+            adb.write_text('''#!/usr/bin/env bash
+if [[ "$1 $2 $3 $4" == "shell getprop ro.build.version.sdk " ]]; then echo 35; exit 0; fi
+if [[ "$1" == install ]]; then
+  case "$*" in
+    *app-debug-androidTest.apk) touch test-installed ;;
+    *app-debug.apk) touch app-installed ;;
+  esac
+fi
+if [[ "$1 $2 $3" == "shell pm revoke" ]]; then
+  [[ -e app-installed && -e test-installed ]] || exit 23
+  exit 29
+fi
+exit 0
+''')
+            adb.chmod(0o755)
+            result = subprocess.run(['bash', str(ROOT / 'scripts/android-smoke.sh')], cwd=root,
+                                    env=dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH']),
+                                    capture_output=True, text=True)
+            self.assertEqual(29, result.returncode, result.stderr)
 
 
 class WorkflowReportingTests(unittest.TestCase):

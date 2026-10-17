@@ -40,6 +40,10 @@ adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-
 # Runtime permission revocation kills the app; exercise denial in a fresh instrumentation.
 api_level=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
 if [[ "$api_level" -ge 33 ]]; then
+  # UTP may uninstall both packages after connected tests. The separate denial
+  # instrumentation needs the exact current APKs, while -r preserves app data.
+  adb install -r app/build/outputs/apk/debug/app-debug.apk
+  adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
   permission_log=app/build/reports/androidTests/notification-permission-cycle.txt
   adb shell am force-stop ru.tgwatch
   adb shell pm revoke ru.tgwatch android.permission.POST_NOTIFICATIONS

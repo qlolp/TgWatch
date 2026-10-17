@@ -2,7 +2,8 @@
 """Summarize connected JUnit XML without printing failure bodies or messages.
 
 This always-successful diagnostic step never replaces the emulator/test step's
-exit status. Only bounded identifier attributes become GitHub annotations.
+exit status. Only bounded identifiers and the test's own source location become
+GitHub annotations.
 """
 from pathlib import Path
 import re
@@ -28,6 +29,18 @@ def workflow_escape(value):
 def safe_identifier(value, fallback):
     # Do not emit arbitrary parameter values, command text or exception messages.
     return value if value and IDENTIFIER.fullmatch(value) else fallback
+
+
+def case_source_location(case, exception):
+    """Expose only the failing test's own source filename/line, never raw text."""
+    name = case.get('classname', '')
+    if not name.startswith('ru.tgwatch.') or not IDENTIFIER.fullmatch(name):
+        return ''
+    source = name.rsplit('.', 1)[-1].split('$', 1)[0]
+    frame = re.compile(r'^\s*at ' + re.escape(name) + r'\.[A-Za-z_$][A-Za-z0-9_$]*\('
+                       + re.escape(source) + r'\.(kt|java):([1-9][0-9]{0,5})\)\s*$', re.M)
+    match = frame.search(exception.text or '')
+    return f' [{source}.{match[1]}:{match[2]}]' if match else ''
 
 
 def case_outcome(case):
@@ -92,7 +105,7 @@ def report(directory, output=sys.stdout):
             exception = case.find(outcome)
             label = safe_identifier(case.get('classname'), 'unknown-class') + '.' + safe_identifier(case.get('name'), 'unknown-test')
             kind = safe_identifier(exception.get('type'), 'unknown-exception')
-            message = workflow_escape(f'{label} ({kind})')
+            message = workflow_escape(f'{label} ({kind})' + case_source_location(case, exception))
             print(f'::error title=Connected Android test {outcome}::{message}', file=output)
             annotations += 1
         if result['failures'] + result['errors'] > MAX_ANNOTATIONS:
