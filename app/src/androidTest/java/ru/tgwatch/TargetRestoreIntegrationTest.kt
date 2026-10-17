@@ -173,4 +173,63 @@ class TargetRestoreIntegrationTest {
             if (previousMarker == null) marker.delete() else marker.writeBytes(previousMarker)
         }
     }
+
+    @Test fun validBackupRepairsACorruptSecondaryJournalAfterColdReload() {
+        val old = TargetPersistence.storage().journalFile(TargetId.MATRIX)
+        val bytes = old.readBytes()
+        try {
+            old.writeText("damaged journal")
+            TargetPersistence::class.java.getDeclaredField("current").apply { isAccessible = true }.set(null, null)
+            History::class.java.getDeclaredField("loaded").apply { isAccessible = true }.setBoolean(null, false)
+            val source = data()
+            BackupManager.restoreTargets(ctx, source)
+            assertEquals(source.observations, TargetPersistence.storage().snapshot().observations)
+            assertFalse(BackupManager.hasPending())
+        } finally {
+            if (TargetPersistence.active?.journalFile(TargetId.MATRIX) == old || TargetPersistence.active == null)
+                old.writeBytes(bytes)
+        }
+    }
+
+    @Test fun validBackupRepairsACorruptRegistryAfterColdReload() {
+        val directory = TargetPersistence.storage().journalFile(TargetId.MATRIX).parentFile!!
+        val old = File(directory, "registry.json")
+        val bytes = old.readBytes()
+        try {
+            old.writeText("damaged registry")
+            TargetPersistence::class.java.getDeclaredField("current").apply { isAccessible = true }.set(null, null)
+            History::class.java.getDeclaredField("loaded").apply { isAccessible = true }.setBoolean(null, false)
+            val source = data()
+            BackupManager.restoreTargets(ctx, source)
+            assertEquals(source.observations, TargetPersistence.storage().snapshot().observations)
+            assertFalse(BackupManager.hasPending())
+        } finally {
+            if (TargetPersistence.active?.journalFile(TargetId.MATRIX)?.parentFile == directory ||
+                TargetPersistence.active == null) old.writeBytes(bytes)
+        }
+    }
+
+    @Test fun failedRestoreKeepsUnsavedTelegramMemoryAndItsRepairDebt() {
+        History.replaceSnapshot(ctx, emptyList())
+        val file = TargetPersistence.storage().journalFile(TargetId.TELEGRAM)
+        check(file.setReadOnly())
+        try {
+            val at = System.currentTimeMillis() + 1000
+            History.record(ctx, at, History.Kind.FAIL, -1)
+            assertEquals(HistoryFailure.WRITE, History.healthFailure)
+            val unsaved = History.snapshot(ctx)
+            assertEquals(1, unsaved.size)
+            val imported = TargetBackupImport(data())
+            TargetRestore.stage(ctx, imported)
+            try {
+                TargetRestore.apply(ctx, imported, emptySet(), syncPreferences = {
+                    throw java.io.IOException("materialization failed")
+                })
+                fail("Failed restore was accepted")
+            } catch (_: java.io.IOException) { }
+            assertEquals(unsaved, History.snapshot(ctx))
+            assertEquals(HistoryFailure.WRITE, History.healthFailure)
+            assertTrue(BackupManager.hasPending())
+        } finally { if (file.exists()) check(file.setWritable(true, true)) }
+    }
 }

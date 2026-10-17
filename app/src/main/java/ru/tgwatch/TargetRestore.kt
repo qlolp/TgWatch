@@ -24,8 +24,6 @@ internal object TargetRestore {
 
     fun apply(ctx: Context, imported: TargetBackupImport, cleared: Set<String>,
         syncPreferences: (File) -> Unit = HistoryStorage::syncDirectory) = synchronized(History) {
-        val old = TargetPersistence.storage().snapshot()
-        val oldLegacyComplete = TargetPersistence.storage().legacyMigrationComplete
         val preferences = Prefs.sp(ctx).all.toMap()
         val privatePreferences = ctx.applicationContext.getSharedPreferences(
             TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE)
@@ -35,31 +33,33 @@ internal object TargetRestore {
                 imported.snapshot.targets.firstOrNull { it.id == id }
                     ?: TargetDefinition.default(id).copy(enabled = false)
             }, observations = TargetId.entries.associateWith { imported.snapshot.observations[it].orEmpty() })
-            TargetPersistence.replaceGeneration(ctx, complete)
-            val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false)
-            cleared.forEach(edit::remove)
-            preferences.keys.filter { it.startsWith("target.") }.forEach(edit::remove)
-            imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
-            for (id in TargetId.entries) {
-                val definition = imported.snapshot.targets.firstOrNull { it.id == id } ?: TargetDefinition.default(id)
-                definitions(edit, definition)
-                val revision = imported.snapshot.observations[id].orEmpty().maxOfOrNull { it.endpointRevision } ?: 0L
-                edit.putLong(TargetPreferences.key(id, "endpoint_revision"), revision)
-                edit.putBoolean(TargetPreferences.key(id, "endpoint_review"), definition.requiresEndpoint)
+            TargetPersistence.replaceGeneration(ctx, complete) {
+                val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false)
+                cleared.forEach(edit::remove)
+                preferences.keys.filter { it.startsWith("target.") }.forEach(edit::remove)
+                imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
+                for (id in TargetId.entries) {
+                    val definition = imported.snapshot.targets.firstOrNull { it.id == id }
+                        ?: TargetDefinition.default(id)
+                    definitions(edit, definition)
+                    val revision = imported.snapshot.observations[id].orEmpty()
+                        .maxOfOrNull { it.endpointRevision } ?: 0L
+                    edit.putLong(TargetPreferences.key(id, "endpoint_revision"), revision)
+                    edit.putBoolean(TargetPreferences.key(id, "endpoint_review"), definition.requiresEndpoint)
+                }
+                check(edit.commit()) { "Cannot restore target settings" }
+                imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
+                EventLog.replace(ctx, imported.snapshot.log)
+                LastSuccessStore.clear(ctx)
+                MonitorService.clearRestoredState()
+                syncPreferences(File(ctx.applicationContext.createDeviceProtectedStorageContext()
+                    .dataDir, "shared_prefs"))
             }
-            check(edit.commit()) { "Cannot restore target settings" }
-            imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
-            EventLog.replace(ctx, imported.snapshot.log)
-            LastSuccessStore.clear(ctx)
-            MonitorService.clearRestoredState()
-            syncPreferences(File(ctx.applicationContext.createDeviceProtectedStorageContext()
-                .dataDir, "shared_prefs"))
         }
         applied.exceptionOrNull()?.let { failure ->
             if (failure is Error) throw failure
             // A recoverable runtime failure leaves old public data observable only after a successful retry.
             val rollback = runCatching {
-                TargetPersistence.replaceGeneration(ctx, old, supersedeLegacy = oldLegacyComplete)
                 val edit = Prefs.sp(ctx).edit().clear()
                 preferences.forEach { (key, value) -> if (value != null) put(edit, key, value) }
                 check(edit.commit())

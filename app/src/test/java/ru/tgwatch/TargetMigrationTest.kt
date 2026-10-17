@@ -114,4 +114,39 @@ class TargetMigrationTest {
             try { TargetStorage.open(root); fail() } catch (_: IOException) { }
         } finally { root.deleteRecursively() }
     }
+
+    @Test fun openingOneTargetDoesNotReadAnotherTargetsCorruptJournal() {
+        val root = Files.createTempDirectory("targets-isolated-read").toFile()
+        try {
+            val store = TargetStorage.open(root)
+            store.replaceGeneration(data(1))
+            store.journalFile(TargetId.MATRIX).writeText("unreadable matrix journal")
+            val reopened = TargetStorage.open(root)
+            assertEquals(data(1).observations.getValue(TargetId.TELEGRAM), reopened.read(TargetId.TELEGRAM))
+            try { reopened.read(TargetId.MATRIX); fail("Corruption was presented as an empty history") }
+            catch (_: IOException) { }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun materializationFailureRestoresExactOldFilesWithoutReadingCorruptHistory() {
+        val root = Files.createTempDirectory("targets-pointer-rollback").toFile()
+        try {
+            val store = TargetStorage.open(root)
+            store.replaceGeneration(data(1))
+            val corrupt = store.journalFile(TargetId.MATRIX).apply { writeText("preserve these damaged bytes") }
+            val oldManifest = File(root, "active-generation").readBytes()
+            var sawNew = false
+            try {
+                store.replaceGeneration(data(2), materialize = {
+                    sawNew = TargetStorage.open(root).snapshot() == data(2)
+                    throw IOException("settings failed after manifest switch")
+                })
+                fail("Failed settings were accepted")
+            } catch (_: IOException) { }
+            assertTrue("Public settings apply only after a complete new generation is visible", sawNew)
+            assertArrayEquals(oldManifest, File(root, "active-generation").readBytes())
+            assertEquals(corrupt, store.journalFile(TargetId.MATRIX))
+            assertEquals("preserve these damaged bytes", corrupt.readText())
+        } finally { root.deleteRecursively() }
+    }
 }

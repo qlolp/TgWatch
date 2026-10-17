@@ -6,14 +6,15 @@ import java.io.File
 /** A cached handle, installed only while holding History's monitor on the recovery worker. */
 internal object TargetPersistence {
     @Volatile private var current: TargetStorage? = null
-    val active: TargetStorage? get() = current
+    val active: TargetStorage? get() = current?.takeIf { it.isInitialized }
     fun storage(): TargetStorage = checkNotNull(current) { "Target storage is not ready" }
 
-    fun initialize(ctx: Context) = synchronized(History) {
-        if (current != null) return@synchronized
+    fun initialize(ctx: Context, forRestore: Boolean = false) = synchronized(History) {
+        if (current?.isInitialized == true) return@synchronized
         val directory = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, "targets-v1")
-        val storage = TargetStorage.open(directory, elapsedMs = android.os.SystemClock::elapsedRealtime)
-        if (!storage.isInitialized) {
+        val storage = current ?: TargetStorage.open(directory,
+            elapsedMs = android.os.SystemClock::elapsedRealtime, validateRegistry = !forRestore)
+        if (!storage.isInitialized && !forRestore) {
             val legacy = History.snapshot(ctx)
             storage.replaceGeneration(TargetBackupSnapshot(System.currentTimeMillis(), emptyMap(),
                 TargetPreferences.definitions(ctx), TargetId.entries.associateWith { id ->
@@ -21,7 +22,7 @@ internal object TargetPersistence {
                 }, emptyList()), supersedeLegacy = false)
         }
         current = storage
-        History.invalidateTargetCache(storage.legacyMigrationComplete)
+        if (storage.isInitialized) History.invalidateTargetCache(storage.legacyMigrationComplete)
     }
 
     fun telegramRows(ctx: Context): List<Observation> {
@@ -47,10 +48,15 @@ internal object TargetPersistence {
     }
 
     fun replaceGeneration(ctx: Context, data: TargetBackupSnapshot,
-        supersedeLegacy: Boolean = true) = synchronized(History) {
-        initialize(ctx)
-        storage().replaceGeneration(data, supersedeLegacy)
-        History.invalidateTargetCache(storage().legacyMigrationComplete)
+        supersedeLegacy: Boolean = true, materialize: () -> Unit = {}) = synchronized(History) {
+        initialize(ctx, forRestore = true)
+        val undoAttachment = History.attachmentRollback()
+        runCatching {
+            storage().replaceGeneration(data, supersedeLegacy) {
+                History.invalidateTargetCache(storage().legacyMigrationComplete)
+                materialize()
+            }
+        }.onFailure { if (it !is Error) undoAttachment() }.getOrThrow()
     }
 
     internal fun publicRow(row: Observation): Observation =

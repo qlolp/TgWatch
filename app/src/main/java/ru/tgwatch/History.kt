@@ -70,6 +70,19 @@ object History {
         statsCache.clear()
         version++
     }
+    /** No history read can enter during materialization; retain the existing samples and repair debt on rollback. */
+    @Synchronized internal fun attachmentRollback(): () -> Unit {
+        val wasLoaded = loaded
+        val wasMigrated = migrated
+        return { synchronized(this) {
+            loaded = wasLoaded
+            migrated = wasMigrated
+            preparation.clear()
+            appliedPreparation = null
+            statsCache.clear()
+            version++
+        } }
+    }
     private fun load(ctx: Context) {
         if (!loaded) {
             val stored = if (TargetPersistence.active == null) HistoryFileReader.readCounted(file(ctx)) else {

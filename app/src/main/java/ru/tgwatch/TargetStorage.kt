@@ -24,14 +24,15 @@ class TargetStorage private constructor(private val directory: File, private val
     /** Path lookup is deliberately lock-free; callers hold the History monitor while switching generations. */
     fun journalFile(id: TargetId): File = File(generation(), "${id.wire}.csv")
 
-    @Synchronized fun replaceGeneration(data: TargetBackupSnapshot, supersedeLegacy: Boolean = true) {
+    @Synchronized fun replaceGeneration(data: TargetBackupSnapshot, supersedeLegacy: Boolean = true,
+        materialize: () -> Unit = {}) {
         TargetBackupCodec.validate(data)
         val name = UUID.randomUUID().toString().replace("-", "")
         val staged = File(directory, name)
         val previous = active
         check(staged.mkdir()) { "Cannot create target generation" }
         var published = false
-        try {
+        val installed = runCatching {
             for (id in TargetId.entries) TargetJournal.write(File(staged, "${id.wire}.csv"),
                 data.observations[id].orEmpty(), io)
             val bytes = TargetBackupCodec.encode(data.copy(observations = data.observations.mapValues { emptyList() }))
@@ -46,14 +47,18 @@ class TargetStorage private constructor(private val directory: File, private val
             published = true
             io.syncDirectory(directory)
             active = name
+            materialize()
             compaction.clear()
             syncPolicy.clear()
-        } catch (failure: IOException) {
-            if (published) {
-                try { TargetManifest.restore(directory, previous) }
-                catch (rollback: IOException) { failure.addSuppressed(rollback) }
-            }
-            if (!published || TargetManifest.read(directory) != name) staged.deleteRecursively()
+        }
+        installed.exceptionOrNull()?.let { failure ->
+            if (failure is Error) throw failure
+            if (published) runCatching {
+                TargetManifest.restore(directory, previous)
+                active = previous
+            }.exceptionOrNull()?.let(failure::addSuppressed)
+            val retired = !published || runCatching { TargetManifest.read(directory) != name }.getOrDefault(false)
+            if (retired) staged.deleteRecursively()
             throw failure
         }
     }
@@ -123,11 +128,12 @@ class TargetStorage private constructor(private val directory: File, private val
         private const val KEEP_MS = 7 * CoverageStats.DAY_MS
         private val GENERATION = Regex("[a-f0-9]{32}")
         fun open(directory: File, io: HistoryFileOperations = SystemHistoryFileOperations,
-            elapsedMs: () -> Long = { java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) }
-        ): TargetStorage {
+            elapsedMs: () -> Long = { java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
+            validateRegistry: Boolean = true): TargetStorage {
             if (!directory.isDirectory && !directory.mkdirs()) throw IOException("Cannot create target storage")
             return TargetStorage(directory, io, elapsedMs).also { store ->
-                if (store.isInitialized) store.snapshot() // Reject corrupt generations before admitting monitoring.
+                // Each journal reports its own read failure; a damaged goal cannot disable the others.
+                if (validateRegistry && store.isInitialized) store.registry()
             }
         }
     }

@@ -111,7 +111,7 @@ object BackupManager {
             AutomationReceiver.invalidateState()
             var recovered = false
             HistorySessions.queue(ctx).exclusive {
-                TargetPersistence.initialize(ctx)
+                TargetPersistence.initialize(ctx, forRestore = true)
                 BackupJournals.migrateLegacy(ctx)
                 recovered = BackupJournals.transaction(ctx).recover { bytes, endpoint ->
                     TargetRestore.apply(ctx, TargetBackupImport(TargetBackupCodec.decode(bytes), endpoint),
