@@ -615,6 +615,8 @@ jobs:
           target: android-wear
           arch: x86
           profile: wearos_large_round
+          # The official OS3 image pins ART CPU sets to CPUs0..3.
+          cores: 4
           disable-animations: true
           script: bash scripts/wear-smoke.sh
       - name: Wear device reports
