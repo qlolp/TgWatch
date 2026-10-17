@@ -6,6 +6,10 @@ TgWatch monitors Telegram reachability locally on Android 8.0 and later. It need
 no Telegram account, phone number or access to messages. The interface supports
 English and Russian; Android 13+ also provides a per-app language setting.
 
+Optional independent targets cover Matrix, WhatsApp Web and a custom HTTPS service,
+each with its own history, intervals and alerts. Telegram remains the default;
+additional targets and integrations start disabled. See [targets](multiservice.md).
+
 ## Reading the status
 
 | Status | Meaning |
@@ -76,29 +80,49 @@ file picker. The report contains aggregate status and power/scheduling data;
 it excludes raw history, logs and automation credentials. Nothing is uploaded
 automatically.
 
-Optional, off by default: informational HTTPS checks of Matrix, WhatsApp Web and
-one custom `https://` address appear only in connection diagnostics. Their
-results are excluded from Telegram classification and alerts, and use three
-separate workers so a stuck extra probe cannot occupy Telegram/control workers.
-Telegram's result is published first; later EXTRA results only enrich diagnostics
-for the same check and network.
-A [webhook](automation.md#webhook-alert)
-(for example an ntfy.sh topic) can receive one short line when the published
-status changes. Its address is treated as a credential and kept out of backups
-and diagnostics. Address changes invalidate stale send decisions; an older
-request may finish without changing the new address's delivery history.
-Webhook results have a 10-second total deadline. Cancellation is requested at
-expiry, while a noncooperative transport retains the single physical slot.
-The private settings screen shows sanitized delivery health for the current
-process, without exposing or exporting the address or exception details.
+Independent Matrix/WhatsApp/custom HTTPS targets do not change Telegram status.
+Legacy informational EXTRA checks remain diagnostics only and never automatically
+enable a target. Private service addresses, the automation token and webhook URL
+stay outside portable backups, Direct Boot data and diagnostic/share exports.
+
+The optional [HTTPS webhook](automation.md#webhook-alert) supports text or a bounded
+JSON event with per-target status filters. The JSON contains public status, previous
+status, time, latency, network class and freshness, without endpoints or tokens.
+One physical request, a ten-second deadline, rate limits and settings-generation
+fences apply. The [Home Assistant example](examples/home-assistant/tgwatch-events.yaml)
+uses events, without a heartbeat or MQTT client in the app.
+
+## Latency and surfaces
+
+The selected target's latency screen offers hour/day/week counts, mean and exact
+nearest-rank p50/p95/p99. Telegram uses the best confirmed MTProto response per check;
+local DC/address-family histograms provide approximate ranges, not message speed.
+Configurable slow-response alerts require consecutive measured results. Unknown or
+unmeasured checks break the pending streak. DC buckets are not portable backup data.
+
+Widgets select a target; existing widgets keep Telegram. An expanded widget shows
+six hours of history, observation coverage, last success and check/mute actions.
+Status sharing freezes a preview before sending either text or a PNG through the
+system share sheet. Both use the same capture, excluding addresses and secrets.
+
+The standalone `ru.tgwatch.wear` APK for Wear OS3+/API30 measures this watch's network,
+without a phone or Google Data Layer. Manual checks use one web endpoint and three
+rotating DCs, at most four physical requests and eight seconds. A failed subset does
+not claim a global outage. Tile and complication read only the local cache, expire
+after three minutes and open a user-initiated check on tap. No periodic background
+monitor runs on the watch. [Wear details](wear.md).
 
 ## Install and develop
 
-[Latest published APK](https://github.com/qlolp/TgWatch/releases/latest/download/TgWatch.apk).
+[Latest published phone APK](https://github.com/qlolp/TgWatch/releases/latest/download/TgWatch.apk)
+and [SHA-256](https://github.com/qlolp/TgWatch/releases/latest/download/TgWatch.apk.sha256).
+The source version and a completed build do not establish publication: inspect the
+[release page](https://github.com/qlolp/TgWatch/releases/latest). Wear assets use the
+separate `TgWatch-wear` prefix; every unified release includes both apps' six files.
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.18.0` (Android code `1018000`), Android target API35.
+The source version is `1.19.0` (Android code `1019000`), Android target API35.
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed
@@ -115,7 +139,7 @@ checks dependency audits, production certificate continuity and a real upgrade.
 Use JDK17, Android SDK35 and the checked-in Gradle wrapper:
 
 ```sh
-bash ./gradlew testDebugUnitTest detekt lintDebug assembleDebug assembleRelease
+bash ./gradlew :probe-core:test :app:testDebugUnitTest :app:detekt :app:lintDebug :app:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
 ```
 
 Local release builds are unsigned unless the existing production signing key is

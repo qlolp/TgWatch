@@ -1,0 +1,15 @@
+name: Feature request
+description: Explain the problem a feature would solve
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: Describe a concrete situation, the current limitation, and your suggested behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Privacy, battery and compatibility
+      description: Mention relevant offline behavior, phone/Wear support and opt-in expectations. Do not include credentials or personal endpoints.

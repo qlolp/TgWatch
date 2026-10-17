@@ -1,17 +1,16 @@
-TG Monitor checks whether Telegram is reachable from your device and keeps a local seven-day availability history. It needs no Telegram account, phone number or access to messages, and it never sends messages.
+TgWatch privately monitors Telegram reachability from your Android device. Optional independent Matrix, WhatsApp Web and custom HTTPS targets have their own seven-day history, intervals and alerts. Telegram remains the default; additional targets and integrations start disabled. No Telegram account, phone number or message access is needed.
 
-Each check combines an unauthenticated MTProto greeting (req_pq_multi / resPQ) with HTTPS requests to Telegram web endpoints. Control sites are asked only when Telegram does not answer, so the status distinguishes "Telegram unreachable", "partially reachable", "no network" and "unknown". A check does not prove that messages are delivered.
+Telegram checks combine an unauthenticated MTProto greeting with HTTPS web probes. Matrix checks its versions response; WhatsApp checks its web resource. These measurements do not prove message delivery or authenticate a Telegram server. Offline, unknown, unmeasured and observed outages are distinct; gaps never become healthy uptime.
 
 Features:
-* Battery profiles or a custom interval; Android Doze and vendor restrictions can still delay checks, and the app shows how fresh the result is.
-* Independent notifications, sound and vibration for outages, partial availability and recovery; minute-precise quiet hours.
-* Home-screen widget, Quick Settings tile and an optional daily summary.
-* Chart, CSV export/import and a password-encrypted portable backup.
-* English and Russian interface.
+* Battery profiles, custom intervals, foreground monitoring and explicit result freshness. Android Doze and vendor restrictions can still delay checks.
+* Per-target notifications, minute-precise quiet hours and mute actions.
+* Widgets with target selection, expanded history/coverage, check and mute buttons; a Telegram Quick Settings tile.
+* Exact latency percentiles, local approximate DC histograms and slow-response alerts.
+* Charts, incident summaries, CSV export/import and password-encrypted portable backups. After restore, targets remain disabled for review.
+* Frozen status preview shared as text or PNG, without private addresses or credentials.
+* English and Russian interface, first-run guide, Material You on Android12+.
 
-Optional and off by default:
-* Token-protected automation API for Tasker or your own Android client.
-* Informational checks of Matrix, WhatsApp Web or one HTTPS address of your choice, shown only in diagnostics; they never change the Telegram status or alerts.
-* A webhook (for example an ntfy.sh topic) that receives one short line when the status changes. The address is kept private and is not included in backups or diagnostics.
+Optional token-protected automation and HTTPS text/JSON webhook are off by default. Private service/webhook addresses and tokens stay outside portable backups, Direct Boot data, diagnostic exports and shared cards. There is no author server, account or telemetry. The user chooses whether to send a webhook event or share a report.
 
-Privacy: there is no account and no telemetry. History, logs and settings stay on the device; the diagnostic report is saved only where you choose.
+A separate standalone Wear OS3+ app measures the watch network manually; it does not synchronize phone history. Tile and complication read a three-minute local cache without starting network probes. The F-Droid candidate here covers the phone application only; catalog acceptance is separate.

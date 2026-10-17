@@ -1,0 +1,22 @@
+{
+  "sourceVersion": "1.19.0",
+  "applyAfterRelease": "v1.19.0",
+  "status": "prepared",
+  "description": "Private Android reachability monitor for Telegram, Matrix, WhatsApp Web and custom HTTPS services.",
+  "topicAdditions": [
+    "android",
+    "kotlin",
+    "telegram",
+    "network-monitoring",
+    "privacy",
+    "network-diagnostics",
+    "uptime-monitoring",
+    "fdroid"
+  ],
+  "preserveExistingTopics": true,
+  "labels": [],
+  "labelPolicy": "Create missing good first issue/help wanted labels only after identifying suitable issues; never bulk-assign.",
+  "applicationStatus": "blocked",
+  "applicationReason": "GitHub REST CONNECT403 in this runtime. Native authenticated Git read and branch push work. Read current topics before merging additions; apply multi-service description only after release.",
+  "protectedBranch": "claude/project-thread-s0ejzl"
+}

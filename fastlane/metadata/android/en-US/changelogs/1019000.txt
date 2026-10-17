@@ -1,0 +1,1 @@
+Independent monitoring targets, observation coverage, JSON webhook, latency trends and thresholds, per-target widgets, private status sharing, and a separate standalone Wear OS app. Local history migrates safely; old backups and Telegram API v1 remain supported.

@@ -1,1 +1,1 @@
-Monitor Telegram connectivity on your device
+Private reachability monitor for Telegram, Matrix and HTTPS services
