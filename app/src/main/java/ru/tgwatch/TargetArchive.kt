@@ -19,6 +19,17 @@ internal object TargetArchive {
             TargetPreferences.definitions(ctx), rows, EventLog.all(ctx).toList())
     }
 
+    fun rows(ctx: Context, id: TargetId, now: Long): List<TargetObservation> = synchronized(History) {
+        TargetPersistence.initialize(ctx)
+        val revision = TargetPreferences.endpointRevision(ctx, id)
+        val store = TargetPersistence.storage()
+        if (id == TargetId.TELEGRAM) {
+            val current = History.snapshot(ctx, now)
+            store.read(id).filter { it.endpointRevision != revision } +
+                current.map { TargetObservation(TargetPersistence.publicRow(it), revision) }
+        } else clip(store.recordedRows(id, revision, now).valueOrThrow(), now)
+    }
+
     private fun clip(rows: List<TargetObservation>, now: Long): List<TargetObservation> =
         rows.groupBy { it.endpointRevision }.flatMap { (revision, cohort) ->
             val epoch = cohort.maxOfOrNull { it.row.clockEpoch } ?: 0L

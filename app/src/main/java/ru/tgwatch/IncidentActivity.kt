@@ -26,8 +26,9 @@ class IncidentActivity : Activity() {
         private const val WEEK = 7
         private const val MINUTE_MS = 60_000L
         private const val TICK_MS = 1000L
-        fun open(ctx: Context, days: Int) {
-            ctx.startActivity(Intent(ctx, IncidentActivity::class.java).putExtra(DAYS, days).apply {
+        fun open(ctx: Context, days: Int, id: TargetId = TargetId.TELEGRAM) {
+            ctx.startActivity(Intent(ctx, IncidentActivity::class.java).putExtra(DAYS, days)
+                .putExtra(TargetAutomation.EXTRA_TARGET_ID, id.wire).apply {
                 if (ctx !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         }
@@ -40,6 +41,7 @@ class IncidentActivity : Activity() {
     private lateinit var empty: TextView
     private lateinit var period: Button
     private var requested: HistoryDisplayKey? = null
+    private var targetId = TargetId.TELEGRAM
     private var days = WEEK
     private var resumed = false
     private val ticker = object : Runnable {
@@ -52,9 +54,12 @@ class IncidentActivity : Activity() {
         setContentView(R.layout.activity_incidents)
         ScreenInsets.apply(this, findViewById(R.id.incidentRoot))
         days = if ((savedInstanceState?.getInt(DAYS) ?: intent.getIntExtra(DAYS, WEEK)) == 1) 1 else WEEK
+        targetId = TargetId.fromWire((savedInstanceState?.getString(TargetAutomation.EXTRA_TARGET_ID)
+            ?: intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID)).orEmpty()) ?: TargetId.TELEGRAM
+        title = getString(R.string.incidents_title) + " · " + TargetNames.label(targetId)
         val app = applicationContext
         loader = LatestRequestLoader(worker, Executor { ui.post(it) },
-            { key -> IncidentDisplay.load(app, key.days) }, ::show)
+            { key -> IncidentDisplay.load(app, key.days, key.targetId) }, ::show)
         adapter = IncidentAdapter(this, ::share)
         empty = findViewById(R.id.incidentEmpty)
         findViewById<ListView>(R.id.incidentList).apply { adapter = this@IncidentActivity.adapter; emptyView = empty }
@@ -90,23 +95,33 @@ class IncidentActivity : Activity() {
     override fun onDestroy() { loader.close(); worker.shutdownNow(); super.onDestroy() }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt(DAYS, days)
+        outState.putString(TargetAutomation.EXTRA_TARGET_ID, targetId.wire)
         super.onSaveInstanceState(outState)
     }
 
-    private fun updatePeriod() { period.setText(if (days == 1) R.string.period_day else R.string.period_week) }
+    private fun updatePeriod() {
+        period.text = TargetNames.label(targetId) + " · " +
+            getString(if (days == 1) R.string.period_day else R.string.period_week)
+    }
 
     private fun refresh() {
         if (!resumed || BackupManager.hasPending()) return
-        val key = HistoryDisplayKey(History.version, System.currentTimeMillis() / MINUTE_MS, days)
+        val key = HistoryDisplayKey(TargetHistoryPresentation.version(targetId),
+            System.currentTimeMillis() / MINUTE_MS, days,
+            targetId, TargetPreferences.endpointRevision(this, targetId), TargetPersistence.active?.generationId)
         if (requested != key) { requested = key; loader.request(key) }
     }
 
     private fun show(key: HistoryDisplayKey, result: Result<IncidentDisplay>) {
-        if (!resumed || isFinishing || key.days != days) return
+        val selected = key.days == days && key.targetId == targetId
+        if (!resumed || isFinishing || !selected) return
         val display = result.getOrNull()
-        val fresh = display != null && display.version == History.version &&
+        val currentIdentity = key.endpointRevision == TargetPreferences.endpointRevision(this, targetId) &&
+            key.generation == TargetPersistence.active?.generationId
+        val fresh = display != null && display.version == TargetHistoryPresentation.version(targetId) &&
             display.at / MINUTE_MS == System.currentTimeMillis() / MINUTE_MS
-        if (fresh && !BackupManager.hasPending()) {
+
+        if (fresh && currentIdentity && !BackupManager.hasPending()) {
             adapter.clear()
             adapter.addAll(display.cards)
             empty.setText(R.string.incidents_empty)

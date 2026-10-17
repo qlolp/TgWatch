@@ -31,6 +31,22 @@ object DailySummary {
         return Text(title, body)
     }
 
+    fun targets(values: Map<TargetId, TimeStats?>): Text? {
+        if (values.isEmpty() || values.values.all { it != null && it.checks == 0 }) return null
+        val body = values.entries.joinToString("\n\n") { (id, stats) ->
+            val name = TargetNames.label(id)
+            val value = stats?.let(::text)
+            when {
+                stats == null -> "$name: " + Lang.t("история недоступна", "history unavailable")
+                value == null -> "$name: " + Lang.t("нет проверок", "no checks")
+                else -> (value.title + "\n" + value.body).replace("Telegram", name)
+            }
+        }
+        return if (values.keys == setOf(TargetId.TELEGRAM) && values[TargetId.TELEGRAM] != null)
+            text(checkNotNull(values[TargetId.TELEGRAM]))
+            else Text(Lang.t("Доступность за сутки", "Reachability in the last 24 h"), body)
+    }
+
     /** Next wall-clock moment at [minuteOfDay] strictly after [now]; DST-safe via Calendar. */
     fun nextAt(now: Long, minuteOfDay: Int, zone: TimeZone = TimeZone.getDefault()): Long {
         val minute = minuteOfDay.coerceIn(0, 1439)

@@ -26,6 +26,7 @@ internal object TargetSettingWrites {
             else TargetPreferences.fence.begin(id)
         } ?: return false
         AutomationReceiver.invalidateState()
+        WebhookNotifier.forget(id)
         return try {
             HistorySessions.queue(ctx).exclusive { synchronized(History) { operation(token) } }.get()
             true

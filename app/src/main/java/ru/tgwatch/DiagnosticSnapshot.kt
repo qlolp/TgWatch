@@ -3,6 +3,9 @@ package ru.tgwatch
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class TargetDiagnostic(val state: TargetSnapshot, val running: Boolean, val stale: Boolean,
+    val stats: TimeStats?, val failure: HistoryFailure? = null)
+
 /** Explicit allowlist serializer. Never serialize State, ProbeOutcome, preferences, or files directly. */
 data class DiagnosticSnapshot(
     val appVersion: String,
@@ -21,9 +24,10 @@ data class DiagnosticSnapshot(
     val endpoints: List<ProbeOutcome>,
     val scheduling: ScheduleDiagnostics.Snapshot,
     val monitorHealth: MonitorHealth = MonitorHealth(),
+    val targets: List<TargetDiagnostic> = emptyList(),
 ) {
     fun toJson(): String {
-        val json = JSONObject().put("schema_version", 2)
+        val json = JSONObject().put("schema_version", SCHEMA_VERSION)
             .put("app", JSONObject()
                 .put("version", appVersion.takeIf { VERSION.matches(it) } ?: "unknown")
                 .put("version_code", appVersionCode.coerceAtLeast(0)))
@@ -34,6 +38,7 @@ data class DiagnosticSnapshot(
             .put("endpoints", endpointsJson())
             .put("scheduling", schedulingJson())
             .put("monitor_health", healthJson())
+            .put("targets", targetsJson())
         return json.toString(2).also { check(it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) }
     }
 
@@ -52,7 +57,7 @@ data class DiagnosticSnapshot(
         .put("stale", stale)
         .put("latency_ms", status.latencyMs.coerceIn(-1, MAX_LATENCY_MS))
 
-    private fun statsJson(): Any = dailyStats?.let { stats ->
+    private fun statsJson(stats: TimeStats? = dailyStats): Any = stats?.let { stats ->
         val coverage = CoverageStats.from(stats, CoverageStats.DAY_MS)
         JSONObject()
             .put("ok_ms", stats.okMs.coerceAtLeast(0))
@@ -67,6 +72,18 @@ data class DiagnosticSnapshot(
             .put("assessed_ms", coverage.assessedMs)
             .put("window_ms", coverage.windowMs)
     } ?: JSONObject.NULL
+
+    private fun targetsJson(): JSONArray = JSONArray().apply {
+        targets.distinctBy { it.state.id }.take(TargetId.entries.size).forEach { goal ->
+            val state = goal.state
+            put(JSONObject().put("target_id", state.id.wire).put("running", goal.running)
+                .put("status", state.status.name).put("checked_at_ms", state.checkedAtMs)
+                .put("stale", goal.stale).put("latency_ms", state.latencyMs?.coerceAtMost(MAX_LATENCY_MS)
+                    ?: JSONObject.NULL)
+                .put("last_24_hours", statsJson(goal.stats))
+                .put("storage_failure", goal.failure?.name ?: JSONObject.NULL))
+        }
+    }
 
     private fun healthJson() = JSONObject()
         .put("check_started_elapsed_ms", monitorHealth.checkStartedElapsed.coerceAtLeast(0))
@@ -97,6 +114,7 @@ data class DiagnosticSnapshot(
         .put("overlapping_requests", scheduling.overlappingRequests)
 
     companion object {
+        private const val SCHEMA_VERSION = 3
         const val MAX_BYTES = 16 * 1024
         private const val MAX_LATENCY_MS = 60_000L
         private const val MAX_SDK = 1_000

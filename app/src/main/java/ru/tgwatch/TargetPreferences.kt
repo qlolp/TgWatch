@@ -62,6 +62,7 @@ object TargetPreferences {
             Prefs.sp(ctx).edit().putBoolean(key(id, "enabled"), false).apply()
         }
         AutomationReceiver.invalidateState()
+        WebhookNotifier.forget(id)
     }
 
     internal fun key(id: TargetId, suffix: String) = "target.${id.wire}.$suffix"

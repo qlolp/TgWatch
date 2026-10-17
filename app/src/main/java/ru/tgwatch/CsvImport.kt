@@ -33,28 +33,10 @@ object CsvImport {
             require(line.length <= 4096) { "CSV row too large" }
             val fields = line.split(',')
             require(fields.size == if (currentFormat) 7 else 5) { "Incomplete CSV row" }
-            val at = timestamp(fields[0])
-            val until = timestamp(fields[1])
-            val kind = fields[2]
-            require(kind in Timeline.kinds) { "Unknown status" }
-            val duration = number(fields[3])
-            require(until >= at && duration == until - at) { "Invalid duration" }
-            // UNKNOWN export rows also represent generated, potentially multi-day gaps.
-            require(kind == "UNKNOWN" || duration <= 600_000L) { "Observation exceeds coverage limit" }
-            val latency = if (fields[4].isEmpty()) -1L else number(fields[4])
-            require(latency >= -1L) { "Invalid latency" }
-            require(until > at || currentFormat && kind == "UNKNOWN" && latency == -1L) {
-                "Invalid epoch metadata"
-            }
-            val epoch = if (currentFormat) number(fields[5]) else 0L
-            require(epoch >= 0L) { "Invalid clock epoch" }
-            val active = if (currentFormat) when (fields[6]) {
-                "true" -> true
-                "false" -> false
-                else -> throw IllegalArgumentException("Invalid current statistics flag")
-            } else true
+            val (row, active) = record(fields, currentFormat)
+            val epoch = row.clockEpoch
             maxEpoch = maxOf(maxEpoch, epoch)
-            rows += Observation(at, until, kind, latency, epoch) to active
+            rows += row to active
         }
         require(rows.all { (row, active) -> active == (row.clockEpoch == maxEpoch) }) { "Inconsistent clock epoch flag" }
         // The old export cannot distinguish real UNKNOWN checks from generated gaps.
@@ -67,6 +49,30 @@ object CsvImport {
             return observations + latest.copy(until = latest.at, kind = "UNKNOWN", latencyMs = -1)
         }
         return observations
+    }
+
+    internal fun record(fields: List<String>, currentFormat: Boolean): Pair<Observation, Boolean> {
+        val at = timestamp(fields[0])
+        val until = timestamp(fields[1])
+        val kind = fields[2]
+        require(kind in Timeline.kinds) { "Unknown status" }
+        val duration = number(fields[3])
+        require(until >= at && duration == until - at) { "Invalid duration" }
+        // UNKNOWN export rows also represent generated, potentially multi-day gaps.
+        require(kind == "UNKNOWN" || duration <= 600_000L) { "Observation exceeds coverage limit" }
+        val latency = if (fields[4].isEmpty()) -1L else number(fields[4])
+        require(latency >= -1L) { "Invalid latency" }
+        require(until > at || currentFormat && kind == "UNKNOWN" && latency == -1L) {
+            "Invalid epoch metadata"
+        }
+        val epoch = if (currentFormat) number(fields[5]) else 0L
+        require(epoch >= 0L) { "Invalid clock epoch" }
+        val active = if (currentFormat) when (fields[6]) {
+            "true" -> true
+            "false" -> false
+            else -> throw IllegalArgumentException("Invalid current statistics flag")
+        } else true
+        return Observation(at, until, kind, latency, epoch) to active
     }
 
     private fun number(value: String): Long {

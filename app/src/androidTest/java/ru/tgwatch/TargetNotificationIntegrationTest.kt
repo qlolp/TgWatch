@@ -146,6 +146,13 @@ class TargetNotificationIntegrationTest {
     }
 
     @Test fun productionTargetPublicationAlertsWithoutWaitingForHistory() {
+        val webhookField = WebhookNotifier::class.java.getDeclaredField("coordinator").apply { isAccessible = true }
+        val previousWebhook = webhookField.get(null)
+        val delivered = java.util.concurrent.atomic.AtomicReference<String?>()
+        val config = WebhookConfiguration("https://example.invalid/hook", true, 0, WebhookFormat.JSON)
+        webhookField.set(null, WebhookCoordinator(Any(), { config }, SystemClock::elapsedRealtime,
+            { _, body, finished -> delivered.set(body.bytes.toString(Charsets.UTF_8)); finished(204); true },
+            { _, _ -> {} }))
         val type = MonitorService::class.java
         fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
         val service = MonitorService()
@@ -177,7 +184,10 @@ class TargetNotificationIntegrationTest {
                 TargetReport(TargetStatus.DOWN, emptyList(), true, null)) }
             await { notification(matrix, "outage") != null }
             assertEquals("Measured event publication must not wait for a history write", 1L, release.count)
+            await { delivered.get() != null }
+            assertEquals("matrix", org.json.JSONObject(delivered.get()!!).getString("service_id"))
         } finally {
+            webhookField.set(null, previousWebhook)
             release.countDown()
             if (holder.isAlive) holder.join(5_000)
             monitoring?.close()

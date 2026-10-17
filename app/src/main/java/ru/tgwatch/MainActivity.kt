@@ -84,7 +84,7 @@ class MainActivity : Activity() {
     private var shownLog: List<String>? = null
     private lateinit var historyUi: MainHistoryUi
     private var historyDays = 1
-    private var exportDays = 7
+    private lateinit var csvExport: TargetCsvExportUi
     private lateinit var btnPeriod: Button
     private lateinit var btnProfile: Button
     private lateinit var tvDiagnostics: TextView
@@ -105,7 +105,9 @@ class MainActivity : Activity() {
             shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), text)
         }
         applySystemBarInsets()
-        findViewById<Button>(R.id.btnIncidents).setOnClickListener { IncidentActivity.open(this, historyDays) }
+        findViewById<Button>(R.id.btnIncidents).setOnClickListener {
+            IncidentActivity.open(this, historyDays, targetUi.selected)
+        }
         findViewById<Button>(R.id.btnAutomation).setOnClickListener { AutomationSettingsActivity.open(this) }
         findViewById<Button>(R.id.btnExportDiagnostics).setOnClickListener { LocalDiagnostics.export(this) }
         backupUi = BackupUi(this)
@@ -113,7 +115,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnRestoreBackup).setOnClickListener { backupUi.restore() }
         findViewById<Button>(R.id.btnImportCsv).setOnClickListener { backupUi.importCsv() }
         historyDays = savedInstanceState?.getInt("history_days", 1) ?: 1
-        exportDays = savedInstanceState?.getInt("export_days", 7) ?: 7
+        csvExport = TargetCsvExportUi(this, savedInstanceState)
         advancedExpanded = savedInstanceState?.getBoolean("advanced_expanded", false) ?: false
         advancedSettings = findViewById(R.id.advancedSettings)
         btnAdvanced = findViewById(R.id.btnAdvanced)
@@ -133,8 +135,7 @@ class MainActivity : Activity() {
             render()
         }
         findViewById<Button>(R.id.btnExportCsv).setOnClickListener {
-            exportDays = historyDays
-            safeStartExport()
+            csvExport.export(targetUi.selected, historyDays)
         }
         findViewById<Button>(R.id.btnDiagnostics).setOnClickListener {
             tvDiagnostics.visibility = if (tvDiagnostics.visibility == View.VISIBLE) View.GONE else View.VISIBLE
@@ -632,7 +633,7 @@ class MainActivity : Activity() {
         targetUi.save(outState)
         outState.putInt("history_days", historyDays)
         outState.putBoolean("advanced_expanded", advancedExpanded)
-        outState.putInt("export_days", exportDays)
+        csvExport.save(outState)
         super.onSaveInstanceState(outState)
     }
 
@@ -642,34 +643,12 @@ class MainActivity : Activity() {
         targetUi.open(intent)
     }
 
-    private fun safeStartExport() {
-        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "text/csv"
-            putExtra(Intent.EXTRA_TITLE, "tgwatch-${if (exportDays == 1) "day" else "week"}.csv")
-        }
-        try { startActivityForResult(intent, 20) }
-        catch (e: Exception) { Toast.makeText(this, Lang.t("Не удалось открыть сохранение файла", "Couldn’t open the file save dialog"), Toast.LENGTH_LONG).show() }
-    }
-
     @Deprecated("Platform activity result API for dependency-free native UI")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (backupUi.onResult(requestCode, resultCode, data)) return
         if (LocalDiagnostics.onActivityResult(this, requestCode, resultCode, data)) return
-        if (requestCode != 20 || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
-        val days = exportDays
-        val app = applicationContext
-        Thread({
-            val message = try {
-                val csv = History.exportCsv(app, days)
-                val output = app.contentResolver.openOutputStream(uri, "wt") ?: error(Lang.t("Файл недоступен", "File unavailable"))
-                output.bufferedWriter(Charsets.UTF_8).use { it.write(csv) }
-                Lang.t("CSV сохранён", "CSV saved")
-            } catch (e: Exception) { Lang.t("Не удалось сохранить CSV: ${e.message}", "Couldn’t save the CSV: ${e.message}") }
-            runOnUiThread { if (!isFinishing && !isDestroyed) Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
-        }, "tg-export").start()
+        csvExport.onResult(requestCode, resultCode, data)
     }
 
     private fun animateCardColor(target: Int) {

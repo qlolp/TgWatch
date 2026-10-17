@@ -107,6 +107,52 @@ class TargetHistoryIntegrationTest {
             assertEquals(2, TargetPersistence.storage().read(id).count { !it.row.isEpochMetadata })
         } finally { file.setWritable(true, true); HistorySessions.queue(ctx).close(session, now + 2_000).get() }
     }
+    @Test fun targetCsvImportReplacesOnlyNamedGoalsAndPreservesOtherPrivateReviewState() {
+        val now = System.currentTimeMillis()
+        val row = Observation(now - 3_000, now - 2_000, "OK", 25)
+        val tg = TargetObservation(row, TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM))
+        val wa = TargetObservation(row, TargetPreferences.endpointRevision(ctx, TargetId.WHATSAPP))
+        HistorySessions.queue(ctx).exclusive {
+            TargetPersistence.storage().replaceRows(TargetId.TELEGRAM, listOf(tg))
+            TargetPersistence.storage().replaceRows(TargetId.WHATSAPP, listOf(wa))
+            History.invalidateTargetCache(TargetPersistence.storage().legacyMigrationComplete)
+        }.get()
+        assertTrue(Prefs.sp(ctx).edit().putBoolean("enabled", true)
+            .putBoolean(TargetPreferences.key(TargetId.WHATSAPP, "enabled"), true)
+            .putInt(TargetPreferences.key(TargetId.WHATSAPP, "interval"), 90)
+            .putBoolean(TargetPreferences.key(TargetId.CUSTOM, "endpoint_review"), false).commit())
+        val own = listOf(TargetObservation(row.copy(kind = "DOWN"), 9))
+        BackupManager.importHistories(ctx, mapOf(TargetId.MATRIX to own))
+        assertEquals(listOf(tg), TargetPersistence.storage().read(TargetId.TELEGRAM))
+        assertEquals(listOf(wa), TargetPersistence.storage().read(TargetId.WHATSAPP))
+        assertEquals(own, TargetPersistence.storage().read(TargetId.MATRIX))
+        assertEquals(9L, TargetPreferences.endpointRevision(ctx, TargetId.MATRIX))
+        assertEquals(90, TargetPreferences.storedDefinition(ctx, TargetId.WHATSAPP).intervalSec)
+        assertFalse(Prefs.sp(ctx).getBoolean(TargetPreferences.key(TargetId.CUSTOM, "endpoint_review"), true))
+        assertEquals(privatePreferences, ctx.getSharedPreferences(TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE).all)
+        assertFalse(Prefs.isEnabled(ctx))
+        assertTrue(TargetId.entries.none { TargetPreferences.storedDefinition(ctx, it).enabled })
+    }
+
+    @Test fun incidentsAndDiagnosticsReadOnlyTheirOwnGoalAndCurrentEndpoint() {
+        val now = System.currentTimeMillis()
+        val revision = TargetPreferences.endpointRevision(ctx, TargetId.MATRIX)
+        val rows = listOf(Observation(now - 3_000, now - 2_000, "OK"),
+            Observation(now - 2_000, now - 1_000, "DOWN"), Observation(now - 1_000, now, "OK"))
+        HistorySessions.queue(ctx).exclusive {
+            TargetPersistence.storage().replaceRows(TargetId.MATRIX, rows.map { TargetObservation(it, revision) })
+        }.get()
+        val cards = IncidentDisplay.load(ctx, 1, TargetId.MATRIX).cards
+        assertEquals(1, cards.size)
+        assertTrue(cards.single().contains("Matrix"))
+        assertFalse(cards.single().contains("Telegram"))
+        val report = org.json.JSONObject(LocalDiagnostics.snapshot(ctx).toJson()).getJSONArray("targets")
+        val goal = (0 until report.length()).map(report::getJSONObject).single { it.getString("target_id") == "matrix" }
+        assertEquals(1, goal.getJSONObject("last_24_hours").getInt("outage_count"))
+        assertEquals(3, goal.getJSONObject("last_24_hours").getInt("checks"))
+        assertFalse(report.toString().contains("https://"))
+    }
+
     private fun restore(store: SharedPreferences, data: Map<String, *>) {
         val edit = store.edit().clear()
         data.forEach { (key, value) -> when (value) {

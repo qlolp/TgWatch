@@ -224,3 +224,26 @@ The fixture test checks YAML structure, mappings and the documented payload cont
 it does not certify a running Home Assistant instance or render every HA template.
 
 Native MQTT, multiple destinations and custom headers remain separate extensions.
+
+## Independent targets: API v2
+
+The same explicit receiver and bearer-token checks also accept
+`ru.tgwatch.automation.GET_TARGET_STATE` and
+`ru.tgwatch.automation.CHECK_TARGET_NOW`, with a required `target_id` extra:
+`telegram`, `matrix`, `whatsapp`, or `custom`. Missing/unknown IDs are rejected.
+State replies use `api_version=2`, generic `DOWN`, `target_id`, the existing public
+state fields and optional `latency_ms`; they contain no addresses or history.
+CHECK operates only against the existing active target and never starts it.
+Each target has its own durable ten-second check limit; Telegram shares that
+limit between API v1 and v2. State requests share one physical compute slot and
+an eight-second logical reply deadline. Expiry does not free blocked work.
+
+API v1 and its exact historical reply fields continue to refer to Telegram.
+When Telegram is disabled while another target keeps the service alive, v1
+reports `running=false` and CHECK returns STOPPED.
+
+Opt-in text/JSON webhooks use the same four `service_id` values. Baselines,
+pending transitions and cooldowns are separate per target, while every target
+shares the existing single physical HTTPS delivery slot. Stale/unmeasured results
+are ignored; settings changes invalidate only the affected goal's pending event.
+The JSON schema remains version 1 with the same eight public fields.

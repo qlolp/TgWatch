@@ -15,6 +15,21 @@ class DiagnosticSnapshotTest {
         dailyStats = TimeStats(60_000, 30_000, 10_000, 20_000, 50_000, 30_000, 7, 125),
         endpoints = outcomes, scheduling = ScheduleDiagnostics.Snapshot())
 
+    @Test fun goalsHaveSeparatePublicAggregatesAndNoEndpointText() {
+        val state = TargetSnapshot(TargetId.MATRIX, TargetStatus.DOWN, 1_000, 1_000)
+        val json = JSONObject(snapshot().copy(targets = listOf(TargetDiagnostic(state,
+            running = true, stale = false, stats = null, failure = HistoryFailure.WRITE))).toJson())
+        assertEquals(3, json.getInt("schema_version"))
+        val goals = json.getJSONArray("targets")
+        assertEquals(1, goals.length())
+        val goal = goals.getJSONObject(0)
+        assertEquals(setOf("target_id", "running", "status", "checked_at_ms", "stale", "latency_ms",
+            "last_24_hours", "storage_failure"), goal.keyNames())
+        assertEquals("matrix", goal.getString("target_id"))
+        assertEquals("DOWN", goal.getString("status"))
+        assertTrue(goal.isNull("last_24_hours"))
+        assertEquals("WRITE", goal.getString("storage_failure"))
+    }
     @Test fun formatterExcludesPrivateReasonsLogsAndUnknownEndpoints() {
         val output = snapshot(listOf(
             ProbeOutcome("api.telegram.org", ProbeGroup.WEB, true, 125,
@@ -60,7 +75,7 @@ class DiagnosticSnapshotTest {
     }
     @Test fun reportSectionsCannotContainRawHistoryLogPreferencesOrIdentifiers() {
         val json = JSONObject(snapshot().toJson())
-        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health"),
+        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health", "targets"),
             json.keyNames())
         assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keyNames())
         assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent", "coverage_percent", "assessed_ms", "window_ms"),

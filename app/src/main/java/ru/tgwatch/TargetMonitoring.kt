@@ -108,12 +108,14 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         val attempt = TargetAttempt(id, cfg.generation, repository.currentNetworkRevision,
             cfg.endpointRevision, SystemClock.elapsedRealtime())
         dispatch.submit(attempt, {
-            when {
+            val report = when {
                 network == null || caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true ->
                     TargetReport(TargetStatus.NO_NETWORK, emptyList(), true, null)
                 caps == null -> TargetReport(TargetStatus.UNKNOWN, emptyList(), false, null)
                 else -> (runnerFactory?.invoke(network) ?: runner(network)).check(attempt, cfg.definition, endpoint)
             }
+            report.copy(networkKind = caps?.let(WebhookNetworks::kind) ?: NetworkKind.UNKNOWN,
+                checkedAtMs = System.currentTimeMillis(), checkedElapsedMs = SystemClock.elapsedRealtime())
         }, { completed(attempt, network, it) })
     }
 

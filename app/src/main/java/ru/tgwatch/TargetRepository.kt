@@ -41,7 +41,8 @@ class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(Ta
         if (!report.publishable || attempt.networkRevision != networkRevision) return false
         val current = configurations.getValue(attempt.id)
         val revision = Math.addExact(snapshots[attempt.id]?.revision ?: -1L, 1L)
-        return publish(TargetSnapshot(attempt.id, report.status, wallClock(), elapsedClock(),
+        return publish(TargetSnapshot(attempt.id, report.status, report.checkedAtMs.takeIf { it > 0L } ?: wallClock(),
+            report.checkedElapsedMs.takeIf { it > 0L } ?: elapsedClock(),
             current.definition.intervalSec, report.latencyMs, attempt.generation, revision, attempt.endpointRevision))
     }
 

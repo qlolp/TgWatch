@@ -92,3 +92,12 @@ before scheduling work; stopping or restoring can invalidate it. No service
 start occurs through this helper. The automation receiver owns its independent
 10-second monotonic request limit; acceptance means queued, not a guarantee of a
 completed probe.
+
+## Multiple targets (schema 3)
+
+Schema 3 retains the earlier Telegram sections and adds a bounded `targets` array
+with fixed public IDs. Each entry has `target_id`, `running`, `status`,
+`checked_at_ms`, `stale`, `latency_ms`, `last_24_hours`, and `storage_failure`.
+A failed history read produces null aggregates and a typed failure, never zero
+availability. No target address, free-form label, credential or raw history is
+included. The existing `state.running` refers specifically to Telegram.

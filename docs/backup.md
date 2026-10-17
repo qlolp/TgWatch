@@ -83,3 +83,7 @@ CSV — отдельный незашифрованный перенос **ис�
 в старом пятиколоночном формате нулевая длительность недопустима.
 
 [README](../README.md) · [Разработка](../CONTRIBUTING.md)
+
+CSV v3 is described in [Independent monitoring targets](multiservice.md#csv-v3).
+It carries target IDs and public endpoint revisions, and imports only the named
+histories. The encrypted v3 backup remains the format for settings and all goals.

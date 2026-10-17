@@ -27,12 +27,14 @@ internal object TargetConfigTransactions {
         check(Looper.myLooper() != Looper.getMainLooper())
         return if (!isPending(id)) true else {
             val token = TargetPreferences.fence.begin(id) ?: return false
+            WebhookNotifier.forget(id)
+            AutomationReceiver.invalidateState()
             try {
                 HistorySessions.queue(ctx).exclusive { synchronized(History) { replay(ctx, id) } }.get()
                 !isPending(id)
             }
             catch (_: Exception) { false }
-            finally { TargetPreferences.fence.finish(token) }
+            finally { TargetPreferences.fence.finish(token); AutomationReceiver.invalidateState() }
         }
     }
 

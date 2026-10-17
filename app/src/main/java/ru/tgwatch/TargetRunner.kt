@@ -5,7 +5,8 @@ import java.util.concurrent.TimeUnit
 data class TargetAttempt(val id: TargetId, val generation: Long, val networkRevision: Long,
     val endpointRevision: Long, val startedElapsed: Long)
 data class TargetReport(val status: TargetStatus, val outcomes: List<ProbeOutcome>,
-    val publishable: Boolean, val latencyMs: Long?)
+    val publishable: Boolean, val latencyMs: Long?, val networkKind: NetworkKind = NetworkKind.UNKNOWN,
+    val checkedAtMs: Long = 0L, val checkedElapsedMs: Long = 0L)
 
 /** Primary publication never waits for secondary targets; all secondary work shares one physical lane. */
 class TargetRunner(private val primary: () -> ProbeReport,

@@ -397,10 +397,12 @@ class MonitorReliabilityIntegrationTest {
         repeat(40) {
             if (Thread.getAllStackTraces().any { (worker, stack) -> worker.name == "tg-summary" &&
                     worker.state == Thread.State.BLOCKED && stack.any { frame ->
-                        frame.className == History::class.java.name && frame.methodName == "stats" } }) return
+                        frame.className == DailySummaryReceiver.Companion::class.java.name && frame.methodName == "post" } }) return
             SystemClock.sleep(50)
         }
-        throw AssertionError("Summary worker did not wait for the real History monitor")
+        val stacks = Thread.getAllStackTraces().filter { it.key.name == "tg-summary" }
+            .entries.joinToString("\n") { (worker, frames) -> "$worker ${worker.state}\n" + frames.joinToString("\n") }
+        throw AssertionError("Summary worker did not wait for the real History monitor\n$stacks")
     }
 
     private fun service(context: Context = ctx): MonitorService {

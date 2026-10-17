@@ -71,12 +71,13 @@ object LocalDiagnostics {
         val notifications = ctx.getSystemService(NotificationManager::class.java)
         val current = MonitorService.state
         val stats = History.readStats(ctx)
+        val telegramRunning = MonitorService.running && TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled
         return DiagnosticSnapshot(
             appVersion = app.versionName.orEmpty(),
             appVersionCode = if (Build.VERSION.SDK_INT >= 28) app.longVersionCode
                 else @Suppress("DEPRECATION") app.versionCode.toLong(),
-            sdkInt = Build.VERSION.SDK_INT, running = MonitorService.running, status = current,
-            stale = !MonitorService.running || current.checkedAt <= 0 ||
+            sdkInt = Build.VERSION.SDK_INT, running = telegramRunning, status = current,
+            stale = !telegramRunning || current.checkedAt <= 0 ||
                 current.isStale(System.currentTimeMillis()),
             notificationsAllowed = notifications.areNotificationsEnabled() &&
                 (Build.VERSION.SDK_INT < 33 ||
@@ -88,8 +89,25 @@ object LocalDiagnostics {
             userUnlocked = ctx.getSystemService(UserManager::class.java).isUserUnlocked,
             dailyStats = (stats as? HistoryRead.Ready)?.value, endpoints = MonitorService.endpointOutcomes(),
             monitorHealth = MonitorService.healthSnapshot(),
-            scheduling = MonitorService.schedulingDiagnostics(),
+            scheduling = MonitorService.schedulingDiagnostics(), targets = targets(ctx),
         )
+    }
+
+    private fun targets(ctx: Context): List<TargetDiagnostic> {
+        val now = System.currentTimeMillis()
+        val elapsed = android.os.SystemClock.elapsedRealtime()
+        return TargetId.entries.map { id ->
+            val state = TargetStateStore.current(ctx, id)
+            val running = MonitorService.running && TargetPreferences.definition(ctx, id).enabled
+            val stale = !running || if (state.checkedElapsedMs > 0L)
+                ProbeRules.isStale(state.checkedElapsedMs, elapsed, state.expectedIntervalSec)
+                else ProbeRules.isStale(state.checkedAtMs, now, state.expectedIntervalSec)
+            val read = runCatching { TargetHistories.stats(ctx, id, now = now) }.getOrElse {
+                HistoryRead.Unavailable(null, (it as? HistoryUnavailableException)?.failure ?: HistoryFailure.READ)
+            }
+            TargetDiagnostic(state, running, stale, (read as? HistoryRead.Ready)?.value,
+                (read as? HistoryRead.Unavailable)?.failure ?: TargetHistories.failures[id])
+        }
     }
 
     private fun toast(activity: Activity, message: String) = Toast.makeText(activity, message, Toast.LENGTH_LONG).show()

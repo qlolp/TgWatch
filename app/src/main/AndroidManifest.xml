@@ -74,7 +74,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Continuous monitoring of Telegram API reachability for the user" />
+                android:value="Continuous reachability checks of services explicitly selected by the user" />
         </service>
 
         <!-- Плитка «Telegram» в быстрых настройках шторки -->

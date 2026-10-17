@@ -13,11 +13,10 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
-import java.text.DateFormat
-import java.util.Date
 
 /** SAF documents and password entry; expensive crypto/storage work never runs on the UI thread. */
 class BackupUi(private val activity: Activity) {
+    private data class CsvDocument(val rows: Map<TargetId, List<TargetObservation>>, val legacy: Boolean)
     private var busy = false
     private val dialogs = mutableListOf<Dialog>()
 
@@ -76,11 +75,11 @@ class BackupUi(private val activity: Activity) {
                 finally { pass.fill('\u0000') }
             }, { previewTargets(it) }, Lang.t("Неверный пароль или повреждённая копия", "Wrong password or damaged backup")) }
             CSV -> work(Lang.t("Проверка CSV…", "Checking CSV…"), {
-                val bytes = read(uri, BackupCodec.MAX_PLAINTEXT_BYTES)
+                val bytes = read(uri, TargetBackupCodec.MAX_PLAINTEXT_BYTES)
                 val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
-                BackupSnapshot(System.currentTimeMillis(), emptyMap(), CsvImport.parse(text), emptyList())
-            }, { preview(it, Lang.t("Импортировать CSV?", "Import CSV?"), true) }, Lang.t("CSV повреждён или имеет неподдерживаемый формат", "The CSV is damaged or in an unsupported format"))
+                CsvDocument(TargetCsv.parse(text), TargetCsv.isLegacy(text))
+            }, { previewCsv(it) }, Lang.t("CSV повреждён или имеет неподдерживаемый формат", "The CSV is damaged or in an unsupported format"))
         }
         return true
     }
@@ -143,21 +142,25 @@ class BackupUi(private val activity: Activity) {
             }.setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
     }
 
-    private fun preview(snapshot: BackupSnapshot, title: String, csv: Boolean = false) {
-        val locale = activity.resources.configuration.locales[0]
-        val format = DateFormat.getDateTimeInstance(DateFormat.DEFAULT, DateFormat.DEFAULT, locale)
-        val date = format.format(Date(snapshot.createdAt))
-        AlertDialog.Builder(activity).setTitle(title)
-            .setMessage(Lang.t("Дата: $date\nЗаписей истории: ${snapshot.observations.size}\n", "Date: $date\nHistory records: ${snapshot.observations.size}\n") +
-                (if (csv) Lang.t("Настройки и журнал сохранятся. Текущая история будет заменена.\n\n", "Settings and the log will be kept. The current history will be replaced.\n\n") else
-                    Lang.t("Записей журнала: ${snapshot.log.size}\n\nТекущие данные будут заменены. ", "Log records: ${snapshot.log.size}\n\nThe current data will be replaced. ")) +
-                Lang.t("Мониторинг будет остановлен; включите его вручную после восстановления.", "Monitoring will be stopped; turn it back on manually after restoring."))
-            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ -> work(Lang.t("Восстановление…", "Restoring…"), {
-                if (csv) BackupManager.importHistory(activity.applicationContext, snapshot.observations)
-                else BackupManager.restore(activity.applicationContext, snapshot)
-            }, { message(Lang.t("Данные восстановлены. Мониторинг выключен.", "Data restored. Monitoring is off.")); activity.recreate() },
-                Lang.t("Восстановление прервано. Нажмите «Восстановить резервную копию» для повторной попытки.", "Restore interrupted. Tap “Restore backup” to try again.")) }
-            .setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
+    private fun previewCsv(document: CsvDocument) {
+        val rows = document.rows
+        val names = rows.keys.joinToString(", ", transform = TargetNames::label)
+        val count = rows.values.sumOf { it.size }
+        AlertDialog.Builder(activity).setTitle(Lang.t("Импортировать CSV?", "Import CSV?"))
+            .setMessage(Lang.t("Цели: $names. Записей: $count.\n\nИстория указанных целей будет заменена. " +
+                "Настройки, журнал и история других целей сохранятся. Все цели будут остановлены.",
+                "Targets: $names. Records: $count.\n\nHistory for these targets will be replaced. " +
+                    "Settings, log and other targets' histories are kept. All targets will stop."))
+            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ ->
+                work(Lang.t("Восстановление…", "Restoring…"), {
+                    if (document.legacy) BackupManager.importHistory(activity.applicationContext,
+                        rows.getValue(TargetId.TELEGRAM).map { value ->
+                            value.row.copy(kind = Timeline.canonicalKind(value.row.kind)) })
+                    else BackupManager.importHistories(activity.applicationContext, rows)
+                }, { message(Lang.t("История восстановлена. Все цели выключены.",
+                    "History restored. All targets are off.")); activity.recreate() },
+                    Lang.t("Восстановление прервано. Повторите попытку.", "Restore interrupted. Please retry."))
+            }.setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
     }
 
     @Suppress("DEPRECATION")

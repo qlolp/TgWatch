@@ -412,6 +412,10 @@ class MonitorService : Service() {
                 runCatching { targetAlertController?.onCheck(snapshot) }.onFailure {
                     Log.w(TAG, "target alert: ${it.javaClass.simpleName}")
                 }
+                WebhookNotifier.onPublished(this@MonitorService, TargetWebhookObservation.from(snapshot, report,
+                    targetMonitoring?.repository?.currentNetworkRevision ?: 0L,
+                    System.currentTimeMillis(), SystemClock.elapsedRealtime()))
+                postNotification(state)
                 broadcastState()
             }
         }

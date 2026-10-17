@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Looper
 
 /** Portable data crosses this boundary only after full schema/authentication validation. */
+// Keep legacy and target entry points on the same restore monitor; their storage implementations are separate.
+@Suppress("TooManyFunctions")
 object BackupManager {
     @Volatile private var replacingHistory = false
     private val settingKeys = setOf("power_profile", "interval_sec", "keep_awake", "vibrate",
@@ -63,22 +65,30 @@ object BackupManager {
     @Synchronized fun snapshotTargets(ctx: Context, now: Long = System.currentTimeMillis()): TargetBackupSnapshot =
         TargetArchive.snapshot(ctx, now)
 
-    /** CSV changes history; capture current configuration/log after the service has fully stopped. */
+    /** Legacy CSV always selects Telegram; the v3 path changes only explicitly named histories. */
     @Synchronized fun importHistory(ctx: Context, observations: List<Observation>) {
+        val validated = BackupCodec.decode(BackupCodec.encode(BackupSnapshot(0L, emptyMap(), observations, emptyList())))
+        importHistories(ctx, mapOf(TargetId.TELEGRAM to validated.observations.map {
+            TargetObservation(TargetPersistence.publicRow(it),
+                TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM))
+        }))
+    }
+
+    @Synchronized fun importHistories(ctx: Context, observations: Map<TargetId, List<TargetObservation>>) {
         check(Looper.myLooper() != Looper.getMainLooper())
         check(!hasPending() && !TargetConfigTransactions.anyPending)
-        val validated = BackupCodec.decode(BackupCodec.encode(BackupSnapshot(0L, emptyMap(), observations, emptyList())))
+        require(observations.isNotEmpty())
+        TargetBackupCodec.validate(TargetBackupSnapshot(0, emptyMap(),
+            observations.keys.map(TargetDefinition::default), observations, emptyList()))
         replacingHistory = true
         try {
             check(Prefs.sp(ctx).edit().putBoolean("enabled", false).commit())
             WatchdogReceiver.cancel(ctx)
             MonitorService.stopAndAwait(ctx)
             val current = snapshotTargets(ctx)
-            val revision = TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM)
-            val changed = current.copy(observations = current.observations + (TargetId.TELEGRAM to
-                validated.observations.map { TargetObservation(TargetPersistence.publicRow(it), revision) }))
+            val changed = current.copy(observations = current.observations + observations)
             TargetRestore.stage(ctx, TargetBackupImport(changed,
-                metadata = PrivateRestoreMetadata(setOf(TargetId.TELEGRAM))))
+                metadata = PrivateRestoreMetadata(observations.keys)))
             recoverPending(ctx)
         } finally { replacingHistory = false }
     }

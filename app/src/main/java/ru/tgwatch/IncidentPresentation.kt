@@ -8,7 +8,7 @@ import java.util.Date
 /** Only aggregate episode fields enter an explicitly shared summary. */
 internal object IncidentPresentation {
     fun describe(episode: OutageEpisode, locale: Locale = Locale.getDefault(),
-        zone: TimeZone = TimeZone.getDefault()): String {
+        zone: TimeZone = TimeZone.getDefault(), targetId: TargetId = TargetId.TELEGRAM): String {
         val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss XXX", locale).apply { timeZone = zone }
         fun time(at: Long) = format.format(Date(at))
         return buildString {
@@ -27,6 +27,6 @@ internal object IncidentPresentation {
             append(Lang.t("\nНет данных: ", "\nNo data: ")).append(recoveryDurationStr(episode.unknownMs))
             append(Lang.t("\nИнтервалы оценены по проверкам; отсутствие данных не доказывает сбой.",
                 "\nIntervals are estimated from checks; missing data does not prove an outage."))
-        }
+        }.let { if (targetId == TargetId.TELEGRAM) it else it.replace("Telegram", TargetNames.label(targetId)) }
     }
 }
