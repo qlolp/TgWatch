@@ -41,11 +41,12 @@ internal object TargetSettingWrites {
             if (BackupManager.hasPending() || TargetConfigTransactions.isPending(id)) null
             else TargetPreferences.fence.begin(id)
         } ?: return false
+        AutomationReceiver.invalidateState()
         return try {
             HistorySessions.queue(ctx).exclusive { operation(token) }.get()
             true
         } catch (_: Exception) { false }
-        finally { TargetPreferences.fence.finish(token) }
+        finally { TargetPreferences.fence.finish(token); AutomationReceiver.invalidateState() }
     }
 
     internal fun write(edit: SharedPreferences.Editor, value: TargetDefinition): SharedPreferences.Editor {

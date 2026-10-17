@@ -117,15 +117,18 @@ class MonitorService : Service() {
         }
 
         /** Queue against this service instance only; never create or resurrect a service. */
-        fun requestRunningCheck(ctx: Context, admission: () -> Boolean = { true }): Boolean {
+        fun requestRunningCheck(ctx: Context, id: TargetId = TargetId.TELEGRAM,
+            admission: () -> Boolean = { true }): Boolean {
             val service = activeService ?: return false
-            return synchronized(service) {
-                if (service.acceptsRunningCheck(ctx)) {
+            return if (id != TargetId.TELEGRAM) service.requestSecondaryCheck(ctx, id, admission)
+            else synchronized(service) {
+                if (service.acceptsRunningCheck(ctx) && TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled) {
                     var admitted = false
                     // The queued task cannot acquire this lock until durable admission completes.
                     val queued = service.worker.post {
                         synchronized(service) {
-                            if (admitted && service.acceptsRunningCheck(ctx)) {
+                            val enabled = TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled
+                            if (admitted && service.acceptsRunningCheck(ctx) && enabled) {
                                 service.offlineBackoff.reset()
                                 service.scheduleCheck(0L)
                             }
@@ -137,6 +140,8 @@ class MonitorService : Service() {
                 } else false
             }
         }
+
+        internal val targetRepository: TargetRepository? get() = activeService?.targetMonitoring?.repository
 
         fun start(ctx: Context) {
             if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
@@ -215,6 +220,27 @@ class MonitorService : Service() {
     private lateinit var eventNotifications: EventNotifications
     private var slowController: SlowAlertController? = null
     private val offlineBackoff = OfflineBackoff()
+
+    @Synchronized private fun requestSecondaryCheck(ctx: Context, id: TargetId, admission: () -> Boolean): Boolean {
+        val definition = TargetPreferences.definition(ctx, id)
+        val unlocked = getSystemService(android.os.UserManager::class.java).isUserUnlocked
+        val available = acceptsRunningCheck(ctx) && definition.enabled && (!definition.requiresEndpoint || unlocked)
+        if (!available) return false
+        var admitted = false
+        val queued = worker.post {
+            synchronized(this) {
+                if (admitted && acceptsRunningCheck(ctx)) {
+                    targetMonitoring?.let { targets ->
+                        targets.refresh(notify = false)
+                        targets.request(id)
+                        targets.startDue()
+                    }
+                }
+            }
+        }
+        if (queued) admitted = admission()
+        return admitted
+    }
     private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false

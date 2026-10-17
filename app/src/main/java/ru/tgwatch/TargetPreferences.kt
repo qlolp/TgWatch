@@ -53,9 +53,12 @@ object TargetPreferences {
     fun setDefinition(ctx: Context, definition: TargetDefinition): Boolean =
         TargetSettingWrites.definition(ctx, definition)
     fun setEndpoint(ctx: Context, id: TargetId, raw: String): Boolean = TargetSettingWrites.endpoint(ctx, id, raw)
-    fun stop(ctx: Context, id: TargetId) = synchronized(this) {
-        fence.bump(id)
-        Prefs.sp(ctx).edit().putBoolean(key(id, "enabled"), false).apply()
+    fun stop(ctx: Context, id: TargetId) {
+        synchronized(this) {
+            fence.bump(id)
+            Prefs.sp(ctx).edit().putBoolean(key(id, "enabled"), false).apply()
+        }
+        AutomationReceiver.invalidateState()
     }
 
     internal fun key(id: TargetId, suffix: String) = "target.${id.wire}.$suffix"

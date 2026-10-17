@@ -107,6 +107,7 @@ object Prefs {
             TargetId.entries.forEach(TargetPreferences.fence::bump)
             sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
         }
+        AutomationReceiver.invalidateState()
         if (value) WatchdogReceiver.schedule(ctx) else WatchdogReceiver.cancel(ctx)
     }
 

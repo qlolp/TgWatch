@@ -25,7 +25,7 @@ internal class AutomationStateDispatcher(
 
     fun invalidate() = synchronized(generationLock) {
         generation++
-        physical.get()?.expire()
+        physical.get()?.invalidate()
         AutomationStateCache.clear()
     }
 
@@ -35,12 +35,12 @@ internal class AutomationStateDispatcher(
     }
 
     fun submit(compute: () -> AutomationStateSnapshot, complete: (Result<AutomationStateSnapshot>) -> Unit,
-        finish: () -> Unit): Boolean {
+        finish: () -> Unit, key: AutomationStateKey = AutomationStateKey()): Boolean {
         val admitted = synchronized(generationLock) { generation }
         val attempt = Attempt({ result -> synchronized(generationLock) {
             val current = if (admitted == generation) result else
                 Result.failure(TimeoutException("State invalidated by data replacement"))
-            AutomationStateCache.endCompute(clock(), current.getOrNull())
+            AutomationStateCache.endCompute(clock(), current.getOrNull(), key)
             complete(current)
         }
         }, finish)
@@ -88,6 +88,7 @@ internal class AutomationStateDispatcher(
             if (ended.get()) cancel.getAndSet(null)?.invoke()
         }
         fun expire() = finish(Result.failure(TimeoutException("State compute deadline exceeded")), true)
+        fun invalidate() = finish(Result.failure(RejectedExecutionException("State invalidated by data replacement")))
         fun finish(result: Result<AutomationStateSnapshot>, timedOut: Boolean = false) {
             if (!ended.compareAndSet(false, true)) return
             expired = timedOut

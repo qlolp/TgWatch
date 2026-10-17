@@ -49,6 +49,9 @@ class MultiTargetPublicationTest {
         previous = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
+        // Logical service teardown deliberately retains physically executing secondary leases.
+        // Earlier integration cases use real transports; deterministic fixtures start after those return.
+        await { ProbeAdmission.process.snapshot().secondary == 0 }
         assumeNotNull(ctx.getSystemService(ConnectivityManager::class.java).activeNetwork)
         privatePrevious = privateStore.all.toMap()
         val edit = Prefs.sp(ctx).edit().putBoolean("enabled", true)

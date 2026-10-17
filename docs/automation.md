@@ -1,4 +1,4 @@
-# Automation API (version 1)
+# Automation API (versions 1 and 2)
 
 Open **Advanced → Automation**, enable access, and copy the access token.
 Access is disabled by default. Each token contains 256 random bits encoded as
@@ -11,7 +11,7 @@ supported Android versions, and attempts to clear the same token after 45 second
 or when access is disabled/regenerated. Background clipboard restrictions can
 prevent that cleanup; Android 13+ also expires clipboard entries itself.
 
-The bearer token grants access to the two operations below. Keep it in a trusted
+The bearer token grants access to the read/check operations below. Keep it in a trusted
 automation app's private variables. Do not put it into task exports, logs, shared
 files, URLs, screenshots, or public bug reports. It lives in ordinary private
 credential-protected SharedPreferences, outside Direct Boot storage, portable
@@ -56,7 +56,37 @@ Result data is null. Only success includes these result extras:
 | `status` | string | `UNKNOWN`, `OK`, `PARTIAL`, `TG_DOWN`, or `NO_NETWORK` |
 | `checked_at_ms` | long | Unix milliseconds of the snapshot's check; `0` when unknown. |
 | `stale` | boolean | True for stopped/unknown state, backwards wall time, or more than three expected check intervals without a result. |
-| `running` | boolean | Monitor is running, enabled, and no restore is pending. |
+| `running` | boolean | Telegram is enabled in the running monitor and no restore is pending. |
+
+## Independent targets (version 2)
+
+Use the same explicit component and bearer token, with one of these actions and a
+string extra `target_id`: `telegram`, `matrix`, `whatsapp`, or `custom`. The ID is
+required and case sensitive; unknown or missing IDs return result `2` without state.
+
+| Action | Behavior |
+| --- | --- |
+| `ru.tgwatch.automation.GET_TARGET_STATE` | Return only the chosen target's current/persisted public state. |
+| `ru.tgwatch.automation.CHECK_TARGET_NOW` | Request a check of the chosen enabled target in the existing service. |
+
+Version 2 returns the same five base fields, with `api_version=2`, plus `target_id`
+and an optional nonnegative long `latency_ms` when a latency was measured. Its
+status values are `UNKNOWN`, `OK`, `PARTIAL`, `DOWN`, and `NO_NETWORK`. Addresses,
+credentials, raw probe errors and history are excluded. A stopped target has
+`running=false` and `stale=true`, even when another target keeps the common service
+running. A private target cannot be checked before unlock or during an accepted
+endpoint change. No API request configures or enables a target.
+
+The ten-second manual-check budget is independent per target and durable within
+one boot. Version 1 and version 2 share Telegram's budget. Each target/version has
+its own one-second response cache. All computations share one physical worker;
+an eight-second response deadline finishes the ordered request without creating a
+replacement worker while the old one remains blocked.
+
+Legacy `CHECK_NOW` and `GET_STATE` always mean Telegram, regardless of extra
+`target_id`, the selected screen or other enabled targets. They retain version 1,
+the five-field response and `TG_DOWN`. In Tasker, choose the version-two action
+and add `target_id:matrix` to request Matrix explicitly.
 
 ## Tasker
 

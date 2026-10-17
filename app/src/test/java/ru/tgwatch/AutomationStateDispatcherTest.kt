@@ -38,6 +38,7 @@ class AutomationStateDispatcherTest {
         assertEquals(1, replies)
         assertEquals(1, finishes)
         assertTrue(dispatcher.health().busy)
+        assertFalse("Restore invalidation is not an eight-second timeout", dispatcher.health().deadlineExpired)
         assertNull(AutomationStateCache.take(0))
         work!!.run()
         assertFalse(dispatcher.health().busy)

@@ -39,7 +39,8 @@ class AutomationReceiver : BroadcastReceiver() {
         }
         try {
             val app = context.applicationContext
-            var deliverSnapshot = intent.action == ACTION_GET_STATE
+            var request = TargetAutomationRequest(TargetId.TELEGRAM, 1, false)
+            var deliverSnapshot = true
             synchronized(AutomationSettings) {
                 val supplied = intent.getStringExtra(EXTRA_TOKEN)
                 if (!AutomationPolicy.authorized(AutomationSettings.enabled(context),
@@ -49,29 +50,18 @@ class AutomationReceiver : BroadcastReceiver() {
                     reply(RESULT_INVALID)
                     return
                 }
-                if (intent.action == ACTION_CHECK_NOW) {
-                    if (!Prefs.isEnabled(context) || !MonitorService.running || BackupManager.hasPending()) {
-                        reply(RESULT_STOPPED)
-                        return
-                    }
-                    val elapsed = SystemClock.elapsedRealtime()
-                    when (AutomationCheckAdmission.request(elapsed, AutomationSettings.lastCheckElapsed(context),
-                        { admission -> MonitorService.requestRunningCheck(context, admission) },
-                        { AutomationSettings.recordCheck(context, elapsed) })) {
-                        AutomationCheckAdmission.Result.ACCEPTED -> deliverSnapshot = isOrderedBroadcast
-                        AutomationCheckAdmission.Result.RATE_LIMITED -> {
-                            reply(RESULT_RATE_LIMITED)
-                            return
-                        }
-                        AutomationCheckAdmission.Result.UNAVAILABLE -> {
-                            reply(RESULT_STOPPED)
-                            return
-                        }
-                    }
+                val parsed = TargetAutomation.parse(intent.action,
+                    intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID))
+                if (parsed == null) { reply(RESULT_INVALID); return }
+                request = parsed
+                if (request.checkNow) {
+                    val admitted = admitCheck(context, request.targetId)
+                    if (admitted != RESULT_OK) { reply(admitted); return }
+                    deliverSnapshot = isOrderedBroadcast
                 }
             }
             if (deliverSnapshot) {
-                deliverState(app)
+                deliverState(app, request)
             } else {
                 reply(RESULT_OK)
             }
@@ -82,23 +72,37 @@ class AutomationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun deliverState(ctx: Context) {
+    private fun admitCheck(ctx: Context, id: TargetId): Int {
+        if (!TargetPreferences.definition(ctx, id).enabled || !MonitorService.running || BackupManager.hasPending())
+            return RESULT_STOPPED
         val elapsed = SystemClock.elapsedRealtime()
-        val cached = AutomationStateCache.take(elapsed)
-        when {
-            cached != null -> reply(RESULT_OK, cached.toBundle())
-            !isOrderedBroadcast -> reply(RESULT_OK)
-            !AutomationStateCache.beginCompute(elapsed) -> {
-                val raced = AutomationStateCache.take(elapsed)
-                if (raced != null) reply(RESULT_OK, raced.toBundle()) else reply(RESULT_RATE_LIMITED)
-            }
-            else -> scheduleStateCompute(ctx)
+        return when (AutomationCheckAdmission.request(elapsed, AutomationSettings.lastCheckElapsed(ctx, id),
+            { admission -> MonitorService.requestRunningCheck(ctx, id, admission) },
+            { AutomationSettings.recordCheck(ctx, elapsed, id) })) {
+            AutomationCheckAdmission.Result.ACCEPTED -> RESULT_OK
+            AutomationCheckAdmission.Result.RATE_LIMITED -> RESULT_RATE_LIMITED
+            AutomationCheckAdmission.Result.UNAVAILABLE -> RESULT_STOPPED
         }
     }
 
-    private fun scheduleStateCompute(ctx: Context) {
+    private fun deliverState(ctx: Context, request: TargetAutomationRequest) {
+        val elapsed = SystemClock.elapsedRealtime()
+        val key = AutomationStateKey(request.targetId, request.apiVersion)
+        val cached = AutomationStateCache.take(elapsed, key)
+        when {
+            cached != null -> reply(RESULT_OK, cached.toBundle())
+            !isOrderedBroadcast -> reply(RESULT_OK)
+            !AutomationStateCache.beginCompute(elapsed, key) -> {
+                val raced = AutomationStateCache.take(elapsed, key)
+                if (raced != null) reply(RESULT_OK, raced.toBundle()) else reply(RESULT_RATE_LIMITED)
+            }
+            else -> scheduleStateCompute(ctx, key)
+        }
+    }
+
+    private fun scheduleStateCompute(ctx: Context, key: AutomationStateKey) {
         val pending = goAsync()
-        stateDispatcher.submit({ stateSnapshot(ctx) }, { result ->
+        stateDispatcher.submit({ TargetAutomationState.compute(ctx, key) }, { result ->
             val snapshot = result.getOrNull()
             val error = result.exceptionOrNull()
             val code = when {
@@ -107,7 +111,7 @@ class AutomationReceiver : BroadcastReceiver() {
                 else -> RESULT_INVALID
             }
             pending.setResult(code, null, snapshot?.toBundle())
-        }, { pending.finish() })
+        }, { pending.finish() }, key)
     }
 
     private fun reply(code: Int, extras: Bundle? = null) {
@@ -115,21 +119,4 @@ class AutomationReceiver : BroadcastReceiver() {
         setResult(code, null, extras)
     }
 
-    private fun stateSnapshot(ctx: Context): AutomationStateSnapshot {
-        val running = MonitorService.running && Prefs.isEnabled(ctx) && !BackupManager.hasPending()
-        val state = if (running) MonitorService.state else Prefs.loadLastState(ctx) ?: MonitorService.State()
-        val checkedAt = state.checkedAt.coerceAtLeast(0L)
-        val now = System.currentTimeMillis()
-        val stale = if (running && state.checkedElapsed > 0L) {
-            checkedAt <= 0L || state.isStale(now)
-        } else {
-            AutomationPolicy.stale(running, checkedAt, now, state.expectedIntervalSec)
-        }
-        return AutomationStateSnapshot(
-            status = state.status.name,
-            checkedAtMs = checkedAt,
-            stale = stale,
-            running = running,
-        )
-    }
 }

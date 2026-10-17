@@ -39,6 +39,8 @@ object AutomationSettings {
             if (!AutomationPolicy.validToken(prefs.getString(KEY_TOKEN, null))) edit.putString(KEY_TOKEN, newToken())
         } else {
             edit.remove(KEY_TOKEN).remove(KEY_LAST_ELAPSED).remove(KEY_BOOT)
+            prefs.all.keys.filter { it.startsWith("$KEY_LAST_ELAPSED.") || it.startsWith("$KEY_BOOT.") }
+                .forEach(edit::remove)
         }
         return edit.commit()
     }
@@ -50,15 +52,19 @@ object AutomationSettings {
     }
 
     /** Persist the elapsed-time throttle across process recreation, reset only on a new boot. */
-    @Synchronized internal fun lastCheckElapsed(ctx: Context): Long? {
+    @Synchronized internal fun lastCheckElapsed(ctx: Context, id: TargetId = TargetId.TELEGRAM): Long? {
         val prefs = store(ctx)
         val boot = bootCount(ctx)
-        if (!prefs.contains(KEY_LAST_ELAPSED) || prefs.getInt(KEY_BOOT, -1) != boot) return null
-        return prefs.getLong(KEY_LAST_ELAPSED, 0)
+        val suffix = if (id == TargetId.TELEGRAM) "" else ".${id.wire}"
+        if (!prefs.contains(KEY_LAST_ELAPSED + suffix) || prefs.getInt(KEY_BOOT + suffix, -1) != boot) return null
+        return prefs.getLong(KEY_LAST_ELAPSED + suffix, 0)
     }
 
-    @Synchronized internal fun recordCheck(ctx: Context, elapsed: Long): Boolean = store(ctx).edit()
-        .putLong(KEY_LAST_ELAPSED, elapsed).putInt(KEY_BOOT, bootCount(ctx)).commit()
+    @Synchronized internal fun recordCheck(ctx: Context, elapsed: Long, id: TargetId = TargetId.TELEGRAM): Boolean {
+        val suffix = if (id == TargetId.TELEGRAM) "" else ".${id.wire}"
+        return store(ctx).edit().putLong(KEY_LAST_ELAPSED + suffix, elapsed)
+            .putInt(KEY_BOOT + suffix, bootCount(ctx)).commit()
+    }
 
     private fun bootCount(ctx: Context): Int =
         Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)
