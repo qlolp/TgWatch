@@ -30,6 +30,7 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         elapsedClock = SystemClock::elapsedRealtime)
     private val schedule = TargetSchedule(repository.definitions().filter { it.id != TargetId.TELEGRAM })
     @Volatile private var closed = false
+    private val settingsRevisions = mutableMapOf<TargetId, Long>()
     private val dispatch = TargetDispatch(Executor { host.worker.post(it) }) {
         if (!closed && host.isCurrent()) host.onProgress()
     }
@@ -42,7 +43,11 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
             TargetPreferences.definitions(host.context).forEach { definition ->
                 val before = repository.configuration(definition.id)
                 val revision = TargetPreferences.endpointRevision(host.context, definition.id)
-                if (before.definition != definition || before.endpointRevision != revision) {
+                val settingsRevision = TargetPreferences.fence.snapshot(definition.id).revision
+                val settingsChanged = settingsRevisions.put(definition.id, settingsRevision)?.let {
+                    it != settingsRevision
+                } ?: false
+                if (before.definition != definition || before.endpointRevision != revision || settingsChanged) {
                     repository.install(TargetConfiguration(definition, Math.addExact(before.generation, 1L), revision))
                     if (definition.id != TargetId.TELEGRAM) {
                         schedule.configure(definition, SystemClock.elapsedRealtime())
@@ -91,10 +96,8 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
     override fun close() { closed = true; dispatch.close() }
 
     private fun launch(id: TargetId) {
-        val (cfg, endpoint) = synchronized(TargetPreferences) {
-            val current = repository.configuration(id)
-            current to if (current.definition.requiresEndpoint) TargetPreferences.endpoint(host.context, id) else null
-        }
+        val cfg = repository.configuration(id)
+        val endpoint = if (cfg.definition.requiresEndpoint) TargetPreferences.endpoint(host.context, id) else null
         val parked = cfg.definition.requiresEndpoint && endpoint == null
         if (!cfg.definition.enabled || parked || closed) {
             schedule.finished(id, SystemClock.elapsedRealtime())

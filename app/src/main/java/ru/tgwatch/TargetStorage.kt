@@ -11,6 +11,7 @@ class TargetStorage private constructor(private val directory: File, private val
     private val compaction = mutableMapOf<TargetId, HistoryCompaction>()
     private val syncPolicy = mutableMapOf<TargetId, HistoryStorage.AppendSyncPolicy>()
     val isInitialized: Boolean get() = active != null
+    val generationId: String? get() = active
     val legacyMigrationComplete: Boolean get() = File(generation(), LEGACY_COMPLETE).isFile
 
     @Synchronized fun read(id: TargetId): List<TargetObservation> =

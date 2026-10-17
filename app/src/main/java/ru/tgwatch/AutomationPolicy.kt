@@ -15,7 +15,8 @@ object AutomationPolicy {
     const val STATE_GAP_MS = 200L
 
     fun validAction(action: String?): Boolean =
-        action == ACTION_CHECK_NOW || action == ACTION_GET_STATE
+        action == ACTION_CHECK_NOW || action == ACTION_GET_STATE ||
+            action == TargetAutomation.ACTION_GET_TARGET_STATE || action == TargetAutomation.ACTION_CHECK_TARGET_NOW
 
     fun validToken(token: String?): Boolean = token != null && token.length == TOKEN_LENGTH &&
         token.all { it in '0'..'9' || it in 'a'..'f' }

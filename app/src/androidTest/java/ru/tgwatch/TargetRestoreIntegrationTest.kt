@@ -86,6 +86,7 @@ class TargetRestoreIntegrationTest {
 
     @Test fun csvImportPreservesOtherTargetHistoriesAndDefinitions() {
         BackupManager.restoreTargets(ctx, data())
+        check(Prefs.sp(ctx).edit().putBoolean(TargetPreferences.key(TargetId.CUSTOM, "endpoint_review"), false).commit())
         val original = TargetPersistence.storage().snapshot()
         val now = System.currentTimeMillis()
         val rows = listOf(Observation(now - 1000, now, "TG_DOWN", 17, 6))
@@ -94,6 +95,7 @@ class TargetRestoreIntegrationTest {
         for (id in TargetId.entries.filter { it != TargetId.TELEGRAM })
             assertEquals(original.observations[id], TargetPersistence.storage().read(id))
         assertTrue(TargetPreferences.definitions(ctx).none { it.enabled })
+        assertFalse(Prefs.sp(ctx).getBoolean(TargetPreferences.key(TargetId.CUSTOM, "endpoint_review"), true))
     }
 
     @Test fun legacyCredentialMovesToPrivateStorageAndNeverAppearsInV3Export() {

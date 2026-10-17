@@ -28,8 +28,10 @@ object RecoveryCoordinator {
         val app = ctx.applicationContext
         gate.start {
             BackupManager.recoverPending(app)
+            TargetConfigTransactions.discover(app)
             TargetPersistence.initialize(app)
             PrivateEndpoints.migrateLegacy(app)
+            TargetConfigTransactions.resume(app)
         }
     }
     fun onUserUnlocked(ctx: Context) {
@@ -38,7 +40,7 @@ object RecoveryCoordinator {
         whenReady { HistorySessions.queue(app).exclusive {
             PrivateEndpoints.migrateLegacy(app)
             History.snapshot(app)
-        } }
+        }; TargetConfigTransactions.resume(app) }
     }
     fun whenReady(action: () -> Unit) = gate.whenReady(action)
 }

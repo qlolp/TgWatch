@@ -103,7 +103,10 @@ object Prefs {
 
     fun setEnabled(ctx: Context, value: Boolean) {
         if (value && BackupManager.hasPending()) return
-        sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
+        synchronized(TargetPreferences) {
+            TargetId.entries.forEach(TargetPreferences.fence::bump)
+            sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
+        }
         if (value) WatchdogReceiver.schedule(ctx) else WatchdogReceiver.cancel(ctx)
     }
 
@@ -111,7 +114,10 @@ object Prefs {
     fun intervalSec(ctx: Context): Int = sp(ctx).getInt(KEY_INTERVAL, DEFAULT_INTERVAL_SEC)
 
     fun setIntervalSec(ctx: Context, value: Int) {
-        sp(ctx).edit().putInt(KEY_INTERVAL, value.coerceIn(10, 120)).putString(KEY_PROFILE, "CUSTOM").apply()
+        synchronized(TargetPreferences) {
+            TargetPreferences.fence.bump(TargetId.TELEGRAM)
+            sp(ctx).edit().putInt(KEY_INTERVAL, value.coerceIn(10, 120)).putString(KEY_PROFILE, "CUSTOM").apply()
+        }
     }
 
     fun profile(ctx: Context): PowerProfile? {
@@ -120,7 +126,10 @@ object Prefs {
         return PowerProfile.entries.firstOrNull { it.name == value }
     }
     fun setProfile(ctx: Context, profile: PowerProfile) {
-        sp(ctx).edit().putString(KEY_PROFILE, profile.name).putInt(KEY_INTERVAL, profile.awake).apply()
+        synchronized(TargetPreferences) {
+            TargetPreferences.fence.bump(TargetId.TELEGRAM)
+            sp(ctx).edit().putString(KEY_PROFILE, profile.name).putInt(KEY_INTERVAL, profile.awake).apply()
+        }
     }
     fun effectiveIntervalSec(ctx: Context, bad: Boolean, screenOff: Boolean): Int =
         profile(ctx)?.interval(bad, screenOff) ?: ProbeRules.nextIntervalSec(intervalSec(ctx).coerceIn(10, 120), bad, screenOff)

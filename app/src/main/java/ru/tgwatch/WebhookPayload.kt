@@ -30,6 +30,15 @@ object WebhookPayload {
         val observation = checkNotNull(event.observation)
         val status = WebhookStatuses.normalize(observation.status)
         val legacy = if (status == "DOWN") "TG_DOWN" else status.orEmpty()
-        return checkNotNull(WebhookPolicy.payload(legacy))
+        return if (observation.serviceId == TargetId.TELEGRAM.wire) checkNotNull(WebhookPolicy.payload(legacy)) else {
+            val name = TargetNames.label(checkNotNull(TargetId.fromWire(observation.serviceId)))
+            when (status) {
+                "OK" -> Lang.t("TG Монитор: $name доступен", "TG Monitor: $name is reachable")
+                "DOWN" -> Lang.t("TG Монитор: $name недоступен", "TG Monitor: $name is unreachable")
+                "PARTIAL" -> Lang.t("TG Монитор: $name доступен частично", "TG Monitor: $name is partially reachable")
+                "NO_NETWORK" -> Lang.t("TG Монитор: $name — нет сети", "TG Monitor: $name — no network")
+                else -> error("Unknown target status")
+            }
+        }
     }
 }

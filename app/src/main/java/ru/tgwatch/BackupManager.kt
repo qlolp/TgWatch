@@ -39,12 +39,12 @@ object BackupManager {
         History.snapshot(ctx, now), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {
-        check(!hasPending()) { "Complete pending restore before export" }
+        check(!hasPending() && !TargetConfigTransactions.anyPending) { "Complete pending changes before export" }
         return PortableBackupCodec.encryptTargets(snapshotTargets(ctx), password)
     }
 
     @Synchronized fun exportTelegram(ctx: Context, password: CharArray): ByteArray {
-        check(!hasPending())
+        check(!hasPending() && !TargetConfigTransactions.anyPending)
         val data = snapshot(ctx)
         return PortableBackupCodec.encrypt(data.copy(settings = data.settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY),
             password)
@@ -66,7 +66,7 @@ object BackupManager {
     /** CSV changes history; capture current configuration/log after the service has fully stopped. */
     @Synchronized fun importHistory(ctx: Context, observations: List<Observation>) {
         check(Looper.myLooper() != Looper.getMainLooper())
-        check(!hasPending())
+        check(!hasPending() && !TargetConfigTransactions.anyPending)
         val validated = BackupCodec.decode(BackupCodec.encode(BackupSnapshot(0L, emptyMap(), observations, emptyList())))
         replacingHistory = true
         try {
@@ -75,8 +75,11 @@ object BackupManager {
             MonitorService.stopAndAwait(ctx)
             val current = snapshotTargets(ctx)
             val revision = TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM)
-            restoreTargets(ctx, current.copy(observations = current.observations + (TargetId.TELEGRAM to
-                validated.observations.map { TargetObservation(TargetPersistence.publicRow(it), revision) })))
+            val changed = current.copy(observations = current.observations + (TargetId.TELEGRAM to
+                validated.observations.map { TargetObservation(TargetPersistence.publicRow(it), revision) }))
+            TargetRestore.stage(ctx, TargetBackupImport(changed,
+                metadata = PrivateRestoreMetadata(setOf(TargetId.TELEGRAM))))
+            recoverPending(ctx)
         } finally { replacingHistory = false }
     }
 
@@ -113,8 +116,8 @@ object BackupManager {
             HistorySessions.queue(ctx).exclusive {
                 TargetPersistence.initialize(ctx, forRestore = true)
                 BackupJournals.migrateLegacy(ctx)
-                recovered = BackupJournals.transaction(ctx).recover { bytes, endpoint ->
-                    TargetRestore.apply(ctx, TargetBackupImport(TargetBackupCodec.decode(bytes), endpoint),
+                recovered = BackupJournals.transaction(ctx).recoverWithMetadata { bytes, endpoint, metadata ->
+                    TargetRestore.apply(ctx, TargetBackupImport(TargetBackupCodec.decode(bytes), endpoint, metadata),
                         settingKeys + transientKeys)
                 }
             }.get()
@@ -122,6 +125,7 @@ object BackupManager {
             AutomationReceiver.invalidateState()
             WebhookNotifier.reset()
             BackupJournals.refresh(ctx)
+            TargetConfigTransactions.resume(ctx)
             if (RecoveryCoordinator.state == RecoveryState.FAILED) RecoveryCoordinator.start(ctx)
             return recovered
         } finally { replacingHistory = false }

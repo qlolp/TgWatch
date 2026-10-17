@@ -7,10 +7,16 @@ import android.os.UserManager
 object TargetPreferences {
     internal const val PRIVATE_FILE = "targets-private-v1"
     private const val MAX_ENDPOINT_CHARS = 256
+    val fence = TargetSettingsFence()
 
     fun definitions(ctx: Context): List<TargetDefinition> = TargetId.entries.map { definition(ctx, it) }
 
-    fun definition(ctx: Context, id: TargetId): TargetDefinition {
+    fun definition(ctx: Context, id: TargetId): TargetDefinition = storedDefinition(ctx, id).let {
+        it.copy(enabled = it.enabled && Prefs.isEnabled(ctx) && !fence.snapshot(id).changing &&
+            !TargetConfigTransactions.isPending(id))
+    }
+
+    internal fun storedDefinition(ctx: Context, id: TargetId): TargetDefinition {
         val defaults = TargetDefinition.default(id)
         val preferences = Prefs.sp(ctx)
         val telegram = id == TargetId.TELEGRAM
@@ -18,7 +24,7 @@ object TargetPreferences {
             preferences.getInt(key(id, "interval"), defaults.intervalSec))
             .coerceIn(if (telegram) TargetDefinition.MIN_TELEGRAM_SEC else TargetDefinition.MIN_TARGET_SEC,
                 if (telegram) TargetDefinition.MAX_TELEGRAM_SEC else TargetDefinition.MAX_TARGET_SEC)
-        return TargetDefinition(id, Prefs.isEnabled(ctx) && preferences.getBoolean(key(id, "enabled"), telegram),
+        return TargetDefinition(id, preferences.getBoolean(key(id, "enabled"), telegram),
             interval, preferences.getBoolean(key(id, "requires_endpoint"), defaults.requiresEndpoint),
             TargetAlertSettings(if (telegram) Prefs.notifyFor(ctx, "TG_DOWN") else
                 preferences.getBoolean(key(id, "notify_outage"), defaults.alerts.notifyOutage),
@@ -33,7 +39,9 @@ object TargetPreferences {
 
     fun endpoint(ctx: Context, id: TargetId): String? {
         val app = ctx.applicationContext
-        if (!app.getSystemService(UserManager::class.java).isUserUnlocked ||
+        val changing = fence.snapshot(id).changing || TargetConfigTransactions.isPending(id)
+        if (changing ||
+            !app.getSystemService(UserManager::class.java).isUserUnlocked ||
             Prefs.sp(ctx).getBoolean(key(id, "endpoint_review"), false)) return null
         val raw = app.getSharedPreferences(PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
         return HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
@@ -41,6 +49,14 @@ object TargetPreferences {
 
     fun endpointRevision(ctx: Context, id: TargetId): Long =
         Prefs.sp(ctx).getLong(key(id, "endpoint_revision"), 0L).coerceAtLeast(0L)
+
+    fun setDefinition(ctx: Context, definition: TargetDefinition): Boolean =
+        TargetSettingWrites.definition(ctx, definition)
+    fun setEndpoint(ctx: Context, id: TargetId, raw: String): Boolean = TargetSettingWrites.endpoint(ctx, id, raw)
+    fun stop(ctx: Context, id: TargetId) = synchronized(this) {
+        fence.bump(id)
+        Prefs.sp(ctx).edit().putBoolean(key(id, "enabled"), false).apply()
+    }
 
     internal fun key(id: TargetId, suffix: String) = "target.${id.wire}.$suffix"
 }

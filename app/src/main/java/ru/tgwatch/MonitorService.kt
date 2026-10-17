@@ -203,6 +203,7 @@ class MonitorService : Service() {
     private var historySession = 0L
     private var targetMonitoring: TargetMonitoring? = null
     @Volatile private var telegramDueElapsed: Long? = null
+    @Volatile private var primarySettingsRevision: Long? = null
     private var deferredExtra: Probe? = null
     private lateinit var workerThread: HandlerThread
     private val stopped = CountDownLatch(1)
@@ -588,6 +589,7 @@ class MonitorService : Service() {
         extraCoordinator.invalidate()
         checkStartedMono = SystemClock.elapsedRealtime()
         val revision = checkSchedule.begin()
+        primarySettingsRevision = TargetPreferences.fence.snapshot(TargetId.TELEGRAM).revision
         var retryDelayMs: Long? = null
         acquireWakeLockForCheck()
         try {
@@ -615,6 +617,7 @@ class MonitorService : Service() {
             }
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
+            primarySettingsRevision = null
             checkStartedMono = 0L
             releaseWakeLock()
         }
@@ -643,7 +646,10 @@ class MonitorService : Service() {
 
     /** Network callbacks and primary publication share this lock, including revision validation. */
     @Synchronized private fun publishCheckedResult(result: Probe, revision: Long) {
-        if (!acceptsRunningCheck(this) || !TargetPreferences.definition(this, TargetId.TELEGRAM).enabled) return
+        val settingsRevision = TargetPreferences.fence.snapshot(TargetId.TELEGRAM).revision
+        val currentSettings = primarySettingsRevision?.let { it == settingsRevision } ?: true
+        if (!acceptsRunningCheck(this) || !TargetPreferences.definition(this, TargetId.TELEGRAM).enabled ||
+            !currentSettings) return
         if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
         // A result from a network that has since changed is no observation: keep the prior state,
         // history and alerts. afterCheck() runs the replacement check one second later.
@@ -757,7 +763,8 @@ class MonitorService : Service() {
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
         WebhookNotifier.onPublished(this, WebhookObservation("telegram", newState.status.name,
             newState.checkedAt, newState.latencyMs.takeIf { it >= 0L }, probeNetwork, checkSchedule.revision,
-            measured = newState.status != Status.UNKNOWN, stale = newState.isStale(now)))
+            measured = newState.status != Status.UNKNOWN, stale = newState.isStale(now),
+            expectedIntervalSec = newState.expectedIntervalSec))
     }
 
     private fun broadcastState() {

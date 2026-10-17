@@ -18,7 +18,7 @@ internal object TargetRestore {
         BackupJournals.refresh(ctx)
         check(!BackupJournals.pending) { "Complete pending restore before replacing data" }
         val bytes = TargetBackupCodec.encode(imported.snapshot)
-        try { BackupJournals.transaction(ctx).stage(bytes, imported.legacyEndpoint) }
+        try { BackupJournals.transaction(ctx).stage(bytes, imported.legacyEndpoint, imported.metadata) }
         finally { bytes.fill(0); BackupJournals.refresh(ctx) }
     }
 
@@ -45,7 +45,8 @@ internal object TargetRestore {
                     val revision = imported.snapshot.observations[id].orEmpty()
                         .maxOfOrNull { it.endpointRevision } ?: 0L
                     edit.putLong(TargetPreferences.key(id, "endpoint_revision"), revision)
-                    edit.putBoolean(TargetPreferences.key(id, "endpoint_review"), definition.requiresEndpoint)
+                    edit.putBoolean(TargetPreferences.key(id, "endpoint_review"),
+                        review(preferences, imported, definition))
                 }
                 check(edit.commit()) { "Cannot restore target settings" }
                 imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
@@ -77,6 +78,12 @@ internal object TargetRestore {
         StatusWidget.updateAll(ctx)
         DailySummaryReceiver.schedule(ctx)
     }
+
+    private fun review(preferences: Map<String, *>, imported: TargetBackupImport,
+        definition: TargetDefinition): Boolean =
+        if (definition.id in imported.metadata.reviewTargets) definition.requiresEndpoint
+        else preferences[TargetPreferences.key(definition.id, "endpoint_review")] as? Boolean
+            ?: definition.requiresEndpoint
 
     private fun definitions(edit: android.content.SharedPreferences.Editor, definition: TargetDefinition) {
         fun key(suffix: String) = TargetPreferences.key(definition.id, suffix)

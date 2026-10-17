@@ -9,7 +9,10 @@ enum class WebhookEventKind(val wireName: String) {
 }
 
 data class WebhookObservation(val serviceId: String, val status: String, val checkedAtMs: Long,
-    val latencyMs: Long?, val network: NetworkKind, val revision: Long, val measured: Boolean, val stale: Boolean)
+    val latencyMs: Long?, val network: NetworkKind, val revision: Long, val measured: Boolean, val stale: Boolean,
+    val expectedIntervalSec: Int = TargetDefinition.DEFAULT_TELEGRAM_SEC) {
+    init { require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetDefinition.MAX_TARGET_SEC) }
+}
 data class WebhookEvent(val kind: WebhookEventKind, val observation: WebhookObservation?, val previousStatus: String?)
 
 internal object WebhookStatuses {
@@ -24,6 +27,7 @@ internal object WebhookStatuses {
 /** Measured baseline is independent of delivery, retries and filters. At most four built-in IDs. */
 class WebhookEventTracker {
     private val previous = mutableMapOf<String, String>()
+    fun forget(serviceId: String) { previous.remove(serviceId) }
     fun accepts(observation: WebhookObservation): Boolean = observation.measured && !observation.stale &&
         observation.checkedAtMs > 0L && observation.serviceId in WebhookStatuses.services &&
         WebhookStatuses.normalize(observation.status) != null

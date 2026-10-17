@@ -49,6 +49,7 @@ object WebhookNotifier {
 
     /** Address or switch changed: the next change is reported regardless of earlier posts. */
     fun reset() { coordinator?.reset() }
+    fun forget(id: TargetId) { coordinator?.forget(id.wire) }
 
     internal fun health(ctx: Context): WebhookHealth = coordinator(ctx).health()
 
@@ -79,10 +80,13 @@ internal class WebhookCoordinator(
 ) {
     private val gate = WebhookGate()
     private var tracker = WebhookEventTracker()
-    private data class PendingEvent(val id: Long, val event: WebhookEvent)
+    private data class PendingEvent(val id: Long, val event: WebhookEvent, val refreshedElapsed: Long) {
+        fun fresh(now: Long): Boolean = now >= refreshedElapsed && now - refreshedElapsed <=
+            checkNotNull(event.observation).expectedIntervalSec * FRESH_INTERVALS * MILLIS_PER_SECOND
+    }
     private var sequence = 0L
-    private var latest: PendingEvent? = null
-    private var configured: WebhookConfiguration? = null
+    private val latest = linkedMapOf<String, PendingEvent>()
+    private val configurationFence = WebhookConfigurationFence()
     private var generation = 0L
     private var active: Attempt? = null
     private var lastHealth = WebhookHealth()
@@ -108,12 +112,22 @@ internal class WebhookCoordinator(
     }
 
     fun reset() = synchronized(configurationLock) {
-        configured = configuration()
+        configurationFence.changed(configuration())
         invalidate()
     }
 
+    fun forget(serviceId: String) = synchronized(configurationLock) {
+        tracker.forget(serviceId)
+        latest.remove(serviceId)
+        gate.forget(serviceId)
+        active?.takeIf { it.request.superseded }?.let {
+            lastHealth = WebhookHealth(lastSuccessElapsed = lastHealth.lastSuccessElapsed)
+            it.cancel(cancelTransport)
+        }
+    }
+
     fun health(): WebhookHealth = synchronized(configurationLock) {
-        synchronizeConfiguration(configuration())
+        if (configurationFence.changed(configuration())) invalidate()
         lastHealth.copy(inFlight = active != null, transportBlocked = active?.let {
             it.cancellationRequested || it.result == WebhookNotifier.TestResult.TIMED_OUT
         } == true)
@@ -123,21 +137,24 @@ internal class WebhookCoordinator(
         val captured = configuration()
         synchronized(configurationLock) {
             val current = configuration()
-            synchronizeConfiguration(current)
+            if (configurationFence.changed(current)) invalidate()
             if (captured != current || !tracker.accepts(observation)) return
             val event = tracker.observe(observation)
-            if (event != null) latest = PendingEvent(++sequence, event)
-            else latest?.takeIf {
-                it.event.observation?.serviceId == observation.serviceId &&
-                    it.event.observation.status == WebhookStatuses.normalize(observation.status)
-            }?.let { latest = it.copy(event = it.event.copy(observation = observation)) }
-            val pending = latest?.takeIf { it.event.kind in current.events }
+            if (event != null) latest[observation.serviceId] = PendingEvent(++sequence, event, nowElapsed())
+            else latest[observation.serviceId]?.takeIf {
+                it.event.observation?.status == WebhookStatuses.normalize(observation.status)
+            }?.let { latest[observation.serviceId] = it.copy(event = it.event.copy(observation = observation),
+                refreshedElapsed = nowElapsed()) }
             val url = current.url?.takeIf { current.enabled }
-            if (pending != null && url != null) {
-                val observation = checkNotNull(pending.event.observation)
-                val key = "${observation.serviceId}:${WebhookStatuses.normalize(observation.status)}"
-                gate.beginEvent(key, nowElapsed())?.let {
-                    dispatch(it, url, WebhookPayload.encode(pending.event, current.format), eventId = pending.id)
+            if (url != null) {
+                val due = latest.values.firstNotNullOfOrNull { pending ->
+                    val measured = checkNotNull(pending.event.observation)
+                    val key = "${measured.serviceId}:${WebhookStatuses.normalize(measured.status)}"
+                    if (pending.event.kind !in current.events || !pending.fresh(nowElapsed())) null else
+                        gate.beginEvent(key, nowElapsed())?.let { pending to it }
+                }
+                due?.let { (pending, request) ->
+                    dispatch(request, url, WebhookPayload.encode(pending.event, current.format), eventId = pending.id)
                 }
             }
         }
@@ -147,7 +164,7 @@ internal class WebhookCoordinator(
         val captured = configuration()
         synchronized(configurationLock) {
             val current = configuration()
-            synchronizeConfiguration(current)
+            if (configurationFence.changed(current)) invalidate()
             val url = current.url
             val request = if (url != null && captured == current) gate.beginTest(nowElapsed()) else null
             when {
@@ -186,7 +203,7 @@ internal class WebhookCoordinator(
                     if (active === attempt) attempt.cancel(cancelTransport)
                 }
             } else {
-                synchronizeConfiguration(configuration())
+                if (configurationFence.changed(configuration())) invalidate()
                 report(attempt, WebhookNotifier.TestResult.TIMED_OUT)
                 if (active === attempt) attempt.cancel(cancelTransport)
             }
@@ -195,7 +212,7 @@ internal class WebhookCoordinator(
 
     private fun complete(attempt: Attempt, code: Int) = synchronized(configurationLock) {
         if (active === attempt) {
-            synchronizeConfiguration(configuration())
+            if (configurationFence.changed(configuration())) invalidate()
             val result = when {
                 nowElapsed() - attempt.started >= WebhookPolicy.RESULT_DEADLINE_MS ->
                     WebhookNotifier.TestResult.TIMED_OUT
@@ -216,8 +233,9 @@ internal class WebhookCoordinator(
         attempt.result = result
         attempt.cancelDeadline?.invoke()
         attempt.cancelDeadline = null
-        if (attempt.generation == generation) {
-            if (result == WebhookNotifier.TestResult.SENT && attempt.eventId == latest?.id) latest = null
+        if (attempt.generation == generation && !attempt.request.superseded) {
+            if (result == WebhookNotifier.TestResult.SENT)
+                latest.entries.removeAll { it.value.id == attempt.eventId }
             lastHealth = lastHealth.copy(outcome = when (result) {
                 WebhookNotifier.TestResult.SENT -> WebhookOutcome.SENT
                 WebhookNotifier.TestResult.TIMED_OUT -> WebhookOutcome.TIMED_OUT
@@ -236,19 +254,17 @@ internal class WebhookCoordinator(
         generation++
         gate.reset()
         tracker = WebhookEventTracker()
-        latest = null
+        latest.clear()
         lastHealth = WebhookHealth()
         active?.cancel(cancelTransport)
     }
 
-    private fun synchronizeConfiguration(current: WebhookConfiguration) {
-        if (configured != current) {
-            configured = current
-            invalidate()
-        }
-    }
 
-    private companion object { const val NO_RESPONSE = -1 }
+    private companion object {
+        const val NO_RESPONSE = -1
+        const val FRESH_INTERVALS = 3L
+        const val MILLIS_PER_SECOND = 1_000L
+    }
 }
 
 /** Transport category only; never exposes SSIDs, addresses or Android Network handles. */

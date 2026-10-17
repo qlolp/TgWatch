@@ -4,7 +4,8 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 
 /** Credential-bearing legacy data has a separate private import channel and is never re-exported. */
-internal data class TargetBackupImport(val snapshot: TargetBackupSnapshot, val legacyEndpoint: String? = null)
+internal data class TargetBackupImport(val snapshot: TargetBackupSnapshot, val legacyEndpoint: String? = null,
+    val metadata: PrivateRestoreMetadata = PrivateRestoreMetadata())
 
 internal object TargetPortableBackup {
     private const val VERSION = 3

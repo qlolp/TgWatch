@@ -5,6 +5,16 @@ internal data class WebhookConfiguration(val url: String?, val enabled: Boolean,
     val format: WebhookFormat = WebhookFormat.TEXT,
     val events: Set<WebhookEventKind> = WebhookEventKind.DELIVERY_EVENTS)
 
+/** Compare one complete credential configuration; transports keep their own physical identity. */
+internal class WebhookConfigurationFence {
+    private var installed: WebhookConfiguration? = null
+    fun changed(current: WebhookConfiguration): Boolean {
+        val changed = current != installed
+        installed = current
+        return changed
+    }
+}
+
 /** Android-independent webhook rules: address validation, payload text and request identity. */
 object WebhookPolicy {
     const val MAX_URL_LENGTH = 512
@@ -56,7 +66,9 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
     private val testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {
     /** Identity belongs to one physical request; callbacks must retain this exact token. */
     class Request internal constructor(internal val generation: Long, internal val status: String?,
-        internal val previousSent: String?)
+        internal val previousSent: String?) {
+        internal var superseded = false
+    }
 
     private var lastSent: String? = null
     private var generation = 0L
@@ -69,6 +81,14 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
         generation++
         lastSent = null
         sentAt.clear()
+    }
+
+    @Synchronized fun forget(serviceId: String) {
+        require(serviceId in WebhookStatuses.services)
+        val prefix = "$serviceId:"
+        sentAt.keys.removeAll { it.startsWith(prefix) }
+        if (lastSent?.startsWith(prefix) == true) lastSent = null
+        inFlight?.takeIf { it.status?.startsWith(prefix) == true }?.superseded = true
     }
 
     /** The token to post [status] now and later pass to [finished], or null when no post is due. */
@@ -93,7 +113,7 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
 
     /** Event tracking already established the measured baseline, including filtered initial failures. */
     @Synchronized fun beginEvent(key: String, nowElapsed: Long): Request? {
-        if (inFlight != null || key == lastSent || !gapAllows(sentAt[key], nowElapsed, minGapMs)) return null
+        if (inFlight != null || !gapAllows(sentAt[key], nowElapsed, minGapMs)) return null
         return Request(generation, key, lastSent).also {
             lastSent = key
             sentAt[key] = nowElapsed
@@ -105,7 +125,8 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
     @Synchronized fun finished(request: Request, delivered: Boolean): Boolean {
         if (inFlight !== request) return false
         inFlight = null
-        if (request.generation == generation && request.status != null && !delivered) {
+        val currentGeneration = request.generation == generation && !request.superseded
+        if (currentGeneration && request.status != null && !delivered) {
             lastSent = request.previousSent
         }
         return true

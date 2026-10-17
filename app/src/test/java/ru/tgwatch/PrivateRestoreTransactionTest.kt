@@ -8,6 +8,34 @@ import java.io.IOException
 import java.nio.file.Files
 
 class PrivateRestoreTransactionTest {
+    @Test fun privateMetadataBindsReplayToItsGenerationAndPreservesUnimportedReviewFlags() {
+        val root = Files.createTempDirectory("private-restore-metadata").toFile()
+        try {
+            val marker = File(root, "dp/id")
+            val credentials = File(root, "cp")
+            val metadata = PrivateRestoreMetadata(setOf(TargetId.CUSTOM), "a".repeat(32))
+            PrivateRestoreTransaction(marker, credentials).stage(byteArrayOf(1), null, metadata)
+            assertFalse(marker.readText().contains("custom"))
+            assertTrue(PrivateRestoreTransaction(marker, credentials).recoverWithMetadata { _, _, restored ->
+                assertEquals(metadata, restored)
+            })
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun oldPrivateJournalDefaultsToReviewingAllTargets() {
+        val root = Files.createTempDirectory("private-restore-old-metadata").toFile()
+        try {
+            val marker = File(root, "dp/id")
+            val credentials = File(root, "cp")
+            val transaction = PrivateRestoreTransaction(marker, credentials)
+            transaction.stage(byteArrayOf(1), null)
+            File(credentials, marker.readText() + "/metadata").delete()
+            assertTrue(transaction.recoverWithMetadata { _, _, metadata ->
+                assertEquals(TargetId.entries.toSet(), metadata.reviewTargets)
+                assertNull(metadata.baseGenerationId)
+            })
+        } finally { root.deleteRecursively() }
+    }
     private class Crash : Error()
     private class Cuts(private val before: Int = -1, private val after: Int = -1) : HistoryFileOperations {
         var count = 0
