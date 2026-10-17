@@ -74,6 +74,7 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 dependencies {
+    implementation("androidx.core:core:1.16.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:runner:1.7.0")

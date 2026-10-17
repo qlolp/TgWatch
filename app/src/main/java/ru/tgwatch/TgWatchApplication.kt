@@ -9,6 +9,7 @@ class TgWatchApplication : Application() {
         // Text built in code (notifications, widget, tile) follows the resource locale.
         Lang.update(this)
         RecoveryCoordinator.start(this)
+        StatusShareJobs.cleanup(this)
         // Alarms do not survive reboot, update or restore; re-arming on each process start is cheap.
         DailySummaryReceiver.schedule(this)
     }

@@ -174,4 +174,11 @@
     <string name="widget_coverage_day">Покрытие измерениями за сутки: %1$s</string>
     <string name="widget_graph_description">Последние 6 часов, 72 интервала по 5 минут: %1$d доступны, %2$d неизвестны. Пробелы не означают сбои.</string>
     <string name="widget_last_result">Последний результат: %1$s</string>
+    <string name="share_status_title">Поделиться статусом</string>
+    <string name="share_status_help">Проверьте этот снимок перед открытием системного меню отправки. Адреса, токены и исходная диагностика исключены.</string>
+    <string name="share_status_text">Поделиться текстом</string>
+    <string name="share_status_png">Поделиться PNG</string>
+    <string name="share_status_refresh">Обновить предпросмотр / повторить</string>
+    <string name="share_status_busy">Другая карточка ещё готовится. Повторите после её завершения.</string>
+    <string name="share_status_expired">Срок хранения PNG истёк. Обновите предпросмотр перед отправкой.</string>
 </resources>

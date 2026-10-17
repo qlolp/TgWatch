@@ -244,6 +244,7 @@
 
             <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="@string/period_day" />
             <Button android:id="@+id/btnLatency" style="@style/ButtonText" android:text="@string/latency_title" />
+            <Button android:id="@+id/btnShareStatus" style="@style/ButtonText" android:text="@string/share_status_title" />
             <Button android:id="@+id/btnIncidents" style="@style/ButtonText" android:text="@string/incidents_title" />
             <TextView
                 android:id="@+id/tvDayStats"

@@ -174,4 +174,11 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="widget_coverage_day">Assessment coverage, 24 h: %1$s</string>
     <string name="widget_graph_description">Last 6 hours in 72 five-minute bins: %1$d reachable, %2$d unknown. Gaps are not outages.</string>
     <string name="widget_last_result">Last result: %1$s</string>
+    <string name="share_status_title">Share status</string>
+    <string name="share_status_help">Review this frozen snapshot before opening the system Sharesheet. Addresses, tokens and raw diagnostics are excluded.</string>
+    <string name="share_status_text">Share text</string>
+    <string name="share_status_png">Share PNG</string>
+    <string name="share_status_refresh">Refresh preview / retry</string>
+    <string name="share_status_busy">Another card is being prepared. Retry when it finishes.</string>
+    <string name="share_status_expired">This PNG preview expired. Refresh the preview before sharing.</string>
 </resources>

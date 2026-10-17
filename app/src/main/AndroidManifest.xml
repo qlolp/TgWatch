@@ -52,6 +52,11 @@
             android:theme="@android:style/Theme.NoDisplay" />
 
         <activity android:name=".LatencyActivity" android:exported="false" />
+        <activity android:name=".StatusShareActivity" android:exported="false" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="ru.tgwatch.status-share"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/share_status_paths" />
+        </provider>
         <activity android:name=".WidgetConfigurationActivity" android:exported="true">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
         </activity>

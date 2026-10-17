@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/shareStatusRoot" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/bg" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+        <TextView style="@style/CardTitle" android:text="@string/share_status_title" />
+        <TextView style="@style/Body" android:text="@string/share_status_help" />
+        <TextView android:id="@+id/shareStatusPreview" style="@style/Body" android:textIsSelectable="true"
+            android:accessibilityLiveRegion="polite" android:text="@string/history_loading" />
+        <ImageView android:id="@+id/shareStatusImage" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:adjustViewBounds="true" android:scaleType="fitCenter"
+            android:importantForAccessibility="no" />
+        <Button android:id="@+id/shareStatusText" style="@style/ButtonText" android:text="@string/share_status_text" />
+        <Button android:id="@+id/shareStatusPng" style="@style/ButtonText" android:text="@string/share_status_png" />
+        <Button android:id="@+id/shareStatusRetry" style="@style/ButtonText" android:text="@string/share_status_refresh" />
+        <Button android:id="@+id/shareStatusDone" style="@style/ButtonText" android:text="@string/automation_done" />
+    </LinearLayout>
+</ScrollView>

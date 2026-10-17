@@ -106,6 +106,9 @@ class MainActivity : Activity() {
         }
         applySystemBarInsets()
         findViewById<Button>(R.id.btnLatency).setOnClickListener { LatencyActivity.open(this, targetUi.selected) }
+        findViewById<Button>(R.id.btnShareStatus).setOnClickListener {
+            StatusShareActivity.open(this, targetUi.selected)
+        }
         findViewById<Button>(R.id.btnIncidents).setOnClickListener {
             IncidentActivity.open(this, historyDays, targetUi.selected)
         }
