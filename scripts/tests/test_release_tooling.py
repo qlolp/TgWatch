@@ -14,7 +14,9 @@ SCAN_ARTIFACT = "app/build/reports/sbom/TgWatch.sbom.cdx.json"
 LIBRARY = {"type": "library", "group": "org.example", "name": "library", "version": "1.0",
            "purl": "pkg:maven/org.example/library@1.0?type=jar", "bom-ref": "pkg:maven/org.example/library@1.0?type=jar",
            "hashes": [{"alg": "SHA-256", "content": "a" * 64}]}
-BOM = {"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1, "components": [LIBRARY]}
+BOM = {"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1, "components": [LIBRARY],
+       "metadata": {"component": {"type": "application", "name": "TgWatch", "version": "1.13.0",
+                                    "bom-ref": "ru.tgwatch:releaseRuntimeClasspath"}}}
 
 
 def scan_fixture(vulnerabilities=None, results=True, artifact=SCAN_ARTIFACT):
@@ -42,18 +44,31 @@ class ToolFixture:
         packages = [{"group": "org.example", "name": "library", "version": "1.0", "scopes": ["releaseRuntimeClasspath"]},
                     {"group": "junit", "name": "junit", "version": "4.13.2", "scopes": ["debugUnitTestRuntimeClasspath"]}]
         audit = {"checked_at": "2026-10-10T00:00:00+00:00", "source": "https://api.osv.dev/v1/query",
+                 "applicationId": "ru.tgwatch", "applicationVersion": "1.13.0",
                  "packages": [dict(package, vulnerabilities=[]) for package in packages]}
         self.files = []
         apk_fixture = b"APK fixture inspected by external Android tool mocks"
         checksum = hashlib.sha256(apk_fixture).hexdigest() + "  TgWatch.apk\n"
         for name, data in (("TgWatch.apk", apk_fixture), ("TgWatch.apk.sha256", checksum.encode()),
                            ("TgWatch.sbom.cdx.json", json.dumps(BOM).encode()),
-                           ("TgWatch.dependencies.json", json.dumps({"packages": packages}).encode()),
+                           ("TgWatch.dependencies.json", json.dumps({"packages": packages, "applicationId": "ru.tgwatch", "applicationVersion": "1.13.0"}).encode()),
                            ("TgWatch.osv.json", json.dumps(audit).encode()),
                            ("TgWatch.trivy.json", json.dumps(scan_fixture()).encode())):
             path = self.work / name
             path.write_bytes(data)
             self.files.append(path)
+        for phone in list(self.files):
+            watch = self.work / phone.name.replace('TgWatch', 'TgWatch-wear', 1)
+            data = phone.read_bytes()
+            if phone.suffix == '.json':
+                data = data.replace(b'ru.tgwatch:', b'ru.tgwatch.wear:')
+                data = data.replace(b'"ru.tgwatch"', b'"ru.tgwatch.wear"')
+                data = data.replace(b'"name": "TgWatch"', b'"name": "TgWatch Wear"')
+                data = data.replace(b'app/build/reports/sbom/TgWatch.', b'wear/build/reports/sbom/TgWatch-wear.')
+            elif phone.name.endswith('.sha256'):
+                data = data.replace(b'TgWatch.apk', b'TgWatch-wear.apk')
+            watch.write_bytes(data)
+            self.files.append(watch)
         self.fixture = {"releases": [], "latest": None, "sha": "a" * 40}
         self.mock("gh", '''import json, os, sys
 from pathlib import Path
@@ -100,7 +115,10 @@ if state.get('extra_signer'): print('Signer #2 certificate SHA-256 digest: ' + '
 from pathlib import Path
 state = json.loads(Path(os.environ['MOCK_STATE']).read_text())
 if state.get('aapt_error'): print('Invalid APK manifest', file=sys.stderr); sys.exit(1)
-print(state.get('badging', "package: name='ru.tgwatch' versionCode='1013000' versionName='1.13.0'"))
+watch = Path(sys.argv[-1]).name == 'TgWatch-wear.apk'
+identity = 'ru.tgwatch.wear' if watch else 'ru.tgwatch'
+floor = 30 if watch else 26
+print(state.get('badging', f"package: name='{identity}' versionCode='1013000' versionName='1.13.0'\\nsdkVersion:'{floor}'"))
 ''')
 
     def mock(self, name, body):
@@ -687,6 +705,8 @@ class FinalSignedApkWorkflowTests(unittest.TestCase):
             data = b"substituted APK" if tamper else b"original signed APK"
             (root / "TgWatch.apk").write_bytes(data)
             (root / "TgWatch.apk.sha256").write_text(hashlib.sha256(data).hexdigest() + "  TgWatch.apk\n")
+            (root / "TgWatch-wear.apk").write_bytes(b"original signed APK")
+            (root / "TgWatch-wear.apk.sha256").write_text(original + "  TgWatch-wear.apk\n")
             (root / "version.properties").write_text("version=1.15.0\n")
             tools = root / "sdk/build-tools/35.0.0"
             tools.mkdir(parents=True)
@@ -696,7 +716,8 @@ class FinalSignedApkWorkflowTests(unittest.TestCase):
                 path = tools / executable
                 path.write_text("#!/usr/bin/env python3\nprint(" + repr(output) + ")\n")
                 path.chmod(0o755)
-            env = dict(os.environ, APK_SHA256=original, ANDROID_HOME=str(root / "sdk"), BUILD_TOOLS="35.0.0")
+            env = dict(os.environ, APK_SHA256=original, WEAR_APK_SHA256=original,
+                       ANDROID_HOME=str(root / "sdk"), BUILD_TOOLS="35.0.0")
             return subprocess.run(["bash", "-c", guard["run"]], cwd=root, env=env, text=True, capture_output=True)
 
     def test_original_signed_apk_can_pass_publication_guard(self):

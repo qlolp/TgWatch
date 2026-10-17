@@ -58,7 +58,14 @@ android {
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 dependencies {
     implementation(project(":probe-core"))
+    implementation("androidx.wear.tiles:tiles:1.6.2")
+    implementation("androidx.wear.protolayout:protolayout:1.4.2")
+    implementation("androidx.wear.watchface:watchface-complications-data-source:1.3.0")
+    implementation("androidx.concurrent:concurrent-futures:1.3.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
 }
+
+extra["auditSourceVersion"] = sourceVersion
+apply(from = rootProject.file("gradle/runtime-audit.gradle.kts"))

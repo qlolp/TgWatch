@@ -1,7 +1,7 @@
 name: Build APK
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
           python3 scripts/test_dependency_audit.py
           python3 scripts/test_signing_keychain.py
       - name: Unit tests, Android lint and APKs
-        run: bash ./gradlew detekt testDebugUnitTest lintDebug assembleDebug assembleRelease dependencyInventory generateReleaseSbom --no-daemon --stacktrace
+        run: bash ./gradlew :probe-core:test :app:detekt :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon --stacktrace
       - name: Audit all exact resolved runtime and test dependencies against OSV
         run: python3 scripts/dependency-audit.py app/build/reports/dependencies/resolved.json app/build/reports/dependencies/osv-report.json
       - name: Install pinned Trivy scanner
@@ -103,7 +103,7 @@ jobs:
             echo 'Production signing is not configured. Use scripts/configure-signing.sh with the existing production backup on a trusted Mac. It never creates a replacement key; debug APKs are test-only.' >> "$GITHUB_STEP_SUMMARY"
           fi
   release:
-    needs: [build, android]
+    needs: [build, android, wear, wear-android]
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -152,6 +152,16 @@ jobs:
         with:
           name: dependency-reports
           path: release-dependencies
+      - name: Download this run's successful Wear SBOM scan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wear-sbom-reports
+          path: wear-release-evidence
+      - name: Download this run's full Wear dependency audit
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wear-dependency-reports
+          path: wear-release-dependencies
       - name: Validate scan evidence
         run: |
           python3 scripts/lock-requirements.py --check scripts/requirements-release.txt scripts/requirements-release.lock
@@ -160,6 +170,10 @@ jobs:
             --sbom release-evidence/TgWatch.sbom.cdx.json --trivy release-evidence/TgWatch.trivy.json \
             --status release-evidence/TgWatch.trivy.status.json \
             --inventory release-dependencies/resolved.json --osv release-dependencies/osv-report.json
+          python3 scripts/verify-audit-evidence.py --application-id ru.tgwatch.wear \
+            --sbom wear-release-evidence/TgWatch-wear.sbom.cdx.json --trivy wear-release-evidence/TgWatch-wear.trivy.json \
+            --status wear-release-evidence/TgWatch-wear.trivy.status.json \
+            --inventory wear-release-dependencies/resolved.json --osv wear-release-dependencies/osv-report.json
       - name: Build with persistent signing key
         id: signed
         env:
@@ -188,6 +202,16 @@ jobs:
           cp release-evidence/TgWatch.trivy.json TgWatch.trivy.json
           cp release-dependencies/resolved.json TgWatch.dependencies.json
           cp release-dependencies/osv-report.json TgWatch.osv.json
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --verbose --print-certs wear/build/outputs/apk/release/wear-release.apk
+          cp wear/build/outputs/apk/release/wear-release.apk TgWatch-wear.apk
+          sha256sum TgWatch-wear.apk > TgWatch-wear.apk.sha256
+          echo "wear_apk_sha256=$(cut -d' ' -f1 TgWatch-wear.apk.sha256)" >> "$GITHUB_OUTPUT"
+          cmp wear/build/reports/sbom/TgWatch-wear.sbom.cdx.json wear-release-evidence/TgWatch-wear.sbom.cdx.json
+          cmp wear/build/reports/dependencies/resolved.json wear-release-dependencies/resolved.json
+          cp wear-release-evidence/TgWatch-wear.sbom.cdx.json TgWatch-wear.sbom.cdx.json
+          cp wear-release-evidence/TgWatch-wear.trivy.json TgWatch-wear.trivy.json
+          cp wear-release-dependencies/resolved.json TgWatch-wear.dependencies.json
+          cp wear-release-dependencies/osv-report.json TgWatch-wear.osv.json
       - name: Verify signing continuity with immutable published 1.10.47
         env:
           GH_TOKEN: ${{ github.token }}
@@ -329,8 +353,11 @@ jobs:
           git ls-files --others -z > "$untracked_list"
           while IFS= read -r -d '' path; do
             case "$path" in
-              app/build/*|.gradle/*) ;;
+              app/build/*|wear/build/*|probe-core/build/*|.gradle/*) ;;
               TgWatch.apk|TgWatch.apk.sha256|TgWatch.sbom.cdx.json|TgWatch.trivy.json|TgWatch.dependencies.json|TgWatch.osv.json) ;;
+              TgWatch-wear.apk|TgWatch-wear.apk.sha256|TgWatch-wear.sbom.cdx.json|TgWatch-wear.trivy.json|TgWatch-wear.dependencies.json|TgWatch-wear.osv.json) ;;
+              wear-release-evidence/TgWatch-wear.sbom.cdx.json|wear-release-evidence/TgWatch-wear.trivy.json|wear-release-evidence/TgWatch-wear.trivy.status.json|wear-release-evidence/TgWatch-wear.trivy.log) ;;
+              wear-release-dependencies/resolved.json|wear-release-dependencies/osv-report.json) ;;
               release-evidence/TgWatch.sbom.cdx.json|release-evidence/TgWatch.trivy.json|release-evidence/TgWatch.trivy.status.json|release-evidence/TgWatch.trivy.log) ;;
               release-dependencies/resolved.json|release-dependencies/osv-report.json) ;;
               previous/TgWatch.apk|previous-latest/TgWatch.apk|previous-latest/TgWatch.apk.sha256|previous-latest/tag.txt) ;;
@@ -349,11 +376,15 @@ jobs:
         # Third-party emulator steps ran in this workspace after signing: publish only the exact signed bytes.
         env:
           APK_SHA256: ${{ steps.signed.outputs.apk_sha256 }}
+          WEAR_APK_SHA256: ${{ steps.signed.outputs.wear_apk_sha256 }}
         run: |
           set -euo pipefail
           test -n "$APK_SHA256"
           echo "$APK_SHA256  TgWatch.apk" | sha256sum -c -
           [ "$(cut -d' ' -f1 TgWatch.apk.sha256)" = "$APK_SHA256" ]
+          test -n "$WEAR_APK_SHA256"
+          echo "$WEAR_APK_SHA256  TgWatch-wear.apk" | sha256sum -c -
+          [ "$(cut -d' ' -f1 TgWatch-wear.apk.sha256)" = "$WEAR_APK_SHA256" ]
           "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --print-certs TgWatch.apk > publish-signature.txt
           grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' publish-signature.txt
           "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2" dump badging TgWatch.apk > publish-badging.txt
@@ -439,8 +470,11 @@ jobs:
           git ls-files --others -z > "$untracked_list"
           while IFS= read -r -d '' path; do
             case "$path" in
-              app/build/*|.gradle/*) ;;
+              app/build/*|wear/build/*|probe-core/build/*|.gradle/*) ;;
               TgWatch.apk|TgWatch.apk.sha256|TgWatch.sbom.cdx.json|TgWatch.trivy.json|TgWatch.dependencies.json|TgWatch.osv.json) ;;
+              TgWatch-wear.apk|TgWatch-wear.apk.sha256|TgWatch-wear.sbom.cdx.json|TgWatch-wear.trivy.json|TgWatch-wear.dependencies.json|TgWatch-wear.osv.json) ;;
+              wear-release-evidence/TgWatch-wear.sbom.cdx.json|wear-release-evidence/TgWatch-wear.trivy.json|wear-release-evidence/TgWatch-wear.trivy.status.json|wear-release-evidence/TgWatch-wear.trivy.log) ;;
+              wear-release-dependencies/resolved.json|wear-release-dependencies/osv-report.json) ;;
               release-evidence/TgWatch.sbom.cdx.json|release-evidence/TgWatch.trivy.json|release-evidence/TgWatch.trivy.status.json|release-evidence/TgWatch.trivy.log) ;;
               release-dependencies/resolved.json|release-dependencies/osv-report.json) ;;
               previous/TgWatch.apk|previous-latest/TgWatch.apk|previous-latest/TgWatch.apk.sha256|previous-latest/tag.txt) ;;
@@ -461,7 +495,7 @@ jobs:
             --apksigner "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" \
             --aapt2 "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2" \
             --notes "docs/releases/${version}.md" \
-            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json TgWatch.dependencies.json TgWatch.osv.json
+            --assets TgWatch.apk TgWatch.apk.sha256 TgWatch.sbom.cdx.json TgWatch.trivy.json TgWatch.dependencies.json TgWatch.osv.json TgWatch-wear.apk TgWatch-wear.apk.sha256 TgWatch-wear.sbom.cdx.json TgWatch-wear.trivy.json TgWatch-wear.dependencies.json TgWatch-wear.osv.json
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -507,3 +541,85 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/connected/
             smoke-logcat.txt
+  wear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Legacy wrapper regressions inspect the immutable historical commit.
+          fetch-depth: 0
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Standalone Wear unit tests, lint, APK and resolved evidence
+        run: |
+          python3 -m pip install --require-hashes -r scripts/requirements-release.lock
+          bash ./gradlew :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug :wear:assembleRelease :wear:dependencyInventory :wear:generateReleaseSbom --no-daemon
+      - name: Audit exact Wear runtime and test dependencies against OSV
+        run: python3 scripts/dependency-audit.py wear/build/reports/dependencies/resolved.json wear/build/reports/dependencies/osv-report.json
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
+        with:
+          version: v0.75.0
+      - name: Gate Wear runtime SBOM on HIGH and CRITICAL vulnerabilities
+        run: bash scripts/scan-sbom.sh wear/build/reports/sbom/TgWatch-wear.sbom.cdx.json wear/build/reports/sbom/TgWatch-wear.trivy.json
+      - name: Wear SBOM scan reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wear-sbom-reports
+          path: wear/build/reports/sbom/TgWatch-wear.*
+      - name: Wear resolved graph and OSV report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wear-dependency-reports
+          path: wear/build/reports/dependencies/*.json
+      - name: Wear quality reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wear-quality-reports
+          path: wear/build/reports/
+  wear-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Legacy wrapper regressions inspect the immutable historical commit.
+          fetch-depth: 0
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Enable KVM for Wear OS
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real standalone Wear OS3 surface and manual-check smoke
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          target: android-wear
+          arch: x86
+          profile: wearos_large_round
+          disable-animations: true
+          script: bash scripts/wear-smoke.sh
+      - name: Wear device reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wear-device-reports
+          path: wear-smoke-reports/

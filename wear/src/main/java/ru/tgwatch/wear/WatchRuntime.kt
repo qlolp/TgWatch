@@ -35,6 +35,7 @@ internal object WatchRuntime {
     private var network: Network? = null
     private var captive = false
     private lateinit var cm: ConnectivityManager
+    private lateinit var cmContext: Context
     private lateinit var store: WatchStore
     private var pending: WatchSnapshot? = null
     private var saving = false
@@ -47,6 +48,7 @@ internal object WatchRuntime {
     interface Observer { fun onWatchChanged() }
 
     fun initialize(context: Context) {
+        cmContext = context.applicationContext
         cm = context.getSystemService(ConnectivityManager::class.java)
         store = WatchStore(context)
         network = cm.activeNetwork
@@ -63,6 +65,7 @@ internal object WatchRuntime {
             }
         })
         io.execute {
+            runCatching { WatchSurfaceAction.initialize(context) }
             boot = runCatching { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT).toLong() }
                 .getOrElse { (SecureRandom().nextLong() and Long.MAX_VALUE) or (1L shl 32) }
             val restored = store.load()
@@ -113,6 +116,9 @@ internal object WatchRuntime {
     private fun publish(value: WatchSnapshot) {
         snapshot = value
         notifyChanged()
+        runCatching { androidx.wear.tiles.TileService.getUpdater(cmContext).requestUpdate(StatusTileService::class.java) }
+        runCatching { androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
+            .create(cmContext, android.content.ComponentName(cmContext, StatusComplicationService::class.java)).requestUpdateAll() }
         synchronized(this) {
             pending = value
             if (saving) return

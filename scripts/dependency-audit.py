@@ -77,6 +77,8 @@ def main():
         if not any('releaseRuntimeClasspath' in p.get('scopes', []) for p in packages):
             raise ValueError('Release runtime graph missing')
         report = {'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'applicationId': inventory.get('applicationId', 'ru.tgwatch'),
+            'applicationVersion': inventory.get('applicationVersion'),
             'source': 'https://api.osv.dev/v1/query',
             'packages': audit(packages, application_version=inventory.get('applicationVersion'))}
         destination.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')

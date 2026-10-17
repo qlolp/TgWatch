@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 import re
 import subprocess
+from release_apps import application
 
 PRODUCTION_CERTIFICATE = "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1"
 
@@ -20,7 +21,8 @@ def verify_checksum(apk: Path, checksum: Path):
     return actual
 
 
-def verify_apk_identity(apk, version, code, aapt2):
+def verify_apk_identity(apk, version, code, aapt2, application_id=None):
+    app = application(application_id or 'ru.tgwatch')
     result = subprocess.run([str(aapt2), "dump", "badging", str(apk)],
                             text=True, capture_output=True, timeout=30)
     if result.returncode:
@@ -29,12 +31,14 @@ def verify_apk_identity(apk, version, code, aapt2):
     if len(packages) != 1:
         raise ValueError("APK has no single package metadata line")
     fields = re.findall(r"([A-Za-z]+)='([^']*)'", packages[0])
-    expected = {"name": "ru.tgwatch", "versionName": version, "versionCode": str(code)}
+    expected = {"name": application_id or "ru.tgwatch", "versionName": version, "versionCode": str(code)}
     for key, value in expected.items():
         matches = [entry for field, entry in fields if field == key]
         if matches != [value]:
             label = "package name" if key == "name" else key
             raise ValueError(f"APK {label} does not match expected {value}")
+    if application_id is not None and re.findall(r"^sdkVersion:'([0-9]+)'$", result.stdout, re.M) != [str(app['min_sdk'])]:
+        raise ValueError('APK minSdk differs from the approved application floor')
 
 
 def verify_production_signature(apk, apksigner):

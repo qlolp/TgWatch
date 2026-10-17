@@ -1,6 +1,7 @@
 package ru.tgwatch.wear
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,11 +18,14 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
     private lateinit var status: TextView
     private lateinit var detail: TextView
     private lateinit var check: Button
+    private var resumed = false
+    private var surfaceConsumed = false
     private val tick = object : Runnable {
         override fun run() { render(); main.postDelayed(this, 1_000) }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        surfaceConsumed = savedInstanceState?.getBoolean("surface-consumed") ?: false
         setContentView(ru.tgwatch.wear.R.layout.activity_watch)
         status = findViewById(R.id.watch_status)
         detail = findViewById(R.id.watch_detail)
@@ -37,6 +41,18 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
         WatchRuntime.observe(this)
         main.post(tick)
     }
+    override fun onResume() { super.onResume(); resumed = true; render() }
+    override fun onPause() { resumed = false; super.onPause() }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        surfaceConsumed = false
+        render()
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("surface-consumed", surfaceConsumed)
+        super.onSaveInstanceState(outState)
+    }
     override fun onStop() {
         controller.cancel()
         WatchRuntime.unobserve(this)
@@ -46,6 +62,10 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
     override fun onWatchChanged() = render()
     private fun render() {
         if (!::status.isInitialized) return
+        if (resumed && WatchRuntime.ready && !surfaceConsumed) {
+            surfaceConsumed = true
+            if (WatchSurfaceAction.valid(intent.getStringExtra(WatchSurfaceAction.EXTRA))) controller.request()
+        }
         val value = WatchRuntime.snapshot
         val stale = value?.stale(SystemClock.elapsedRealtime(), WatchRuntime.boot) != false
         status.text = getString(when {

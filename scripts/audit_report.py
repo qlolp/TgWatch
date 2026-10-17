@@ -1,6 +1,7 @@
 """Validate OSV audit evidence against every resolved runtime and test package."""
 from datetime import datetime
 from local_project import is_local_core
+from release_apps import verify_application_evidence
 
 OSV_SOURCE = "https://api.osv.dev/v1/query"
 SCOPES = {"releaseRuntimeClasspath", "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath"}
@@ -27,6 +28,7 @@ def identities(packages, application_version=None):
 
 
 def verify_osv(report, inventory):
+    verify_application_evidence(inventory, report=report)
     version = inventory.get('applicationVersion')
     expected = identities(inventory.get("packages"), version)
     if not any("releaseRuntimeClasspath" in scopes for scopes in expected.values()):
@@ -54,6 +56,7 @@ def verify_osv(report, inventory):
 
 
 def verify_runtime_inventory(bom, inventory):
+    verify_application_evidence(inventory, bom=bom)
     expected = identities(inventory.get("packages"), inventory.get('applicationVersion'))
     for component in bom["components"]:
         coordinate = tuple(component.get(key) for key in ("group", "name", "version"))

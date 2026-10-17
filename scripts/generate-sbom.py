@@ -12,10 +12,13 @@ from urllib.parse import quote, urlencode
 
 from sbom_schema import validate
 from local_project import is_local_core, core_ref, core_purl
+from release_apps import application
 
 
 def generate(inventory):
-    root_ref = "ru.tgwatch:releaseRuntimeClasspath"
+    application_id = inventory.get('applicationId', 'ru.tgwatch')
+    app = application(application_id)
+    root_ref = application_id + ":releaseRuntimeClasspath"
     components = {}
     module_refs = {}
     for artifact in inventory["artifacts"]:
@@ -69,7 +72,7 @@ def generate(inventory):
         for module in sorted(module_refs):
             dependencies.extend({"ref": ref, "dependsOn": children(module)} for ref in sorted(module_refs[module]))
     bom = {"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
-           "metadata": {"component": {"type": "application", "name": "TgWatch",
+           "metadata": {"component": {"type": "application", "name": app['name'],
                         "version": inventory["applicationVersion"], "bom-ref": root_ref}},
            "components": [components[key] for key in sorted(components)],
            "dependencies": dependencies}

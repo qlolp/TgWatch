@@ -33,7 +33,7 @@ assert_legacy_observation() {
 }
 # The always-run reporter must never mistake a previous run for fresh results.
 rm -rf -- app/build/outputs/androidTest-results/connected
-bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
+bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace
 python3 scripts/adb-readiness.py
 mkdir -p app/build/reports/androidTests/ui-screenshots
 adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png

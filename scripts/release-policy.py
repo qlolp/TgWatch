@@ -18,6 +18,7 @@ import time
 from apk_verification import verify_apk_identity, verify_checksum, verify_production_signature
 from scan_report import verify_report
 from audit_report import verify_osv, verify_runtime_inventory
+from release_apps import APPS, release_assets, verify_application_evidence, sbom_path
 from jsonschema.exceptions import ValidationError
 
 GH_COMMAND_TIMEOUT = 120
@@ -194,6 +195,8 @@ def verify_published_assets(repo, tag, expected_hashes):
                 if hashlib.sha256((out / name).read_bytes()).hexdigest() != expected:
                     raise ValueError(f"Published {name} differs from the validated upload")
             verify_checksum(out / "TgWatch.apk", out / "TgWatch.apk.sha256")
+            if 'TgWatch-wear.apk' in expected_hashes:
+                verify_checksum(out / "TgWatch-wear.apk", out / "TgWatch-wear.apk.sha256")
     except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as error:
         raise PublishedAssetVerificationError(str(error)) from error
 
@@ -211,19 +214,23 @@ def publish(args):
     if len({path.name for path in assets}) != len(assets) or not all(path.is_file() and path.stat().st_size for path in assets):
         raise ValueError("Release assets must be nonempty files with unique names")
     by_name = {path.name: path for path in assets}
-    required = {"TgWatch.apk", "TgWatch.apk.sha256", "TgWatch.osv.json", "TgWatch.dependencies.json", "TgWatch.sbom.cdx.json", "TgWatch.trivy.json"}
+    required = release_assets()
     if set(by_name) != required:
         raise ValueError("Unified release needs complete APK/checksum, SBOM, Trivy and full dependency/OSV evidence")
     expected_hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in assets}
-    verify_checksum(by_name["TgWatch.apk"], by_name["TgWatch.apk.sha256"])
-    verify_production_signature(by_name["TgWatch.apk"], args.apksigner)
-    verify_apk_identity(by_name["TgWatch.apk"], version, code, args.aapt2)
-    inventory = json.loads(by_name["TgWatch.dependencies.json"].read_text())
-    bom = json.loads(by_name["TgWatch.sbom.cdx.json"].read_text())
-    verify_osv(json.loads(by_name["TgWatch.osv.json"].read_text()), inventory)
-    verify_runtime_inventory(bom, inventory)
-    if verify_report(json.loads(by_name["TgWatch.trivy.json"].read_text()), "app/build/reports/sbom/TgWatch.sbom.cdx.json", bom):
-        raise ValueError("Trivy HIGH/CRITICAL findings block release publication")
+    for application_id, app in APPS.items():
+        prefix = app['prefix']
+        verify_checksum(by_name[prefix + '.apk'], by_name[prefix + '.apk.sha256'])
+        verify_production_signature(by_name[prefix + '.apk'], args.apksigner)
+        verify_apk_identity(by_name[prefix + '.apk'], version, code, args.aapt2, application_id=application_id)
+        inventory = json.loads(by_name[prefix + '.dependencies.json'].read_text())
+        bom = json.loads(by_name[prefix + '.sbom.cdx.json'].read_text())
+        osv = json.loads(by_name[prefix + '.osv.json'].read_text())
+        verify_application_evidence(inventory, bom, osv, application_id)
+        verify_osv(osv, inventory)
+        verify_runtime_inventory(bom, inventory)
+        if verify_report(json.loads(by_name[prefix + '.trivy.json'].read_text()), sbom_path(application_id), bom):
+            raise ValueError("Trivy HIGH/CRITICAL findings block release publication")
     # Repeat preflight immediately before the sole mutation; CI serializes publishers.
     preflight(args.repo, version, args.sha, args.ref)
     if any(hashlib.sha256(path.read_bytes()).hexdigest() != expected_hashes[path.name] for path in assets):
