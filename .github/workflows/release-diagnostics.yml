@@ -17,12 +17,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api repos/qlolp/TgWatch/actions/jobs/117516805713/logs > "$RUNNER_TEMP/release-job.log"
-          gh api repos/qlolp/TgWatch/actions/runs/39073404090/artifacts > "$RUNNER_TEMP/release-artifacts.json"
           python3 - <<'PY'
           from pathlib import Path
           import hashlib, io, json, os, re, subprocess, zipfile
           root = Path(os.environ['RUNNER_TEMP'])
+          def api_capture(endpoint, filename):
+              result = subprocess.run(['gh','api',endpoint],capture_output=True)
+              if result.returncode:
+                  error = result.stderr.decode('utf-8',errors='replace')
+                  status = re.search(r'HTTP ([0-9]{3})',error)
+                  categories = [label for label,pattern in {
+                      'forbidden':r'(?i)forbidden|not accessible',
+                      'not-found':r'(?i)not found',
+                      'auth-required':r'(?i)authentication|bad credentials',
+                      'expired':r'(?i)expired|gone',
+                      'network':r'(?i)resolve|timeout|connection',
+                  }.items() if re.search(pattern,error)]
+                  print('::error title=Diagnostic API access::' + filename + ': exit=' + str(result.returncode)
+                        + ' HTTP=' + (status[1] if status else 'unknown') + ' categories=' + ','.join(categories)
+                        + ' error-sha256=' + hashlib.sha256(result.stderr).hexdigest())
+                  raise SystemExit(result.returncode)
+              (root / filename).write_bytes(result.stdout)
+              print('::notice title=Diagnostic API access::Received ' + filename)
+          api_capture('repos/qlolp/TgWatch/actions/jobs/117516805713/logs','release-job.log')
+          api_capture('repos/qlolp/TgWatch/actions/runs/39073404090/artifacts','release-artifacts.json')
           data = (root / 'release-job.log').read_bytes()
           if zipfile.is_zipfile(io.BytesIO(data)):
               with zipfile.ZipFile(io.BytesIO(data)) as archive:
