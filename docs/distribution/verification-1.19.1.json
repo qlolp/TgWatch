@@ -1,0 +1,95 @@
+{
+  "tag": "v1.19.1",
+  "sourceRevision": "e4c75d53712738f1b8ad3c2b42b8891ea82208c9",
+  "applications": {
+    "ru.tgwatch": {
+      "sha256": "b5c7bd423cdf61a0f9bc02d506e26e29886a1a1a89bcc397cfc118a3626a21fd",
+      "version": "1.19.1",
+      "versionCode": 1019001,
+      "minSdk": 26,
+      "targetSdk": 35,
+      "runtimeArtifacts": 22,
+      "signature": "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1",
+      "osvVerified": true,
+      "trivyVerified": true
+    },
+    "ru.tgwatch.wear": {
+      "sha256": "9f3aa469e0d32b346432755ff2e21fee8434449259e07f7254e388810f0e8251",
+      "version": "1.19.1",
+      "versionCode": 1019001,
+      "minSdk": 30,
+      "targetSdk": 35,
+      "runtimeArtifacts": 60,
+      "signature": "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1",
+      "osvVerified": true,
+      "trivyVerified": true
+    }
+  },
+  "assetSha256": {
+    "TgWatch-wear.apk": "9f3aa469e0d32b346432755ff2e21fee8434449259e07f7254e388810f0e8251",
+    "TgWatch-wear.apk.sha256": "a373e6b25bba63b056f56513d55de649ce8474fd04d5d2ab50c27c036bdf11ed",
+    "TgWatch-wear.dependencies.json": "b4839921ded6f12cc0de4cd5d1a0a68ec6b95c3f2161051126c0a3ccff8c2248",
+    "TgWatch-wear.osv.json": "ff4eeaf59026c24d29eb8979b6c3fb0b6d0586cc776ef908db8358441636c63d",
+    "TgWatch-wear.sbom.cdx.json": "8aa0559a0b4d1428130bbe9dca79c592f6f743648f21ab450dd9f3541ffa7d00",
+    "TgWatch-wear.trivy.json": "e8b081a820d6be9c3007e968274e2aca2224173a1da994a9b7f88c3aef5079ae",
+    "TgWatch.apk": "b5c7bd423cdf61a0f9bc02d506e26e29886a1a1a89bcc397cfc118a3626a21fd",
+    "TgWatch.apk.sha256": "9cb9e32564ecf2af1fc77fbdf85c0c5d2b8c642528676ce638dd5baac5d6c99f",
+    "TgWatch.dependencies.json": "ed134526da53163acaa07f446fcae34ed285d8d06fb607c9b9c5ebe082a072be",
+    "TgWatch.osv.json": "452e7aae682cb47554237e31dc7c3bd83cd2ec6a3af3010054c49d4a0622fbae",
+    "TgWatch.sbom.cdx.json": "71768c0bace6dc85c64acf3bc7d1a5a7891a5527fcf3f46ad27ebbf11697b701",
+    "TgWatch.trivy.json": "c88c1fb83d9ebab05a8231438c1647ca20348922dbf3c5e907bf6fa6c93676bb"
+  },
+  "workflow": {
+    "id": 39075104543,
+    "url": "https://github.com/qlolp/TgWatch/actions/runs/39075104543",
+    "status": "success",
+    "signedUpgradePaths": "legacy v1.10.47 and workflow-selected latest stable predecessor; no data clearing within either upgrade"
+  },
+  "localChecks": {
+    "jvmHeap": {
+      "passed": 607,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "python": {
+      "passed": 208,
+      "failures": 0
+    },
+    "coreJarUmasks": [
+      "022",
+      "077"
+    ],
+    "coreJarByteIdentical": true,
+    "androidMatrixApis": [
+      29,
+      35
+    ],
+    "wearApi": 30
+  },
+  "independentPhoneBuild": {
+    "tag": "v1.19.1",
+    "sourceRevision": "e4c75d53712738f1b8ad3c2b42b8891ea82208c9",
+    "unsignedSha256": "c297ae84fbaf90eb88fe0cf6180c35a13a9cab94b040842e53e71e07502cfcdb",
+    "independentBuildSucceeded": true,
+    "fdroidBuildSucceeded": true,
+    "unsignedBytesIdentical": true
+  },
+  "signatureTransplant": {
+    "tool": "apksigcopier1.1.1",
+    "independentSourceExitCode": 0,
+    "fdroidRecipeExitCode": 0
+  },
+  "fdroid": {
+    "localReadmetaExitCode": 0,
+    "localLintExitCode": 0,
+    "localRecipeBuildsSucceeded": 1,
+    "officialServerVerified": false,
+    "submissionSent": false,
+    "catalogAccepted": false
+  },
+  "repositoryMetadata": {
+    "applicationStatus": "blocked",
+    "reason": "GitHub REST transport denied (Forbidden); approved values retained without replacing unreadable existing topics."
+  }
+}

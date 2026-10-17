@@ -24,7 +24,7 @@ Repo: https://github.com/qlolp/TgWatch.git
 Builds:
   - versionName: 1.19.1
     versionCode: 1019001
-    disable: Packaging candidate; verify the published tag and F-Droid build first
+    disable: Pending F-Droid maintainer review; local exact-tag recipe build verified
     commit: v1.19.1
     subdir: app
     gradle:

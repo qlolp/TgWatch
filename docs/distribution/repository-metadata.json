@@ -17,6 +17,6 @@
   "labels": [],
   "labelPolicy": "Create missing good first issue/help wanted labels only after identifying suitable issues; never bulk-assign.",
   "applicationStatus": "blocked",
-  "applicationReason": "GitHub REST CONNECT403 in this runtime. Native authenticated Git read and branch push work. Read current topics before merging additions; apply multi-service description only after release.",
+  "applicationReason": "GitHub REST read denied (Forbidden) with existing GH_TOKEN; native authenticated Git read/write succeeds. Current topics cannot be read/merged safely in this runtime. Prepared values remain unapplied.",
   "protectedBranch": "claude/project-thread-s0ejzl"
 }

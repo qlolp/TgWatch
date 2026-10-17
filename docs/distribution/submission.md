@@ -1,21 +1,21 @@
 # Distribution preparation: 1.19.1
 
 This package is prepared for review. It is **not an F-Droid submission or catalog
-acceptance**. Intended source tag: `v1.19.1`; phone code1019001, package `ru.tgwatch`,
+acceptance**. Verified published source tag: `v1.19.1`; phone code1019001, package `ru.tgwatch`,
 minSdk26/target35, MIT. Release/source/signature checks remain mandatory before
 publishing or enabling the disabled candidate recipe.
 
 | Check | Evidence / status |
 | --- | --- |
-| Candidate metadata | `metadata/ru.tgwatch.yml`, disabled pending exact tag and catalog build |
+| Candidate metadata | `metadata/ru.tgwatch.yml`, disabled pending maintainer review; local exact-tag build verified |
 | Store text | English/Russian fastlane text and code1019001 changelogs |
 | Toolchain | Gradle8.14.6, AGP8.13.2, Kotlin2.4.21, JDK17, SDK35/build-tools35.0.0 |
 | fdroidserver | Isolated2.4.5; readmeta and lint exit0 on17October2026 |
 | Categories | Official fdroiddata keys; source hash recorded in `../fdroid.md` |
-| Independent unsigned source build | Pending exact corrected v1.19.1 source tag |
-| F-Droid recipe build | Pending verification of intended published source tag and catalog tooling |
-| Production payload reproducibility | Pending exact v1.19.1 production-signed comparison |
-| GitHub metadata | Prepared values in repository-metadata.json; API access currently blockedCONNECT403 |
+| Independent unsigned source build | Passed from exact v1.19.1 tag e4c75d53712738f1b8ad3c2b42b8891ea82208c9; identity verified |
+| F-Droid recipe build | Local fdroid build --test --stop passed; normal scan enabled, no force/skip |
+| Production payload reproducibility | Passed: apksigcopier signature transplant verifies both independent and F-Droid source APKs against published production APK |
+| GitHub metadata | Prepared values in repository-metadata.json; REST access denied (Forbidden); existing native Git authentication works |
 | Sending a submission | Not sent; requires separate instruction to send |
 
 The runtime includes Kotlin stdlib, AndroidX and first-party `:probe-core`, without
@@ -60,16 +60,33 @@ key, real history, private endpoints or tokens belong in the submission.
 
 ## Independent source assembly evidence
 
-The earlier v1.19.0 source tag 9a5f54fa5eb1088e411f9e7092a47efce249aae8
-passed an independent Git-aware build and an actual fdroidserver2.4.5 recipe build.
-Those unsigned APKs were byte-identical (SHA-256
-29c274b7096fdfe0c9f77a5c1e92613c361b3d8dd810f022a5c6e1400c67893b).
-Its production publication stopped before upgrade/publication because the private
-signing umask changed ZIP permissions inside the first-party JAR and thus its SBOM
-hash. The tag remains immutable and no production APK was published for it.
+The exact v1.19.1 source commit is
+`e4c75d53712738f1b8ad3c2b42b8891ea82208c9`. Independent clean Git-aware assembly
+and actual fdroidserver2.4.5 recipe build both passed; their unsigned APKs were
+byte-identical, SHA-256
+`c297ae84fbaf90eb88fe0cf6180c35a13a9cab94b040842e53e71e07502cfcdb`.
+Both report ru.tgwatch1.19.1/code1019001/min26/target35. readmeta/lint exit0.
+The F-Droid build ran normal source scanning and signing-config cleanup.
 
-The corrected v1.19.1 build gives the JAR canonical file/directory permissions.
-A real clean-build test with separate in-process compilers verifies byte equality
-under umasks022 and077; a reused Kotlin daemon would mask this reproduction.
-Exact-tag source/F-Droid/signed-payload checks will be recorded here after that
-immutable source and production APK exist. No catalog acceptance is implied.
+The repository recipe stays disabled for maintainer review; the tested copy was
+enabled only in isolated packaging staging. Staging used the supported Gradle path
+configuration for pinned8.14.6 and normal VCS initialization before building.
+No `--force`, scanner bypass or signing secret was used. The source tarball and
+tested recipe are retained with verification evidence.
+
+Tag v1.19.0 remains an unpublished source snapshot after its release SBOM gate
+detected umask-dependent ZIP permissions in the first-party JAR. v1.19.1 fixes
+those permissions and tests actual clean builds under both masks; code payloads
+were unchanged. The immutable older tag was not moved.
+
+Published phone APK SHA-256 is
+`b5c7bd423cdf61a0f9bc02d506e26e29886a1a1a89bcc397cfc118a3626a21fd`.
+apksigcopier1.1.1 `compare --unsigned` returned0 for both the independent source
+APK and the F-Droid recipe APK against that production APK. Its existing production
+certificate was verified. This establishes current signed-payload reproducibility;
+official F-Droid server validation and catalog acceptance are separate external
+steps. No submission has been sent.
+
+[Published artifact hashes and full verification results](verification-1.19.1.json)
+include separate phone/Wear identities, audits and the successful signed-upgrade
+workflow. All12 official release assets were downloaded and independently checked.
