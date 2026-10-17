@@ -1,7 +1,7 @@
 # F-Droid packaging candidate
 
 `metadata/ru.tgwatch.yml` is a **disabled phone-only candidate** for source version
-1.19.0, Android code1019000, intended tag `v1.19.0`. It has not been submitted or
+1.19.1, Android code1019001, intended tag `v1.19.1`. It has not been submitted or
 accepted by F-Droid. Verify the immutable tag on main before enabling the recipe.
 The separate `ru.tgwatch.wear` APK is not part of this catalog candidate.
 
@@ -41,7 +41,7 @@ metadata. Verify the tag/commit/code, review the recipe's `disable` reason, then
 ```sh
 fdroid readmeta
 fdroid lint ru.tgwatch
-fdroid build --test ru.tgwatch:1019000
+fdroid build --test ru.tgwatch:1019001
 ```
 
 The build remains disabled until its exact published source and catalog build have

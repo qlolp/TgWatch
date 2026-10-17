@@ -1,6 +1,6 @@
 {
-  "sourceVersion": "1.19.0",
-  "applyAfterRelease": "v1.19.0",
+  "sourceVersion": "1.19.1",
+  "applyAfterRelease": "v1.19.1",
   "status": "prepared",
   "description": "Private Android reachability monitor for Telegram, Matrix, WhatsApp Web and custom HTTPS services.",
   "topicAdditions": [

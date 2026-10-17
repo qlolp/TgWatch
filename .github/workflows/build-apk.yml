@@ -43,6 +43,8 @@ jobs:
           python3 scripts/report-python-tests.py
           python3 scripts/test_dependency_audit.py
           python3 scripts/test_signing_keychain.py
+      - name: Verify first-party JAR reproducibility across file masks
+        run: bash scripts/check-core-reproducibility.sh
       - name: Unit tests, Android lint and APKs
         run: bash ./gradlew :probe-core:test :app:detekt :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon --stacktrace
       - name: Audit all exact resolved runtime and test dependencies against OSV
@@ -196,8 +198,14 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk TgWatch.apk
           sha256sum TgWatch.apk > TgWatch.apk.sha256
           echo "apk_sha256=$(cut -d' ' -f1 TgWatch.apk.sha256)" >> "$GITHUB_OUTPUT"
-          cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json
-          cmp app/build/reports/dependencies/resolved.json release-dependencies/resolved.json
+          if ! cmp app/build/reports/sbom/TgWatch.sbom.cdx.json release-evidence/TgWatch.sbom.cdx.json; then
+            echo '::error title=Signed build evidence mismatch::Phone SBOM differs from its audited build.'
+            exit 1
+          fi
+          if ! cmp app/build/reports/dependencies/resolved.json release-dependencies/resolved.json; then
+            echo '::error title=Signed build evidence mismatch::Phone dependency graph differs from its audited build.'
+            exit 1
+          fi
           cp release-evidence/TgWatch.sbom.cdx.json TgWatch.sbom.cdx.json
           cp release-evidence/TgWatch.trivy.json TgWatch.trivy.json
           cp release-dependencies/resolved.json TgWatch.dependencies.json
@@ -206,8 +214,14 @@ jobs:
           cp wear/build/outputs/apk/release/wear-release.apk TgWatch-wear.apk
           sha256sum TgWatch-wear.apk > TgWatch-wear.apk.sha256
           echo "wear_apk_sha256=$(cut -d' ' -f1 TgWatch-wear.apk.sha256)" >> "$GITHUB_OUTPUT"
-          cmp wear/build/reports/sbom/TgWatch-wear.sbom.cdx.json wear-release-evidence/TgWatch-wear.sbom.cdx.json
-          cmp wear/build/reports/dependencies/resolved.json wear-release-dependencies/resolved.json
+          if ! cmp wear/build/reports/sbom/TgWatch-wear.sbom.cdx.json wear-release-evidence/TgWatch-wear.sbom.cdx.json; then
+            echo '::error title=Signed build evidence mismatch::Wear SBOM differs from its audited build.'
+            exit 1
+          fi
+          if ! cmp wear/build/reports/dependencies/resolved.json wear-release-dependencies/resolved.json; then
+            echo '::error title=Signed build evidence mismatch::Wear dependency graph differs from its audited build.'
+            exit 1
+          fi
           cp wear-release-evidence/TgWatch-wear.sbom.cdx.json TgWatch-wear.sbom.cdx.json
           cp wear-release-evidence/TgWatch-wear.trivy.json TgWatch-wear.trivy.json
           cp wear-release-dependencies/resolved.json TgWatch-wear.dependencies.json
