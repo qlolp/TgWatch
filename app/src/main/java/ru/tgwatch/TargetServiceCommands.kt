@@ -5,6 +5,11 @@ internal data class TargetServiceCommand(val action: String?, val targetId: Targ
 
 /** Missing goal IDs belong to historical Telegram commands; invalid IDs never select a goal. */
 internal object TargetServiceCommands {
+    fun expectedIntervalSec(telegramActualSec: Int, definitions: List<TargetDefinition>): Int =
+        definitions.filter { it.enabled }.minOfOrNull {
+            if (it.id == TargetId.TELEGRAM) telegramActualSec else it.intervalSec
+        } ?: TargetDefinition.DEFAULT_TELEGRAM_SEC
+
     fun route(action: String?, rawId: String?, enabled: Set<TargetId>): TargetServiceCommand {
         val id = if (rawId == null) TargetId.TELEGRAM else TargetId.fromWire(rawId)
         if (id == null) return TargetServiceCommand(null, TargetId.TELEGRAM, ignored = true)

@@ -145,4 +145,5 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="webhook_event_network_lost">Network lost</string>
     <string name="webhook_event_recovery">Service recovered</string>
     <string name="webhook_event_network_restored">Network restored</string>
+    <string name="target_convert_extra">Enable independent target using diagnostic settings</string>
 </resources>

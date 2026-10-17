@@ -29,6 +29,8 @@ internal object TargetRestore {
             TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE)
         val oldPrivate = privatePreferences.all.toMap()
         val applied = runCatching {
+            // A settings job captured before replacement cannot reactivate or reconfigure restored data.
+            synchronized(TargetPreferences) { TargetId.entries.forEach(TargetPreferences.fence::bump) }
             val complete = imported.snapshot.copy(targets = TargetId.entries.map { id ->
                 imported.snapshot.targets.firstOrNull { it.id == id }
                     ?: TargetDefinition.default(id).copy(enabled = false)

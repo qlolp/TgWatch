@@ -58,6 +58,58 @@ class TargetPreferencesIntegrationTest {
         if (!Prefs.isEnabled(ctx)) WatchdogReceiver.cancel(ctx)
     }
 
+    @Test fun legacyDiagnosticsRemainOptInAndConversionExplicitlyCopiesOnlyPrivateCustomEndpoint() {
+        assertTrue(Prefs.sp(ctx).edit().putBoolean(TargetPreferences.key(id, "enabled"), false)
+            .putBoolean("extra_probe_custom", true).commit())
+        assertTrue(Prefs.setExtraCustomUrl(ctx, "https://legacy.example"))
+        assertFalse(TargetPreferences.definition(ctx, id).enabled)
+        val expected = TargetPreferences.fence.snapshot(id).revision
+        assertTrue(TargetLegacyConversion.convert(ctx, id, expected))
+        assertTrue(TargetPreferences.definition(ctx, id).enabled)
+        assertFalse(Prefs.extraCustom(ctx))
+        assertEquals("https://legacy.example", TargetPreferences.endpoint(ctx, id))
+        assertFalse(BackupManager.snapshotTargets(ctx).toString().contains("https://legacy.example"))
+    }
+    @Test fun independentGoalsSuppressEquivalentExtraButKeepDifferentCustomDiagnostic() {
+        assertTrue(Prefs.sp(ctx).edit().putBoolean("extra_probe_matrix", true)
+            .putBoolean("extra_probe_whatsapp", true).putBoolean("extra_probe_custom", true)
+            .putBoolean(TargetPreferences.key(TargetId.MATRIX, "enabled"), true)
+            .putBoolean(TargetPreferences.key(TargetId.WHATSAPP, "enabled"), true).commit())
+        assertTrue(Prefs.setExtraCustomUrl(ctx, "https://old.example"))
+        assertTrue(informationalEndpoints().isEmpty())
+        assertTrue(Prefs.setExtraCustomUrl(ctx, "https://different.example"))
+        assertEquals(1, informationalEndpoints().size)
+        TargetPreferences.stop(ctx, TargetId.MATRIX)
+        assertEquals(2, informationalEndpoints().size)
+    }
+
+    @Test fun endpointJobQueuedBehindRestoreCannotClearRestoredReviewRequirement() {
+        val data = BackupManager.snapshotTargets(ctx)
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val holder = Thread { synchronized(History) { held.countDown(); release.await(10, TimeUnit.SECONDS) } }
+        val result = AtomicReference<Boolean?>()
+        val setting = Thread { result.set(TargetPreferences.setEndpoint(ctx, id, "https://queued.example")) }
+        holder.start()
+        try {
+            assertTrue(held.await(2, TimeUnit.SECONDS))
+            val restored = HistorySessions.queue(ctx).exclusive { TargetRestore.apply(ctx,
+                TargetBackupImport(data), emptySet()) }
+            setting.start()
+            val deadline = SystemClock.elapsedRealtime() + 3_000
+            while (!TargetPreferences.fence.snapshot(id).changing && SystemClock.elapsedRealtime() < deadline)
+                SystemClock.sleep(10)
+            assertTrue(TargetPreferences.fence.snapshot(id).changing)
+            release.countDown()
+            restored.get(10, TimeUnit.SECONDS)
+            setting.join(5_000)
+            assertFalse(setting.isAlive)
+            assertEquals(false, result.get())
+            assertTrue(Prefs.sp(ctx).getBoolean(TargetPreferences.key(id, "endpoint_review"), false))
+            assertEquals("https://old.example", privateStore.getString(id.wire, null))
+        } finally { release.countDown(); holder.join(5_000); setting.join(5_000) }
+    }
+
     @Test fun blockedPrivateCommitParksOnlyCustomAndDoesNotHoldThePublicationLock() {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -221,6 +273,28 @@ class TargetPreferencesIntegrationTest {
             }
         }
     }
+    private fun informationalEndpoints(): List<ProbeEndpoint> {
+        val type = MonitorService::class.java
+        val service = MonitorService()
+        ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)
+            .apply { isAccessible = true }.invoke(service, ctx)
+        val monitor = type.getDeclaredMethod("createTargetMonitoring").apply { isAccessible = true }
+            .invoke(service) as TargetMonitoring
+        type.getDeclaredField("targetMonitoring").apply { isAccessible = true }.set(service, monitor)
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            (type.getDeclaredMethod("informationalEndpoints").apply { isAccessible = true }.invoke(service)
+                as List<ProbeEndpoint>)
+        } finally {
+            monitor.close()
+            for (name in listOf("probeExecutor", "extraProbeExecutor"))
+                (type.getDeclaredField(name).apply { isAccessible = true }.get(service)
+                    as java.util.concurrent.ExecutorService).shutdownNow()
+            (type.getDeclaredField("extraCoordinator").apply { isAccessible = true }.get(service)
+                as ExtraProbeCoordinator).close()
+        }
+    }
+
     private fun restore(store: SharedPreferences, data: Map<String, *>) {
         val edit = store.edit().clear()
         data.forEach { (key, value) -> when (value) {

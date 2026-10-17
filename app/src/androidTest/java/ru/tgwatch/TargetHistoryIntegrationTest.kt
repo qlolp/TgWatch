@@ -153,6 +153,15 @@ class TargetHistoryIntegrationTest {
         assertFalse(report.toString().contains("https://"))
     }
 
+    @Test fun restoreInvalidatesQueuedSettingsCapturedBeforeReplacement() {
+        val oldRevision = TargetPreferences.fence.snapshot(TargetId.TELEGRAM).revision
+        val oldEnable = TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM).copy(enabled = true)
+        BackupManager.restoreTargets(ctx, saved)
+        assertFalse("A settings click captured before restore must not reactivate restored data",
+            TargetSettingWrites.definition(ctx, oldEnable, oldRevision))
+        assertFalse(Prefs.isEnabled(ctx))
+    }
+
     private fun restore(store: SharedPreferences, data: Map<String, *>) {
         val edit = store.edit().clear()
         data.forEach { (key, value) -> when (value) {

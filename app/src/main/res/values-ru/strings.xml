@@ -145,4 +145,5 @@
     <string name="webhook_event_network_lost">Потеря сети</string>
     <string name="webhook_event_recovery">Сервис восстановлен</string>
     <string name="webhook_event_network_restored">Сеть восстановлена</string>
+    <string name="target_convert_extra">Включить отдельную цель с настройками диагностики</string>
 </resources>

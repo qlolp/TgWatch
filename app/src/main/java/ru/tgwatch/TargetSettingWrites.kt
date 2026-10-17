@@ -28,7 +28,10 @@ internal object TargetSettingWrites {
         AutomationReceiver.invalidateState()
         WebhookNotifier.forget(id)
         return try {
-            HistorySessions.queue(ctx).exclusive { synchronized(History) { operation(token) } }.get()
+            HistorySessions.queue(ctx).exclusive { synchronized(History) {
+                check(TargetPreferences.fence.snapshot(id).revision == token.revision) { "Settings were superseded" }
+                operation(token)
+            } }.get()
             true
         } catch (_: Exception) { false }
         finally { TargetPreferences.fence.finish(token); AutomationReceiver.invalidateState() }

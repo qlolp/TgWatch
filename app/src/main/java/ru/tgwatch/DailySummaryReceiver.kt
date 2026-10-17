@@ -47,12 +47,13 @@ class DailySummaryReceiver : BroadcastReceiver() {
             // Stopped monitoring stays quiet: no scheduled summary until the user starts it again.
             if (!eligible(ctx, force, settings, now, isCurrent)) return false
             return try {
-                val ids = TargetId.entries.filter { TargetPreferences.storedDefinition(ctx, it).enabled }
-                    .ifEmpty { if (force) listOf(TargetId.TELEGRAM) else emptyList() }
-                val text = synchronized(History) { DailySummary.targets(ids.associateWith {
+                val scope = TargetSummaryScope.capture(ctx, force)
+                val text = synchronized(History) { DailySummary.targets(scope.ids.associateWith {
                     (TargetHistories.stats(ctx, it, 1, now) as? HistoryRead.Ready)?.value
                 }) }
-                if (text == null) false else publish(ctx, force, settings, text, isCurrent)
+                if (text == null) false else publish(ctx, force, settings, text) {
+                    isCurrent() && scope.current(ctx)
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "daily summary", e)
                 false

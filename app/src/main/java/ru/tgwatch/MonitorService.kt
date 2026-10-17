@@ -287,7 +287,7 @@ class MonitorService : Service() {
         // Primary checks have a 12-second network budget. If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
-        } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, state.expectedIntervalSec)) {
+        } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, TargetServiceHealth.expectedIntervalSec(this))) {
             scheduleCheck(0L)
         }
     }
@@ -399,6 +399,7 @@ class MonitorService : Service() {
         override fun acquireWakeLock() = acquireWakeLockForCheck()
         override fun onProgress() {
             lastProgressMono = SystemClock.elapsedRealtime()
+            WatchdogReceiver.schedule(this@MonitorService)
             releaseWakeLock()
             drainDeferredExtras()
             rearmChecks()

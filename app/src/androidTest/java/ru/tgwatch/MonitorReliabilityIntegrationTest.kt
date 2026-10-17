@@ -376,6 +376,30 @@ class MonitorReliabilityIntegrationTest {
         }
     }
 
+    @Test fun disablingOneGoalWhileSummaryWaitsDoesNotDeliverItsOldSnapshot() {
+        seedSummary()
+        val now = System.currentTimeMillis()
+        HistorySessions.queue(ctx).exclusive {
+            TargetPersistence.storage().replaceRows(TargetId.MATRIX,
+                listOf(TargetObservation(Observation(now - 60_000, now, "OK"),
+                    TargetPreferences.endpointRevision(ctx, TargetId.MATRIX))))
+        }.get()
+        assertTrue(Prefs.sp(ctx).edit().putBoolean(TargetPreferences.key(TargetId.MATRIX, "enabled"), true)
+            .putBoolean(TargetPreferences.key(TargetId.TELEGRAM, "enabled"), true).commit())
+        withHeldHistory { release ->
+            val finished = CountDownLatch(1)
+            val result = AtomicReference<Boolean?>()
+            assertTrue(DailySummaryReceiver.postAsync(ctx, false) { result.set(it); finished.countDown() })
+            awaitSummaryHistoryWait()
+            TargetPreferences.stop(ctx, TargetId.MATRIX)
+            assertTrue(Prefs.isEnabled(ctx))
+            release.countDown()
+            assertTrue(finished.await(2, TimeUnit.SECONDS))
+            assertEquals(false, result.get())
+            assertTrue(manager.activeNotifications.none { it.id == EventNotifications.SUMMARY_ID })
+        }
+    }
+
     private fun seedSummary() {
         val now = System.currentTimeMillis()
         History.replaceSnapshot(ctx, listOf(Observation(now - 60_000, now, "OK", 12)))

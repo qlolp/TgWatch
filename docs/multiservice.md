@@ -19,6 +19,14 @@ address starts a new endpoint revision; previous revisions remain archived and
 do not contribute to the new address's statistics. Device clock rollback also
 separates statistics into clock epochs.
 
+Existing EXTRA diagnostics do not enable independent targets during upgrade.
+When a diagnostic is enabled, the corresponding target's settings offer an
+explicit conversion button. Custom HTTPS copies the old address only on the
+settings worker after that choice; it stays private. Conversion disables the old
+diagnostic after saving the independent target. Equivalent diagnostic probes are
+suppressed while an independent target runs; a different custom diagnostic stays
+available. No history is invented from earlier diagnostics.
+
 One foreground service schedules all enabled targets, with shared physical
 connection limits (16 primary, 3 secondary). Other targets use 60–300 seconds;
 Telegram retains its profiles and 10–120 second custom interval. Disabling one

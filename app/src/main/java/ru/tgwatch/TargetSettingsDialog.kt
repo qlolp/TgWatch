@@ -8,6 +8,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -67,8 +68,25 @@ internal object TargetSettingsDialog {
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.setOnDismissListener { endpoint?.text?.clear() }
+        conversion(activity, id, content) { dialog.dismiss() }
         dialog.show()
         return dialog
+    }
+
+    private fun conversion(activity: Activity, id: TargetId, content: LinearLayout, close: () -> Unit) {
+        val app = activity.applicationContext
+        val active = Prefs.isEnabled(app) && TargetPreferences.storedDefinition(app, id).enabled
+        if (!active && TargetLegacyConversion.available(app, id)) content.addView(Button(activity).apply {
+            setText(R.string.target_convert_extra)
+            isSaveEnabled = false
+            setOnClickListener {
+                val expected = TargetPreferences.fence.snapshot(id).revision
+                close()
+                TargetActions.submit(activity, id) {
+                    TargetLegacyConversion.convert(app, id, expected).also { if (it) TargetActions.reconcile(app, id) }
+                }
+            }
+        })
     }
 
     private fun save(activity: Activity, value: TargetDefinition, endpoint: String?) {

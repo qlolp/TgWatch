@@ -39,7 +39,9 @@ class WatchdogReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "TgWatch"
         private const val ACTION = "ru.tgwatch.action.WATCHDOG"
-        fun schedule(ctx: Context, delayMs: Long = ServiceHealth.WATCHDOG_MS) {
+        fun schedule(ctx: Context, delayMs: Long = if (MonitorService.running)
+            ServiceHealth.watchdogDelayMs(TargetServiceHealth.expectedIntervalSec(ctx))
+            else ServiceHealth.WATCHDOG_MS) {
             if (!Prefs.isEnabled(ctx)) {
                 cancel(ctx)
                 return
