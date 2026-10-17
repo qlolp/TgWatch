@@ -20,16 +20,22 @@ internal object TargetSettingsExecutor {
     fun busy(id: TargetId) = id in busy
 
     fun submit(activity: Activity, id: TargetId, operation: () -> Boolean): Boolean {
-        if (!busy.add(id)) return false
         val screen = WeakReference(activity)
+        return background(id, operation) { result ->
+            ui.post { screen.get()?.takeUnless { it.isFinishing || it.isDestroyed }?.let {
+                Toast.makeText(it, if (result) R.string.target_saved else R.string.target_settings_failed,
+                    Toast.LENGTH_LONG).show()
+            } }
+        }
+    }
+
+    fun background(id: TargetId, operation: () -> Boolean, finished: (Boolean) -> Unit): Boolean {
+        if (!busy.add(id)) return false
         return try {
             worker.execute {
                 val result = try { execute(operation) }
                     finally { busy.remove(id) }
-                ui.post { screen.get()?.takeUnless { it.isFinishing || it.isDestroyed }?.let {
-                    Toast.makeText(it, if (result) R.string.target_saved else R.string.target_settings_failed,
-                        Toast.LENGTH_LONG).show()
-                } }
+                finished(result)
             }
             true
         } catch (_: RejectedExecutionException) { busy.remove(id); false }

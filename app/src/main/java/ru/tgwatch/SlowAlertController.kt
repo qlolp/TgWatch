@@ -21,7 +21,8 @@ internal class SlowAlertController(
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         val muteChanged = key?.startsWith("alert_mute_") == true || key == "alerts_muted_until"
         val policyChanged = key == null || key == "notify_slow" || key.startsWith("quiet_")
-        if (muteChanged || policyChanged) reconcile()
+        val targetChanged = key?.startsWith(TargetPreferences.key(TargetId.TELEGRAM, "")) == true
+        if (muteChanged || policyChanged || targetChanged) reconcile()
     }
     init { notifications.clearSlow(); settings.registerOnSharedPreferenceChangeListener(listener) }
 
@@ -48,6 +49,7 @@ internal class SlowAlertController(
         val muted = Prefs.alertsMutedUntil(ctx, now) > now
         val quiet = !Prefs.alertsAllowed(ctx, now) && !muted
         val live = running()
+        if (!live) policy.onCheck("STOPPED", -1L, SystemClock.elapsedRealtime())
         val state = SlowDisplayState(policy.active, enabled, muted, quiet, live)
         val action = display.reconcile(state, SystemClock.elapsedRealtime())
         if (action == SlowDisplayAction.SHOW) notifications.slow(latencyMs)

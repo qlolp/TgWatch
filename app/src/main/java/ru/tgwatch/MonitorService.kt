@@ -219,6 +219,7 @@ class MonitorService : Service() {
     private lateinit var am: AlarmManager
     private lateinit var eventNotifications: EventNotifications
     private var slowController: SlowAlertController? = null
+    private var targetAlertController: TargetAlertController? = null
     private val offlineBackoff = OfflineBackoff()
 
     @Synchronized private fun requestSecondaryCheck(ctx: Context, id: TargetId, admission: () -> Boolean): Boolean {
@@ -271,6 +272,7 @@ class MonitorService : Service() {
             if (destroyed) return
             if (RecoveryCoordinator.state == RecoveryState.FAILED) { stopSelf(); return }
             slowController?.reconcile()
+            targetAlertController?.reconcile()
             postNotification(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
@@ -357,7 +359,10 @@ class MonitorService : Service() {
         am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         createChannels()
         eventNotifications = EventNotifications(this, nm)
-        slowController = SlowAlertController(this, eventNotifications, { acceptsRunningCheck(this) }, { text ->
+        targetAlertController = TargetAlertController(this, nm) { acceptsRunningCheck(this) }
+        slowController = SlowAlertController(this, eventNotifications, {
+            acceptsRunningCheck(this) && TargetPreferences.definition(this, TargetId.TELEGRAM).enabled
+        }, { text ->
             HistorySessions.queue(this).submit(historySession) { EventLog.add(this, text) }
         })
         restorePersistedState(this)
@@ -397,8 +402,14 @@ class MonitorService : Service() {
             rearmChecks()
         }
         override fun onPublished(snapshot: TargetSnapshot, report: TargetReport) {
-            if (snapshot.id != TargetId.TELEGRAM) {
-                TargetHistories.publish(this@MonitorService, historySession, snapshot, report.publishable)
+            if (snapshot.id != TargetId.TELEGRAM && report.publishable) {
+                TargetHistories.publish(this@MonitorService, historySession, snapshot, report.publishable) { recovery ->
+                    val current = targetMonitoring?.repository?.snapshot(snapshot.id) === snapshot
+                    if (isCurrent() && current) targetAlertController?.recovered(snapshot, recovery)
+                }
+                runCatching { targetAlertController?.onCheck(snapshot) }.onFailure {
+                    Log.w(TAG, "target alert: ${it.javaClass.simpleName}")
+                }
                 broadcastState()
             }
         }
@@ -424,6 +435,7 @@ class MonitorService : Service() {
         if (action == ACTION_HEALTH) ensureProgress()
         val first = beginLoop()
         slowController?.reconcile()
+        targetAlertController?.reconcile()
         dispatchStartAction(action, first)
 
         return START_STICKY
@@ -475,6 +487,7 @@ class MonitorService : Service() {
         destroyed = true
         stopping = true
         slowController?.close()
+        targetAlertController?.close()
         targetMonitoring?.close()
         deferredExtra = null
         extraCoordinator.close()

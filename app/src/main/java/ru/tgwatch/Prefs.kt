@@ -86,8 +86,9 @@ object Prefs {
     }
 
     /** Не вибрировать в тихие часы, пока оповещения заглушены, и в системном «не беспокоить». */
-    fun alertsAllowed(ctx: Context, now: Long = System.currentTimeMillis()): Boolean {
-        if (inQuietHoursNow(ctx, now) || alertMuteRemaining(ctx, now) > 0L) return false
+    fun alertsAllowed(ctx: Context, now: Long = System.currentTimeMillis(), id: TargetId = TargetId.TELEGRAM): Boolean {
+        val muted = alertMuteRemaining(ctx, now) > 0L || TargetAlertPreferences.remaining(ctx, id) > 0L
+        if (inQuietHoursNow(ctx, now) || muted) return false
         return try {
             val filter = (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .currentInterruptionFilter
@@ -259,8 +260,8 @@ object Prefs {
 
     /** Display-only wall-clock projection; suppression and expiry use elapsedRealtime. */
     @Synchronized
-    fun alertsMutedUntil(ctx: Context, now: Long = System.currentTimeMillis()): Long {
-        val remaining = alertMuteRemaining(ctx, now)
+    fun alertsMutedUntil(ctx: Context, now: Long = System.currentTimeMillis(), id: TargetId = TargetId.TELEGRAM): Long {
+        val remaining = maxOf(alertMuteRemaining(ctx, now), TargetAlertPreferences.remaining(ctx, id))
         return if (remaining > 0) now.coerceAtMost(Long.MAX_VALUE - remaining) + remaining else 0L
     }
 
@@ -275,7 +276,11 @@ object Prefs {
         AlertMute.mute(alertMuteStore(ctx), SystemClock.elapsedRealtime(), bootCount(ctx))
 
     @Synchronized
-    fun clearAlertMute(ctx: Context): Boolean = AlertMute.clear(alertMuteStore(ctx))
+    fun clearAlertMute(ctx: Context): Boolean {
+        val legacy = AlertMute.clear(alertMuteStore(ctx))
+        val own = TargetAlertPreferences.clear(ctx, TargetId.TELEGRAM)
+        return legacy && own
+    }
 
     private fun bootCount(ctx: Context): Int? = try {
         Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT).takeIf { it >= 0 }
