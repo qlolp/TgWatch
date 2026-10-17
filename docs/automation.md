@@ -112,51 +112,85 @@ authorized debugging environment while the command runs. This ADB example does
 not require weakening the receiver's authentication. Disable wireless debugging
 when finished if it is only needed for setup/testing.
 
-## Webhook alert
+## Webhook alerts and Home Assistant
 
-**Advanced → Automation and webhook** can also post one short plain-text line,
-for example `TG Monitor: Telegram is unreachable`, to an HTTPS address you own,
-such as an ntfy.sh topic, when the published status changes. It is disabled by
-default and needs a saved address before it can be enabled. **Send test message**
-posts a fixed test line, even while the switch is off.
+**Advanced → Automation and webhook** sends optional status-change events to one
+user-owned HTTPS address. It is off by default. Save an address, choose **Text**
+(the default, suitable for an ntfy topic) or **JSON**, and select event filters.
+**Send test message** also works while delivery is disabled; it never changes the
+measured baseline and is not an observation.
 
-- Only `https://` addresses up to 512 characters, without user info or a
-  fragment, are accepted; a query string (ntfy options) is allowed. Redirects
-  are not followed. The body is `text/plain; charset=utf-8`; the User-Agent is
-  `TgWatch/<installed version> (Android)`.
-- The body is one status line in the interface language: no history,
-  diagnostics, endpoint results, addresses or tokens.
-- Reported statuses: OK, PARTIAL, TG_DOWN and NO_NETWORK. UNKNOWN is never sent,
-  and a monitor that starts in OK stays silent until the first change. The
-  first post of each status is immediate; the same status is posted again at
-  most once per 60 seconds. A post held back by that limit, or one that failed
-  (no 2xx response), is retried by a later check, so the endpoint converges to
-  the current status. Delivery is best effort: a NO_NETWORK post usually cannot
-  leave the device.
-- One background thread, at most one request in flight, 5-second connect and
-  read timeouts and a 10-second total result deadline measured with elapsed time.
-  The deadline reports timeout once and requests cancellation. DNS or a stuck
-  transport may ignore it: the physical slot is retained until the operation
-  really ends, so a second request is not admitted in the meantime. Posting
-  never blocks or changes monitoring, notifications or history.
-  The decision state and delivery health are per process.
-- Private settings display the last attempt, last successful delivery, a
-  sanitized outcome and whether a physical request is still in flight.
-  The health display contains no address, token, response body or raw exception;
-  it is not backed up or uploaded. Changing settings isolates older results
-  from the current configuration's health. If a cancelled or timed-out physical
-  request has not ended, the screen explicitly shows that delivery is blocked.
-  Changing settings cannot erase that condition or admit a second request.
-- Saving an address or changing the enabled setting invalidates older send
-  snapshots atomically. A request already admitted to the old address may finish,
-  but its completion cannot update the new address's delivery/rate history or
-  release another request. The old request continues to occupy the single
-  physical slot until it finishes; a later monitor check can then send the same
-  outage to the current address. A settings change does not send a new request
-  automatically.
-- Treat the address as a credential: anyone who knows an ntfy topic URL can post
-  to it. Like the automation token it lives in private credential-protected
-  SharedPreferences (`webhook-private-v1`), outside Direct Boot storage, portable
-  backups, platform backup/transfer and diagnostic exports, and it is never
-  logged. The screen shows only the host; enter the address again to replace it.
-  Before the first unlock after a reboot the webhook is inactive.
+Text remains one translated line, for example `TG Monitor: Telegram is unreachable`.
+JSON is `application/json; charset=utf-8` with exactly this versioned allowlist:
+
+```json
+{
+  "schema_version": 1,
+  "service_id": "telegram",
+  "event": "unreachable",
+  "status": "DOWN",
+  "previous_status": "OK",
+  "checked_at_ms": 1792038600000,
+  "latency_ms": null,
+  "network": "WIFI"
+}
+```
+
+- `status`: OK, PARTIAL, DOWN, NO_NETWORK. Legacy Telegram TG_DOWN maps to DOWN
+  only in JSON; existing API v1 and text behavior remain compatible.
+- `event`: unreachable, partial, network_lost, recovery, network_restored. Recovery
+  means OK after DOWN/PARTIAL; a measured return from NO_NETWORK is network_restored.
+  All five are selected by default. Filters never change observations or local alerts.
+- `previous_status` is the previous measured state, independently of filtering,
+  delivery success and retries. It is null on an initial failure. UNKNOWN,
+  cancelled, unmeasured and stale results neither send events nor reset this baseline.
+  An initial OK is silent. Repeated delivered status is not a heartbeat.
+- `checked_at_ms` is the completed check's Unix timestamp; `latency_ms` is its
+  confirmed latency or null (never -1). `network` is WIFI, CELLULAR, VPN, ETHERNET,
+  OTHER or UNKNOWN; SSIDs, IP addresses and Android network handles are excluded.
+- An explicit JSON test uses event=test, service_id=telegram, network=UNKNOWN;
+  status, previous_status, checked_at_ms and latency_ms are null. Tests bypass
+  event filters and do not affect recovery detection.
+
+Generic JSON is **not** the ntfy JSON API: ntfy uses a different request schema.
+Use Text for an ntfy topic. No history, free-form target names, raw diagnostic
+errors, endpoint addresses or credentials are included in either body.
+
+Only HTTPS URLs up to 512 characters without user info or fragment are accepted;
+query strings (for example ntfy options) are allowed. Redirects are not followed.
+The User-Agent is `TgWatch/<installed version> (Android)`. Connect/read timeouts
+are five seconds each, with an independent ten-second total monotonic deadline.
+One physical request is allowed in the whole process. A timeout reports once and
+requests cancellation, but a stuck native/DNS operation keeps the slot until it
+actually returns. There is no backlog of old events: later valid monitor checks
+attempt the latest allowed event. Retries retain a minimum 60-second gap per status;
+NO_NETWORK delivery is best effort and normally cannot leave the device.
+
+The private screen shows sanitized delivery health without the address, response
+body or transport exception. URL, enabled switch, format and filters form one
+configuration generation. Saving any of them isolates old callbacks and rate/health
+history, including after a failed disk commit that changed SharedPreferences memory.
+Changing settings does not free an old physical request or send automatically.
+
+All webhook configuration is in credential-protected `webhook-private-v1`, outside
+Direct Boot, portable backup, platform backup/transfer, diagnostics and logs.
+Before the first unlock the adapter is inactive. The screen displays only the saved
+host; paths/queries may grant posting rights and should be treated as credentials.
+
+### Home Assistant package
+
+Copy [tgwatch-events.yaml](examples/home-assistant/tgwatch-events.yaml) into your HA
+packages setup. Put a long random `tgwatch_webhook_id` in HA `secrets.yaml`, expose
+the corresponding `/api/webhook/<secret>` through your own HTTPS endpoint and
+configure TgWatch for JSON. The example is local-only: the phone must reach it
+through the permitted local/VPN network and trusted HTTPS ingress. Adapt HA network
+policy explicitly if you need remote delivery. Do not paste the secret URL into issues.
+
+The package records **Last event** and its measurement time. It has no permanent
+online sensor: event-only delivery has no heartbeat, and a saved OK may be stale.
+Missing messages never prove continued availability. Explicit test events, unknown
+statuses, wrong service IDs and missing timestamps do not replace the helpers.
+The fixture test checks YAML structure, mappings and the documented payload contract;
+it does not certify a running Home Assistant instance or render every HA template.
+
+Native MQTT, multiple destinations and custom headers remain separate extensions.

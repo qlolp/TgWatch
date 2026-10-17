@@ -134,4 +134,15 @@
     <string name="health_storage_failed">История недоступна (%1$s)</string>
     <string name="health_recovering">Подготовка локального хранилища</string>
     <string name="health_recovery_failed">Не удалось восстановить хранилище</string>
+    <string name="webhook_format_current">Формат сообщения: %1$s</string>
+    <string name="webhook_format_title">Формат сообщения</string>
+    <string name="webhook_format_text">Текст (совместим с ntfy)</string>
+    <string name="webhook_format_json">JSON (Home Assistant / скрипты)</string>
+    <string name="webhook_filters_current">События: %1$d из %2$d</string>
+    <string name="webhook_filters_title">Отправлять события</string>
+    <string name="webhook_event_unreachable">Сервис недоступен</string>
+    <string name="webhook_event_partial">Частичная доступность</string>
+    <string name="webhook_event_network_lost">Потеря сети</string>
+    <string name="webhook_event_recovery">Сервис восстановлен</string>
+    <string name="webhook_event_network_restored">Сеть восстановлена</string>
 </resources>

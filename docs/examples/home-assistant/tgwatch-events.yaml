@@ -1,0 +1,44 @@
+# Home Assistant package: last observed Telegram event, not a live availability sensor.
+# TgWatch sends events only: no heartbeat. A saved OK becomes stale; silence proves nothing.
+# Add tgwatch_webhook_id: "<long random private value>" to secrets.yaml.
+# Use your HTTPS /api/webhook/<secret> URL in TgWatch; select JSON explicitly.
+# local_only allows local/VPN delivery. Configure your trusted HTTPS ingress accordingly.
+input_text:
+  tgwatch_last_event:
+    name: "TgWatch: last event (Telegram)"
+    max: 32
+input_datetime:
+  tgwatch_checked_at:
+    name: "TgWatch: event measurement time"
+    has_date: true
+    has_time: true
+automation:
+  - alias: "TgWatch: record last Telegram event"
+    triggers:
+      - trigger: webhook
+        webhook_id: !secret tgwatch_webhook_id
+        allowed_methods: [POST]
+        local_only: true
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.json is mapping
+             and trigger.json.schema_version == 1
+             and trigger.json.service_id == 'telegram'
+             and trigger.json.event in ['unreachable', 'partial', 'network_lost', 'recovery', 'network_restored']
+             and trigger.json.status in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK']
+             and trigger.json.checked_at_ms is number
+             and trigger.json.checked_at_ms is not boolean
+             and trigger.json.checked_at_ms > 0 }}
+    actions:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.tgwatch_last_event
+        data:
+          value: "{{ trigger.json.status }}"
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.tgwatch_checked_at
+        data:
+          timestamp: "{{ trigger.json.checked_at_ms / 1000 }}"
+    mode: restart

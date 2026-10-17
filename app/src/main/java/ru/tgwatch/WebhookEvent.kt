@@ -4,7 +4,8 @@ enum class NetworkKind { WIFI, CELLULAR, VPN, ETHERNET, OTHER, UNKNOWN }
 enum class WebhookFormat { TEXT, JSON }
 enum class WebhookEventKind(val wireName: String) {
     UNREACHABLE("unreachable"), PARTIAL("partial"), NETWORK_LOST("network_lost"),
-    RECOVERY("recovery"), NETWORK_RESTORED("network_restored"), TEST("test")
+    RECOVERY("recovery"), NETWORK_RESTORED("network_restored"), TEST("test");
+    companion object { val DELIVERY_EVENTS: Set<WebhookEventKind> = entries.filterNot { it == TEST }.toSet() }
 }
 
 data class WebhookObservation(val serviceId: String, val status: String, val checkedAtMs: Long,

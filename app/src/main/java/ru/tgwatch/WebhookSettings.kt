@@ -16,6 +16,8 @@ object WebhookSettings {
     internal const val FILE = "webhook-private-v1"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_URL = "url"
+    private const val KEY_FORMAT = "format"
+    private const val KEY_EVENTS = "events"
     private var generation = 0L
 
     private fun store(ctx: Context): SharedPreferences {
@@ -38,8 +40,24 @@ object WebhookSettings {
     @Synchronized fun activeUrl(ctx: Context): String? = if (enabled(ctx)) url(ctx) else null
 
     /** Readers and coordinator admission share this object's monitor with every settings write. */
-    @Synchronized internal fun configuration(ctx: Context): WebhookConfiguration =
-        WebhookConfiguration(url(ctx), enabled(ctx), generation)
+    @Synchronized internal fun configuration(ctx: Context): WebhookConfiguration {
+        val current = if (unlocked(ctx)) store(ctx) else null
+        val format = WebhookFormat.entries.firstOrNull { it.name == current?.getString(KEY_FORMAT, null) }
+            ?: WebhookFormat.TEXT
+        val events = current?.getStringSet(KEY_EVENTS, null)?.mapNotNull { saved ->
+            WebhookEventKind.DELIVERY_EVENTS.firstOrNull { it.name == saved }
+        }?.toSet() ?: WebhookEventKind.DELIVERY_EVENTS
+        return WebhookConfiguration(url(ctx), enabled(ctx), generation, format, events)
+    }
+
+    /** Format and filter form one credential configuration generation; an empty filter is allowed. */
+    @Synchronized fun setDeliveryResult(ctx: Context, format: WebhookFormat,
+        events: Set<WebhookEventKind>): WriteResult = when {
+        WebhookEventKind.TEST in events -> WriteResult.INVALID
+        !unlocked(ctx) -> WriteResult.STORAGE_FAILED
+        else -> committed(store(ctx).edit().putString(KEY_FORMAT, format.name)
+            .putStringSet(KEY_EVENTS, events.map { it.name }.toSet()))
+    }
 
     /** Enabling requires a saved valid address. */
     @Synchronized fun setEnabled(ctx: Context, value: Boolean): Boolean =
@@ -63,7 +81,8 @@ object WebhookSettings {
 
     /** Removes the address and turns the webhook off. */
     @Synchronized fun clear(ctx: Context): Boolean =
-        unlocked(ctx) && committed(store(ctx).edit().remove(KEY_URL).remove(KEY_ENABLED)) == WriteResult.SAVED
+        unlocked(ctx) && committed(store(ctx).edit().remove(KEY_URL).remove(KEY_ENABLED)
+            .remove(KEY_FORMAT).remove(KEY_EVENTS)) == WriteResult.SAVED
 
     /** Even a failed disk commit can replace SharedPreferences' in-memory configuration. */
     private fun committed(editor: SharedPreferences.Editor): WriteResult {

@@ -131,7 +131,7 @@ internal class WebhookCoordinator(
                 it.event.observation?.serviceId == observation.serviceId &&
                     it.event.observation.status == WebhookStatuses.normalize(observation.status)
             }?.let { latest = it.copy(event = it.event.copy(observation = observation)) }
-            val pending = latest
+            val pending = latest?.takeIf { it.event.kind in current.events }
             val url = current.url?.takeIf { current.enabled }
             if (pending != null && url != null) {
                 val observation = checkNotNull(pending.event.observation)

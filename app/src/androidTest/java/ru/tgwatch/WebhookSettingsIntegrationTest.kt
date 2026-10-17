@@ -1,5 +1,9 @@
 package ru.tgwatch
 
+import android.content.ContextWrapper
+import android.content.SharedPreferences
+import android.widget.Button
+import androidx.test.core.app.ActivityScenario
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -38,6 +42,7 @@ class WebhookSettingsIntegrationTest {
                         when (value) {
                             is String -> edit.putString(key, value)
                             is Boolean -> edit.putBoolean(key, value)
+                            is Set<*> -> edit.putStringSet(key, value.filterIsInstance<String>().toSet())
                             else -> error("Unsupported fixture preference")
                         }
                     }
@@ -144,4 +149,77 @@ class WebhookSettingsIntegrationTest {
         assertEquals("Duplicate completion cannot release the replacement request", 2, posted.size)
         completions.last()(204)
     }
+    @Test fun formatAndFiltersArePrivateAndSurviveScreenRecreation() {
+        val before = BackupManager.snapshot(ctx).settings
+        assertEquals(WebhookFormat.TEXT, WebhookSettings.configuration(ctx).format)
+        assertEquals(WebhookEventKind.entries.toSet() - WebhookEventKind.TEST,
+            WebhookSettings.configuration(ctx).events)
+        assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setDeliveryResult(ctx,
+            WebhookFormat.JSON, setOf(WebhookEventKind.RECOVERY)))
+        val saved = WebhookSettings.configuration(ctx)
+        assertEquals(WebhookFormat.JSON, saved.format)
+        assertEquals(setOf(WebhookEventKind.RECOVERY), saved.events)
+        assertEquals(before, BackupManager.snapshot(ctx).settings)
+        val direct = ctx.createDeviceProtectedStorageContext()
+            .getSharedPreferences(WebhookSettings.FILE, Context.MODE_PRIVATE)
+        assertFalse(direct.contains("format"))
+        assertFalse(direct.contains("events"))
+        ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val button = activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_FORMAT)
+                assertTrue(button.text.contains("JSON"))
+                assertFalse(button.isSaveEnabled)
+            }
+            scenario.recreate()
+            scenario.onActivity { activity ->
+                assertTrue(activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_FORMAT)
+                    .text.contains("JSON"))
+            }
+        }
+        assertEquals(saved, WebhookSettings.configuration(ctx))
+        assertEquals(WebhookSettings.WriteResult.INVALID, WebhookSettings.setDeliveryResult(ctx,
+            WebhookFormat.TEXT, setOf(WebhookEventKind.TEST)))
+        assertEquals(saved, WebhookSettings.configuration(ctx))
+        assertTrue(WebhookSettings.clear(ctx))
+        assertEquals(WebhookFormat.TEXT, WebhookSettings.configuration(ctx).format)
+    }
+
+    @Test fun failedSaveInvalidatesInMemoryGeneration() {
+        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        val completions = mutableListOf<(Int) -> Unit>()
+        val coordinator = WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(ctx) }, { 0L },
+            { _, _, finished -> completions.add(finished); true })
+        coordinator.onPublished(WebhookObservation("telegram", "TG_DOWN", 1_000, null,
+            NetworkKind.UNKNOWN, 1, true, false))
+        val before = WebhookSettings.configuration(ctx)
+        val failing = object : ContextWrapper(ctx) {
+            override fun getApplicationContext(): Context = this
+            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+                val actual = ctx.getSharedPreferences(name, mode)
+                return object : SharedPreferences by actual {
+                    override fun edit(): SharedPreferences.Editor {
+                        val editor = actual.edit()
+                        return object : SharedPreferences.Editor by editor {
+                            override fun putString(key: String, value: String?): SharedPreferences.Editor {
+                                editor.putString(key, value); return this
+                            }
+                            override fun putStringSet(key: String, value: Set<String>?): SharedPreferences.Editor {
+                                editor.putStringSet(key, value); return this
+                            }
+                            // SharedPreferences publishes memory before discovering a disk error.
+                            override fun commit(): Boolean { editor.apply(); return false }
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(WebhookSettings.WriteResult.STORAGE_FAILED, WebhookSettings.setDeliveryResult(failing,
+            WebhookFormat.JSON, setOf(WebhookEventKind.RECOVERY)))
+        assertTrue(WebhookSettings.configuration(ctx).generation > before.generation)
+        completions.single()(204)
+        assertNull(coordinator.health().lastSuccessElapsed)
+        assertEquals(WebhookFormat.JSON, WebhookSettings.configuration(ctx).format)
+    }
+
 }

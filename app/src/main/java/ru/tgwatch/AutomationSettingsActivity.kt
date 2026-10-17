@@ -35,6 +35,8 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_SET = 0x00a71006
         const val ID_WEBHOOK_TEST = 0x00a71007
         const val ID_WEBHOOK_HEALTH = 0x00a71008
+        const val ID_WEBHOOK_FORMAT = 0x00a71009
+        const val ID_WEBHOOK_FILTERS = 0x00a7100a
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
@@ -61,6 +63,7 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var webhookUrlView: TextView
     private lateinit var webhookTest: Button
     private var refreshing = false
+    private lateinit var webhookDelivery: WebhookDeliverySettingsUi
     private lateinit var webhookHealth: TextView
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
@@ -124,6 +127,7 @@ class AutomationSettingsActivity : Activity() {
         button(column, R.string.webhook_set_url).apply { id = ID_WEBHOOK_SET }.setOnClickListener { editWebhookUrl() }
         webhookTest = button(column, R.string.webhook_test).apply { id = ID_WEBHOOK_TEST }
         webhookTest.setOnClickListener { sendWebhookTest() }
+        webhookDelivery = WebhookDeliverySettingsUi(this).apply { attach(column) }
         webhookHealth = text(R.string.webhook_title).apply { id = ID_WEBHOOK_HEALTH }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
@@ -206,6 +210,7 @@ class AutomationSettingsActivity : Activity() {
         webhookUrlView.text = if (webhook == null) getString(R.string.webhook_url_unset)
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
+        webhookDelivery.refresh()
         val text = WebhookHealthText.format(WebhookNotifier.health(this), android.os.SystemClock.elapsedRealtime())
         if (webhookHealth.text.toString() != text) webhookHealth.text = text
     }

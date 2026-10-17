@@ -134,4 +134,15 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="health_storage_failed">History unavailable (%1$s)</string>
     <string name="health_recovering">Preparing local storage</string>
     <string name="health_recovery_failed">Storage recovery failed</string>
+    <string name="webhook_format_current">Payload format: %1$s</string>
+    <string name="webhook_format_title">Payload format</string>
+    <string name="webhook_format_text">Text (ntfy compatible)</string>
+    <string name="webhook_format_json">JSON (Home Assistant / scripts)</string>
+    <string name="webhook_filters_current">Events: %1$d of %2$d</string>
+    <string name="webhook_filters_title">Send these events</string>
+    <string name="webhook_event_unreachable">Service unreachable</string>
+    <string name="webhook_event_partial">Partially reachable</string>
+    <string name="webhook_event_network_lost">Network lost</string>
+    <string name="webhook_event_recovery">Service recovered</string>
+    <string name="webhook_event_network_restored">Network restored</string>
 </resources>
