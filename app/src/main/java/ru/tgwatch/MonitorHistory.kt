@@ -2,7 +2,8 @@ package ru.tgwatch
 
 import android.content.Context
 
-internal data class HistoryPublication(val state: MonitorService.State, val changed: Boolean, val partial: Boolean)
+internal data class HistoryPublication(val state: MonitorService.State, val changed: Boolean, val partial: Boolean,
+    val outcomes: List<ProbeOutcome> = emptyList(), val dcGeneration: String? = null)
 
 /** All persistence belonging to a measured publication runs on the ordered journal worker. */
 internal object MonitorHistory {
@@ -20,6 +21,8 @@ internal object MonitorHistory {
                 MonitorService.Status.UNKNOWN -> History.Kind.UNKNOWN
             }
             History.record(ctx, state.checkedAt, kind, state.latencyMs, state.expectedIntervalSec)
+            // Rebuildable metrics can fail independently of the availability journal.
+            DcLatencyRecorder.record(ctx, publication.outcomes, state.checkedAt, publication.dcGeneration)
             val event = if (state.status == MonitorService.Status.OK)
                 History.recovery(ctx, state.checkedAt, publication.partial) else null
             event?.let { runCatching { recovery(it) } }

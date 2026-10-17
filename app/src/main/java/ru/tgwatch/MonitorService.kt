@@ -727,6 +727,11 @@ class MonitorService : Service() {
         } else {
             // Admission failure is monitor health, not a new observation about Telegram.
             lastEndpoints = result.outcomes.toList()
+            val generation = TargetPersistence.active?.generationId
+            val at = System.currentTimeMillis()
+            HistorySessions.queue(this).submit(historySession) {
+                DcLatencyRecorder.record(this, result.outcomes, at, generation)
+            }
             checkSchedule.request(UNMEASURED_RETRY_MS)
         }
     }
@@ -801,7 +806,8 @@ class MonitorService : Service() {
         )
 
         MonitorHistory.publish(this, historySession,
-            HistoryPublication(newState, changed, partialAlert || Prefs.notifyFor(this, "PARTIAL")), { recovery ->
+            HistoryPublication(newState, changed, partialAlert || Prefs.notifyFor(this, "PARTIAL"),
+                p.outcomes, TargetPersistence.active?.generationId), { recovery ->
                 synchronized(this) {
                     if (acceptsRunningCheck(this) && state === newState) {
                         if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,

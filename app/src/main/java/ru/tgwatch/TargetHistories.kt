@@ -41,6 +41,7 @@ internal object TargetHistories {
     }
 
     fun end(ctx: Context, session: Long, now: Long) = synchronized(History) {
+        DcLatencyRecorder.flush()
         for (id in sessions.end(session)) {
             if (id == TargetId.TELEGRAM) History.endSession(ctx, now) else {
                 val closed = runCatching { closeTarget(ctx, id, now) }
