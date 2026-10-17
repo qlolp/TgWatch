@@ -108,7 +108,9 @@ await_observation "$before" --status NO_NETWORK
 before=$(last_check)
 adb shell svc wifi enable
 adb shell svc data enable
-await_observation "$before" --exclude-status NO_NETWORK --exclude-status UNKNOWN
+# A completed, measured UNKNOWN is valid when this network blocks all probes.
+# The reader still requires a fresh, positive-width observation of this goal.
+await_observation "$before" --exclude-status NO_NETWORK
 before=$(last_check)
 adb shell dumpsys battery unplug
 adb shell input keyevent KEYCODE_SLEEP

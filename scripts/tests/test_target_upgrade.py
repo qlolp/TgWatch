@@ -77,6 +77,15 @@ class TargetUpgradeTests(unittest.TestCase):
         self.assertTrue(module.has_observation(data, 'telegram', 1000, status='NO_NETWORK'))
         self.assertFalse(module.has_observation(data, 'telegram', 1000, exclude_status=('NO_NETWORK',)))
 
+    def test_recovery_requires_new_measured_observation_without_demanding_target_success(self):
+        module = self.load()
+        data = module.capture(self.reader(self.generation({'telegram': '1000,2000,UNKNOWN,-1,1,0\n'})), 2000)
+        self.assertTrue(module.has_observation(data, 'telegram', 1000, exclude_status=('NO_NETWORK',)))
+        data['observations'][0]['until_ms'] = 1000
+        self.assertFalse(module.has_observation(data, 'telegram', 1000, exclude_status=('NO_NETWORK',)))
+        smoke = (ROOT / 'scripts/android-smoke.sh').read_text()
+        self.assertNotIn('--exclude-status UNKNOWN', smoke)
+
     def test_old_endpoint_and_clock_epoch_cannot_satisfy_fresh_await(self):
         module = self.load()
         data = module.capture(self.reader(self.generation({'telegram':
