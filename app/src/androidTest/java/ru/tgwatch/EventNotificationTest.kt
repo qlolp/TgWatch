@@ -288,8 +288,11 @@ class EventNotificationTest {
             controller?.close()
             val current = SlowAlertController(ctx, events, running::get, {})
             controller = current
-            val now = android.os.SystemClock.elapsedRealtime()
-            repeat(3) { current.onCheck("OK", 1500, now + it) }
+            // A synthetic now + index can still be in the future on a fast
+            // emulator. Future measurements are deliberately stale.
+            repeat(3) {
+                current.onCheck("OK", 1500, android.os.SystemClock.elapsedRealtime())
+            }
             awaitNotification(manager, EventNotifications.SLOW_ID)
         }
         try {
