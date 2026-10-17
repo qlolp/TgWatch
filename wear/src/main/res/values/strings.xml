@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">TgWatch</string>
+    <string name="check_now">Check now</string>
+    <string name="checking">Checking…</string>
+    <string name="no_result">No local result</string>
+    <string name="stale">Result is out of date</string>
+    <string name="status_ok">Telegram available</string>
+    <string name="status_partial">Partly available</string>
+    <string name="status_no_network">No internet connection</string>
+    <string name="status_unknown">Availability not confirmed</string>
+    <string name="last_result">Last result: %1$s</string>
+    <string name="latency">Best MTProto response: %1$d ms</string>
+    <string name="busy">No measurement: previous request is still finishing</string>
+    <string name="not_completed">Check did not complete. Last result kept.</string>
+    <string name="measured_on_watch">Measured on this watch</string>
+    <string name="lang" translatable="false">en</string>
+</resources>

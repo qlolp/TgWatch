@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">TgWatch</string>
+    <string name="check_now">Проверить</string>
+    <string name="checking">Проверяем…</string>
+    <string name="no_result">На часах ещё нет результата</string>
+    <string name="stale">Результат устарел</string>
+    <string name="status_ok">Telegram доступен</string>
+    <string name="status_partial">Частично доступен</string>
+    <string name="status_no_network">Нет подключения к интернету</string>
+    <string name="status_unknown">Доступность не подтверждена</string>
+    <string name="last_result">Последний результат: %1$s</string>
+    <string name="latency">Лучший ответ MTProto: %1$d мс</string>
+    <string name="busy">Не измерено: прошлый запрос ещё завершается</string>
+    <string name="not_completed">Проверка не завершилась. Последний результат сохранён.</string>
+    <string name="measured_on_watch">Измерено на этих часах</string>
+    <string name="lang" translatable="false">ru</string>
+</resources>
