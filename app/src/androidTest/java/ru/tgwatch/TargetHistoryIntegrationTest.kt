@@ -15,10 +15,12 @@ class TargetHistoryIntegrationTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var saved: TargetBackupSnapshot
     private lateinit var preferences: Map<String, *>
+    private lateinit var privatePreferences: Map<String, *>
     private var session = 0L
     @Before fun save() {
         HistoryTestStorage.awaitReady()
         preferences = Prefs.sp(ctx).all.toMap()
+        privatePreferences = ctx.getSharedPreferences(TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE).all.toMap()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         saved = BackupManager.snapshotTargets(ctx)
@@ -26,6 +28,8 @@ class TargetHistoryIntegrationTest {
     @After fun restore() {
         if (session != 0L) HistorySessions.queue(ctx).close(session, System.currentTimeMillis()).get()
         if (::saved.isInitialized) BackupManager.restoreTargets(ctx, saved)
+        if (::privatePreferences.isInitialized) restore(ctx.getSharedPreferences(
+            TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE), privatePreferences)
         if (::preferences.isInitialized) restore(Prefs.sp(ctx), preferences)
     }
 
@@ -87,6 +91,16 @@ class TargetHistoryIntegrationTest {
             assertEquals(HistoryFailure.WRITE, failed.failure)
             assertEquals(1, failed.lastKnown!!.downChecks)
             assertEquals(TargetStatus.DOWN, TargetStateStore.load(ctx, id).status)
+            val changed = TargetPreferences.setEndpoint(ctx, id, "https://new.example")
+            val afterChange = TargetPersistence.storage().recordedRows(id)
+            val kept = when (afterChange) {
+                is HistoryRead.Ready -> afterChange.value
+                is HistoryRead.Unavailable -> afterChange.lastKnown.orEmpty()
+            }
+            assertTrue("An endpoint change must retain the unsaved measured row in its original cohort",
+                kept.any { it.endpointRevision == revision && it.row.at == now + 1_000 && it.row.kind == "DOWN" })
+            if (changed) assertTrue("An accepted endpoint change must durably retain the measured row",
+                TargetPersistence.storage().read(id).any { it.endpointRevision == revision && it.row.kind == "DOWN" })
             HistorySessions.queue(ctx).close(session, now + 2_000).get()
             assertTrue(TargetHistories.stats(ctx, id, 1, now + 2_000) is HistoryRead.Ready)
             assertNull(TargetHistories.failures[id])

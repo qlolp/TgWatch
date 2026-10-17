@@ -9,10 +9,12 @@ import android.os.Bundle
 import android.os.Parcel
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,8 +50,8 @@ class TargetUiIntegrationTest {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         if (::data.isInitialized) BackupManager.restoreTargets(ctx, data)
-        if (::preferences.isInitialized) restore(Prefs.sp(ctx), preferences)
         if (::privatePreferences.isInitialized) restore(privateStore, privatePreferences)
+        if (::preferences.isInitialized) restore(Prefs.sp(ctx), preferences)
         if (!Prefs.isEnabled(ctx)) WatchdogReceiver.cancel(ctx)
     }
 
@@ -115,6 +117,33 @@ class TargetUiIntegrationTest {
         assertTrue(TargetAlertPreferences.clear(ctx, TargetId.MATRIX))
         assertEquals(0, TargetAlertPreferences.remaining(ctx, TargetId.MATRIX))
     }
+
+    @Test fun savingTelegramIntervalAlsoUpdatesItsExistingControls() {
+        Prefs.setProfile(ctx, PowerProfile.BALANCED)
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.findViewById<Button>(R.id.btnTargetSettings).performClick()
+                val helper = MainActivity::class.java.getDeclaredField("targetUi").apply { isAccessible = true }.get(activity)
+                val dialog = helper.javaClass.getDeclaredField("dialog").apply { isAccessible = true }.get(helper) as AlertDialog
+                val interval = findSpinner(dialog.window!!.decorView)!!
+                val wanted = activity.getString(R.string.target_interval, 60)
+                val index = (0 until interval.adapter.count).first { interval.adapter.getItem(it).toString() == wanted }
+                interval.setSelection(index)
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            }
+            val end = SystemClock.elapsedRealtime() + 5_000
+            val matched = AtomicBoolean()
+            do {
+                scenario.onActivity { matched.set(it.findViewById<RadioGroup>(R.id.rgInterval).checkedRadioButtonId == R.id.rb60) }
+                if (!matched.get()) SystemClock.sleep(50)
+            } while (!matched.get() && SystemClock.elapsedRealtime() < end)
+            assertEquals(60, Prefs.intervalSec(ctx))
+            assertTrue("Legacy controls must reflect the applied target interval", matched.get())
+        }
+    }
+
+    private fun findSpinner(view: View): Spinner? = if (view is Spinner) view else if (view is ViewGroup)
+        (0 until view.childCount).asSequence().mapNotNull { findSpinner(view.getChildAt(it)) }.firstOrNull() else null
 
     private fun select(scenario: ActivityScenario<MainActivity>, id: TargetId) {
         scenario.onActivity { it.findViewById<Spinner>(R.id.targetSelector).setSelection(id.ordinal) }

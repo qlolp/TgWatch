@@ -123,8 +123,11 @@ internal object TargetSettingsDialog {
             TargetAlertSettings.SLOW_STEP_MS).toInt()
         progress = ((value - TargetAlertSettings.MIN_SLOW_MS) / TargetAlertSettings.SLOW_STEP_MS).toInt()
         isSaveEnabled = false
-        fun update() { label.text = activity.getString(R.string.target_slow_threshold,
-            TargetAlertSettings.MIN_SLOW_MS + progress * TargetAlertSettings.SLOW_STEP_MS) }
+        fun update() {
+            label.text = activity.getString(R.string.target_slow_threshold,
+                TargetAlertSettings.MIN_SLOW_MS + progress * TargetAlertSettings.SLOW_STEP_MS)
+            contentDescription = label.text
+        }
         update()
         setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) = update()

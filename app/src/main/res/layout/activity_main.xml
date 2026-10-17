@@ -311,7 +311,7 @@
             android:visibility="gone">
 
         <LinearLayout style="@style/Card">
-            <TextView style="@style/CardTitle" android:text="@string/intervals_title" />
+            <TextView style="@style/CardTitle" android:text="@string/target_telegram_intervals" />
             <RadioGroup
                 android:id="@+id/rgInterval"
                 android:layout_width="match_parent"

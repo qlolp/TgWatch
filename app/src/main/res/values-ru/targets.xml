@@ -1,6 +1,9 @@
 <resources>
     <string name="target_select">Цель мониторинга</string>
     <string name="target_settings">Настройки цели</string>
+    <string name="target_telegram_profile">Telegram — профиль: %1$s</string>
+    <string name="target_custom_interval">Свой интервал</string>
+    <string name="target_telegram_intervals">Интервал проверки Telegram</string>
     <string name="target_enabled">Наблюдать за этой целью</string>
     <string name="target_interval">Проверять каждые %1$d с</string>
     <string name="target_notify_outage">Уведомления о сбоях</string>

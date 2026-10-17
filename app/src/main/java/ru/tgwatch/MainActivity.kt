@@ -565,6 +565,7 @@ class MainActivity : Activity() {
         val alarmOk = Prefs.exactAlarmsAllowed(this)
 
         renderSetup(notifOk, batteryOk, alarmOk)
+        TargetLegacySettingsUi.refresh(this, intervalButtons) { changingProfile = it }
 
         if (targetUi.selected == TargetId.TELEGRAM) renderTelegramStatus(s, now, running, stale)
         historyUi.refresh(historyDays, now)
@@ -624,8 +625,7 @@ class MainActivity : Activity() {
     }
 
     private fun updateProfileLabel() {
-        val profile = Prefs.profile(this)
-        btnProfile.text = Lang.t("Профиль: ", "Profile: ") + (profile?.title ?: Lang.t("Свой интервал", "Custom interval"))
+        btnProfile.text = TargetLegacySettingsUi.profileLabel(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

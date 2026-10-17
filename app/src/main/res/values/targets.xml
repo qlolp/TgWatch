@@ -2,6 +2,9 @@
     <item name="targetEndpointInput" type="id" />
     <string name="target_select">Monitoring target</string>
     <string name="target_settings">Target settings</string>
+    <string name="target_telegram_profile">Telegram — profile: %1$s</string>
+    <string name="target_custom_interval">Custom interval</string>
+    <string name="target_telegram_intervals">Telegram check interval</string>
     <string name="target_enabled">Monitor this target</string>
     <string name="target_interval">Check every %1$d seconds</string>
     <string name="target_notify_outage">Outage notifications</string>

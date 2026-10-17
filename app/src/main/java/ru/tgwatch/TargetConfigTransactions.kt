@@ -41,8 +41,10 @@ internal object TargetConfigTransactions {
         TargetRestore.requireUnlocked(ctx)
         val store = TargetPersistence.storage()
         val old = TargetPreferences.storedDefinition(ctx, id)
-        val next = TargetEndpointRevision.change(store.read(id), TargetPreferences.endpointRevision(ctx, id),
-            System.currentTimeMillis(), TargetBackupCodec.rowLimit(id))
+        val now = System.currentTimeMillis()
+        val revision = TargetPreferences.endpointRevision(ctx, id)
+        val rows = store.recordedRows(id, revision, now).valueOrThrow()
+        val next = TargetEndpointRevision.change(rows, revision, now, TargetBackupCodec.rowLimit(id))
         val definition = old.copy(requiresEndpoint = id == TargetId.CUSTOM || endpoint != null,
             enabled = old.enabled && (id != TargetId.CUSTOM || endpoint != null))
         val data = TargetBackupSnapshot(System.currentTimeMillis(), emptyMap(), listOf(definition),
