@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LatencyTotalTest {
+    @org.junit.Test fun checkedCounterSumIsExactOrUnavailableWithoutNewPlatformApis() {
+        org.junit.Assert.assertEquals(Long.MAX_VALUE, LatencyTotal.checkedSum(listOf(Long.MAX_VALUE, 0)))
+        org.junit.Assert.assertNull(LatencyTotal.checkedSum(listOf(Long.MAX_VALUE, 1)))
+        org.junit.Assert.assertNull(LatencyTotal.checkedSum(listOf(-1)))
+        org.junit.Assert.assertEquals(0L, LatencyTotal.checkedSum(emptyList()))
+    }
     private fun total(initial: Long = 0L) = LatencyTotal(initial)
     private fun add(total: LatencyTotal, value: Long) = total.add(value)
     private fun average(total: LatencyTotal, count: Int) = total.average(count)

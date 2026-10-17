@@ -11,4 +11,15 @@ class LatencyTotal(initial: Long = 0L) {
     fun average(count: Int): Long = if (count <= 0) -1L else
         sum.divide(BigInteger.valueOf(count.toLong())).min(BigInteger.valueOf(Long.MAX_VALUE)).toLong()
     fun copy(): LatencyTotal = LatencyTotal().also { it.sum = sum }
+    companion object {
+        /** BigInteger.longValueExact is API31+, while phone support starts at API26. */
+        fun checkedSum(values: Iterable<Long>): Long? {
+            var total = BigInteger.ZERO
+            for (value in values) {
+                if (value < 0L) return null
+                total = total.add(BigInteger.valueOf(value))
+            }
+            return total.takeIf { it <= BigInteger.valueOf(Long.MAX_VALUE) }?.toLong()
+        }
+    }
 }

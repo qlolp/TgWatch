@@ -71,8 +71,8 @@ internal object LatencyPresentation {
         }
 
     private fun aggregate(rows: List<DcLatencyBucket>): DcLatencyBucket? = try {
-        fun sum(values: List<Long>): Long = values.fold(BigInteger.ZERO) { a, b ->
-            a + BigInteger.valueOf(b) }.longValueExact()
+        fun sum(values: List<Long>): Long = LatencyTotal.checkedSum(values)
+            ?: throw ArithmeticException("DC counter total exceeds its supported range")
         rows.first().copy(successCount = sum(rows.map { it.successCount }),
             errorCount = sum(rows.map { it.errorCount }), notMeasuredCount = sum(rows.map { it.notMeasuredCount }),
             histogram = rows.first().histogram.indices.map { index -> sum(rows.map { it.histogram[index] }) })

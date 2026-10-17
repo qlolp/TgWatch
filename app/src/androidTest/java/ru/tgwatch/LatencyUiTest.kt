@@ -78,6 +78,27 @@ class LatencyUiTest {
         val decoded = TargetBackupCodec.decode(TargetBackupCodec.encode(portable))
         assertEquals(5000L, decoded.targets.single { it.id == TargetId.MATRIX }.alerts.slowThresholdMs)
     }
+    @Test fun actualDcBucketsRenderOnSupportedOlderAndroid() {
+        val now = System.currentTimeMillis()
+        HistorySessions.queue(ctx).exclusive {
+            DcLatencyRecorder.record(ctx, listOf(
+                ProbeOutcome("MTProto DC1", ProbeGroup.MTPROTO, true, 200, "fixture"),
+                ProbeOutcome("MTProto DC2", ProbeGroup.MTPROTO, false, -1, "fixture")),
+                now, TargetPersistence.active?.generationId)
+            assertEquals(2, DcLatencyRecorder.read().valueOrThrow().size)
+        }.get()
+        ActivityScenario.launch(LatencyActivity::class.java).use { scenario ->
+            val deadline = SystemClock.elapsedRealtime() + 20_000
+            var text = ""
+            while (!text.contains("dc1-v4") && SystemClock.elapsedRealtime() < deadline) {
+                scenario.onActivity { text = it.findViewById<TextView>(R.id.latencyDcSummary).text.toString() }
+                SystemClock.sleep(100)
+            }
+            assertTrue("Real DC metrics must render on API ${android.os.Build.VERSION.SDK_INT}: $text", text.contains("dc1-v4"))
+            assertTrue(text.contains("200"))
+            assertTrue(text.contains("dc2-v4"))
+        }
+    }
     private fun await(scenario: ActivityScenario<LatencyActivity>, expected: String) {
         val deadline = SystemClock.elapsedRealtime() + 20_000
         var ready = false
