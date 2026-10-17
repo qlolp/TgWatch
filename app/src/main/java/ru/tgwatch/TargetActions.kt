@@ -11,20 +11,20 @@ internal object TargetActions {
         val revision = TargetPreferences.fence.snapshot(id).revision
         val definition = TargetPreferences.storedDefinition(app, id).copy(enabled = true)
         submit(activity, id) {
-            TargetSettingWrites.definition(app, definition, revision).also { if (it) reconcile(app) }
+            TargetSettingWrites.definition(app, definition, revision).also { if (it) reconcile(app, id) }
         }
     }
 
-    fun stop(ctx: Context, id: TargetId) { TargetPreferences.stop(ctx, id); reconcile(ctx) }
+    fun stop(ctx: Context, id: TargetId) { TargetPreferences.stop(ctx, id); reconcile(ctx, id) }
     fun check(ctx: Context, id: TargetId): Boolean = MonitorService.requestRunningCheck(ctx, id)
 
-    fun reconcile(ctx: Context) {
+    fun reconcile(ctx: Context, changedId: TargetId = TargetId.TELEGRAM) {
         when {
-            TargetPreferences.definitions(ctx).none { it.enabled } -> {
+            !Prefs.isEnabled(ctx) || TargetId.entries.none { TargetPreferences.storedDefinition(ctx, it).enabled } -> {
                 Prefs.setEnabled(ctx, false)
                 MonitorService.stop(ctx)
             }
-            MonitorService.running -> MonitorService.send(ctx, MonitorService.ACTION_SETTINGS)
+            MonitorService.running -> MonitorService.send(ctx, MonitorService.ACTION_SETTINGS, changedId)
             else -> runCatching { MonitorService.start(ctx) }.onFailure {
                 if (it is Error) throw it
                 WatchdogReceiver.schedule(ctx)

@@ -14,7 +14,7 @@ import android.service.quicksettings.TileService
 
 /**
  * Плитка в быстрых настройках шторки: показывает статус Telegram.
- * Нажатие — проверить сейчас; если мониторинг выключен — открыть приложение и запустить его.
+ * Нажатие — проверить Telegram; если цель выключена — открыть её в приложении.
  */
 class StatusTileService : TileService() {
 
@@ -67,7 +67,7 @@ class StatusTileService : TileService() {
     @Suppress("TooGenericExceptionCaught") // Any refused command is recorded, then the app opens instead.
     override fun onClick() {
         super.onClick()
-        if (MonitorService.running) {
+        if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled) {
             try {
                 MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
                 ui.postDelayed({ refresh() }, 400L)
@@ -76,7 +76,6 @@ class StatusTileService : TileService() {
                 openApp()
             }
         } else {
-            Prefs.setEnabled(this, true)
             openApp()
         }
     }
@@ -84,6 +83,7 @@ class StatusTileService : TileService() {
     @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated") // Intent overload is required on API 26–33.
     private fun openApp() {
         val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(TargetAutomation.EXTRA_TARGET_ID, TargetId.TELEGRAM.wire)
         if (Build.VERSION.SDK_INT >= 34) {
             startActivityAndCollapse(
                 PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
@@ -100,7 +100,8 @@ class StatusTileService : TileService() {
         val now = System.currentTimeMillis()
         val stale = s.isStale(now)
         val (tileState, icon, subtitle) = when {
-            !MonitorService.running -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, Lang.t("Выключен", "Off"))
+            !TargetPreferences.definition(this, TargetId.TELEGRAM).enabled || !MonitorService.running ->
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, Lang.t("Выключен", "Off"))
             stale && s.status == MonitorService.Status.PARTIAL ->
                 Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, Lang.t("Устарело · частично", "Stale · partial"))
             stale && s.status == MonitorService.Status.OK ->

@@ -51,7 +51,7 @@ class MultiTargetPublicationTest {
         MonitorService.stopAndAwait(ctx)
         // Logical service teardown deliberately retains physically executing secondary leases.
         // Earlier integration cases use real transports; deterministic fixtures start after those return.
-        await { ProbeAdmission.process.snapshot().secondary == 0 }
+        await(45_000) { ProbeAdmission.process.snapshot().secondary == 0 }
         assumeNotNull(ctx.getSystemService(ConnectivityManager::class.java).activeNetwork)
         privatePrevious = privateStore.all.toMap()
         val edit = Prefs.sp(ctx).edit().putBoolean("enabled", true)
@@ -124,6 +124,32 @@ class MultiTargetPublicationTest {
         assertEquals(1L, customStarted.count)
         assertNull(monitor.repository.snapshot(TargetId.CUSTOM))
         assertFalse(events.any { it.id == TargetId.CUSTOM })
+    }
+
+    @Test fun stoppedOwnerCannotOverrideClearedPersistedTargetState() {
+        val type = MonitorService::class.java
+        fun field(name: String) = type.getDeclaredField(name).apply { isAccessible = true }
+        val service = MonitorService()
+        val previousRunning = MonitorService.running
+        val previousService = field("activeService").get(null)
+        val cfg = monitor.repository.configuration(TargetId.MATRIX)
+        val measured = TargetSnapshot(TargetId.MATRIX, TargetStatus.OK, System.currentTimeMillis(),
+            SystemClock.elapsedRealtime(), generation = cfg.generation, endpointRevision = cfg.endpointRevision)
+        assertTrue(monitor.repository.publish(measured))
+        TargetStateStore.persist(ctx, TargetSnapshot(TargetId.MATRIX, endpointRevision = cfg.endpointRevision))
+        try {
+            field("targetMonitoring").set(service, monitor)
+            field("destroyed").setBoolean(service, true)
+            field("activeService").set(null, service)
+            field("running").setBoolean(null, false)
+            assertEquals(TargetStatus.UNKNOWN, TargetStateStore.current(ctx, TargetId.MATRIX).status)
+        } finally {
+            field("activeService").set(null, previousService)
+            field("running").setBoolean(null, previousRunning)
+            (field("probeExecutor").get(service) as java.util.concurrent.ExecutorService).shutdownNow()
+            (field("extraProbeExecutor").get(service) as java.util.concurrent.ExecutorService).shutdownNow()
+            (field("extraCoordinator").get(service) as ExtraProbeCoordinator).close()
+        }
     }
 
     @Test fun serviceSecondaryWakeDoesNotRunTelegramBeforeItsDeadline() {
@@ -222,8 +248,8 @@ class MultiTargetPublicationTest {
         assertTrue(done.await(5, TimeUnit.SECONDS))
         failure.get()?.let { throw AssertionError(it) }
     }
-    private fun await(condition: () -> Boolean) {
-        val end = SystemClock.elapsedRealtime() + 10_000
+    private fun await(timeoutMs: Long = 10_000, condition: () -> Boolean) {
+        val end = SystemClock.elapsedRealtime() + timeoutMs
         while (!condition() && SystemClock.elapsedRealtime() < end) SystemClock.sleep(50)
         assertTrue(condition())
     }

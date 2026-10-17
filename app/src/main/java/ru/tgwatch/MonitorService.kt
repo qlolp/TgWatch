@@ -141,16 +141,18 @@ class MonitorService : Service() {
             }
         }
 
-        internal val targetRepository: TargetRepository? get() = activeService?.targetMonitoring?.repository
+        internal val targetRepository: TargetRepository? get() = activeService
+            ?.takeUnless { !running || it.destroyed || it.stopping }?.targetMonitoring?.repository
 
         fun start(ctx: Context) {
             if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             ctx.startForegroundService(Intent(ctx, MonitorService::class.java).setAction(ACTION_START))
         }
 
-        fun send(ctx: Context, action: String) {
+        fun send(ctx: Context, action: String, targetId: TargetId = TargetId.TELEGRAM) {
             if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             val intent = Intent(ctx, MonitorService::class.java).setAction(action)
+                .putExtra(TargetAutomation.EXTRA_TARGET_ID, targetId.wire)
             if (running) {
                 ctx.startService(intent)
             } else {
@@ -421,9 +423,16 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
-        val action = intent?.action
+        val intended = TargetId.entries.filterTo(mutableSetOf()) {
+            Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled
+        }
+        val command = TargetServiceCommands.route(intent?.action,
+            intent?.getStringExtra(TargetAutomation.EXTRA_TARGET_ID), intended)
+        if (command.ignored) return START_STICKY
+        val action = command.action
+        if (command.stopTarget) TargetPreferences.stop(this, command.targetId)
         recordRequestedTrigger(action)
-        if (action == ACTION_STOP) Prefs.setEnabled(this, false)
+        if (command.stopAll) Prefs.setEnabled(this, false)
         if (awaitingRecovery()) return START_NOT_STICKY
         if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
         if (!Prefs.isEnabled(this) || BackupManager.hasPending()) {
@@ -436,12 +445,12 @@ class MonitorService : Service() {
         val first = beginLoop()
         slowController?.reconcile()
         targetAlertController?.reconcile()
-        dispatchStartAction(action, first)
+        dispatchStartAction(action, first, command.targetId)
 
         return START_STICKY
     }
 
-    private fun dispatchStartAction(action: String?, first: Boolean) {
+    private fun dispatchStartAction(action: String?, first: Boolean, targetId: TargetId) {
         if (action == ACTION_ALARM) {
             val now = SystemClock.elapsedRealtime()
             if (targetMonitoring == null || telegramDueElapsed?.let { it <= now } == true)
@@ -449,8 +458,18 @@ class MonitorService : Service() {
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
             acquireWakeLockForCheck(force = true)
         }
-        if (first || action == ACTION_CHECK_NOW || action == ACTION_SETTINGS) {
+        if (first) {
             scheduleCheck(0L)
+        } else if (action == ACTION_CHECK_NOW || action == ACTION_SETTINGS) {
+            if (targetId == TargetId.TELEGRAM && TargetPreferences.definition(this, targetId).enabled) {
+                scheduleCheck(0L)
+            } else worker.post {
+                targetMonitoring?.let { targets ->
+                    targets.refresh(notify = false)
+                    if (action == ACTION_CHECK_NOW) targets.request(targetId)
+                    rearmChecks()
+                }
+            }
         } else if (action == ACTION_ALARM) {
             // The alarm duplicates the pending timer; it must not queue a check after a running one.
             if (targetMonitoring == null) checkSchedule.wake() else rearmChecks()
@@ -878,7 +897,11 @@ class MonitorService : Service() {
 
     /** Complete presentation key, derived only from the immutable state and cached aggregates. */
     private fun notificationView(s: State, now: Long = System.currentTimeMillis()): OngoingView =
-        OngoingNotification.view(s, currentNotificationStats(), now)
+        if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled)
+            OngoingNotification.view(s, currentNotificationStats(), now)
+        else OngoingNotification.targets(TargetId.entries.filter { it != TargetId.TELEGRAM &&
+            Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled }
+            .map { TargetStateStore.current(this, it) }, now, SystemClock.elapsedRealtime())
 
     private fun buildNotification(view: OngoingView): Notification =
         OngoingNotification.build(this, view, ::servicePending)

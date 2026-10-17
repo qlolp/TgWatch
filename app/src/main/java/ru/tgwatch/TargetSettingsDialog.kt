@@ -81,7 +81,7 @@ internal object TargetSettingsDialog {
             val current = TargetPreferences.storedDefinition(app, value.id)
             val applied = changed && TargetSettingWrites.definition(app,
                 value.copy(requiresEndpoint = current.requiresEndpoint), revision)
-            if (applied) TargetActions.reconcile(app)
+            if (applied) TargetActions.reconcile(app, value.id)
             applied
         }
     }
@@ -90,7 +90,7 @@ internal object TargetSettingsDialog {
         val app = activity.applicationContext
         val expected = TargetPreferences.fence.snapshot(id).revision
         TargetActions.submit(activity, id) {
-            TargetSettingWrites.endpoint(app, id, "", expected).also { if (it) TargetActions.reconcile(app) }
+            TargetSettingWrites.endpoint(app, id, "", expected).also { if (it) TargetActions.reconcile(app, id) }
         }
     }
 

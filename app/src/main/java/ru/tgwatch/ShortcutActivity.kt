@@ -21,7 +21,7 @@ class ShortcutActivity : Activity() {
     }
 
     private fun checkNow() {
-        if (!Prefs.isEnabled(this) || BackupManager.hasPending()) {
+        if (!TargetPreferences.definition(this, TargetId.TELEGRAM).enabled || BackupManager.hasPending()) {
             openApp()
             return
         }
@@ -35,13 +35,14 @@ class ShortcutActivity : Activity() {
     }
 
     private fun mute() {
-        val until = AlertActionReceiver.muteNow(this)
-        toast(until?.let { Lang.t("Оповещения заглушены до $it", "Alerts muted until $it") }
-            ?: Lang.t("Не удалось заглушить оповещения", "Could not mute alerts"))
+        val app = applicationContext
+        TargetSettingsExecutor.background(TargetId.TELEGRAM,
+            { AlertActionReceiver.muteNow(app) != null }, {})
     }
 
     private fun openApp() {
-        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(TargetAutomation.EXTRA_TARGET_ID, TargetId.TELEGRAM.wire))
     }
 
     private fun toast(text: String) = Toast.makeText(applicationContext, text, Toast.LENGTH_SHORT).show()

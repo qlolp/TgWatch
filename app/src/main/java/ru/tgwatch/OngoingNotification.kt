@@ -14,7 +14,7 @@ import ru.tgwatch.MonitorService.Status
 internal data class OngoingContent(val title: String, val text: String, val channel: String,
     val icon: Int, val color: Int, val colorized: Boolean)
 internal data class OngoingView(val notif: OngoingContent, val whenMs: Long,
-    val chronometer: Boolean, val progress: Int?)
+    val chronometer: Boolean, val progress: Int?, val targetId: TargetId = TargetId.TELEGRAM)
 
 /** Builds from immutable cached inputs; never reads history or owns service lifecycle. */
 internal object OngoingNotification {
@@ -58,6 +58,33 @@ internal object OngoingNotification {
             progress = NotificationProgress.percent(stats))
     }
 
+    /** Each row names its own goal; no combined uptime or invented outage start is displayed. */
+    fun targets(states: List<TargetSnapshot>, now: Long, elapsed: Long): OngoingView {
+        val selected = states.firstOrNull()?.id ?: TargetId.TELEGRAM
+        val lines = states.map { state ->
+            val stale = if (state.checkedElapsedMs > 0L)
+                ProbeRules.isStale(state.checkedElapsedMs, elapsed, state.expectedIntervalSec)
+                else ProbeRules.isStale(state.checkedAtMs, now, state.expectedIntervalSec)
+            val label = when {
+                state.checkedAtMs <= 0L -> Lang.t("ожидание проверки", "awaiting check")
+                stale -> Lang.t("устарело", "stale")
+                else -> when (state.status) {
+                    TargetStatus.OK -> Lang.t("доступен", "reachable")
+                    TargetStatus.DOWN -> Lang.t("недоступен", "unreachable")
+                    TargetStatus.PARTIAL -> Lang.t("частично доступен", "partially reachable")
+                    TargetStatus.NO_NETWORK -> Lang.t("нет интернета", "no internet")
+                    TargetStatus.UNKNOWN -> Lang.t("не определено", "unknown")
+                }
+            }
+            "${TargetNames.label(state.id)}: $label"
+        }
+        val title = if (states.isEmpty()) Lang.t("Мониторинг", "Monitoring")
+            else states.joinToString(" · ") { TargetNames.label(it.id) }
+        return OngoingView(OngoingContent(title, lines.joinToString("\n"), CHANNEL_OK,
+            R.drawable.ic_stat_wait, COLOR_OK, false), states.maxOfOrNull { it.checkedAtMs }
+                ?.takeIf { it > 0L } ?: now, false, null, selected)
+    }
+
     private fun content(state: State, now: Long, uptime: String, stale: Boolean): OngoingContent = when {
         state.status == Status.UNKNOWN -> OngoingContent(
             if (state.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown")
@@ -86,10 +113,20 @@ internal object OngoingNotification {
     fun build(ctx: Context, view: OngoingView, servicePending: (Int, String) -> PendingIntent): Notification {
         val openApp = PendingIntent.getActivity(ctx, 0,
             Intent(ctx, MainActivity::class.java)
+                .setData(android.net.Uri.parse("tgwatch://ongoing/${view.targetId.wire}"))
+                .putExtra(TargetAutomation.EXTRA_TARGET_ID, view.targetId.wire)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val check = servicePending(CHECK_REQUEST, MonitorService.ACTION_CHECK_NOW)
-        val stop = servicePending(STOP_REQUEST, MonitorService.ACTION_STOP)
+        fun pending(request: Int, action: String): PendingIntent {
+            if (view.targetId == TargetId.TELEGRAM) return servicePending(request, action)
+            val intent = Intent(ctx, MonitorService::class.java).setAction(action)
+                .setData(android.net.Uri.parse("tgwatch://ongoing/${view.targetId.wire}/$action"))
+                .putExtra(TargetAutomation.EXTRA_TARGET_ID, view.targetId.wire)
+            return PendingIntent.getForegroundService(ctx, request, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+        val check = pending(CHECK_REQUEST, MonitorService.ACTION_CHECK_NOW)
+        val stop = pending(STOP_REQUEST, MonitorService.ACTION_STOP)
         val content = view.notif
         val builder = Notification.Builder(ctx, content.channel)
             .setSmallIcon(content.icon)

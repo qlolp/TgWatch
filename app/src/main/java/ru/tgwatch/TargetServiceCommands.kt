@@ -1,0 +1,20 @@
+package ru.tgwatch
+
+internal data class TargetServiceCommand(val action: String?, val targetId: TargetId,
+    val stopTarget: Boolean = false, val stopAll: Boolean = false, val ignored: Boolean = false)
+
+/** Missing goal IDs belong to historical Telegram commands; invalid IDs never select a goal. */
+internal object TargetServiceCommands {
+    fun route(action: String?, rawId: String?, enabled: Set<TargetId>): TargetServiceCommand {
+        val id = if (rawId == null) TargetId.TELEGRAM else TargetId.fromWire(rawId)
+        if (id == null) return TargetServiceCommand(null, TargetId.TELEGRAM, ignored = true)
+        return when (action) {
+            MonitorService.ACTION_STOP -> {
+                val last = (enabled - id).isEmpty()
+                TargetServiceCommand(if (last) action else MonitorService.ACTION_SETTINGS, id, true, last)
+            }
+            MonitorService.ACTION_CHECK_NOW -> TargetServiceCommand(action.takeIf { id in enabled }, id)
+            else -> TargetServiceCommand(action, id)
+        }
+    }
+}

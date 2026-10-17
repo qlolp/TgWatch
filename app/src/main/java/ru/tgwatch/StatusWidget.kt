@@ -60,7 +60,7 @@ class StatusWidget : AppWidgetProvider() {
         }
 
         internal fun handleClick(ctx: Context) {
-            if (Prefs.isEnabled(ctx)) {
+            if (TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled) {
                 try {
                     MonitorService.send(ctx, MonitorService.ACTION_CHECK_NOW)
                 } catch (_: Exception) {
@@ -81,6 +81,7 @@ class StatusWidget : AppWidgetProvider() {
             ctx.startActivity(
                 Intent(ctx, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra(TargetAutomation.EXTRA_TARGET_ID, TargetId.TELEGRAM.wire)
             )
         }
 
@@ -97,7 +98,7 @@ class StatusWidget : AppWidgetProvider() {
         private fun content(ctx: Context): Content {
             val s = MonitorService.state
             val now = System.currentTimeMillis()
-            val running = MonitorService.running || Prefs.isEnabled(ctx)
+            val running = TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled
             val stale = s.isStale(now)
 
             val bg: Int

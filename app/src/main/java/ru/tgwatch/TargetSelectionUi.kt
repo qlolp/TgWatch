@@ -71,7 +71,9 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
 
     fun save(out: Bundle) { out.putString(SELECTED, selected.wire) }
     fun open(intent: Intent) {
-        TargetId.fromWire(intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty())?.let {
+        (TargetId.fromWire(intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty())
+            ?: TargetId.TELEGRAM.takeIf { !intent.hasExtra(TargetAutomation.EXTRA_TARGET_ID) &&
+                intent.action != Intent.ACTION_MAIN })?.let {
             spinner.setSelection(it.ordinal)
         }
     }
@@ -81,7 +83,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
         if (TargetConfigTransactions.isPending(id)) {
             val app = activity.applicationContext
             TargetActions.submit(activity, id) {
-                TargetConfigTransactions.retry(app, id).also { if (it) TargetActions.reconcile(app) }
+                TargetConfigTransactions.retry(app, id).also { if (it) TargetActions.reconcile(app, id) }
             }
         } else { dialog?.dismiss(); dialog = TargetSettingsDialog.show(activity, id) }
     }
