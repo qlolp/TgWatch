@@ -141,7 +141,10 @@ class StatusShareIntegrationTest {
         try {
             val testPackage = instrumentation.context.packageName
             val request = Intent().setComponent(ComponentName(testPackage, "ru.tgwatch.ShareGrantClientActivity"))
-                .setData(uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("reply_action", action)
+                // A reply can arrive before the previous helper task finishes.
+                // Reusing its identical root intent can swallow the next request.
+                .setData(uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                .putExtra("reply_action", action)
                 .putExtra("reply_package", ctx.packageName).putExtra("nonce", nonce)
             if (grant) {
                 request.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
