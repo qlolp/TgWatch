@@ -7,7 +7,7 @@ import javax.crypto.Cipher
 
 /** Portable archive format negotiation, separate from the private JSON journal codec. */
 object PortableBackupCodec {
-    const val MAX_ENVELOPE_BYTES = BackupCrypto.MAX_ENVELOPE_BYTES
+    const val MAX_ENVELOPE_BYTES = TargetBackupCodec.MAX_PLAINTEXT_BYTES + 56
     private const val PUBLISHED_MAX_BYTES = 4 * 1024 * 1024
     private const val HEADER_BYTES = 33
     private const val TAG_BYTES = 16
@@ -23,6 +23,15 @@ object PortableBackupCodec {
         "sound_partial" to false, "sound_recovery" to false)
     private val publishedIntegerKeys = setOf("interval_sec", "quiet_start_hour", "quiet_end_hour")
     private val publishedStringKeys = setOf("power_profile", "vibration_pattern")
+
+    fun encryptTargets(snapshot: TargetBackupSnapshot, password: CharArray): ByteArray =
+        TargetPortableBackup.encrypt(snapshot, password)
+
+    fun decryptTargets(bytes: ByteArray, password: CharArray): TargetBackupSnapshot =
+        decryptTargetImport(bytes, password).snapshot
+
+    internal fun decryptTargetImport(bytes: ByteArray, password: CharArray): TargetBackupImport =
+        TargetPortableBackup.decryptImport(bytes, password)
 
     /** Version 2 intentionally writes typed JSON; version 1 remains import-only. */
     fun encrypt(snapshot: BackupSnapshot, password: CharArray): ByteArray = checked {

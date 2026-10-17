@@ -14,23 +14,27 @@ object TargetPreferences {
         val defaults = TargetDefinition.default(id)
         val preferences = Prefs.sp(ctx)
         val telegram = id == TargetId.TELEGRAM
-        val interval = preferences.getInt(key(id, "interval"),
-            if (telegram) Prefs.intervalSec(ctx) else defaults.intervalSec)
+        val interval = (if (telegram) Prefs.intervalSec(ctx) else
+            preferences.getInt(key(id, "interval"), defaults.intervalSec))
             .coerceIn(if (telegram) TargetDefinition.MIN_TELEGRAM_SEC else TargetDefinition.MIN_TARGET_SEC,
                 if (telegram) TargetDefinition.MAX_TELEGRAM_SEC else TargetDefinition.MAX_TARGET_SEC)
-        return TargetDefinition(id, preferences.getBoolean(key(id, "enabled"), telegram && Prefs.isEnabled(ctx)),
+        return TargetDefinition(id, Prefs.isEnabled(ctx) && preferences.getBoolean(key(id, "enabled"), telegram),
             interval, preferences.getBoolean(key(id, "requires_endpoint"), defaults.requiresEndpoint),
-            TargetAlertSettings(preferences.getBoolean(key(id, "notify_outage"),
-                if (telegram) Prefs.notifyFor(ctx, "TG_DOWN") else defaults.alerts.notifyOutage),
-                preferences.getBoolean(key(id, "notify_recovery"),
-                    if (telegram) Prefs.notifyRecovery(ctx) else defaults.alerts.notifyRecovery),
-                preferences.getBoolean(key(id, "notify_slow"),
-                    if (telegram) Prefs.notifyFor(ctx, "SLOW") else defaults.alerts.notifySlow)))
+            TargetAlertSettings(if (telegram) Prefs.notifyFor(ctx, "TG_DOWN") else
+                preferences.getBoolean(key(id, "notify_outage"), defaults.alerts.notifyOutage),
+                if (telegram) Prefs.notifyRecovery(ctx) else
+                    preferences.getBoolean(key(id, "notify_recovery"), defaults.alerts.notifyRecovery),
+                if (telegram) Prefs.notifyFor(ctx, "SLOW") else
+                    preferences.getBoolean(key(id, "notify_slow"), defaults.alerts.notifySlow),
+                preferences.getLong(key(id, "slow_threshold"), defaults.alerts.slowThresholdMs)
+                    .coerceIn(TargetAlertSettings.MIN_SLOW_MS, TargetAlertSettings.MAX_SLOW_MS)
+                    .let { it / TargetAlertSettings.SLOW_STEP_MS * TargetAlertSettings.SLOW_STEP_MS }))
     }
 
     fun endpoint(ctx: Context, id: TargetId): String? {
         val app = ctx.applicationContext
-        if (!app.getSystemService(UserManager::class.java).isUserUnlocked) return null
+        if (!app.getSystemService(UserManager::class.java).isUserUnlocked ||
+            Prefs.sp(ctx).getBoolean(key(id, "endpoint_review"), false)) return null
         val raw = app.getSharedPreferences(PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
         return HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
     }

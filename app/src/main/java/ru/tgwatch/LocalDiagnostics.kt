@@ -45,7 +45,7 @@ object LocalDiagnostics {
         val ctx = activity.applicationContext
         Thread({
             val success = try {
-                check(!BackupManager.hasPending(ctx))
+                check(!BackupManager.hasPending())
                 val bytes = snapshot(ctx).toJson().toByteArray(Charsets.UTF_8)
                 ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
                     ?: error("No output stream")

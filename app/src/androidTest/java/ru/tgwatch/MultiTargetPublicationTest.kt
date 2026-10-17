@@ -90,6 +90,16 @@ class MultiTargetPublicationTest {
         assertEquals(TargetStatus.OK, monitor.repository.snapshot(TargetId.CUSTOM)!!.status)
     }
 
+    @Test fun telegramBridgePreservesRestoredEndpointRevision() {
+        assertTrue(Prefs.sp(ctx).edit().putLong(TargetPreferences.key(TargetId.TELEGRAM, "endpoint_revision"), 5).commit())
+        worker {
+            monitor.refresh(notify = false)
+            monitor.onTelegram(MonitorService.State(MonitorService.Status.OK, System.currentTimeMillis(),
+                checkedElapsed = SystemClock.elapsedRealtime()), emptyList())
+        }
+        assertEquals(5L, checkNotNull(monitor.repository.snapshot(TargetId.TELEGRAM)).endpointRevision)
+    }
+
     @Test fun disablingDuringFlightRejectsOldReportAndPreservesMatrix() {
         worker { monitor.startDue() }
         assertTrue(customStarted.await(5, TimeUnit.SECONDS))

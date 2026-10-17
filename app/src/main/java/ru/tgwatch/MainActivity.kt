@@ -481,7 +481,7 @@ class MainActivity : Activity() {
 
     private fun render() {
         if (recoveryUi.preparing()) return
-        if (BackupManager.hasPending(this)) {
+        if (BackupManager.hasPending()) {
             btnToggle.isEnabled = false
             btnCheck.isEnabled = false
             tvTitle.text = Lang.t("Незавершённое восстановление", "Restore not finished")

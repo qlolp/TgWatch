@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
@@ -171,4 +172,18 @@ configurations.matching { it.name == "detekt" }.configureEach {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
     }
+}
+
+// A separate fork tests the real maximum v3 archive without running the entire unit suite.
+tasks.register<Test>("targetBackupHeapTest") {
+    group = "verification"
+    description = "Round-trip the largest v3 backup in a 128 MiB JVM"
+    dependsOn("compileDebugUnitTestSources")
+    val unit = tasks.named<Test>("testDebugUnitTest").get()
+    testClassesDirs = unit.testClassesDirs
+    classpath = unit.classpath
+    maxHeapSize = "128m"
+    maxParallelForks = 1
+    systemProperty("tgwatch.backup.heap.limit", 128L * 1024 * 1024)
+    filter { includeTestsMatching("ru.tgwatch.TargetBackupCodecTest.maximumBackupFits128MiB") }
 }

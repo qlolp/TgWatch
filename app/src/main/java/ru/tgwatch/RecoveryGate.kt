@@ -4,6 +4,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
 
 enum class RecoveryState { INITIALIZING, READY, FAILED }
+internal class RecoveryDeferredException : IllegalStateException("Recovery waits for credential storage")
 
 /** A failed durable replay never opens the write/probe gate; retry uses the preserved journal. */
 internal class RecoveryGate(private val executor: Executor) {
@@ -21,9 +22,14 @@ internal class RecoveryGate(private val executor: Executor) {
         }
         try {
             executor.execute {
-                val recovered = runCatching(recover).isSuccess
+                val result = runCatching(recover)
+                val recovered = result.isSuccess
+                val deferred = result.exceptionOrNull() is RecoveryDeferredException
                 val actions = synchronized(lock) {
-                    state = if (recovered) RecoveryState.READY else RecoveryState.FAILED
+                    state = when { recovered -> RecoveryState.READY
+                        deferred -> RecoveryState.INITIALIZING
+                        else -> RecoveryState.FAILED }
+                    if (deferred) started = false
                     if (recovered) readyActions.toList().also { readyActions.clear() } else emptyList()
                 }
                 actions.forEach { runCatching(it) }

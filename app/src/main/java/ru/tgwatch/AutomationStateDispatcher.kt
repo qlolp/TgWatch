@@ -20,6 +20,14 @@ internal class AutomationStateDispatcher(
     private val deadline: (Long, () -> Unit) -> (() -> Unit) = AutomationDeadlines::schedule,
 ) {
     private val physical = AtomicReference<Attempt?>(null)
+    private val generationLock = Any()
+    private var generation = 0L
+
+    fun invalidate() = synchronized(generationLock) {
+        generation++
+        physical.get()?.expire()
+        AutomationStateCache.clear()
+    }
 
     fun health(): AutomationComputeHealth {
         val current = physical.get()
@@ -28,9 +36,13 @@ internal class AutomationStateDispatcher(
 
     fun submit(compute: () -> AutomationStateSnapshot, complete: (Result<AutomationStateSnapshot>) -> Unit,
         finish: () -> Unit): Boolean {
-        val attempt = Attempt({ result ->
-            AutomationStateCache.endCompute(clock(), result.getOrNull())
-            complete(result)
+        val admitted = synchronized(generationLock) { generation }
+        val attempt = Attempt({ result -> synchronized(generationLock) {
+            val current = if (admitted == generation) result else
+                Result.failure(TimeoutException("State invalidated by data replacement"))
+            AutomationStateCache.endCompute(clock(), current.getOrNull())
+            complete(current)
+        }
         }, finish)
         if (!physical.compareAndSet(null, attempt)) {
             attempt.finish(Result.failure(RejectedExecutionException("State compute is busy")))

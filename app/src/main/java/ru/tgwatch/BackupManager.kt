@@ -2,7 +2,6 @@ package ru.tgwatch
 
 import android.content.Context
 import android.os.Looper
-import java.io.File
 
 /** Portable data crosses this boundary only after full schema/authentication validation. */
 object BackupManager {
@@ -16,14 +15,7 @@ object BackupManager {
     private val transientKeys = setOf("last_status", "last_checked", "last_since", "last_latency",
         "last_reason", "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at")
 
-    private fun pending(ctx: Context) = File(ctx.applicationContext.createDeviceProtectedStorageContext()
-        .filesDir, "restore-pending-v1.json")
-
-    private fun publishedPending(ctx: Context) = File(ctx.applicationContext.createDeviceProtectedStorageContext()
-        .filesDir, "restore.pending")
-
-    private fun hasJournal(ctx: Context): Boolean = pending(ctx).exists() || publishedPending(ctx).exists()
-    fun hasPending(ctx: Context): Boolean = replacingHistory || hasJournal(ctx) ||
+    fun hasPending(): Boolean = replacingHistory || BackupJournals.pending ||
         RecoveryCoordinator.state != RecoveryState.READY
 
     /** One `now` stamps the copy and clips the predicted coverage tail it must not carry. */
@@ -47,52 +39,91 @@ object BackupManager {
         History.snapshot(ctx, now), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {
-        check(!hasPending(ctx)) { "Complete pending restore before export" }
-        return PortableBackupCodec.encrypt(snapshot(ctx), password)
+        check(!hasPending()) { "Complete pending restore before export" }
+        return PortableBackupCodec.encryptTargets(snapshotTargets(ctx), password)
+    }
+
+    @Synchronized fun exportTelegram(ctx: Context, password: CharArray): ByteArray {
+        check(!hasPending())
+        val data = snapshot(ctx)
+        return PortableBackupCodec.encrypt(data.copy(settings = data.settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY),
+            password)
     }
 
     fun decrypt(bytes: ByteArray, password: CharArray): BackupSnapshot {
-        return PortableBackupCodec.decrypt(bytes, password)
+        val imported = PortableBackupCodec.decryptTargetImport(bytes, password)
+        val data = imported.snapshot
+        val revision = data.observations[TargetId.TELEGRAM].orEmpty().maxOfOrNull { it.endpointRevision } ?: 0L
+        return BackupSnapshot(data.createdAtMs, data.globalSettings,
+            data.observations[TargetId.TELEGRAM].orEmpty().filter { it.endpointRevision == revision }.map {
+                if (it.row.kind == "DOWN") it.row.copy(kind = "TG_DOWN") else it.row
+            }, data.log)
     }
+
+    @Synchronized fun snapshotTargets(ctx: Context, now: Long = System.currentTimeMillis()): TargetBackupSnapshot =
+        TargetArchive.snapshot(ctx, now)
 
     /** CSV changes history; capture current configuration/log after the service has fully stopped. */
     @Synchronized fun importHistory(ctx: Context, observations: List<Observation>) {
         check(Looper.myLooper() != Looper.getMainLooper())
-        check(!hasPending(ctx))
+        check(!hasPending())
         val validated = BackupCodec.decode(BackupCodec.encode(BackupSnapshot(0L, emptyMap(), observations, emptyList())))
         replacingHistory = true
         try {
             check(Prefs.sp(ctx).edit().putBoolean("enabled", false).commit())
             WatchdogReceiver.cancel(ctx)
             MonitorService.stopAndAwait(ctx)
-            restore(ctx, snapshot(ctx).copy(observations = validated.observations))
+            val current = snapshotTargets(ctx)
+            val revision = TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM)
+            restoreTargets(ctx, current.copy(observations = current.observations + (TargetId.TELEGRAM to
+                validated.observations.map { TargetObservation(TargetPersistence.publicRow(it), revision) })))
         } finally { replacingHistory = false }
     }
 
     @Synchronized fun restore(ctx: Context, snapshot: BackupSnapshot) {
-        check(Looper.myLooper() != Looper.getMainLooper()) { "Restore must run off the UI thread" }
-        // Encode/decode before changing enabled/service/history: validates and detaches mutable input.
-        val payload = BackupCodec.encode(snapshot)
-        BackupCodec.decode(payload)
-        check(!hasJournal(ctx)) { "Complete pending restore before replacing data" }
-        try {
-            RestoreTransaction(pending(ctx)).stage(payload)
-            recoverPending(ctx)
-        } finally { payload.fill(0) }
+        val validated = BackupCodec.decode(BackupCodec.encode(snapshot))
+        TargetRestore.stage(ctx, TargetPortableBackup.legacy(validated))
+        recoverPending(ctx)
     }
 
-    /** Called at process startup before any component, or by a background restore worker. */
+    @Synchronized fun restoreTargets(ctx: Context, snapshot: TargetBackupSnapshot) {
+        val bytes = TargetBackupCodec.encode(snapshot)
+        val validated = try { TargetBackupCodec.decode(bytes) } finally { bytes.fill(0) }
+        TargetRestore.stage(ctx, TargetBackupImport(validated))
+        recoverPending(ctx)
+    }
+
+    /** Disk inspection and private migration happen only on recovery/restore workers. */
     @Synchronized fun recoverPending(ctx: Context): Boolean {
-        if (!hasJournal(ctx)) return false
-        check(Prefs.sp(ctx).edit().putBoolean("enabled", false).commit())
-        WatchdogReceiver.cancel(ctx)
-        MonitorService.stopAndAwait(ctx)
-        var recovered = false
-        HistorySessions.queue(ctx).exclusive {
-            recovered = BackupRecovery(settingKeys + transientKeys).recover(ctx, pending(ctx), publishedPending(ctx))
-        }.get()
-        if (RecoveryCoordinator.state == RecoveryState.FAILED) RecoveryCoordinator.start(ctx)
-        return recovered
+        check(Looper.myLooper() != Looper.getMainLooper())
+        BackupJournals.refresh(ctx)
+        if (!BackupJournals.pending) {
+            if (RecoveryCoordinator.state == RecoveryState.FAILED) RecoveryCoordinator.start(ctx)
+            return false
+        }
+        TargetRestore.requireUnlocked(ctx)
+        replacingHistory = true
+        try {
+            check(Prefs.sp(ctx).edit().putBoolean("enabled", false).commit())
+            WatchdogReceiver.cancel(ctx)
+            MonitorService.stopAndAwait(ctx)
+            WebhookNotifier.reset()
+            AutomationReceiver.invalidateState()
+            var recovered = false
+            HistorySessions.queue(ctx).exclusive {
+                TargetPersistence.initialize(ctx)
+                BackupJournals.migrateLegacy(ctx)
+                recovered = BackupJournals.transaction(ctx).recover { bytes, endpoint ->
+                    TargetRestore.apply(ctx, TargetBackupImport(TargetBackupCodec.decode(bytes), endpoint),
+                        settingKeys + transientKeys)
+                }
+            }.get()
+            // Requests admitted while the pending gate was closed cannot outlive the completed replacement.
+            AutomationReceiver.invalidateState()
+            WebhookNotifier.reset()
+            BackupJournals.refresh(ctx)
+            if (RecoveryCoordinator.state == RecoveryState.FAILED) RecoveryCoordinator.start(ctx)
+            return recovered
+        } finally { replacingHistory = false }
     }
-
 }

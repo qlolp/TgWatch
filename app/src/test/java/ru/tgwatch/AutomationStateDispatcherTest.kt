@@ -24,6 +24,27 @@ class AutomationStateDispatcherTest {
     private val snapshot = AutomationStateSnapshot("OK", 100, false, true)
     @After fun clear() { AutomationStateCache.clear() }
 
+    @Test fun restoreInvalidatesPendingReplyAndCacheWithoutReleasingPhysicalCompute() {
+        val deadline = Deadline()
+        var work: Runnable? = null
+        val dispatcher = AutomationStateDispatcher(Executor { work = it }, { 0L }, deadline::schedule)
+        var replies = 0
+        var finishes = 0
+        dispatcher.submit({ snapshot }, { result ->
+            assertTrue(result.isFailure)
+            replies++
+        }, { finishes++ })
+        dispatcher.invalidate()
+        assertEquals(1, replies)
+        assertEquals(1, finishes)
+        assertTrue(dispatcher.health().busy)
+        assertNull(AutomationStateCache.take(0))
+        work!!.run()
+        assertFalse(dispatcher.health().busy)
+        assertEquals(1, replies)
+        assertNull(AutomationStateCache.take(0))
+    }
+
     @Test fun hangingComputeFinishesPendingAtEightSecondsAndNeverSpawnsReplacement() {
         val worker = Executors.newSingleThreadExecutor()
         val started = CountDownLatch(1)

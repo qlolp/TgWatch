@@ -21,7 +21,7 @@ class MonitorHealthUiTest {
     private lateinit var preferences: Map<String, *>
     private lateinit var original: List<Observation>
     private lateinit var oldState: MonitorService.State
-    private val historyFile get() = File(ctx.createDeviceProtectedStorageContext().filesDir, "history-v2.csv")
+    private val historyFile get() = HistoryTestStorage.file(ctx)
     private fun field(name: String) = MonitorService::class.java.getDeclaredField(name).apply { isAccessible = true }
 
     @Before fun isolate() {

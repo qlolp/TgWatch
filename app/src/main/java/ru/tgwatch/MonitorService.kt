@@ -139,12 +139,12 @@ class MonitorService : Service() {
         }
 
         fun start(ctx: Context) {
-            if (BackupManager.hasPending(ctx) && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
+            if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             ctx.startForegroundService(Intent(ctx, MonitorService::class.java).setAction(ACTION_START))
         }
 
         fun send(ctx: Context, action: String) {
-            if (BackupManager.hasPending(ctx) && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
+            if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return
             val intent = Intent(ctx, MonitorService::class.java).setAction(action)
             if (running) {
                 ctx.startService(intent)
@@ -223,7 +223,7 @@ class MonitorService : Service() {
 
     private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
         !destroyed && !stopping && RecoveryCoordinator.state == RecoveryState.READY &&
-        Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
+        Prefs.isEnabled(ctx) && !BackupManager.hasPending()
 
     /**
      * Ограниченный пул; один зависший адрес не занимает новые потоки при повторных проверках.
@@ -385,7 +385,7 @@ class MonitorService : Service() {
         if (action == ACTION_STOP) Prefs.setEnabled(this, false)
         if (awaitingRecovery()) return START_NOT_STICKY
         if (action == ACTION_SETTINGS || action == ACTION_CHECK_NOW) offlineBackoff.reset()
-        if (!Prefs.isEnabled(this) || BackupManager.hasPending(this)) {
+        if (!Prefs.isEnabled(this) || BackupManager.hasPending()) {
             stopSelf()
             return START_NOT_STICKY
         }

@@ -56,10 +56,26 @@ object History {
     @Volatile var version = 0L
         private set
 
-    private fun file(ctx: Context) = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, FILE)
+    private fun file(ctx: Context) = TargetPersistence.active?.journalFile(TargetId.TELEGRAM)
+        ?: File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, FILE)
+    private fun writeRows(ctx: Context, rows: List<Observation>, replaceAll: Boolean = false) {
+        if (TargetPersistence.active != null) TargetPersistence.replaceTelegram(ctx, rows, replaceAll)
+        else HistoryStorage.write(file(ctx), rows)
+    }
+    @Synchronized internal fun invalidateTargetCache(legacyComplete: Boolean) {
+        loaded = false
+        migrated = legacyComplete
+        preparation.clear()
+        appliedPreparation = null
+        statsCache.clear()
+        version++
+    }
     private fun load(ctx: Context) {
         if (!loaded) {
-            val stored = HistoryFileReader.readCounted(file(ctx))
+            val stored = if (TargetPersistence.active == null) HistoryFileReader.readCounted(file(ctx)) else {
+                val rows = TargetPersistence.telegramRows(ctx)
+                HistoryFileReader.ReadResult(rows, rows.size)
+            }
             samples = stored.rows.toMutableList()
             physicalRows = stored.physicalRows
             preparation.clear()
@@ -77,7 +93,9 @@ object History {
             val marker = File(dp, "history-migrated-v2")
             val legacy = File(ctx.applicationContext.filesDir, "history.csv")
             val hadMarker = marker.exists()
-            val result = HistoryStorage.migrateLegacy(legacy, file(ctx), marker, samples)
+            val result = if (TargetPersistence.active == null)
+                HistoryStorage.migrateLegacy(legacy, file(ctx), marker, samples)
+            else migrateMinuteHistory(ctx, legacy, marker)
             if (samples != result.samples) {
                 preparation.clear()
                 appliedPreparation = null
@@ -88,6 +106,16 @@ object History {
             migrated = result.complete
             if (result.complete && !hadMarker) physicalRows = samples.size
         }
+    }
+    private fun migrateMinuteHistory(ctx: Context, legacy: File, marker: File): HistoryStorage.Migration {
+        if (marker.exists()) return HistoryStorage.Migration(samples, true)
+        val merged = Timeline.retained(HistoryStorage.merge(HistoryStorage.readLegacy(legacy), samples), Long.MIN_VALUE)
+        writeRows(ctx, merged)
+        java.io.FileOutputStream(marker).use {
+            it.write("legacy minute estimates imported".toByteArray()); it.fd.sync()
+        }
+        HistoryStorage.syncDirectory(marker.parentFile!!)
+        return HistoryStorage.Migration(merged, true)
     }
     private fun prune(now: Long) {
         val prepared = preparation.prepare(samples, version, now - KEEP_MS)
@@ -132,7 +160,7 @@ object History {
         prune(now)
         try {
             if (dirty || compaction.needsReplacement(now, physicalRows + 1, file(ctx).length() + MAX_APPEND_BYTES)) {
-                HistoryStorage.write(file(ctx), samples)
+                writeRows(ctx, samples)
                 dirty = false
                 lastCompacted = now
                 physicalRows = samples.size
@@ -141,7 +169,8 @@ object History {
             } else {
                 val elapsed = SystemClock.elapsedRealtime()
                 val sync = appendSync.needsSync(status, elapsed)
-                HistoryStorage.append(file(ctx), samples.last(), sync)
+                if (TargetPersistence.active != null) TargetPersistence.appendTelegram(ctx, samples.last(), sync)
+                else HistoryStorage.append(file(ctx), samples.last(), sync)
                 physicalRows++
                 compaction.savedAppend()
                 appendSync.saved(status, elapsed, sync)
@@ -246,9 +275,11 @@ object History {
     @Synchronized fun replaceSnapshot(ctx: Context, rows: List<Observation>) {
         val now = System.currentTimeMillis()
         dirty = true
-        val retained = HistoryStorage.replace(file(ctx), rows, now - KEEP_MS)
+        HistoryStorage.validateSnapshot(rows)
+        val retained = Timeline.retained(rows, now - KEEP_MS)
+        writeRows(ctx, retained, replaceAll = true)
         // A restored snapshot supersedes legacy history on subsequent process starts too.
-        val marker = File(file(ctx).parentFile, "history-migrated-v2")
+        val marker = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, "history-migrated-v2")
         if (!marker.exists()) java.io.FileOutputStream(marker).use {
             it.write("restored snapshot supersedes legacy history".toByteArray(Charsets.UTF_8))
             it.fd.sync()
@@ -304,7 +335,7 @@ object History {
         preparation.clear()
         appliedPreparation = null
         try {
-            HistoryStorage.write(file(ctx), samples)
+            writeRows(ctx, samples)
             dirty = false
             lastCompacted = now
             physicalRows = samples.size

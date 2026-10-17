@@ -9,6 +9,10 @@ import android.util.Log
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        if (action == Intent.ACTION_USER_UNLOCKED) {
+            RecoveryCoordinator.onUserUnlocked(context)
+            return
+        }
         if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
             DailySummaryReceiver.schedule(context)
             return

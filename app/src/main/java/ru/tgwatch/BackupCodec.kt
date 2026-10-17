@@ -24,6 +24,7 @@ object BackupCodec {
     /** Public probe address only; the webhook address is a credential and never enters backups. */
     private const val CUSTOM_PROBE_URL = "extra_probe_custom_url"
     private val stringKeys = setOf("power_profile", "vibration_pattern", CUSTOM_PROBE_URL)
+    internal val settingKeys: Set<String> = booleanKeys + integerRanges.keys + stringKeys
     private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size,
         booleanKeys.size + integerRanges.size + stringKeys.size)
 

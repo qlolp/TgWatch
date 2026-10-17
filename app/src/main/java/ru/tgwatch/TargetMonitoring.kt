@@ -78,6 +78,7 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         val cfg = repository.configuration(TargetId.TELEGRAM)
         val revision = Math.addExact(repository.snapshot(TargetId.TELEGRAM)?.revision ?: -1L, 1L)
         val snapshot = TargetSnapshot.fromTelegram(state, cfg.generation, revision, MonitorService.healthSnapshot())
+            .copy(endpointRevision = cfg.endpointRevision)
         val report = TargetReport(snapshot.status, outcomes.toList(), true, snapshot.latencyMs)
         if (repository.publish(snapshot)) host.onPublished(snapshot, report)
     }

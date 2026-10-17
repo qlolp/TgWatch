@@ -13,7 +13,7 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class HistoryPersistenceIntegrationTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
-    private val file get() = File(ctx.createDeviceProtectedStorageContext().filesDir, "history-v2.csv")
+    private val file get() = HistoryTestStorage.file(ctx)
     private val held get() = File(file.parentFile, "history-persistence-fixture-held")
     private var original: List<Observation>? = null
     private var enabled = false
@@ -91,7 +91,7 @@ class HistoryPersistenceIntegrationTest {
         History.record(ctx, now + 1000, History.Kind.FAIL, -1)
         recover()
         History.flush(ctx, now + 1000)
-        assertEquals(listOf(now, now + 1000), HistoryStorage.read(file).map { it.at })
+        assertEquals(listOf(now, now + 1000), HistoryTestStorage.rows(ctx).map { it.at })
         // A clean record must append; a redundant full repair would fail here.
         assertTrue(File(file.parentFile, file.name + ".tmp").mkdir())
         History.record(ctx, now + 2000, History.Kind.OK, 12)
@@ -113,7 +113,7 @@ class HistoryPersistenceIntegrationTest {
         History.replaceSnapshot(ctx, listOf(Observation(now, now + 500, "OK", 10)))
         History.stats(ctx, 1, now + 7 * 86_400_000L + 2000)
         History.record(ctx, now + 1000, History.Kind.OK, 12)
-        assertEquals(History.snapshot(ctx), HistoryStorage.read(file))
+        assertEquals(History.snapshot(ctx), HistoryTestStorage.rows(ctx))
         assertEquals(1, Timeline.stats(reload(), now - 1000, now + 2000).checks)
     }
 
@@ -125,8 +125,8 @@ class HistoryPersistenceIntegrationTest {
         }
         History.replaceSnapshot(ctx, rows)
         History.record(ctx, now + 1000, History.Kind.OK, 12)
-        assertTrue(HistoryStorage.read(file).size <= 66_024)
-        assertEquals(History.snapshot(ctx), Timeline.retained(HistoryStorage.read(file), now - 7 * 86_400_000L))
+        assertTrue(HistoryTestStorage.rows(ctx).size <= 66_024)
+        assertEquals(History.snapshot(ctx), Timeline.retained(HistoryTestStorage.rows(ctx), now - 7 * 86_400_000L))
         assertEquals(65_000, reload().size)
     }
 

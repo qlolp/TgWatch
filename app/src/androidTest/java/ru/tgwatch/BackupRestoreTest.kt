@@ -14,6 +14,7 @@ import java.io.File
 class BackupRestoreTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun stoppedSnapshot(): BackupSnapshot {
+        HistoryTestStorage.awaitReady()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         return BackupManager.snapshot(ctx)
@@ -88,7 +89,7 @@ class BackupRestoreTest {
             Prefs.rawSp(ctx).edit().putInt("interval_sec", 10).commit()
             assertTrue(BackupManager.recoverPending(ctx))
             assertEquals(60, Prefs.intervalSec(ctx))
-            assertFalse(BackupManager.hasPending(ctx))
+            assertFalse(BackupManager.hasPending())
         } finally { BackupManager.restore(ctx, original) }
     }
 
@@ -111,10 +112,11 @@ class BackupRestoreTest {
         val journal = File(ctx.createDeviceProtectedStorageContext().filesDir, "restore.pending")
         try {
             journal.writeBytes(payload)
-            assertTrue(BackupManager.hasPending(ctx))
+            BackupJournals.refresh(ctx)
+            assertTrue(BackupManager.hasPending())
             assertTrue(BackupManager.recoverPending(ctx))
             assertFalse(journal.exists())
-            assertFalse(BackupManager.hasPending(ctx))
+            assertFalse(BackupManager.hasPending())
             assertFalse(Prefs.isEnabled(ctx))
             assertEquals(60, Prefs.intervalSec(ctx))
             assertEquals(22*60, Prefs.quietStartMinute(ctx))

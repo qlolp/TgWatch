@@ -23,9 +23,16 @@ class BackupUi(private val activity: Activity) {
 
     fun close() { dialogs.forEach { it.dismiss() }; dialogs.clear() }
 
-    fun export() = document(Intent.ACTION_CREATE_DOCUMENT, EXPORT, "application/octet-stream", "tgwatch.tgwb")
+    fun export() {
+        AlertDialog.Builder(activity).setTitle(Lang.t("Формат резервной копии", "Backup format"))
+            .setItems(arrayOf(Lang.t("Все цели — v3", "All targets — v3"),
+                Lang.t("Только Telegram — совместимый v2", "Telegram only — compatible v2"))) { _, index ->
+                document(Intent.ACTION_CREATE_DOCUMENT, if (index == 0) EXPORT else EXPORT_LEGACY,
+                    "application/octet-stream", if (index == 0) "tgwatch.tgwb" else "tgwatch-telegram-v2.tgwb")
+            }.show().also { dialogs.add(it) }
+    }
     fun restore() {
-        if (BackupManager.hasPending(activity)) {
+        if (BackupManager.hasPending()) {
             AlertDialog.Builder(activity).setTitle(Lang.t("Завершить восстановление?", "Finish restoring?"))
                 .setMessage(Lang.t("Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения.", "The previous restore was interrupted. Monitoring stays off until it is finished."))
                 .setPositiveButton(Lang.t("Продолжить", "Continue")) { _, _ -> work(Lang.t("Восстановление…", "Restoring…"), {
@@ -51,22 +58,23 @@ class BackupUi(private val activity: Activity) {
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {
-        if (code !in EXPORT..CSV) return false
+        if (code !in EXPORT..EXPORT_LEGACY) return false
         if (result != Activity.RESULT_OK) return true
         val uri = data?.data ?: return true
         when (code) {
-            EXPORT -> password(true) { pass -> work(Lang.t("Создание копии…", "Creating backup…"), {
+            EXPORT, EXPORT_LEGACY -> password(true) { pass -> work(Lang.t("Создание копии…", "Creating backup…"), {
                 try {
-                    val archive = BackupManager.export(activity.applicationContext, pass)
+                    val archive = if (code == EXPORT) BackupManager.export(activity.applicationContext, pass)
+                        else BackupManager.exportTelegram(activity.applicationContext, pass)
                     activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(archive) }
                         ?: error("No output")
                 } finally { pass.fill('\u0000') }
             }, { message(Lang.t("Зашифрованная копия сохранена. Для восстановления потребуется пароль.", "Encrypted backup saved. You will need the password to restore it.")) },
                 Lang.t("Не удалось сохранить копию", "Couldn’t save the backup")) }
             RESTORE -> password(false) { pass -> work(Lang.t("Проверка копии…", "Checking backup…"), {
-                try { BackupManager.decrypt(read(uri, BackupCrypto.MAX_ENVELOPE_BYTES), pass) }
+                try { PortableBackupCodec.decryptTargetImport(read(uri, PortableBackupCodec.MAX_ENVELOPE_BYTES), pass) }
                 finally { pass.fill('\u0000') }
-            }, { preview(it, Lang.t("Восстановить копию?", "Restore this backup?")) }, Lang.t("Неверный пароль или повреждённая копия", "Wrong password or damaged backup")) }
+            }, { previewTargets(it) }, Lang.t("Неверный пароль или повреждённая копия", "Wrong password or damaged backup")) }
             CSV -> work(Lang.t("Проверка CSV…", "Checking CSV…"), {
                 val bytes = read(uri, BackupCodec.MAX_PLAINTEXT_BYTES)
                 val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
@@ -117,6 +125,24 @@ class BackupUi(private val activity: Activity) {
         dialogs.add(dialog)
     }
 
+    private fun previewTargets(imported: TargetBackupImport) {
+        val snapshot = imported.snapshot
+        val count = snapshot.observations.values.sumOf { it.size }
+        AlertDialog.Builder(activity).setTitle(Lang.t("Восстановить копию?", "Restore this backup?"))
+            .setMessage(Lang.t("Целей: ${snapshot.targets.size}. Записей истории: $count.\n\n" +
+                "Данные будут заменены. Все цели останутся выключены; приватные адреса нужно проверить заново.",
+                "Targets: ${snapshot.targets.size}. History records: $count.\n\n" +
+                    "Data will be replaced. All targets stay off; private endpoints require review."))
+            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ ->
+                work(Lang.t("Восстановление…", "Restoring…"), {
+                    TargetRestore.stage(activity.applicationContext, imported)
+                    BackupManager.recoverPending(activity.applicationContext)
+                }, { message(Lang.t("Данные восстановлены. Все цели выключены.",
+                    "Data restored. All targets are off.")); activity.recreate() },
+                    Lang.t("Восстановление прервано. Повторите попытку.", "Restore interrupted. Please retry."))
+            }.setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
+    }
+
     private fun preview(snapshot: BackupSnapshot, title: String, csv: Boolean = false) {
         val locale = activity.resources.configuration.locales[0]
         val format = DateFormat.getDateTimeInstance(DateFormat.DEFAULT, DateFormat.DEFAULT, locale)
@@ -154,5 +180,10 @@ class BackupUi(private val activity: Activity) {
     }
 
     private fun message(text: String) = Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
-    companion object { private const val EXPORT = 30; private const val RESTORE = 31; private const val CSV = 32 }
+    companion object {
+        private const val EXPORT = 30
+        private const val RESTORE = 31
+        private const val CSV = 32
+        private const val EXPORT_LEGACY = 33
+    }
 }

@@ -27,7 +27,7 @@ class HistoryFailureUiTest {
         original = History.snapshot(ctx)
         History.replaceSnapshot(ctx, emptyList())
         Prefs.sp(ctx).edit().putBoolean("onboarding_seen", true).commit()
-        file = File(ctx.createDeviceProtectedStorageContext().filesDir, "history-v2.csv")
+        file = HistoryTestStorage.file(ctx)
         assertTrue(file.delete())
         assertTrue(file.mkdir())
         History::class.java.getDeclaredField("loaded").apply { isAccessible = true }.setBoolean(null, false)

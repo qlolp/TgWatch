@@ -25,6 +25,7 @@ class AutomationReceiver : BroadcastReceiver() {
 
         private val stateDispatcher = AutomationStateDispatcher()
         internal fun computeHealth(): AutomationComputeHealth = stateDispatcher.health()
+        internal fun invalidateState() = stateDispatcher.invalidate()
 
     }
 
@@ -49,7 +50,7 @@ class AutomationReceiver : BroadcastReceiver() {
                     return
                 }
                 if (intent.action == ACTION_CHECK_NOW) {
-                    if (!Prefs.isEnabled(context) || !MonitorService.running || BackupManager.hasPending(context)) {
+                    if (!Prefs.isEnabled(context) || !MonitorService.running || BackupManager.hasPending()) {
                         reply(RESULT_STOPPED)
                         return
                     }
@@ -115,7 +116,7 @@ class AutomationReceiver : BroadcastReceiver() {
     }
 
     private fun stateSnapshot(ctx: Context): AutomationStateSnapshot {
-        val running = MonitorService.running && Prefs.isEnabled(ctx) && !BackupManager.hasPending(ctx)
+        val running = MonitorService.running && Prefs.isEnabled(ctx) && !BackupManager.hasPending()
         val state = if (running) MonitorService.state else Prefs.loadLastState(ctx) ?: MonitorService.State()
         val checkedAt = state.checkedAt.coerceAtLeast(0L)
         val now = System.currentTimeMillis()

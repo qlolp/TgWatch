@@ -31,7 +31,7 @@ class EventSettingsTest {
                 Prefs.notifyFor(ctx, "PARTIAL")
                 assertEquals(before, settings.all)
                 assertArrayEquals("A preference read must not consume the journal", sentinel, pending.readBytes())
-                assertTrue("Both retained journal formats must block enabling", BackupManager.hasPending(ctx))
+                assertTrue("Both retained journal formats must block enabling", BackupManager.hasPending())
                 Prefs.setEnabled(ctx, true)
                 assertEquals("A pending restore must prevent changing enabled", before["enabled"], settings.all["enabled"])
                 pending.delete()

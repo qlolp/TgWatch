@@ -56,7 +56,7 @@ class AndroidSmokeTest {
     }
     @Test fun historyUsesDeviceProtectedStorageAndExports() {
         History.record(ctx, System.currentTimeMillis(), History.Kind.PARTIAL, 30, 30)
-        val file = File(ctx.createDeviceProtectedStorageContext().filesDir, "history-v2.csv")
+        val file = HistoryTestStorage.file(ctx)
         assertTrue(file.exists())
         assertTrue(History.exportCsv(ctx).startsWith("from_utc,"))
         assertTrue(History.exportCsv(ctx).contains("PARTIAL"))

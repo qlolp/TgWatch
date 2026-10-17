@@ -58,7 +58,7 @@ class DailySummaryReceiver : BroadcastReceiver() {
         private fun eligible(ctx: Context, force: Boolean, settings: SharedPreferences, now: Long,
             isCurrent: () -> Boolean): Boolean = DailySummary.due(force, Prefs.dailySummary(ctx), Prefs.isEnabled(ctx),
                 alreadyDelivered(now, settings.getLong(LAST_DELIVERY, 0L))) &&
-            !BackupManager.hasPending(ctx) && isCurrent()
+            !BackupManager.hasPending() && isCurrent()
 
         private fun publish(ctx: Context, force: Boolean, settings: SharedPreferences, text: DailySummary.Text,
             isCurrent: () -> Boolean): Boolean {

@@ -7,6 +7,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecoveryGateTest {
+    @Test fun pendingCredentialRestoreWaitsForUnlockWithoutFailingOrOpeningGate() {
+        val pending = ArrayDeque<Runnable>()
+        val gate = RecoveryGate(Executor { pending.add(it) })
+        var probes = 0
+        gate.whenReady { probes++ }
+        gate.start { throw RecoveryDeferredException() }
+        pending.removeFirst().run()
+        assertEquals(RecoveryState.INITIALIZING, gate.state)
+        assertEquals(0, probes)
+        gate.start { }
+        pending.removeFirst().run()
+        assertEquals(RecoveryState.READY, gate.state)
+        assertEquals(1, probes)
+    }
     @Test fun recoveryFailureDoesNotStartProbesAndAllowsRetry() {
         val pending = ArrayDeque<Runnable>()
         val gate = RecoveryGate(Executor { pending.add(it) })

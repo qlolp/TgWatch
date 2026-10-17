@@ -26,7 +26,19 @@ object RecoveryCoordinator {
     val state get() = gate.state
     fun start(ctx: Context) {
         val app = ctx.applicationContext
-        gate.start { BackupManager.recoverPending(app) }
+        gate.start {
+            BackupManager.recoverPending(app)
+            TargetPersistence.initialize(app)
+            PrivateEndpoints.migrateLegacy(app)
+        }
+    }
+    fun onUserUnlocked(ctx: Context) {
+        val app = ctx.applicationContext
+        start(app)
+        whenReady { HistorySessions.queue(app).exclusive {
+            PrivateEndpoints.migrateLegacy(app)
+            History.snapshot(app)
+        } }
     }
     fun whenReady(action: () -> Unit) = gate.whenReady(action)
 }

@@ -96,7 +96,7 @@ class IncidentActivity : Activity() {
     private fun updatePeriod() { period.setText(if (days == 1) R.string.period_day else R.string.period_week) }
 
     private fun refresh() {
-        if (!resumed || BackupManager.hasPending(this)) return
+        if (!resumed || BackupManager.hasPending()) return
         val key = HistoryDisplayKey(History.version, System.currentTimeMillis() / MINUTE_MS, days)
         if (requested != key) { requested = key; loader.request(key) }
     }
@@ -106,7 +106,7 @@ class IncidentActivity : Activity() {
         val display = result.getOrNull()
         val fresh = display != null && display.version == History.version &&
             display.at / MINUTE_MS == System.currentTimeMillis() / MINUTE_MS
-        if (fresh && !BackupManager.hasPending(this)) {
+        if (fresh && !BackupManager.hasPending()) {
             adapter.clear()
             adapter.addAll(display.cards)
             empty.setText(R.string.incidents_empty)

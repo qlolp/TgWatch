@@ -21,7 +21,7 @@ class ShortcutActivity : Activity() {
     }
 
     private fun checkNow() {
-        if (!Prefs.isEnabled(this) || BackupManager.hasPending(this)) {
+        if (!Prefs.isEnabled(this) || BackupManager.hasPending()) {
             openApp()
             return
         }

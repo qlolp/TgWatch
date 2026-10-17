@@ -44,7 +44,8 @@ class BackupRestoreIntegrationTest {
 
     @Before fun saveCurrentDataAndStopMonitoring() {
         assertNotSame("Backup APIs must run on the instrumentation worker", Looper.getMainLooper(), Looper.myLooper())
-        assertFalse("A previous transaction must not be silently discarded", BackupManager.hasPending(ctx))
+        HistoryTestStorage.awaitReady()
+        assertFalse("A previous transaction must not be silently discarded", BackupManager.hasPending())
         previousSettings = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
@@ -61,7 +62,7 @@ class BackupRestoreIntegrationTest {
         if (previousSettings == null) return
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
-        if (BackupManager.hasPending(ctx)) BackupManager.recoverPending(ctx)
+        if (BackupManager.hasPending()) BackupManager.recoverPending(ctx)
         previousHistory?.let { History.replaceSnapshot(ctx, it) }
         writeSettings(previousSettings!!, clear = true)
         // The preferences also contain the durable log: restore the adapter last so its cache
@@ -97,6 +98,7 @@ class BackupRestoreIntegrationTest {
 
     private fun seed(snapshot: BackupSnapshot) {
         writeSettings(snapshot.settings)
+        PrivateEndpoints.migrateLegacy(ctx)
         History.replaceSnapshot(ctx, snapshot.observations)
         EventLog.replace(ctx, snapshot.log)
     }
@@ -111,12 +113,17 @@ class BackupRestoreIntegrationTest {
     }
 
     private fun assertPortableData(expected: BackupSnapshot) {
-        assertEquals(expected.settings, Prefs.sp(ctx).all.filterKeys { it in portableSettings })
+        assertEquals(expected.settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY,
+            Prefs.sp(ctx).all.filterKeys { it in portableSettings })
+        (expected.settings[TargetBackupCodec.LEGACY_ENDPOINT_KEY] as? String)?.let {
+            assertEquals(it, Prefs.extraCustomUrl(ctx))
+        }
+        assertFalse(Prefs.sp(ctx).contains(TargetBackupCodec.LEGACY_ENDPOINT_KEY))
         assertEquals(expected.observations, History.snapshot(ctx))
         assertEquals(expected.log, EventLog.all(ctx))
         // Verify the durable Android files too, not merely the in-memory adapters.
         val dp = ctx.createDeviceProtectedStorageContext()
-        assertEquals(expected.observations, HistoryStorage.read(File(dp.filesDir, "history-v2.csv")))
+        assertEquals(expected.observations, HistoryTestStorage.rows(ctx))
         assertEquals(expected.log, EventLogStorage.decode(
             dp.getSharedPreferences("tgwatch", android.content.Context.MODE_PRIVATE).getString("log", "")!!))
     }
@@ -134,7 +141,7 @@ class BackupRestoreIntegrationTest {
             "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at")) {
             assertFalse("Transient preference $key leaked from restore", Prefs.sp(ctx).contains(key))
         }
-        assertFalse(BackupManager.hasPending(ctx))
+        assertFalse(BackupManager.hasPending())
     }
 
     private fun rejected(action: () -> Unit) {
@@ -154,7 +161,7 @@ class BackupRestoreIntegrationTest {
         try {
             val encrypted = BackupManager.export(ctx, password)
             val decoded = BackupManager.decrypt(encrypted, password)
-            assertEquals(source.settings, decoded.settings)
+            assertEquals(source.settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY, decoded.settings)
             // The portable copy ends at its creation time: a predicted tail is not observed time.
             assertEquals(source.observations.dropLast(1), decoded.observations.dropLast(1))
             assertEquals(source.observations.last().copy(until = decoded.createdAt), decoded.observations.last())
@@ -210,7 +217,7 @@ class BackupRestoreIntegrationTest {
                 assertEquals(beforeState, MonitorService.state)
                 assertFalse(MonitorService.running)
                 assertPortableData(current)
-                assertFalse(BackupManager.hasPending(ctx))
+                assertFalse(BackupManager.hasPending())
             }
         } finally {
             password.fill('\u0000')
@@ -237,7 +244,7 @@ class BackupRestoreIntegrationTest {
             assertEquals(beforeSettings, Prefs.sp(ctx).all)
             assertEquals(beforeState, MonitorService.state)
             assertTrue("Validation must occur before disabling monitoring", Prefs.isEnabled(ctx))
-            assertFalse(BackupManager.hasPending(ctx))
+            assertFalse(BackupManager.hasPending())
             assertPortableData(current)
         }
     }
@@ -285,7 +292,8 @@ class BackupRestoreIntegrationTest {
         val pending = File(ctx.createDeviceProtectedStorageContext().filesDir, "restore-pending-v1.json")
         // Simulate a process dying after durable staging and only part of applying the snapshot.
         RestoreTransaction(pending).stage(BackupCodec.encode(restored))
-        assertTrue(BackupManager.hasPending(ctx))
+        BackupJournals.refresh(ctx)
+        assertTrue(BackupManager.hasPending())
         History.replaceSnapshot(ctx, restored.observations.take(1))
         EventLog.replace(ctx, listOf("partially applied old journal"))
         writeSettings(mapOf("interval_sec" to 10, "enabled" to true))
@@ -302,9 +310,10 @@ class BackupRestoreIntegrationTest {
         BackupManager.restore(ctx, restored)
         val pending = File(ctx.createDeviceProtectedStorageContext().filesDir, "restore-pending-v1.json")
         RestoreTransaction(pending).stage(BackupCodec.encode(restored))
+        BackupJournals.refresh(ctx)
         Prefs.setEnabled(ctx, true)
         assertFalse("Pending restore must prevent re-enabling checks", Prefs.isEnabled(ctx))
-        assertTrue(BackupManager.hasPending(ctx))
+        assertTrue(BackupManager.hasPending())
 
         val destroyed = CountDownLatch(1)
         val receiver = object : BroadcastReceiver() {
@@ -328,7 +337,7 @@ class BackupRestoreIntegrationTest {
                 instrumentation.waitForIdleSync()
                 assertFalse(MonitorService.running)
                 assertFalse(Prefs.isEnabled(ctx))
-                assertTrue(BackupManager.hasPending(ctx))
+                assertTrue(BackupManager.hasPending())
                 // The last row ends in the future. An unconditional endSession would clip it.
                 assertPortableData(restored)
             }
@@ -359,8 +368,8 @@ class BackupRestoreIntegrationTest {
                 finally { completed.countDown() }
             }.start()
             val deadline = SystemClock.elapsedRealtime() + 5000
-            while (!BackupManager.hasPending(ctx) && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(10)
-            assertTrue("CSV must guard restarts even before durable staging", BackupManager.hasPending(ctx))
+            while (!BackupManager.hasPending() && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(10)
+            assertTrue("CSV must guard restarts even before durable staging", BackupManager.hasPending())
             assertFalse(File(ctx.createDeviceProtectedStorageContext().filesDir, "restore-pending-v1.json").exists())
             Prefs.setEnabled(ctx, true)
             MonitorService.start(ctx)
@@ -368,7 +377,7 @@ class BackupRestoreIntegrationTest {
         } finally { releaseMain.countDown() }
         assertTrue(completed.await(15, TimeUnit.SECONDS))
         failure.get()?.let { throw AssertionError("CSV import failed", it) }
-        assertFalse(BackupManager.hasPending(ctx))
+        assertFalse(BackupManager.hasPending())
         assertPortableData(current)
         assertMonitoringDisabledAndDiagnosticsCleared()
     }

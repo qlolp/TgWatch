@@ -36,7 +36,6 @@ object Prefs {
     private const val KEY_EXTRA_MATRIX = "extra_probe_matrix"
     private const val KEY_EXTRA_WHATSAPP = "extra_probe_whatsapp"
     private const val KEY_EXTRA_CUSTOM = "extra_probe_custom"
-    private const val KEY_EXTRA_CUSTOM_URL = "extra_probe_custom_url"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
@@ -103,7 +102,7 @@ object Prefs {
     fun isEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(ctx: Context, value: Boolean) {
-        if (value && BackupManager.hasPending(ctx)) return
+        if (value && BackupManager.hasPending()) return
         sp(ctx).edit().putBoolean(KEY_ENABLED, value).apply()
         if (value) WatchdogReceiver.schedule(ctx) else WatchdogReceiver.cancel(ctx)
     }
@@ -201,20 +200,10 @@ object Prefs {
     fun extraCustom(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EXTRA_CUSTOM, false)
     fun setExtraCustom(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EXTRA_CUSTOM, value).apply() }
 
-    /** Validated public HTTPS address, or an empty string. Not a credential: no user info or query. */
-    fun extraCustomUrl(ctx: Context): String =
-        ExtraProbes.normalizeCustomUrl(sp(ctx).getString(KEY_EXTRA_CUSTOM_URL, null)).orEmpty()
+    /** Endpoint addresses are credential protected and unavailable before unlock. */
+    fun extraCustomUrl(ctx: Context): String = PrivateEndpoints.legacy(ctx)
 
-    /** Empty input clears the address and disables the probe; invalid input changes nothing. */
-    fun setExtraCustomUrl(ctx: Context, value: String): Boolean {
-        val url = if (value.isBlank()) "" else ExtraProbes.normalizeCustomUrl(value)
-        if (url != null) {
-            val edit = sp(ctx).edit().putString(KEY_EXTRA_CUSTOM_URL, url)
-            if (url.isEmpty()) edit.putBoolean(KEY_EXTRA_CUSTOM, false)
-            edit.apply()
-        }
-        return url != null
-    }
+    fun setExtraCustomUrl(ctx: Context, value: String): Boolean = PrivateEndpoints.setLegacy(ctx, value)
 
     fun extraProbeEndpoints(ctx: Context): List<ProbeEndpoint> =
         ExtraProbes.endpoints(extraMatrix(ctx), extraWhatsapp(ctx), extraCustom(ctx), extraCustomUrl(ctx))

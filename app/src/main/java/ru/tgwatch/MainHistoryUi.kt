@@ -58,7 +58,7 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
     fun refresh(selected: Int, now: Long) {
         if (!resumed) return
         health.refresh(now)
-        if (BackupManager.hasPending(activity)) return
+        if (BackupManager.hasPending()) return
         days = selected
         val key = HistoryDisplayKey(History.version, now / MINUTE_MS, days)
         if (requested != key) {
@@ -69,7 +69,7 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
 
     private fun show(key: HistoryDisplayKey, result: Result<HistoryDisplay>) {
         if (!resumed || activity.isFinishing || key.days != days) return
-        if (BackupManager.hasPending(activity)) { invalidate(); return }
+        if (BackupManager.hasPending()) { invalidate(); return }
         val value = result.getOrNull()
         if (value == null || value.version != History.version ||
             value.at / MINUTE_MS != System.currentTimeMillis() / MINUTE_MS) {

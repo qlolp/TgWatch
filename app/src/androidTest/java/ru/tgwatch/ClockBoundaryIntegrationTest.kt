@@ -19,7 +19,7 @@ class ClockBoundaryIntegrationTest {
     private var oldLog: List<String>? = null
 
     @Before fun saveFixture() {
-        assertFalse(BackupManager.hasPending(ctx))
+        assertFalse(BackupManager.hasPending())
         oldSettings = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
@@ -31,7 +31,7 @@ class ClockBoundaryIntegrationTest {
         if (oldSettings == null) return
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
-        if (BackupManager.hasPending(ctx)) BackupManager.recoverPending(ctx)
+        if (BackupManager.hasPending()) BackupManager.recoverPending(ctx)
         oldHistory?.let { History.replaceSnapshot(ctx, it) }
         val edit = Prefs.sp(ctx).edit().clear()
         oldSettings!!.forEach { (key, value) -> when (value) {
@@ -62,8 +62,8 @@ class ClockBoundaryIntegrationTest {
         val version = History.version
         History.stats(ctx, 1, now)
         assertEquals("Reading stats must not repeatedly roll over", version, History.version)
-        val file = File(ctx.createDeviceProtectedStorageContext().filesDir, "history-v2.csv")
-        assertEquals("Epoch remapping must be durably flushed", rolled, HistoryStorage.read(file))
+        val file = HistoryTestStorage.file(ctx)
+        assertEquals("Epoch remapping must be durably flushed", rolled, HistoryTestStorage.rows(ctx))
 
         History.record(ctx, now + 1, History.Kind.OK, Long.MAX_VALUE)
         val fresh = History.snapshot(ctx)
