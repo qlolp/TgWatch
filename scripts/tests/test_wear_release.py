@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
 import sys
+import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -36,6 +39,13 @@ class WearReleaseTests(unittest.TestCase):
         good = "package: name='ru.tgwatch.wear' versionCode='1019000' versionName='1.19.0'\nsdkVersion:'30'\n"
         with patch('apk_verification.subprocess.run', return_value=subprocess.CompletedProcess([], 0, good, '')):
             verify_apk_identity(Path('watch.apk'), '1.19.0', 1019000, 'aapt2', application_id='ru.tgwatch.wear')
+        modern = good.replace('sdkVersion:', 'minSdkVersion:')
+        with patch('apk_verification.subprocess.run', return_value=subprocess.CompletedProcess([], 0, modern, '')):
+            verify_apk_identity(Path('watch.apk'), '1.19.0', 1019000, 'aapt2', application_id='ru.tgwatch.wear')
+        duplicate = modern + "sdkVersion:'30'\n"
+        with patch('apk_verification.subprocess.run', return_value=subprocess.CompletedProcess([], 0, duplicate, '')):
+            with self.assertRaises(ValueError):
+                verify_apk_identity(Path('watch.apk'), '1.19.0', 1019000, 'aapt2', application_id='ru.tgwatch.wear')
         for bad in (good.replace("sdkVersion:'30'", "sdkVersion:'29'"), good.replace('ru.tgwatch.wear', 'ru.tgwatch')):
             with patch('apk_verification.subprocess.run', return_value=subprocess.CompletedProcess([], 0, bad, '')):
                 with self.assertRaises(ValueError):
@@ -50,6 +60,30 @@ class WearReleaseTests(unittest.TestCase):
                     transcript.replace(sorted(EXPECTED)[0], 'unrelatedTest')):
             with self.assertRaises(ValueError):
                 verify(bad, 30)
+
+    def test_smoke_uses_standard_runner_tools_without_ripgrep(self):
+        from wear_smoke_report import EXPECTED
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bin_dir = root / 'bin'
+            bin_dir.mkdir()
+            for name in ['mkdir', 'tr', 'grep', 'timeout', 'cat']:
+                (bin_dir / name).symlink_to(shutil.which(name))
+            (bin_dir / 'python3').symlink_to(sys.executable)
+            transcript = '\n'.join(f'INSTRUMENTATION_STATUS: test={name}\nINSTRUMENTATION_STATUS_CODE: 0'
+                                   for name in sorted(EXPECTED)) + f'\nOK ({len(EXPECTED)} tests)\n'
+            fake_adb = bin_dir / 'adb'
+            fake_adb.write_text(f'#!{sys.executable}\nimport sys\nargs=" ".join(sys.argv[1:])\n'
+                'if "getprop" in args: print("30")\n'
+                'elif "list features" in args: print("feature:android.hardware.type.watch")\n'
+                f'elif "am instrument" in args: print({transcript!r})\n')
+            fake_adb.chmod(0o755)
+            repo = Path(__file__).resolve().parents[2]
+            result = subprocess.run(['/bin/bash', str(repo / 'scripts/wear-smoke.sh')], cwd=repo,
+                env=dict(os.environ, PATH=str(bin_dir), WEAR_SMOKE_SKIP_BUILD='true',
+                         WEAR_SMOKE_REPORT_DIR=str(root / 'reports')),
+                text=True, capture_output=True, timeout=15)
+            self.assertEqual(0, result.returncode, result.stderr)
 
 
 if __name__ == '__main__':

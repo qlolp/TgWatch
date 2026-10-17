@@ -37,7 +37,7 @@ def verify_apk_identity(apk, version, code, aapt2, application_id=None):
         if matches != [value]:
             label = "package name" if key == "name" else key
             raise ValueError(f"APK {label} does not match expected {value}")
-    if application_id is not None and re.findall(r"^sdkVersion:'([0-9]+)'$", result.stdout, re.M) != [str(app['min_sdk'])]:
+    if application_id is not None and re.findall(r"^(?:minSdkVersion|sdkVersion):'([0-9]+)'$", result.stdout, re.M) != [str(app['min_sdk'])]:
         raise ValueError('APK minSdk differs from the approved application floor')
 
 

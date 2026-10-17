@@ -104,15 +104,34 @@ class WatchSurfacesTest {
                 assertTrue(button.getGlobalVisibleRect(visible))
                 assertTrue(visible.height() >= (48 * screen.resources.displayMetrics.density).toInt())
             }
-            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
-                try { FileOutputStream(File(context.filesDir, "wear-large-font.png")).use {
-                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-                } } finally { bitmap.recycle() }
-            } ?: fail("Wear screenshot missing")
+            renderedScreenshot().let { bitmap ->
+                try {
+                    FileOutputStream(File(context.filesDir, "wear-large-font.png")).use {
+                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    }
+                } finally { bitmap.recycle() }
+            }
         } finally {
             activity?.let { instrumentation.runOnMainSync { it.finish() } }
             shell("settings put system font_scale $scale")
         }
+    }
+    private fun renderedScreenshot(): Bitmap {
+        // Main-thread idleness proves view measurement, not that SurfaceFlinger latched the frame.
+        val until = SystemClock.elapsedRealtime() + 15_000
+        while (SystemClock.elapsedRealtime() < until) {
+            val bitmap = instrumentation.uiAutomation.takeScreenshot()
+            if (bitmap != null) {
+                val colors = mutableSetOf<Int>()
+                for (y in bitmap.height / 5 until bitmap.height * 4 / 5 step 4) {
+                    for (x in bitmap.width / 5 until bitmap.width * 4 / 5 step 4) colors.add(bitmap.getPixel(x, y))
+                }
+                if (colors.size > 12 && 0xff111319.toInt() in colors) return bitmap
+                bitmap.recycle()
+            }
+            SystemClock.sleep(100)
+        }
+        error("Screenshot must contain rendered app content, not a flat starting window")
     }
     private fun <T : ContextWrapper> attach(service: T): T {
         ContextWrapper::class.java.getDeclaredMethod("attachBaseContext", Context::class.java)

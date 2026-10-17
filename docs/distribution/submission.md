@@ -12,9 +12,9 @@ publishing or enabling the disabled candidate recipe.
 | Toolchain | Gradle8.14.6, AGP8.13.2, Kotlin2.4.21, JDK17, SDK35/build-tools35.0.0 |
 | fdroidserver | Isolated2.4.5; readmeta and lint exit0 on17October2026 |
 | Categories | Official fdroiddata keys; source hash recorded in `../fdroid.md` |
-| Independent unsigned source build | Pending final committed source snapshot |
+| Independent unsigned source build | Passed from committed snapshot b96a02703c449fcf0f9218af6f6dbc569b743eea; package/version/API verified |
 | F-Droid recipe build | Pending verification of intended published source tag and catalog tooling |
-| Production payload reproducibility | Pending independent source build and exact signed upstream APK comparison |
+| Production payload reproducibility | Pending signed upstream comparison; unsigned code/resources match, Git provenance entry differs |
 | GitHub metadata | Prepared values in repository-metadata.json; API access currently blockedCONNECT403 |
 | Sending a submission | Not sent; requires separate instruction to send |
 
@@ -57,3 +57,19 @@ Attach after final verification: the candidate recipe, exact source tag/commit,
 LICENSE, store metadata/screenshots, readmeta/lint logs, unsigned build identity and
 resolved inventory/SBOM, plus payload-comparison results when available. No signing
 key, real history, private endpoints or tokens belong in the submission.
+
+## Independent source assembly evidence
+
+An archive of commit `b96a02703c449fcf0f9218af6f6dbc569b743eea` was assembled in a
+separate clean directory, with every signing variable unset. The real unsigned APK
+reports `ru.tgwatch`, version1.19.0/code1019000, minSdk26/target35. Its SHA-256 is
+`da0af0a656e89dd08136d85a29b3890a8168a460bfca346240aa95009c36767f`.
+The resolved runtime SBOM exactly matched the workspace's SBOM.
+
+Every code/resource ZIP payload and entry timestamp matched the workspace APK. The
+sole differing entry is `META-INF/version-control-info.textproto`: an archive has
+`NO_SUPPORTED_VCS_FOUND`, while a Git-aware build embeds its revision. The complete
+unsigned APK bytes therefore do not match. This is **not** proof of reproducibility
+against an upstream production-signed APK, nor a completed F-Droid recipe build.
+The catalog build and an exact Git-aware signed-payload comparison remain separate
+checks after the intended immutable source tag exists.
