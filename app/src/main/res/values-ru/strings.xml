@@ -172,6 +172,9 @@
     <string name="widget_muted">Оповещения цели заглушены на час</string>
     <string name="widget_mute_hour">Тихо 1 ч</string>
     <string name="widget_coverage_day">Покрытие измерениями за сутки: %1$s</string>
+    <string name="widget_age_coverage">%1$s · %2$s за 24 ч</string>
+    <string name="widget_goal_off">%1$s · мониторинг выключен</string>
+    <string name="widget_goal_stale">%1$s · результат устарел</string>
     <string name="widget_graph_description">Последние 6 часов, 72 интервала по 5 минут: %1$d доступны, %2$d неизвестны. Пробелы не означают сбои.</string>
     <string name="widget_last_result">Последний результат: %1$s</string>
     <string name="share_status_title">Поделиться статусом</string>

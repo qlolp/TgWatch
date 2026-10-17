@@ -102,6 +102,8 @@ unmeasured checks break the pending streak. DC buckets are not portable backup d
 
 Widgets select a target; existing widgets keep Telegram. An expanded widget shows
 six hours of history, observation coverage, last success and check/mute actions.
+Enlarged fonts keep the status, graph and48dp actions readable; secondary captions
+remain available in the full TalkBack description and the goal screen.
 Status sharing freezes a preview before sending either text or a PNG through the
 system share sheet. Both use the same capture, excluding addresses and secrets.
 

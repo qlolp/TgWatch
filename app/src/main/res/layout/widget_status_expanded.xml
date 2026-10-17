@@ -1,29 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widgetRoot" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="8dp" android:background="@drawable/bg_widget_idle">
+    android:orientation="vertical" android:paddingStart="4dp" android:paddingEnd="4dp"
+    android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/bg_widget_idle">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:gravity="center_vertical">
         <ImageView android:id="@+id/widgetIcon" android:layout_width="24dp" android:layout_height="24dp"
             android:src="@drawable/ic_stat_wait" android:contentDescription="@string/status_icon" />
         <TextView android:id="@+id/widgetTitle" android:layout_width="0dp" android:layout_weight="1"
             android:layout_height="wrap_content" android:textSize="14sp" android:paddingStart="8dp"
-            android:paddingEnd="0dp" android:maxLines="2" android:textColor="@color/on_status" />
+            android:paddingEnd="0dp" android:maxLines="1" android:ellipsize="end" android:textColor="@color/on_status" />
     </LinearLayout>
     <TextView android:id="@+id/widgetSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="12sp" android:textColor="@color/on_status" />
+        android:textSize="12sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textColor="@color/on_status" />
     <TextView android:id="@+id/widgetLastSuccess" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="12sp" android:textColor="@color/on_status" />
+        android:textSize="12sp" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textColor="@color/on_status" />
     <TextView android:id="@+id/widgetCoverage" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="12sp" android:textColor="@color/on_status" />
+        android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:textColor="@color/on_status" />
     <ImageView android:id="@+id/widgetGraph" android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:minHeight="12dp" android:scaleType="fitXY" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-        <Button android:id="@+id/widgetCheck" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/check_now"
-            android:textSize="12sp" />
-        <Button android:id="@+id/widgetMute" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/widget_mute_hour"
-            android:textSize="12sp" />
+        <ImageButton android:id="@+id/widgetCheck" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="48dp" android:minWidth="48dp" android:padding="12dp"
+            android:src="@drawable/ic_widget_check" android:tint="@color/on_status"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="@string/check_now" android:tooltipText="@string/check_now" />
+        <ImageButton android:id="@+id/widgetMute" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="48dp" android:minWidth="48dp" android:padding="12dp"
+            android:src="@drawable/ic_widget_mute" android:tint="@color/on_status"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="@string/widget_mute_hour" android:tooltipText="@string/widget_mute_hour" />
     </LinearLayout>
 </LinearLayout>

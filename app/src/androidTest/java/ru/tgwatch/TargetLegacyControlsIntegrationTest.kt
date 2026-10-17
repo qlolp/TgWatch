@@ -5,6 +5,10 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.os.SystemClock
+import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetManager
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
@@ -64,10 +68,28 @@ class TargetLegacyControlsIntegrationTest {
         MonitorService::class.java.getDeclaredField("state").apply { isAccessible = true }.set(null,
             MonitorService.State(MonitorService.Status.OK, System.currentTimeMillis(),
                 checkedElapsed = SystemClock.elapsedRealtime()))
-        val content = StatusWidget.Companion::class.java.getDeclaredMethod("content", Context::class.java)
-            .apply { isAccessible = true }.invoke(StatusWidget.Companion, ctx)
-        val title = content.javaClass.getDeclaredField("title").apply { isAccessible = true }.get(content)
-        assertEquals(Lang.t("Мониторинг выключен", "Monitoring is off"), title)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+        val host = AppWidgetHost(ctx, 80318)
+        try {
+            val id = host.allocateAppWidgetId()
+            assertTrue(AppWidgetManager.getInstance(ctx).bindAppWidgetIdIfAllowed(id,
+                ComponentName(ctx, StatusWidget::class.java)))
+            // No per-widget setting: an existing widget must still default to Telegram.
+            val snapshot = WidgetSnapshot.load(ctx, id)
+            assertEquals(TargetId.TELEGRAM, snapshot.target)
+            assertFalse(snapshot.running)
+            assertFalse(snapshot.fresh)
+            var title = ""
+            instrumentation.runOnMainSync {
+                val root = WidgetRenderer.render(ctx, snapshot, false).apply(ctx, FrameLayout(ctx))
+                title = root.findViewById<TextView>(R.id.widgetTitle).text.toString()
+            }
+            assertEquals(ctx.getString(R.string.widget_goal_off, TargetNames.label(TargetId.TELEGRAM)), title)
+        } finally {
+            host.deleteHost()
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+        }
         var opened: Intent? = null
         var serviceCommands = 0
         val recording = object : ContextWrapper(ctx) {

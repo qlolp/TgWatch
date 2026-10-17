@@ -172,6 +172,9 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="widget_muted">Target alerts muted for one hour</string>
     <string name="widget_mute_hour">Mute 1 h</string>
     <string name="widget_coverage_day">Assessment coverage, 24 h: %1$s</string>
+    <string name="widget_age_coverage">%1$s · %2$s / 24 h</string>
+    <string name="widget_goal_off">%1$s · monitoring off</string>
+    <string name="widget_goal_stale">%1$s · out of date</string>
     <string name="widget_graph_description">Last 6 hours in 72 five-minute bins: %1$d reachable, %2$d unknown. Gaps are not outages.</string>
     <string name="widget_last_result">Last result: %1$s</string>
     <string name="share_status_title">Share status</string>

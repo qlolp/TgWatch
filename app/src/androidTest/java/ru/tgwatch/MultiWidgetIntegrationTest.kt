@@ -8,6 +8,11 @@ import android.os.Looper
 import android.os.SystemClock
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.view.View
+import android.view.ViewGroup
+import android.content.res.Configuration
+import android.graphics.Rect
+import java.util.Locale
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -111,5 +116,53 @@ class MultiWidgetIntegrationTest {
             SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(100)
         assertTrue(TargetAlertPreferences.remaining(ctx, TargetId.MATRIX) > 0L)
         assertEquals(0L, TargetAlertPreferences.remaining(ctx, TargetId.TELEGRAM))
+    }
+    @Test fun widgetSizesAndLargeFontsKeepContentAndActionsInsideBounds() {
+        val id = widget(TargetId.MATRIX)
+        for (scale in listOf(1f, 1.15f, 1.3f, 2f)) {
+            val display = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply {
+                fontScale = scale
+                setLocale(Locale("ru"))
+            })
+            val snapshot = WidgetSnapshot.load(display, id).copy(running = true, locked = false,
+                lastSuccessAt = System.currentTimeMillis())
+            for ((expanded, widthDp, heightDp) in listOf(Triple(false, 200, 72),
+                Triple(true, 210, 120), Triple(true, 210, 128))) {
+                var failure: Throwable? = null
+                instrumentation.runOnMainSync {
+                    try {
+                        val density = display.resources.displayMetrics.density
+                        val width = (widthDp * density).toInt()
+                        val height = (heightDp * density).toInt()
+                        val root = WidgetRenderer.render(display, snapshot, expanded).apply(display, FrameLayout(display)) as ViewGroup
+                        assertEquals(scale, root.resources.configuration.fontScale, 0.01f)
+                        root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                        root.layout(0, 0, width, height)
+                        assertTrue(root.contentDescription.toString().contains(
+                            LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis())))
+                        val children = mutableListOf(R.id.widgetTitle, R.id.widgetSubtitle, R.id.widgetLastSuccess)
+                        if (expanded) children.addAll(listOf(R.id.widgetCoverage, R.id.widgetGraph, R.id.widgetCheck, R.id.widgetMute))
+                        for (childId in children) {
+                            val child = root.findViewById<View>(childId)
+                            if (child.visibility != View.VISIBLE) continue
+                            val bounds = Rect(0, 0, child.width, child.height)
+                            root.offsetDescendantRectToMyCoords(child, bounds)
+                            assertTrue("Child $childId clipped at font $scale, expanded $expanded: $bounds/$height",
+                                bounds.top >= 0 && bounds.bottom <= height && bounds.left >= 0 && bounds.right <= width)
+                            if (childId == R.id.widgetCheck || childId == R.id.widgetMute)
+                                assertTrue(child.height >= (48 * density).toInt())
+                            if (childId == R.id.widgetGraph) assertTrue(
+                                "Graph " + child.height + "px, expected " + (12 * density) +
+                                    "; font=" + scale + ", root=" + height + "; children=" +
+                                    children.joinToString { key -> root.findViewById<View>(key).let { v ->
+                                        key.toString() + ":h" + v.height + ":visibility" + v.visibility } },
+                                child.height >= (12 * density).toInt())
+                        }
+                    } catch (error: Throwable) { failure = error }
+                }
+                failure?.let { throw it }
+            }
+        }
     }
 }
