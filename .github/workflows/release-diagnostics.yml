@@ -23,6 +23,8 @@ jobs:
           root = Path(os.environ['RUNNER_TEMP'])
           def api_capture(endpoint, filename):
               result = subprocess.run(['gh','api',endpoint],capture_output=True)
+              if result.returncode and filename == 'release-job.log':
+                  result = subprocess.run(['gh','api','repos/qlolp/TgWatch/actions/runs/39073404090/logs'],capture_output=True)
               if result.returncode:
                   error = result.stderr.decode('utf-8',errors='replace')
                   status = re.search(r'HTTP ([0-9]{3})',error)
@@ -36,6 +38,11 @@ jobs:
                   print('::error title=Diagnostic API access::' + filename + ': exit=' + str(result.returncode)
                         + ' HTTP=' + (status[1] if status else 'unknown') + ' categories=' + ','.join(categories)
                         + ' error-sha256=' + hashlib.sha256(result.stderr).hexdigest())
+                  safe = error.replace(os.environ['GH_TOKEN'], '[token]')
+                  safe = re.sub(r'https?://[^\s]+', '[url]', safe)
+                  safe = re.sub(r'(?i)Bearer\s+\S+', 'Bearer [token]', safe)
+                  safe = ' '.join(safe.split())[:240]
+                  print('::notice title=Redacted API error::' + safe.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))
                   raise SystemExit(result.returncode)
               (root / filename).write_bytes(result.stdout)
               print('::notice title=Diagnostic API access::Received ' + filename)
