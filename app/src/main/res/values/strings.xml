@@ -5,8 +5,8 @@
     <string name="lang">en</string>
     <string name="telegram">Telegram</string>
     <string name="status_icon">Telegram status icon</string>
-    <string name="widget_description">Telegram status on your home screen. Tap to open the app.</string>
-    <string name="widget_label">Telegram status</string>
+    <string name="widget_description">An independent monitoring target on your home screen. Tap to check or open settings.</string>
+    <string name="widget_label">TgWatch status</string>
     <string name="chart_description">Response time chart</string>
     <string name="main_subtitle">Checks whether Telegram is reachable</string>
     <string name="setup_title">Permissions needed</string>
@@ -165,4 +165,13 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="latency_dc_metrics">%1$s · samples %2$d · errors %3$d · not measured %4$d · approximate p50 %5$s · approximate p95 %6$s</string>
     <string name="latency_ms">%1$d ms</string>
     <string name="latency_dc_local">Local 15-minute buckets; checkpointed every 15 minutes. Unsaved updates can be lost on a crash. Gaps and failures are not zero latency.</string>
+    <string name="widget_configure">Choose this widget’s monitoring target</string>
+    <string name="widget_locked">%1$s · unlock or review the private endpoint</string>
+    <string name="widget_check_goal">Check %1$s now</string>
+    <string name="widget_mute_goal">Mute %1$s alerts for one hour</string>
+    <string name="widget_muted">Target alerts muted for one hour</string>
+    <string name="widget_mute_hour">Mute 1 h</string>
+    <string name="widget_coverage_day">Assessment coverage, 24 h: %1$s</string>
+    <string name="widget_graph_description">Last 6 hours in 72 five-minute bins: %1$d reachable, %2$d unknown. Gaps are not outages.</string>
+    <string name="widget_last_result">Last result: %1$s</string>
 </resources>

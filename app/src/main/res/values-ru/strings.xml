@@ -5,8 +5,8 @@
     <string name="lang">ru</string>
     <string name="telegram">Telegram</string>
     <string name="status_icon">Значок статуса Telegram</string>
-    <string name="widget_description">Статус Telegram на рабочем столе. Нажми, чтобы открыть приложение.</string>
-    <string name="widget_label">Статус Telegram</string>
+    <string name="widget_description">Независимая цель мониторинга на рабочем столе. Нажмите для проверки или настроек.</string>
+    <string name="widget_label">Статус TgWatch</string>
     <string name="chart_description">График времени ответа</string>
     <string name="main_subtitle">Следит, доступен ли Telegram</string>
     <string name="setup_title">Нужно разрешить работу</string>
@@ -165,4 +165,13 @@
     <string name="latency_dc_metrics">%1$s · выборок %2$d · ошибок %3$d · без измерения %4$d · приближённое p50 %5$s · приближённое p95 %6$s</string>
     <string name="latency_ms">%1$d мс</string>
     <string name="latency_dc_local">Локальные 15-минутные интервалы; запись раз в 15 минут. При аварии несохранённые обновления могут пропасть. Пробелы и ошибки не означают нулевую задержку.</string>
+    <string name="widget_configure">Выберите цель этого виджета</string>
+    <string name="widget_locked">%1$s · разблокируйте устройство или настройте адрес</string>
+    <string name="widget_check_goal">Проверить %1$s сейчас</string>
+    <string name="widget_mute_goal">Заглушить оповещения %1$s на час</string>
+    <string name="widget_muted">Оповещения цели заглушены на час</string>
+    <string name="widget_mute_hour">Тихо 1 ч</string>
+    <string name="widget_coverage_day">Покрытие измерениями за сутки: %1$s</string>
+    <string name="widget_graph_description">Последние 6 часов, 72 интервала по 5 минут: %1$d доступны, %2$d неизвестны. Пробелы не означают сбои.</string>
+    <string name="widget_last_result">Последний результат: %1$s</string>
 </resources>

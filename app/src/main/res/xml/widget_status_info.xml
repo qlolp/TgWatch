@@ -3,6 +3,8 @@
     android:description="@string/widget_description"
     android:previewLayout="@layout/widget_status"
     android:initialLayout="@layout/widget_status"
+    android:configure="ru.tgwatch.WidgetConfigurationActivity"
+    android:widgetFeatures="reconfigurable"
     android:minWidth="200dp"
     android:minHeight="72dp"
     android:minResizeWidth="200dp"

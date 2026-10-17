@@ -52,6 +52,9 @@
             android:theme="@android:style/Theme.NoDisplay" />
 
         <activity android:name=".LatencyActivity" android:exported="false" />
+        <activity android:name=".WidgetConfigurationActivity" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+        </activity>
 
         <!-- Only this app can open credential management. The bearer-token API
              is explicitly addressed by clients; it has no discovery filter. -->

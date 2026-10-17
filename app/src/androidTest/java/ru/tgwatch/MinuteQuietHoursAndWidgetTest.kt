@@ -6,7 +6,6 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.RemoteViews
 import android.widget.Switch
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
@@ -47,9 +46,7 @@ class MinuteQuietHoursAndWidgetTest {
     }
 
     private fun withMeasuredWidget(assertions: (ViewGroup, TextView) -> Unit) {
-        val method = StatusWidget.Companion::class.java.getDeclaredMethod("build", Context::class.java)
-        method.isAccessible = true
-        val remote = method.invoke(StatusWidget.Companion, ctx) as RemoteViews
+        val remote = WidgetRenderer.render(ctx, WidgetSnapshot.load(ctx, 0), false)
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val root = remote.apply(ctx, FrameLayout(ctx)) as ViewGroup
             val density = ctx.resources.displayMetrics.density
