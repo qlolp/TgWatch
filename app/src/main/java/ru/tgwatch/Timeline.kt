@@ -37,6 +37,8 @@ fun recoveryDurationStr(ms: Long): String {
 /** Observations expire. Neither a dead service nor two distant failures fill a gap. */
 object Timeline {
     val kinds = setOf("OK", "TG_DOWN", "PARTIAL", "NO_NETWORK", "UNKNOWN")
+    fun canonicalKind(kind: String): String = if (kind == "DOWN") "TG_DOWN" else kind
+
     /** Start a new epoch after rollback, compacting epoch IDs only if their Long range is exhausted. */
     fun clockRollback(samples: List<Observation>, now: Long): List<Observation> {
         if (current(samples).none { it.at > now }) return samples
@@ -94,7 +96,8 @@ object Timeline {
             val end = minOf(sample.until, until, next)
             if (end <= start) return@forEachIndexed
             if (start > cursor) result += Observation(cursor, start, "UNKNOWN", clockEpoch = epoch)
-            result += sample.copy(at = start, until = end, kind = sample.kind.takeIf { it in kinds } ?: "UNKNOWN")
+            result += sample.copy(at = start, until = end,
+                kind = canonicalKind(sample.kind).takeIf { it in kinds } ?: "UNKNOWN")
             cursor = end
         }
         if (cursor < until) result += Observation(cursor, until, "UNKNOWN", clockEpoch = epoch)
@@ -135,6 +138,7 @@ object Timeline {
             previous = segment.kind
         }
         val inRange = currentChecks(samples).filter { it.at >= from && it.at < until }
+            .map { if (it.kind == "DOWN") it.copy(kind = "TG_DOWN") else it }
         val latency = inRange.filter { it.kind == "OK" && it.latencyMs >= 0 }.map { it.latencyMs }
         return TimeStats(duration["OK"] ?: 0, duration["TG_DOWN"] ?: 0, duration["PARTIAL"] ?: 0,
             duration["NO_NETWORK"] ?: 0, duration["UNKNOWN"] ?: 0, longest, inRange.size,
@@ -154,7 +158,7 @@ object Timeline {
         val before = rows.filter { it.at < checkedAt }
         val previous = before.maxByOrNull { it.at } ?: return null
         val incidentKinds = setOf("TG_DOWN", "NO_NETWORK", "PARTIAL")
-        if (previous.kind !in incidentKinds || previous.until < checkedAt) return null
+        if (canonicalKind(previous.kind) !in incidentKinds || previous.until < checkedAt) return null
         var elapsed = 0L
         var hardFailure = false
         for (segment in segments(before, before.minOf { it.at }, checkedAt).asReversed()) {
@@ -174,7 +178,7 @@ object Timeline {
                 samples.filter { it.clockEpoch != epoch }
             for (s in rows) {
                 append(format.format(Date(s.at))).append(',').append(format.format(Date(s.until))).append(',')
-                append(s.kind).append(',').append(s.until - s.at).append(',')
+                append(canonicalKind(s.kind)).append(',').append(s.until - s.at).append(',')
                 if (s.latencyMs >= 0) append(s.latencyMs)
                 append(',').append(s.clockEpoch).append(',').append(s.clockEpoch == epoch)
                 append('\n')
