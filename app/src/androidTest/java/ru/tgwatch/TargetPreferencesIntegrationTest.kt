@@ -133,6 +133,55 @@ class TargetPreferencesIntegrationTest {
         assertFalse(TargetPreferences.fence.snapshot(id).changing)
     }
 
+    @Test fun changingTelegramAlertsPreservesItsAdaptivePowerProfile() {
+        Prefs.setProfile(ctx, PowerProfile.BALANCED)
+        val before = TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM)
+        assertTrue(TargetPreferences.setDefinition(ctx,
+            before.copy(alerts = before.alerts.copy(notifyOutage = !before.alerts.notifyOutage))))
+        assertEquals(PowerProfile.BALANCED, Prefs.profile(ctx))
+    }
+
+    @Test fun privateGoalCannotBeEnabledWithoutAReviewedEndpoint() {
+        assertTrue(privateStore.edit().remove(id.wire).commit())
+        assertTrue(Prefs.sp(ctx).edit().putBoolean(TargetPreferences.key(id, "enabled"), false)
+            .putBoolean(TargetPreferences.key(id, "endpoint_review"), true).commit())
+        assertFalse(TargetPreferences.setDefinition(ctx, TargetDefinition.default(id).copy(enabled = true)))
+        assertFalse(TargetPreferences.definition(ctx, id).enabled)
+    }
+
+    @Test fun newerProfileEditSupersedesAPendingTargetEditWithoutStoppingTelegram() {
+        Prefs.setIntervalSec(ctx, 41)
+        val before = TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM)
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val holder = Thread { synchronized(History) { held.countDown(); release.await(10, TimeUnit.SECONDS) } }
+        val result = AtomicReference<Boolean>()
+        val setter = Thread { result.set(TargetPreferences.setDefinition(ctx, before.copy(
+            alerts = before.alerts.copy(notifyOutage = !before.alerts.notifyOutage)))) }
+        holder.start()
+        try {
+            assertTrue(held.await(2, TimeUnit.SECONDS))
+            setter.start()
+            val end = SystemClock.elapsedRealtime() + 3_000
+            while (!TargetPreferences.fence.snapshot(TargetId.TELEGRAM).changing && SystemClock.elapsedRealtime() < end)
+                SystemClock.sleep(10)
+            assertTrue(TargetPreferences.fence.snapshot(TargetId.TELEGRAM).changing)
+            Prefs.setProfile(ctx, PowerProfile.BALANCED)
+        } finally { release.countDown(); setter.join(10_000); holder.join(10_000) }
+        assertFalse(setter.isAlive)
+        assertFalse(result.get())
+        assertEquals(PowerProfile.BALANCED, Prefs.profile(ctx))
+        assertTrue(TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled)
+    }
+
+    @Test fun firstMatrixStartDoesNotImplicitlyStartTelegram() {
+        Prefs.setEnabled(ctx, false)
+        assertTrue(Prefs.sp(ctx).edit().remove(TargetPreferences.key(TargetId.TELEGRAM, "enabled")).commit())
+        assertTrue(TargetPreferences.setDefinition(ctx, TargetDefinition.default(TargetId.MATRIX).copy(enabled = true)))
+        assertTrue(TargetPreferences.definition(ctx, TargetId.MATRIX).enabled)
+        assertFalse(TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled)
+    }
+
     private fun intercept(commit: (SharedPreferences.Editor) -> Boolean): Context = object : ContextWrapper(ctx) {
         override fun getApplicationContext(): Context = this
         override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {

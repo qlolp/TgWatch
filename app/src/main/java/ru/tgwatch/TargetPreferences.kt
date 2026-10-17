@@ -38,10 +38,13 @@ object TargetPreferences {
     }
 
     fun endpoint(ctx: Context, id: TargetId): String? {
-        val app = ctx.applicationContext
         val changing = fence.snapshot(id).changing || TargetConfigTransactions.isPending(id)
-        if (changing ||
-            !app.getSystemService(UserManager::class.java).isUserUnlocked ||
+        return if (changing) null else storedEndpoint(ctx, id)
+    }
+
+    internal fun storedEndpoint(ctx: Context, id: TargetId): String? {
+        val app = ctx.applicationContext
+        if (!app.getSystemService(UserManager::class.java).isUserUnlocked ||
             Prefs.sp(ctx).getBoolean(key(id, "endpoint_review"), false)) return null
         val raw = app.getSharedPreferences(PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
         return HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
