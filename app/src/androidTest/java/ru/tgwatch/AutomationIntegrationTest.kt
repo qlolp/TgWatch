@@ -21,6 +21,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.Executors
+import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -197,7 +200,43 @@ class AutomationIntegrationTest {
         }
     }
 
-    private fun request(action: String, token: String): Pair<Int, Bundle?> {
+    @Test fun hangingStateComputeReleasesOrderedReplyWithoutReplacementWorker() {
+        AutomationSettings.setEnabled(ctx, true)
+        val token = AutomationSettings.token(ctx)!!
+        val worker = Executors.newSingleThreadExecutor()
+        val release = CountDownLatch(1)
+        val submissions = AtomicInteger()
+        val field = AutomationReceiver::class.java.getDeclaredField("stateDispatcher").apply { isAccessible = true }
+        val original = field.get(null)
+        val blocked = AutomationStateDispatcher(Executor { task ->
+            submissions.incrementAndGet()
+            worker.execute { release.await(); task.run() }
+        })
+        field.set(null, blocked)
+        try {
+            val first = request(AutomationReceiver.ACTION_GET_STATE, token, 12_000)
+            assertEquals(AutomationReceiver.RESULT_RATE_LIMITED, first.first)
+            assertNull(first.second)
+            assertTrue(blocked.health().busy)
+            assertTrue(blocked.health().deadlineExpired)
+            assertEquals(AutomationReceiver.RESULT_RATE_LIMITED,
+                request(AutomationReceiver.ACTION_GET_STATE, token).first)
+            assertEquals(1, submissions.get())
+            val denied = request(AutomationReceiver.ACTION_GET_STATE, "0".repeat(64))
+            assertEquals(AutomationReceiver.RESULT_UNAUTHORIZED, denied.first)
+            assertNull(denied.second)
+        } finally {
+            release.countDown()
+            worker.shutdown()
+            assertTrue(worker.awaitTermination(3, TimeUnit.SECONDS))
+            field.set(null, original)
+            AutomationStateCache.clear()
+        }
+        assertFalse(blocked.health().busy)
+        assertNull(AutomationStateCache.take(android.os.SystemClock.elapsedRealtime()))
+    }
+
+    private fun request(action: String, token: String, timeoutMs: Long = 5_000): Pair<Int, Bundle?> {
         val latch = CountDownLatch(1)
         var answer: Pair<Int, Bundle?>? = null
         ctx.sendOrderedBroadcast(Intent(ctx, AutomationReceiver::class.java).setAction(action)
@@ -207,7 +246,7 @@ class AutomationIntegrationTest {
                 latch.countDown()
             }
         }, Handler(Looper.getMainLooper()), Activity.RESULT_CANCELED, null, null)
-        assertTrue("Ordered automation result timed out", latch.await(5, TimeUnit.SECONDS))
+        assertTrue("Ordered automation result timed out", latch.await(timeoutMs, TimeUnit.MILLISECONDS))
         return answer!!
     }
 }

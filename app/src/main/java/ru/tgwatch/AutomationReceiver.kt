@@ -7,8 +7,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
-import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeoutException
 
 /** Explicit requests only; no reply broadcasts or service-start path. */
 class AutomationReceiver : BroadcastReceiver() {
@@ -23,9 +23,9 @@ class AutomationReceiver : BroadcastReceiver() {
         const val RESULT_STOPPED = 3
         const val RESULT_RATE_LIMITED = 4
 
-        private val stateIo = Executors.newSingleThreadExecutor { task ->
-            Thread(task, "tg-automation-state").apply { isDaemon = true }
-        }
+        private val stateDispatcher = AutomationStateDispatcher()
+        internal fun computeHealth(): AutomationComputeHealth = stateDispatcher.health()
+
     }
 
     // Early security/lifecycle guards keep denied requests from reaching any operation.
@@ -91,33 +91,22 @@ class AutomationReceiver : BroadcastReceiver() {
                 val raced = AutomationStateCache.take(elapsed)
                 if (raced != null) reply(RESULT_OK, raced.toBundle()) else reply(RESULT_RATE_LIMITED)
             }
-            else -> scheduleStateCompute(ctx, elapsed)
+            else -> scheduleStateCompute(ctx)
         }
     }
 
-    private fun scheduleStateCompute(ctx: Context, elapsed: Long) {
-        // PendingResult must carry the ordered reply; BroadcastReceiver.setResult is not
-        // safe once onReceive returns and work continues on another thread.
+    private fun scheduleStateCompute(ctx: Context) {
         val pending = goAsync()
-        try {
-            stateIo.execute {
-                try {
-                    val nowElapsed = SystemClock.elapsedRealtime()
-                    val snapshot = stateSnapshot(ctx)
-                    AutomationStateCache.endCompute(nowElapsed, snapshot)
-                    pending.setResult(RESULT_OK, null, snapshot.toBundle())
-                } catch (_: Exception) {
-                    AutomationStateCache.endCompute(SystemClock.elapsedRealtime(), null)
-                    pending.setResult(RESULT_INVALID, null, null)
-                } finally {
-                    pending.finish()
-                }
+        stateDispatcher.submit({ stateSnapshot(ctx) }, { result ->
+            val snapshot = result.getOrNull()
+            val error = result.exceptionOrNull()
+            val code = when {
+                snapshot != null -> RESULT_OK
+                error is RejectedExecutionException || error is TimeoutException -> RESULT_RATE_LIMITED
+                else -> RESULT_INVALID
             }
-        } catch (_: RejectedExecutionException) {
-            AutomationStateCache.endCompute(elapsed, null)
-            pending.setResult(RESULT_INVALID, null, null)
-            pending.finish()
-        }
+            pending.setResult(code, null, snapshot?.toBundle())
+        }, { pending.finish() })
     }
 
     private fun reply(code: Int, extras: Bundle? = null) {
