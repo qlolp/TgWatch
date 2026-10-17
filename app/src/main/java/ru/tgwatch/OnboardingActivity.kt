@@ -1,6 +1,7 @@
 package ru.tgwatch
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,7 @@ import android.widget.TextView
  */
 object Onboarding {
     internal const val KEY_SEEN = "onboarding_seen"
+    private const val KEY_NOTIFICATION_ASKED = "notification_permission_asked"
 
     internal fun shouldShow(seen: Boolean, alreadyConfigured: Boolean): Boolean = !seen && !alreadyConfigured
 
@@ -34,18 +36,37 @@ object Onboarding {
     fun needsNotificationPermission(ctx: Context) = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
-    /** Спрашивает разрешение на уведомления (Android 13+), если его ещё нет; `true` — запрос отправлен. */
-    fun requestNotifications(activity: Activity, requestCode: Int = 1): Boolean =
-        needsNotificationPermission(activity).also {
-            if (it) activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestCode)
-        }
+    fun notificationsAllowed(ctx: Context): Boolean =
+        ctx.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
 
-    private val CONFIGURED_KEYS = listOf("enabled", "power_profile", "interval_sec", "last_checked")
+    fun canRequestNotifications(activity: Activity): Boolean = needsNotificationPermission(activity) &&
+        (!Prefs.sp(activity).getBoolean(KEY_NOTIFICATION_ASKED, false) ||
+            activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))
+
+    /** Repeated requests after a permanent denial are handled by the guide's settings action. */
+    fun requestNotifications(activity: Activity, requestCode: Int = 1): Boolean {
+        val request = canRequestNotifications(activity)
+        if (request) {
+            Prefs.sp(activity).edit().putBoolean(KEY_NOTIFICATION_ASKED, true).apply()
+            activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestCode)
+        }
+        return request
+    }
+
+    fun openNotificationSettings(activity: Activity) {
+        runCatching {
+            activity.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName))
+        }.onFailure { OemTips.openAppDetails(activity) }
+    }
+
+    private val CONFIGURED_KEYS = listOf("enabled", "power_profile", "interval_sec", "last_checked", "log")
 }
 
 /** Короткий мастер: что проверяется, уведомления, работа в фоне. Можно пропустить. */
 class OnboardingActivity : Activity() {
-    private data class Page(val title: String, val body: String, val action: String?, val run: (() -> Unit)?)
+    private data class Page(val title: String, val body: String, val action: String?,
+        val enabled: Boolean = true, val run: (() -> Unit)? = null)
 
     private lateinit var pages: List<Page>
     private var index = 0
@@ -55,9 +76,9 @@ class OnboardingActivity : Activity() {
         super.onCreate(savedInstanceState)
         Lang.update(this)
         setContentView(R.layout.activity_onboarding)
+        askedNotifications = savedInstanceState?.getBoolean(STATE_ASKED, false) ?: false
         pages = buildPages()
         index = savedInstanceState?.getInt(STATE_INDEX, 0)?.coerceIn(0, pages.size - 1) ?: 0
-        askedNotifications = savedInstanceState?.getBoolean(STATE_ASKED, false) ?: false
         findViewById<Button>(R.id.btnOnboardingSkip).setOnClickListener { finishOnboarding() }
         findViewById<Button>(R.id.btnOnboardingNext).setOnClickListener {
             if (index == pages.lastIndex) finishOnboarding() else { index++; render() }
@@ -80,7 +101,7 @@ class OnboardingActivity : Activity() {
                     "доступность серверов Telegram с вашего телефона и ведёт историю только на устройстве.",
                 "TG Monitor checks Telegram server reachability from your phone every few seconds, " +
                     "with no account and no author-run servers. History stays on the device."
-            ), null, null
+            ), null
         ),
         Page(
             Lang.t("Уведомления", "Notifications"),
@@ -90,7 +111,11 @@ class OnboardingActivity : Activity() {
                 "Notifications tell you about outages and recoveries. " +
                     "Without them Android 13+ also hides the service icon."
             ),
-            Lang.t("Разрешить уведомления", "Allow notifications")
+            when {
+                Onboarding.notificationsAllowed(this) -> getString(R.string.onboarding_notifications_ready)
+                Onboarding.canRequestNotifications(this) -> Lang.t("Разрешить уведомления", "Allow notifications")
+                else -> Lang.t("Открыть настройки уведомлений", "Open notification settings")
+            }, enabled = !Onboarding.notificationsAllowed(this)
         ) { requestNotifications() },
         Page(
             Lang.t("Работа в фоне", "Background use"),
@@ -99,7 +124,10 @@ class OnboardingActivity : Activity() {
                     "снимите ограничения батареи.",
                 "So Android does not put checks to sleep while the screen is off, remove battery restrictions."
             ) + (OemTips.manufacturerHint()?.let { "\n\n$it" } ?: ""),
-            Lang.t("Снять ограничения батареи", "Remove battery restrictions")
+            if (getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
+                getString(R.string.onboarding_battery_ready)
+                else Lang.t("Снять ограничения батареи", "Remove battery restrictions"),
+            enabled = !getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
         ) { openBattery() }
     )
 
@@ -111,17 +139,26 @@ class OnboardingActivity : Activity() {
         val action = findViewById<Button>(R.id.btnOnboardingAction)
         action.visibility = if (page.action == null) View.GONE else View.VISIBLE
         action.text = page.action.orEmpty()
+        action.isEnabled = page.enabled
         findViewById<Button>(R.id.btnOnboardingNext).text =
             if (index == pages.lastIndex) Lang.t("Готово", "Done") else Lang.t("Далее", "Next")
     }
 
     private fun requestNotifications() {
         if (Onboarding.requestNotifications(this, REQUEST_PAGE)) askedNotifications = true
+        else Onboarding.openNotificationSettings(this)
     }
+
+    override fun onResume() {
+        super.onResume()
+        refreshPages()
+    }
+
+    private fun refreshPages() { pages = buildPages(); render() }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_FINISH) finish()
+        if (requestCode == REQUEST_FINISH) finish() else if (requestCode == REQUEST_PAGE) refreshPages()
     }
 
     private fun openBattery() {

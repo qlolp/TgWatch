@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Долгое нажатие на значок: проверка и пауза оповещений без открытия экрана.
+     ShortcutActivity не экспортирована: лаунчер запускает ярлыки от имени приложения. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="check_now"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_check"
+        android:shortcutShortLabel="@string/shortcut_check_short"
+        android:shortcutLongLabel="@string/shortcut_check_long">
+        <intent
+            android:action="ru.tgwatch.shortcut.CHECK_NOW"
+            android:targetPackage="ru.tgwatch"
+            android:targetClass="ru.tgwatch.ShortcutActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="mute_alerts"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_mute"
+        android:shortcutShortLabel="@string/shortcut_mute_short"
+        android:shortcutLongLabel="@string/shortcut_mute_long">
+        <intent
+            android:action="ru.tgwatch.shortcut.MUTE_ALERTS"
+            android:targetPackage="ru.tgwatch"
+            android:targetClass="ru.tgwatch.ShortcutActivity" />
+    </shortcut>
+</shortcuts>

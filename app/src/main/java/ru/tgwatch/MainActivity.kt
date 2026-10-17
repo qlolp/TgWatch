@@ -97,6 +97,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Lang.update(this)
+        val firstRunGuide = savedInstanceState == null && Onboarding.shouldShow(this)
+        if (firstRunGuide) Prefs.setEnabled(this, false)
         setContentView(R.layout.activity_main)
         historyUi = MainHistoryUi(this) { text ->
             shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), text)
@@ -265,6 +267,7 @@ class MainActivity : Activity() {
         }
         eventSwitch(R.id.swNotifyOutage, "TG_DOWN", false)
         eventSwitch(R.id.swNotifyPartial, "PARTIAL", false)
+        eventSwitch(R.id.swNotifySlow, "SLOW", false)
         eventSwitch(R.id.swSoundPartial, "PARTIAL", true)
         eventSwitch(R.id.swSoundRecovery, "RECOVERY", true)
         fun channelButton(id: Int, event: String) {
@@ -274,7 +277,7 @@ class MainActivity : Activity() {
                     startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                         .putExtra(Settings.EXTRA_CHANNEL_ID, EventNotifications.channel(event)))
-                } catch (_: Exception) { openNotificationSettings() }
+                } catch (_: Exception) { Onboarding.openNotificationSettings(this) }
             }
         }
         channelButton(R.id.btnChannelOutage, "TG_DOWN")
@@ -316,7 +319,7 @@ class MainActivity : Activity() {
         updateQuietHoursLabel()
         btnQuietHours.setOnClickListener { pickQuietHours() }
 
-        val openNotif = View.OnClickListener { openNotificationSettings() }
+        val openNotif = View.OnClickListener { Onboarding.openNotificationSettings(this) }
         val openBatt = View.OnClickListener { openBatterySettings() }
         val openAlarm = View.OnClickListener { openExactAlarmSettings() }
         btnBattery.setOnClickListener(openBatt)
@@ -338,9 +341,9 @@ class MainActivity : Activity() {
             tvOem.text = oem
         }
 
-        // Мастер первого запуска сам спросит разрешение на уведомления, даже если его пропустить.
-        if (savedInstanceState == null && !OnboardingActivity.openIfFirstRun(this)) {
-            Onboarding.requestNotifications(this)
+        // First-run setup can finish or be skipped before the user explicitly starts monitoring.
+        if (savedInstanceState == null) {
+            if (firstRunGuide) OnboardingActivity.open(this) else Onboarding.requestNotifications(this)
         }
     }
 
@@ -449,12 +452,6 @@ class MainActivity : Activity() {
             }
             .setNegativeButton(Lang.t("Отмена", "Cancel"), null)
             .show()
-    }
-
-    private fun openNotificationSettings() {
-        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-        safeStart(intent)
     }
 
     private fun openBatterySettings() {

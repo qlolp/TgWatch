@@ -12,7 +12,7 @@ object BackupManager {
         "vibration_pattern", "quiet_hours", "quiet_start_hour", "quiet_end_hour",
         "quiet_start_minute", "quiet_end_minute", "notify_outage", "notify_partial",
         "sound_outage", "sound_partial", "sound_recovery", "daily_summary", "daily_summary_minute",
-        "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "extra_probe_custom_url")
+        "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "extra_probe_custom_url", "notify_slow")
     private val transientKeys = setOf("last_status", "last_checked", "last_since", "last_latency",
         "last_reason", "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at")
 
@@ -42,7 +42,8 @@ object BackupManager {
         "sound_recovery" to Prefs.soundFor(ctx, "RECOVERY"),
         "daily_summary" to Prefs.dailySummary(ctx), "daily_summary_minute" to Prefs.dailySummaryMinute(ctx),
         "extra_probe_matrix" to Prefs.extraMatrix(ctx), "extra_probe_whatsapp" to Prefs.extraWhatsapp(ctx),
-        "extra_probe_custom" to Prefs.extraCustom(ctx), "extra_probe_custom_url" to Prefs.extraCustomUrl(ctx)),
+        "extra_probe_custom" to Prefs.extraCustom(ctx), "extra_probe_custom_url" to Prefs.extraCustomUrl(ctx),
+        "notify_slow" to Prefs.notifyFor(ctx, "SLOW")),
         History.snapshot(ctx, now), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {

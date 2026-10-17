@@ -211,6 +211,7 @@ class MonitorService : Service() {
     private lateinit var pm: PowerManager
     private lateinit var am: AlarmManager
     private lateinit var eventNotifications: EventNotifications
+    private var slowController: SlowAlertController? = null
     private val offlineBackoff = OfflineBackoff()
     private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
     private val scheduleDiagnostics = ScheduleDiagnostics()
@@ -240,6 +241,7 @@ class MonitorService : Service() {
         override fun run() {
             if (destroyed) return
             if (RecoveryCoordinator.state == RecoveryState.FAILED) { stopSelf(); return }
+            slowController?.reconcile()
             postNotification(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
@@ -316,6 +318,9 @@ class MonitorService : Service() {
         am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         createChannels()
         eventNotifications = EventNotifications(this, nm)
+        slowController = SlowAlertController(this, eventNotifications, { acceptsRunningCheck(this) }, { text ->
+            HistorySessions.queue(this).submit(historySession) { EventLog.add(this, text) }
+        })
         restorePersistedState(this)
         seedVibrationCooldown()
 
@@ -355,6 +360,7 @@ class MonitorService : Service() {
 
         if (action == ACTION_HEALTH) ensureProgress()
         val first = beginLoop()
+        slowController?.reconcile()
         if (action == ACTION_ALARM) {
             scheduleDiagnostics.arrived(SystemClock.elapsedRealtime(), pm.isDeviceIdleMode, checkStartedMono > 0L)
             // Будильник разбудил процессор лишь на мгновение: держим его, пока не пройдёт проверка.
@@ -398,6 +404,7 @@ class MonitorService : Service() {
         try {
         destroyed = true
         stopping = true
+        slowController?.close()
         extraCoordinator.close()
         scheduleDiagnostics.canceled()
         lastScheduleDiagnostics = scheduleDiagnostics.snapshot()
@@ -698,6 +705,7 @@ class MonitorService : Service() {
                 eventNotifications.partial(p.reason, sound, alertsAllowed)
             if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this, "TG_DOWN")) eventNotifications.clearOutage()
             if (p.status == Status.PARTIAL && !Prefs.notifyFor(this, "PARTIAL")) eventNotifications.clearOutage()
+            slowController?.onCheck(p.status.name, p.latencyMs, mono)
         } catch (e: Exception) { Log.w(TAG, "event alert", e) }
 
         postNotification(newState)

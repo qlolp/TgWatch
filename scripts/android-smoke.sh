@@ -46,6 +46,30 @@ bash ./gradlew connectedDebugAndroidTest assembleDebug --no-daemon --stacktrace
 python3 scripts/adb-readiness.py
 mkdir -p app/build/reports/androidTests/ui-screenshots
 adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png
+# Runtime permission revocation kills the app; exercise denial in a fresh instrumentation.
+api_level=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
+if [[ "$api_level" -ge 33 ]]; then
+  permission_log=app/build/reports/androidTests/notification-permission-cycle.txt
+  adb shell am force-stop ru.tgwatch
+  adb shell pm revoke ru.tgwatch android.permission.POST_NOTIFICATIONS
+  adb shell pm set-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
+  permission_status=0
+  adb shell am instrument -w -r -e class \
+    'ru.tgwatch.EventNotificationTest#disabledAppNotificationsReportNoSummaryDelivery,ru.tgwatch.OnboardingFlowTest#permanentlyDeniedNotificationActionReturnsFromSettings' \
+    ru.tgwatch.test/androidx.test.runner.AndroidJUnitRunner > "$permission_log" || permission_status=$?
+  adb shell pm clear-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
+  adb shell pm grant ru.tgwatch android.permission.POST_NOTIFICATIONS
+  python3 - "$permission_log" "$permission_status" <<'PY_PERMISSION'
+import pathlib, sys
+lines = pathlib.Path(sys.argv[1]).read_text().splitlines()
+codes = [int(line.split(":", 1)[1]) for line in lines if line.startswith("INSTRUMENTATION_STATUS_CODE:")]
+if sys.argv[2] != "0" or "OK (2 tests)" not in [line.strip() for line in lines]:
+    raise SystemExit("Permission cycle did not finish")
+if codes.count(0) != 2 or any(code not in (0, 1) for code in codes):
+    raise SystemExit("Permission tests failed or were skipped")
+print("Notification permission cycle: 2 passed, 0 failed/skipped")
+PY_PERMISSION
+fi
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)

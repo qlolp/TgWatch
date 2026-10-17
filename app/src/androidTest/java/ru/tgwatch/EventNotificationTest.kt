@@ -78,9 +78,12 @@ class EventNotificationTest {
             assertEquals(0L, Prefs.alertsMutedUntil(ctx))
             EventNotifications(ctx, manager).outage("Test", sound = false, allowed = true)
             val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
+            EventNotifications(ctx, manager).slow(1500)
+            awaitNotification(manager, EventNotifications.SLOW_ID)
             val before = System.currentTimeMillis()
             outage.actions[1].actionIntent.send()
             awaitAbsent(manager, EventNotifications.OUTAGE_ID)
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
             val until = Prefs.alertsMutedUntil(ctx)
             assertTrue("Mute must last one hour from the tap", until >= before + AlertMute.DURATION_MS &&
                 until <= System.currentTimeMillis() + AlertMute.DURATION_MS)
@@ -235,6 +238,91 @@ class EventNotificationTest {
             assertTrue(edit.commit())
             DailySummaryReceiver.schedule(ctx)
             MonitorService.clearRestoredState()
+        }
+    }
+
+    @Test fun slowTelegramNoticeIsQuietAndHasItsOwnChannel() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val ctx = instrumentation.targetContext
+        if (Build.VERSION.SDK_INT >= 33) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
+                .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")).use { it.readBytes() }
+        }
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        val events = EventNotifications(ctx, manager)
+        try {
+            events.slow(1500)
+            val slow = awaitNotification(manager, EventNotifications.SLOW_ID)
+            assertEquals(EventNotifications.SLOW_CHANNEL, slow.channelId)
+            assertEquals(Lang.t("Telegram тормозит", "Telegram is slow"), slow.extras.getString(Notification.EXTRA_TITLE))
+            assertTrue(slow.extras.getString(Notification.EXTRA_TEXT)!!.contains("1500"))
+            val channel = manager.getNotificationChannel(EventNotifications.SLOW_CHANNEL)
+            assertTrue("A slow Telegram is not an alarm", channel.importance <= NotificationManager.IMPORTANCE_LOW)
+            assertNull(channel.sound)
+            assertEquals(Notification.GROUP_ALERT_SUMMARY, slow.groupAlertBehavior)
+            events.clearSlow()
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
+        } finally {
+            manager.cancel(EventNotifications.SLOW_ID)
+        }
+    }
+
+    @Test fun slowControllerReconcilesDisableMuteAndStopWithoutNewMeasurements() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.grantRuntimePermission(
+            instrumentation.targetContext.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = ctx.getSystemService(NotificationManager::class.java)
+        val events = EventNotifications(ctx, manager)
+        val settings = Prefs.sp(ctx)
+        val keys = listOf("notify_slow", "quiet_hours", "alerts_muted_until", "alert_mute_boot",
+            "alert_mute_started_elapsed", "alert_mute_until_elapsed")
+        val previous = keys.associateWith { settings.all[it] }
+        val originalLog = EventLog.all(ctx).toList()
+        val running = java.util.concurrent.atomic.AtomicBoolean(true)
+        var controller: SlowAlertController? = null
+        fun showSlow() {
+            controller?.close()
+            val current = SlowAlertController(ctx, events, running::get, {})
+            controller = current
+            val now = android.os.SystemClock.elapsedRealtime()
+            repeat(3) { current.onCheck("OK", 1500, now + it) }
+            awaitNotification(manager, EventNotifications.SLOW_ID)
+        }
+        try {
+            Prefs.setNotifyFor(ctx, "SLOW", true)
+            Prefs.setQuietHoursEnabled(ctx, false)
+            assertTrue(Prefs.clearAlertMute(ctx))
+            showSlow()
+            Prefs.setNotifyFor(ctx, "SLOW", false)
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
+            Prefs.setNotifyFor(ctx, "SLOW", true)
+            showSlow()
+            AlertActionReceiver.muteNow(ctx)
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
+            controller?.close()
+            assertTrue(Prefs.clearAlertMute(ctx))
+            showSlow()
+            running.set(false)
+            controller!!.reconcile()
+            awaitAbsent(manager, EventNotifications.SLOW_ID)
+            assertTrue("Notification changes must not invent measurement recovery events",
+                EventLog.all(ctx).none { it.contains(Lang.t("Telegram больше не тормозит", "Telegram is no longer slow")) &&
+                    it !in originalLog })
+        } finally {
+            controller?.close()
+            val edit = settings.edit()
+            keys.forEach { key ->
+                when (val value = previous[key]) {
+                    null -> edit.remove(key)
+                    is Boolean -> edit.putBoolean(key, value)
+                    is Long -> edit.putLong(key, value)
+                    is Int -> edit.putInt(key, value)
+                }
+            }
+            assertTrue(edit.commit())
+            EventLog.replace(ctx, originalLog)
+            events.clearSlow()
         }
     }
 

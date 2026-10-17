@@ -80,11 +80,6 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/open_app_settings" />
 
-            <Button
-                android:id="@+id/btnOnboarding"
-                style="@style/ButtonText"
-                android:layout_marginStart="-12dp"
-                android:text="@string/onboarding_open" />
         </LinearLayout>
 
         <LinearLayout
@@ -271,6 +266,7 @@
 
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/battery_title" />
+            <Button android:id="@+id/btnOnboarding" style="@style/ButtonText" android:text="@string/onboarding_open" />
             <Button android:id="@+id/btnAutomation" style="@style/ButtonText" android:text="@string/automation_settings" />
             <Button android:id="@+id/btnProfile" style="@style/ButtonText" android:text="@string/profile_default" />
             <Button
@@ -399,6 +395,9 @@
             <Switch android:id="@+id/swNotifyPartial" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:minHeight="48dp"
                 android:text="@string/notify_partial" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swNotifySlow" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/notify_slow" android:textColor="@color/text_primary" android:textSize="15sp" />
             <Switch
                 android:id="@+id/swNotifyRecovery"
                 android:layout_width="match_parent"
