@@ -580,7 +580,7 @@ class MonitorService : Service() {
         } else {
             // Admission failure is monitor health, not a new observation about Telegram.
             lastEndpoints = result.outcomes.toList()
-            checkSchedule.request(INTERRUPTED_RETRY_MS)
+            checkSchedule.request(1_000L)
         }
     }
 
