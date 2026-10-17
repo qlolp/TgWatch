@@ -11,6 +11,7 @@ import sys
 from urllib.parse import quote, urlencode
 
 from sbom_schema import validate
+from local_project import is_local_core, core_ref, core_purl
 
 
 def generate(inventory):
@@ -18,6 +19,7 @@ def generate(inventory):
     components = {}
     module_refs = {}
     for artifact in inventory["artifacts"]:
+        local = is_local_core(artifact, inventory.get('applicationVersion'))
         group, name, version, kind = (artifact[field] for field in ("group", "name", "version", "type"))
         if not all(isinstance(value, str) and value for value in (group, name, version, kind)):
             raise ValueError("Resolved artifact coordinates and type must be nonempty strings")
@@ -25,13 +27,22 @@ def generate(inventory):
         if artifact.get("classifier"):
             qualifiers["classifier"] = artifact["classifier"]
         purl = f"pkg:maven/{quote(group, safe='')}/{quote(name, safe='')}@{quote(version, safe='')}?{urlencode(sorted(qualifiers.items()), quote_via=quote)}"
+        if local:
+            if kind != 'jar' or artifact.get('classifier', ''):
+                raise ValueError('Local core must be its compiled unclassified JAR')
+            purl = core_purl(version)
         digest = hashlib.sha256(Path(artifact["file"]).read_bytes()).hexdigest()
         component = {"type": "library", "group": group, "name": name, "version": version,
                      "purl": purl, "bom-ref": purl, "hashes": [{"alg": "SHA-256", "content": digest}]}
+        if local:
+            component['properties'] = [{'name': 'tgwatch:projectPath', 'value': ':probe-core'},
+                                       {'name': 'tgwatch:buildPath', 'value': ':'}]
+            component['licenses'] = [{'license': {'id': 'MIT'}}]
         if purl in components and components[purl] != component:
             raise ValueError(f"Conflicting resolved artifact bytes for {purl}")
         components[purl] = component
-        module_refs.setdefault(f"{group}:{name}:{version}", set()).add(purl)
+        ref = core_ref(version) if local else f"{group}:{name}:{version}"
+        module_refs.setdefault(ref, set()).add(purl)
     graph = inventory.get("runtimeGraph")
     dependencies = [{"ref": root_ref, "dependsOn": sorted(components)}]
     if graph is not None:

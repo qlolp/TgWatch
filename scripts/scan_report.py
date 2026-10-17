@@ -47,8 +47,14 @@ def verify_report(scan, expected_artifact, bom):
         if not isinstance(purl, str) or not purl.startswith("pkg:maven/"):
             raise ValueError("Missing Maven package identity in scan evidence")
         return unquote(purl.split("?", 1)[0].split("#", 1)[0])
+    # The sole first-party core is hashed in the SBOM and explicitly source-accounted
+    # by the OSV evidence gate. It has no published Maven/CVE identity. validate(bom)
+    # rejects every other generic component; this is not a generic dependency bypass.
+    local = {(unquote(component['purl'].split('?', 1)[0]), component['version'])
+             for component in bom['components'] if component['purl'].startswith('pkg:generic/')}
     expected = {(module(component["purl"]), component["version"])
-                for component in bom["components"] if component["type"] == "library"}
+                for component in bom["components"] if component["type"] == "library" and
+                component['purl'].startswith('pkg:maven/')}
     found = set()
     for result in scan.get("Results") or []:
         packages = result.get("Packages") or []
@@ -57,7 +63,12 @@ def verify_report(scan, expected_artifact, bom):
         for package in packages:
             if not isinstance(package, dict) or not isinstance(package.get("Identifier"), dict):
                 raise ValueError("Malformed Trivy package identity")
-            found.add((module(package["Identifier"].get("PURL")), package.get("Version")))
+            purl = package['Identifier'].get('PURL')
+            if isinstance(purl, str) and purl.startswith('pkg:generic/'):
+                if (unquote(purl.split('?', 1)[0]), package.get('Version')) not in local:
+                    raise ValueError('Unreviewed non-Maven identity in Trivy evidence')
+            else:
+                found.add((module(purl), package.get("Version")))
     if not expected <= found:
         raise ValueError("Trivy package inventory does not cover the resolved runtime SBOM")
     return severe

@@ -5,6 +5,8 @@ local.properties
 .DS_Store
 /build/
 /app/build/
+/probe-core/build/
+/wear/build/
 /captures/
 .externalNativeBuild/
 .cxx/
@@ -19,3 +21,7 @@ local.properties
 *signing-password*.txt
 __pycache__/
 *.py[cod]
+
+# Disposable Android smoke output; reports are copied into build reports by CI.
+/legacy-history.csv
+/smoke-logcat.txt

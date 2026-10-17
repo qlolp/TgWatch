@@ -14,7 +14,7 @@ object ProbeRules {
     const val BAD_INTERVAL_SEC = 10
     const val SCREEN_OFF_INTERVAL_SEC = 60
 
-    fun isReachableHttpCode(code: Int): Boolean = code in 100..499
+    fun isReachableHttpCode(code: Int): Boolean = ru.tgwatch.probe.ProbePolicy.isReachableHttpCode(code)
 
     fun describeHttpFailure(code: Int): String = when (code) {
         in 500..599 -> Lang.t("сервер вернул ошибку HTTP $code", "server returned HTTP error $code")

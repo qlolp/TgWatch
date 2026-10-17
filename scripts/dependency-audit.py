@@ -9,6 +9,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from local_project import is_local_core
 
 
 def query_osv(query):
@@ -24,10 +25,12 @@ def query_osv(query):
             time.sleep(attempt + 1)
 
 
-def audit(packages, query=query_osv):
+def audit(packages, query=query_osv, application_version=None):
     if not packages:
         raise ValueError('No resolved dependencies: refusing an empty audit')
     def check(package):
+        if is_local_core(package, application_version):
+            return {**package, 'audit_method': 'first_party_source', 'vulnerabilities': []}
         group, name, version = (package.get(key) for key in ('group', 'name', 'version'))
         if not all(isinstance(value, str) and value for value in (group, name, version)):
             raise ValueError('Invalid resolved coordinate')
@@ -74,13 +77,16 @@ def main():
         if not any('releaseRuntimeClasspath' in p.get('scopes', []) for p in packages):
             raise ValueError('Release runtime graph missing')
         report = {'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'source': 'https://api.osv.dev/v1/query', 'packages': audit(packages)}
+            'source': 'https://api.osv.dev/v1/query',
+            'packages': audit(packages, application_version=inventory.get('applicationVersion'))}
         destination.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
         findings = [(p['group'] + ':' + p['name'] + ':' + p['version'], p['vulnerabilities'])
             for p in report['packages'] if p['vulnerabilities']]
         for coordinate, ids in findings:
             print(f'{coordinate}: {", ".join(ids)}')
-        print(f'Checked {len(packages)} exact resolved Maven versions; findings: {len(findings)}')
+        local = sum(p.get('kind') == 'project' for p in packages)
+        print(f'Checked {len(packages) - local} exact Maven versions; '
+              f'accounted for {local} first-party source component(s); findings: {len(findings)}')
         return 1 if findings else 0
     except Exception as error:
         destination.write_text(json.dumps({'error': str(error), 'status': 'audit_failed'}, indent=2) + '\n')

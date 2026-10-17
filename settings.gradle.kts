@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TgWatch"
-include(":app")
+include(":app", ":probe-core")

@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.testing.Test
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -74,6 +75,7 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 dependencies {
+    implementation(project(":probe-core"))
     implementation("androidx.core:core:1.16.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
@@ -84,12 +86,17 @@ dependencies {
 // Resolve all audit scopes once. The runtime artifact inventory and OSV graph
 // share the same resolution; declarations are never treated as selected versions.
 tasks.register("dependencyInventory") {
+    dependsOn(":probe-core:jar")
     val resolvedReport = layout.buildDirectory.file("reports/dependencies/resolved.json")
     val runtimeInventory = layout.buildDirectory.file("reports/sbom/release-runtime-inventory.json")
     outputs.files(resolvedReport, runtimeInventory)
     outputs.upToDateWhen { false }
     doLast {
         val scopes = listOf("releaseRuntimeClasspath", "debugUnitTestRuntimeClasspath", "debugAndroidTestRuntimeClasspath")
+        fun localCore(id: org.gradle.api.artifacts.component.ComponentIdentifier): Boolean =
+            id is ProjectComponentIdentifier && id.projectPath == ":probe-core" && id.build.buildPath == ":"
+        fun localFields(): MutableMap<String, Any> = mutableMapOf("group" to "ru.tgwatch", "name" to "probe-core",
+            "version" to sourceVersion, "kind" to "project", "projectPath" to ":probe-core", "buildPath" to ":")
         val packages = sortedMapOf<String, MutableMap<String, Any>>()
         val graphs = sortedMapOf<String, List<Map<String, Any>>>()
         for (scope in scopes) {
@@ -97,20 +104,32 @@ tasks.register("dependencyInventory") {
             check(graph.allDependencies.none { it is UnresolvedDependencyResult }) { "Unresolved dependencies in $scope" }
             fun key(id: org.gradle.api.artifacts.component.ComponentIdentifier): String {
                 if (id == graph.root.id) return "ru.tgwatch:$scope"
+                if (localCore(id)) return "project::probe-core:$sourceVersion"
                 check(id is ModuleComponentIdentifier) { "Unsupported non-Maven dependency in $scope: $id" }
                 return "${id.group}:${id.module}:${id.version}"
             }
             configurations.getByName(scope).incoming.artifacts.artifacts.forEach { artifact ->
                 // Unit/Android test classpaths include :app's own classes.jar.
                 // It is represented by the graph root, not an external package.
-                check(artifact.id.componentIdentifier is ModuleComponentIdentifier || artifact.id.componentIdentifier == graph.root.id) {
+                check(artifact.id.componentIdentifier is ModuleComponentIdentifier ||
+                    artifact.id.componentIdentifier == graph.root.id || localCore(artifact.id.componentIdentifier)) {
                     "Cannot silently omit a project/file artifact in $scope: ${artifact.id}"
                 }
             }
             for (component in graph.allComponents) {
-                val id = component.id as? ModuleComponentIdentifier ?: continue
-                val entry = packages.getOrPut(key(id)) { mutableMapOf("group" to id.group, "name" to id.module,
-                    "version" to id.version, "scopes" to mutableListOf<String>()) }
+                val id = component.id
+                if (id == graph.root.id) continue
+                val fields = if (localCore(id)) {
+                    val actual = component.moduleVersion
+                    check(actual?.group == "ru.tgwatch" && actual.name == "probe-core" && actual.version == sourceVersion) {
+                        "Local core identity/version must match the application source"
+                    }
+                    localFields()
+                } else {
+                    check(id is ModuleComponentIdentifier) { "Unsupported dependency origin: $id" }
+                    mutableMapOf<String, Any>("group" to id.group, "name" to id.module, "version" to id.version)
+                }
+                val entry = packages.getOrPut(key(id)) { fields.apply { put("scopes", mutableListOf<String>()) } }
                 @Suppress("UNCHECKED_CAST")
                 (entry["scopes"] as MutableList<String>).add(scope)
             }
@@ -124,13 +143,19 @@ tasks.register("dependencyInventory") {
             output.parentFile.mkdirs()
             output.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(data)) + "\n")
         }
-        write(resolvedReport.get().asFile, mapOf("packages" to packages.values.toList(), "graphs" to graphs))
+        write(resolvedReport.get().asFile, mapOf("applicationVersion" to sourceVersion, "applicationId" to "ru.tgwatch",
+            "packages" to packages.values.toList(), "graphs" to graphs))
         val artifacts = configurations.getByName("releaseRuntimeClasspath").resolvedConfiguration.resolvedArtifacts
         val resolved = artifacts.sortedBy { it.file.absolutePath }.map { artifact ->
             val id = artifact.moduleVersion.id
-            check(artifact.id.componentIdentifier is ModuleComponentIdentifier) { "Unsupported runtime artifact: ${artifact.id}" }
-            mapOf("group" to id.group, "name" to id.name, "version" to id.version,
-                "type" to artifact.extension, "classifier" to (artifact.classifier ?: ""), "file" to artifact.file.absolutePath)
+            val local = localCore(artifact.id.componentIdentifier)
+            check(artifact.id.componentIdentifier is ModuleComponentIdentifier || local) {
+                "Unsupported runtime artifact: ${artifact.id}"
+            }
+            val fields = if (local) localFields() else mutableMapOf<String, Any>("group" to id.group,
+                "name" to id.name, "version" to id.version)
+            fields + mapOf("type" to artifact.extension, "classifier" to (artifact.classifier ?: ""),
+                "file" to artifact.file.absolutePath)
         }
         write(runtimeInventory.get().asFile, mapOf("applicationVersion" to android.defaultConfig.versionName,
             "artifacts" to resolved, "runtimeGraph" to graphs.getValue("releaseRuntimeClasspath")))
