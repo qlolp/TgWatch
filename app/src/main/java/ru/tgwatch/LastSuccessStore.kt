@@ -9,14 +9,14 @@ object LastSuccessStore {
 
     @Synchronized
     @Suppress("TooGenericExceptionCaught") // Diagnostic storage failures must never reject a measured result.
-    fun record(ctx: Context, statusName: String, checkedAt: Long) {
+    fun record(ctx: Context, statusName: String, checkedAt: Long, id: TargetId = TargetId.TELEGRAM) {
         try {
             val settings = Prefs.sp(ctx)
-            val previous = lastSuccessAt(ctx)
+            val previous = lastSuccessAt(ctx, id)
             val next = LastSuccessPolicy.updated(previous, statusName, checkedAt)
             if (next != previous) {
                 // This diagnostic is best-effort; disk failure cannot replace a measured result.
-                check(settings.edit().putLong(KEY_LAST_SUCCESS, next).commit()) {
+                check(settings.edit().putLong(key(id), next).commit()) {
                     "Could not persist last successful check"
                 }
             }
@@ -26,13 +26,17 @@ object LastSuccessStore {
     }
 
     @Synchronized
-    fun lastSuccessAt(ctx: Context): Long =
-        (Prefs.sp(ctx).all[KEY_LAST_SUCCESS] as? Long)?.coerceAtLeast(0L) ?: 0L
+    fun lastSuccessAt(ctx: Context, id: TargetId = TargetId.TELEGRAM): Long =
+        (Prefs.sp(ctx).all[key(id)] as? Long)?.coerceAtLeast(0L) ?: 0L
 
     @Synchronized
     fun clear(ctx: Context) {
-        check(Prefs.sp(ctx).edit().remove(KEY_LAST_SUCCESS).commit()) {
+        val edit = Prefs.sp(ctx).edit()
+        TargetId.entries.forEach { edit.remove(key(it)) }
+        check(edit.commit()) {
             "Could not clear last successful check"
         }
     }
+    private fun key(id: TargetId) = if (id == TargetId.TELEGRAM) KEY_LAST_SUCCESS
+        else TargetPreferences.key(id, KEY_LAST_SUCCESS)
 }

@@ -11,8 +11,8 @@ object HistorySessions {
     val backpressured: Boolean get() = instance?.backpressured == true
     @Synchronized fun queue(ctx: Context): HistorySessionQueue {
         val app = ctx.applicationContext
-        return instance ?: HistorySessionQueue(executor, {
-            History.endSession(app, it)
+        return instance ?: HistorySessionQueue(executor, {}, sessionClosed = { session, at ->
+            TargetHistories.end(app, session, at)
             EventLog.add(app, Lang.t("Мониторинг остановлен", "Monitoring stopped"))
         }).also { instance = it }
     }

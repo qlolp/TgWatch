@@ -43,7 +43,7 @@ internal object TargetSettingWrites {
         } ?: return false
         AutomationReceiver.invalidateState()
         return try {
-            HistorySessions.queue(ctx).exclusive { operation(token) }.get()
+            HistorySessions.queue(ctx).exclusive { synchronized(History) { operation(token) } }.get()
             true
         } catch (_: Exception) { false }
         finally { TargetPreferences.fence.finish(token); AutomationReceiver.invalidateState() }

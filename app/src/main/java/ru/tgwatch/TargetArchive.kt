@@ -12,7 +12,8 @@ internal object TargetArchive {
         val rows = public.observations.mapValues { (id, rows) ->
             if (id == TargetId.TELEGRAM) rows.filter { it.endpointRevision != revision } +
                 telegram.map { TargetObservation(TargetPersistence.publicRow(it), revision) }
-            else clip(rows, now)
+            else clip(TargetPersistence.storage().recordedRows(id,
+                TargetPreferences.endpointRevision(ctx, id), now).valueOrThrow(), now)
         }
         TargetBackupSnapshot(now, BackupManager.snapshot(ctx, now).settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY,
             TargetPreferences.definitions(ctx), rows, EventLog.all(ctx).toList())

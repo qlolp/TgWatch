@@ -38,6 +38,7 @@ class TargetPreferencesIntegrationTest {
         MonitorService.stopAndAwait(ctx)
         rows = TargetPersistence.storage().read(id)
         assertTrue(Prefs.sp(ctx).edit().putBoolean("enabled", true)
+            .putBoolean(TargetPreferences.key(TargetId.TELEGRAM, "enabled"), true)
             .putBoolean(TargetPreferences.key(id, "enabled"), true)
             .putBoolean(TargetPreferences.key(id, "endpoint_review"), false)
             .putLong(TargetPreferences.key(id, "endpoint_revision"), 0).commit())

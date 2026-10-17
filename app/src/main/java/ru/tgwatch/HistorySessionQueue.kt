@@ -10,6 +10,7 @@ class HistorySessionQueue(
     private val executor: Executor,
     private val endSession: (Long) -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val sessionClosed: (Long, Long) -> Unit = { _, at -> endSession(at) },
 ) {
     private data class Transition(val operation: () -> Unit, val done: CompletableFuture<Unit>)
     private val lock = Any()
@@ -47,7 +48,7 @@ class HistorySessionQueue(
         if (session != this.session || closed) return lastBarrier
         closed = true
         if (!hasRecords) return lastBarrier
-        enqueueTransition { endSession(atMs) }
+        enqueueTransition { sessionClosed(session, atMs) }
     }
 
     fun exclusive(operation: () -> Unit): CompletableFuture<Unit> = synchronized(lock) {

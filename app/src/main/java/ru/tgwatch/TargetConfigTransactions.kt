@@ -18,14 +18,19 @@ internal object TargetConfigTransactions {
     fun resume(ctx: Context) {
         val unlocked = ctx.applicationContext.getSystemService(UserManager::class.java).isUserUnlocked
         if (!unlocked || pending.isEmpty()) return
-        HistorySessions.queue(ctx).exclusive { pending.toList().forEach { runCatching { replay(ctx, it) } } }
+        HistorySessions.queue(ctx).exclusive { synchronized(History) {
+            pending.toList().forEach { runCatching { replay(ctx, it) } }
+        } }
     }
 
     fun retry(ctx: Context, id: TargetId): Boolean {
         check(Looper.myLooper() != Looper.getMainLooper())
         return if (!isPending(id)) true else {
             val token = TargetPreferences.fence.begin(id) ?: return false
-            try { HistorySessions.queue(ctx).exclusive { replay(ctx, id) }.get(); !isPending(id) }
+            try {
+                HistorySessions.queue(ctx).exclusive { synchronized(History) { replay(ctx, id) } }.get()
+                !isPending(id)
+            }
             catch (_: Exception) { false }
             finally { TargetPreferences.fence.finish(token) }
         }

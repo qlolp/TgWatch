@@ -415,6 +415,7 @@ class MonitorReliabilityIntegrationTest {
         field("activeService").set(null, service)
         field("running").setBoolean(null, true)
         assertTrue(Prefs.sp(ctx).edit().putBoolean("enabled", true).putBoolean("keep_awake", false)
+            .putBoolean(TargetPreferences.key(TargetId.TELEGRAM, "enabled"), true)
             .putBoolean("vibrate", false).putBoolean("notify_outage", true).putBoolean("notify_recovery", true)
             .putBoolean("quiet_hours", false).remove("alerts_muted_until").remove("alert_mute_until_elapsed").commit())
         fixtureService = service

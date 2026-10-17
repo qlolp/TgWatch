@@ -9,6 +9,7 @@ internal object MonitorHistory {
     fun publish(ctx: Context, session: Long, publication: HistoryPublication,
         recovery: (RecoveryEvent) -> Unit, refreshed: () -> Unit): Boolean =
         HistorySessions.queue(ctx).submit(session) {
+            TargetHistories.markTelegram(session)
             val state = publication.state
             LastSuccessStore.record(ctx, state.status.name, state.checkedAt)
             val kind = when (state.status) {

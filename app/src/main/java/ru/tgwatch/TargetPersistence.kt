@@ -57,6 +57,7 @@ internal object TargetPersistence {
                 materialize()
             }
         }.onFailure { if (it !is Error) undoAttachment() }.getOrThrow()
+        TargetHistories.restored()
     }
 
     internal fun publicRow(row: Observation): Observation =

@@ -6,6 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class HistorySessionQueueTest {
+    @Test fun closeReportsTheRetiredSessionIdentityAfterANewOneOpens() {
+        val worker = ManualWorker()
+        val ended = mutableListOf<Pair<Long, Long>>()
+        val queue = HistorySessionQueue(worker, { fail("Use the target-aware closer") },
+            sessionClosed = { id, at -> ended.add(id to at) })
+        val old = queue.open()
+        queue.submit(old) { }
+        queue.close(old, 123)
+        queue.open()
+        worker.drain()
+        assertEquals(listOf(old to 123L), ended)
+    }
     private class ManualWorker : Executor {
         val work = ArrayDeque<Runnable>()
         override fun execute(task: Runnable) { work.add(task) }

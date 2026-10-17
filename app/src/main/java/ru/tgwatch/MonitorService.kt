@@ -397,7 +397,10 @@ class MonitorService : Service() {
             rearmChecks()
         }
         override fun onPublished(snapshot: TargetSnapshot, report: TargetReport) {
-            if (snapshot.id != TargetId.TELEGRAM) broadcastState()
+            if (snapshot.id != TargetId.TELEGRAM) {
+                TargetHistories.publish(this@MonitorService, historySession, snapshot, report.publishable)
+                broadcastState()
+            }
         }
     })
 
