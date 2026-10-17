@@ -574,14 +574,14 @@ class MonitorService : Service() {
         // A result from a network that has since changed is no observation: keep the prior state,
         // history and alerts. afterCheck() runs the replacement check one second later.
         if (revision != checkSchedule.revision) return
-        if (!result.publishable) {
+        if (result.publishable) {
+            handleResult(result)
+            startExtras(result)
+        } else {
             // Admission failure is monitor health, not a new observation about Telegram.
             lastEndpoints = result.outcomes.toList()
             checkSchedule.request(INTERRUPTED_RETRY_MS)
-            return
         }
-        handleResult(result)
-        startExtras(result)
     }
 
     private fun outcomeLine(r: ProbeOutcome) = "${if (r.reachable) "✓" else "?"} ${r.endpoint}: ${r.detail}" +

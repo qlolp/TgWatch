@@ -82,51 +82,43 @@ class ProbeCancellation : Closeable {
     }
 }
 
-class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long = 6_000L) {
-    private class Lease(private val release: () -> Unit) {
-        private val state = java.util.concurrent.atomic.AtomicInteger(0)
-        fun start() = state.compareAndSet(0, 1)
-        fun cancelBeforeStart() { if (state.compareAndSet(0, 2)) release() }
-        fun finish() { if (state.compareAndSet(1, 2)) release() }
-    }
-    companion object {
-        private val occupied = java.util.WeakHashMap<ExecutorService, MutableSet<String>>()
-        private fun acquire(pool: ExecutorService, endpoint: ProbeEndpoint): Lease? = synchronized(occupied) {
-            val key = "${endpoint.group}:${endpoint.name}:${endpoint.address}"
-            val active = occupied.getOrPut(pool) { mutableSetOf() }
-            if (!active.add(key)) null else Lease { synchronized(occupied) { active.remove(key) } }
-        }
-    }
+class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long = 6_000L,
+    private val admission: ProbeAdmission = ProbeAdmission.process,
+    private val lane: ProbeLane = ProbeLane.PRIMARY) {
     fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> {
         checkCoordinator()
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         val queue = ExecutorCompletionService<ProbeOutcome>(pool)
-        val handles = mutableListOf<Triple<Future<ProbeOutcome>, ProbeCancellation, Lease>>()
+        val handles = mutableListOf<Triple<Future<ProbeOutcome>, ProbeCancellation, ProbePermit>>()
         val results = mutableListOf<ProbeOutcome>()
         val started = ConcurrentHashMap.newKeySet<String>()
         try {
             endpoints.forEach { endpoint ->
-                val lease = acquire(pool, endpoint)
+                val key = "${endpoint.group}:${endpoint.name}:${endpoint.address}"
+                val lease = admission.tryAcquire(key, lane)
                 if (lease == null) {
-                    results += notMeasured(endpoint, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
+                    results += notMeasured(endpoint,
+                        Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                     return@forEach
                 }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable notMeasured(endpoint, Lang.t("Проверка отменена", "Check cancelled"))
+                        if (!lease.start()) return@Callable notMeasured(endpoint,
+                            Lang.t("Проверка отменена", "Check cancelled"))
                         try {
                             cancellation.check()
                             started.add(endpoint.name)
                             operation(endpoint, cancellation)
                         }
                         catch (e: Exception) { ProbeOutcome(endpoint.name, endpoint.group, false, -1, describeProbeError(e)) }
-                        finally { cancellation.close(); lease.finish() }
+                        finally { cancellation.close(); lease.finished() }
                     })
                     handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
                     lease.cancelBeforeStart()
-                    results += notMeasured(endpoint, Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
+                    results += notMeasured(endpoint,
+                        Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing"))
                 }
             }
             repeat(handles.size) {
@@ -184,7 +176,8 @@ class NetworkProbe(
     }
 
     fun checkExtras(extras: List<ProbeEndpoint>): List<ProbeOutcome> =
-        ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS).run(extras.filter { it.group == ProbeGroup.EXTRA }, ::probe)
+        ProbeBatch(extraPool, ExtraProbes.BATCH_TIMEOUT_MS, lane = ProbeLane.SECONDARY)
+            .run(extras.filter { it.group == ProbeGroup.EXTRA }, ::probe)
 
     fun checkPrimary(): ProbeReport {
         val telegram = listOf(
