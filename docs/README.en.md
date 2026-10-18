@@ -65,9 +65,10 @@ duration totals. See [1.15.0](releases/1.15.0.md).
 The encrypted portable backup contains settings, history and the event log. New
 exports use AES-256-GCM and PBKDF2-HMAC-SHA256 with 600,000 iterations. Keep the
 password: there is no recovery service. Restoring replaces data and leaves
-monitoring stopped. Exports from 1.13.2 use JSON payload version 2 inside the
-unchanged TGWB v2 envelope and require TgWatch 1.13.2 or later to restore. Older
-supported backups remain readable. CSV export/import is also supported.
+monitoring stopped. Current all-target exports use TGWB v3 with JSON payload
+version 3. A separate Telegram-only v2 export supports older installations;
+private addresses are excluded from both new export formats. Older supported
+backups remain readable. CSV export/import is also supported.
 See [backup formats](backup.md).
 
 [Automation](automation.md) is disabled by default. An explicit broadcast API
@@ -87,7 +88,7 @@ stay outside portable backups, Direct Boot data and diagnostic/share exports.
 
 The optional [HTTPS webhook](automation.md#webhook-alert) supports text or a bounded
 JSON event with per-target status filters. The JSON contains public status, previous
-status, time, latency, network class and freshness, without endpoints or tokens.
+status, measurement time, latency and network class, without endpoints or tokens.
 One physical request, a ten-second deadline, rate limits and settings-generation
 fences apply. The [Home Assistant example](examples/home-assistant/tgwatch-events.yaml)
 uses events, without a heartbeat or MQTT client in the app.
@@ -95,7 +96,7 @@ uses events, without a heartbeat or MQTT client in the app.
 ## Latency and surfaces
 
 The selected target's latency screen offers hour/day/week counts, mean and exact
-nearest-rank p50/p95/p99. Telegram uses the best confirmed MTProto response per check;
+nearest-rank p50/p95. Telegram uses the best confirmed MTProto response per check;
 local DC/address-family histograms provide approximate ranges, not message speed.
 Configurable slow-response alerts require consecutive measured results. Unknown or
 unmeasured checks break the pending streak. DC buckets are not portable backup data.
