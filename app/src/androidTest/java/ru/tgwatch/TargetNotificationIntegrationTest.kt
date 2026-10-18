@@ -123,7 +123,8 @@ class TargetNotificationIntegrationTest {
         controller.onCheck(state(matrix, TargetStatus.DOWN))
         controller.onCheck(state(whatsapp, TargetStatus.DOWN))
         controller.recovered(ok, RecoveryEvent(1_000))
-        await { notification(matrix, "outage") != null }
+        // Notification delivery is asynchronous; seeing Matrix alone does not mean WhatsApp arrived.
+        await { notification(matrix, "outage") != null && notification(whatsapp, "outage") != null }
         assertNull(notification(matrix, "recovery"))
         assertNotNull(notification(whatsapp, "outage"))
     }

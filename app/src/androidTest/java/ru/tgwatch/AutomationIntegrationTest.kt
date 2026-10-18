@@ -193,7 +193,17 @@ class AutomationIntegrationTest {
                 toggle.performClick()
                 assertFalse(copy.isEnabled)
                 assertNull(AutomationSettings.token(ctx))
-                assertNull("Disabling must clear this screen's clipboard token", clipboard.primaryClip)
+                val cleared = clipboard.primaryClip
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    assertNull("Disabling must clear this screen's clipboard token", cleared)
+                } else if (cleared != null) {
+                    // API26/27 have no clearPrimaryClip: replacing with empty text removes the token.
+                    assertEquals(1, cleared.itemCount)
+                    val item = cleared.getItemAt(0)
+                    assertTrue("The old bearer token must be removed", item.text.isNullOrEmpty())
+                    assertNull("Cleared clipboard must not retain a URI", item.uri)
+                    assertNull("Cleared clipboard must not retain an intent", item.intent)
+                }
             }
             scenario.recreate()
             scenario.onActivity { assertFalse(it.findViewById<Switch>(AutomationSettingsActivity.ID_ENABLE).isChecked) }

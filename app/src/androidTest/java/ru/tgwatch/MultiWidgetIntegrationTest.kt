@@ -26,6 +26,7 @@ class MultiWidgetIntegrationTest {
     private val ctx get() = instrumentation.targetContext
     private val manager get() = AppWidgetManager.getInstance(ctx)
     private lateinit var host: AppWidgetHost
+    private lateinit var bindingPermission: WidgetBindingPermission
     private lateinit var saved: Map<String, *>
     private lateinit var history: TargetBackupSnapshot
     @Before fun isolate() {
@@ -34,14 +35,17 @@ class MultiWidgetIntegrationTest {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         history = BackupManager.snapshotTargets(ctx)
-        instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+        bindingPermission = WidgetBindingPermission.acquire(ctx, instrumentation.uiAutomation)
         host = AppWidgetHost(ctx, 80317)
     }
     @After fun restore() {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
-        if (::host.isInitialized) host.deleteHost()
-        instrumentation.uiAutomation.dropShellPermissionIdentity()
+        try {
+            if (::host.isInitialized) host.deleteHost()
+        } finally {
+            if (::bindingPermission.isInitialized) bindingPermission.close()
+        }
         if (::history.isInitialized) BackupManager.restoreTargets(ctx, history)
         if (::saved.isInitialized) {
             val edit = Prefs.sp(ctx).edit().clear()

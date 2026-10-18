@@ -20,11 +20,13 @@ class EventChannelsTest {
         val manager = ctx.getSystemService(NotificationManager::class.java)
         resetChannels(manager)
         try {
-            events(ctx,manager)
-            val original = manager.getNotificationChannel(recovery).importance
+            // Android8 does not apply programmatic importance changes to existing channels.
+            // Seed distinct choices before construction to exercise preservation on every API.
             manager.createNotificationChannel(NotificationChannel(outage,"Outage",NotificationManager.IMPORTANCE_LOW))
-            assertEquals(NotificationManager.IMPORTANCE_LOW,manager.getNotificationChannel(outage).importance)
+            manager.createNotificationChannel(NotificationChannel(recovery,"Recovery",NotificationManager.IMPORTANCE_HIGH))
+            val original = manager.getNotificationChannel(recovery).importance
             events(ctx,manager)
+            assertEquals(NotificationManager.IMPORTANCE_LOW,manager.getNotificationChannel(outage).importance)
             assertEquals("Recovery importance must be independent",original,
                 manager.getNotificationChannel(recovery).importance)
         } finally { resetChannels(manager) }
@@ -35,30 +37,45 @@ class EventChannelsTest {
         if (Build.VERSION.SDK_INT >= 33) android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation
             .executeShellCommand("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")).use { it.readBytes() }
         val manager = ctx.getSystemService(NotificationManager::class.java)
-        resetChannels(manager)
+        listOf(EventNotifications.OUTAGE_ID,EventNotifications.PARTIAL_ID,EventNotifications.RECOVERY_ID)
+            .forEach { assertBlockedDelivery(ctx,manager,it) }
+    }
+    private fun assertBlockedDelivery(ctx: android.content.Context, manager: NotificationManager, eventId: Int) {
+        // Fresh IDs avoid Android restoring the importance of a previously deleted channel.
+        val suffix = java.util.UUID.randomUUID().toString()
+        val outage = "test_outage_$suffix"
+        val partial = "test_partial_$suffix"
+        val recovery = "test_recovery_$suffix"
+        val channel = when (eventId) {
+            EventNotifications.OUTAGE_ID -> outage
+            EventNotifications.PARTIAL_ID -> partial
+            else -> recovery
+        }
         try {
-            val events = events(ctx,manager)
-            val cases = listOf(
-                Triple(outage,EventNotifications.OUTAGE_ID, { sound: Boolean, allowed: Boolean -> events.outage("Test",sound,allowed) }),
-                Triple(partial,EventNotifications.PARTIAL_ID, { sound: Boolean, allowed: Boolean -> events.partial("Test",sound,allowed) }),
-                Triple(recovery,EventNotifications.RECOVERY_ID, { sound: Boolean, allowed: Boolean -> events.recovered(RecoveryEvent(1000),sound,allowed) }))
-            for ((channel,id,post) in cases) {
-                manager.createNotificationChannel(NotificationChannel(channel,"Blocked",NotificationManager.IMPORTANCE_NONE))
-                assertEquals(NotificationManager.IMPORTANCE_NONE,manager.getNotificationChannel(channel).importance)
-                post(true,false)
-                android.os.SystemClock.sleep(250)
-                assertTrue("Quiet hours bypassed blocked $channel",manager.activeNotifications.none { it.id == id })
-                post(false,true)
-                android.os.SystemClock.sleep(250)
-                assertTrue("Sound toggle bypassed blocked $channel",manager.activeNotifications.none { it.id == id })
-                if (id == EventNotifications.OUTAGE_ID) {
-                    events.partial("Enabled category",true,true)
-                    repeat(40) { if (manager.activeNotifications.none { it.id == EventNotifications.PARTIAL_ID }) android.os.SystemClock.sleep(50) }
-                    assertTrue("Unrelated enabled events must still work",manager.activeNotifications.any { it.id == EventNotifications.PARTIAL_ID })
-                    manager.cancel(EventNotifications.PARTIAL_ID)
-                }
+            manager.createNotificationChannel(NotificationChannel(channel,"Blocked",NotificationManager.IMPORTANCE_NONE))
+            val events = EventNotifications(ctx,manager,outage,partial,recovery)
+            assertEquals(NotificationManager.IMPORTANCE_NONE,manager.getNotificationChannel(channel).importance)
+            val post: (Boolean,Boolean) -> Unit = when (eventId) {
+                EventNotifications.OUTAGE_ID -> { sound,allowed -> events.outage("Test",sound,allowed) }
+                EventNotifications.PARTIAL_ID -> { sound,allowed -> events.partial("Test",sound,allowed) }
+                else -> { sound,allowed -> events.recovered(RecoveryEvent(1000),sound,allowed) }
             }
-        } finally { resetChannels(manager) }
+            post(true,false)
+            android.os.SystemClock.sleep(250)
+            assertTrue("Quiet hours bypassed blocked $channel",manager.activeNotifications.none { it.id == eventId })
+            post(false,true)
+            android.os.SystemClock.sleep(250)
+            assertTrue("Sound toggle bypassed blocked $channel",manager.activeNotifications.none { it.id == eventId })
+            if (eventId == EventNotifications.OUTAGE_ID) {
+                events.partial("Enabled category",true,true)
+                repeat(40) { if (manager.activeNotifications.none { it.id == EventNotifications.PARTIAL_ID }) android.os.SystemClock.sleep(50) }
+                assertTrue("Unrelated enabled events must still work",manager.activeNotifications.any { it.id == EventNotifications.PARTIAL_ID })
+            }
+        } finally {
+            listOf(EventNotifications.OUTAGE_ID,EventNotifications.PARTIAL_ID,EventNotifications.RECOVERY_ID)
+                .forEach { manager.cancel(it) }
+            listOf(outage,partial,recovery).forEach { manager.deleteNotificationChannel(it) }
+        }
     }
     private fun resetChannels(manager: NotificationManager) {
         manager.cancel(EventNotifications.OUTAGE_ID); manager.cancel(EventNotifications.PARTIAL_ID); manager.cancel(EventNotifications.RECOVERY_ID)

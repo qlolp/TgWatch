@@ -69,7 +69,7 @@ class TargetLegacyControlsIntegrationTest {
             MonitorService.State(MonitorService.Status.OK, System.currentTimeMillis(),
                 checkedElapsed = SystemClock.elapsedRealtime()))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+        val bindingPermission = WidgetBindingPermission.acquire(ctx, instrumentation.uiAutomation)
         val host = AppWidgetHost(ctx, 80318)
         try {
             val id = host.allocateAppWidgetId()
@@ -87,8 +87,11 @@ class TargetLegacyControlsIntegrationTest {
             }
             assertEquals(ctx.getString(R.string.widget_goal_off, TargetNames.label(TargetId.TELEGRAM)), title)
         } finally {
-            host.deleteHost()
-            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            try {
+                host.deleteHost()
+            } finally {
+                bindingPermission.close()
+            }
         }
         var opened: Intent? = null
         var serviceCommands = 0
