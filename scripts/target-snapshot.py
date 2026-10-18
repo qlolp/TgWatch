@@ -265,13 +265,21 @@ def save(path, data):
 
 def wait_observation(args):
     deadline = time.monotonic() + args.timeout
+    after = args.after
+    if args.since_boot:
+        started = re.findall(rb'^btime ([1-9][0-9]*)$', adb('shell', 'cat', '/proc/stat').replace(b'\r', b''), re.M)
+        if len(started) != 1:
+            raise ValueError('Cannot establish current kernel boot time')
+        # btime has one-second resolution. Exclude its entire boundary second so
+        # a check that raced PIN setup in the previous boot cannot satisfy this.
+        after = max(after, (int(started[0]) + 1) * 1000 - 1)
     while time.monotonic() < deadline:
         try:
             checked = state()
             data = capture(remote_read)
             foreground = not args.foreground or b'isForeground=true' in adb(
                 'shell', 'dumpsys', 'activity', 'services', 'ru.tgwatch')
-            if checked > args.after and foreground and has_observation(data, 'telegram', checked,
+            if checked > after and foreground and has_observation(data, 'telegram', checked,
                     args.status, args.exclude_status) and state() == checked:
                 print('Fresh committed Telegram observation verified')
                 return
@@ -291,6 +299,7 @@ def main():
     wait.add_argument('--after', type=int, required=True)
     wait.add_argument('--timeout', type=float, default=90)
     wait.add_argument('--foreground', action='store_true')
+    wait.add_argument('--since-boot', action='store_true', help='Require an observation from the current kernel boot')
     wait.add_argument('--status', choices=sorted(KINDS))
     wait.add_argument('--exclude-status', choices=sorted(KINDS), action='append', default=[])
     contains = commands.add_parser('contains')

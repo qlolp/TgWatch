@@ -54,12 +54,29 @@ def prepare(command, timeout, command_timeout, interval, disposable):
         raise PreparationError('Direct Boot preparation requires an emulator, never a physical device')
     readiness.ensure_ready(command, remaining(), command_timeout, interval)
     current = mode()
-    if current in ('native', 'emulated'):
+    if current == 'native':
         return current
-    if current != 'none':
+    if current not in ('none', 'emulated'):
         raise PreparationError('Unsupported emulator file-encryption mode')
-    if not disposable:
+    if current == 'none' and not disposable:
         raise PreparationError('FBE emulation requires explicit --disposable opt-in; it reboots the emulator')
+
+    # Android8 uses opposite defaults for an unset REQUIRE_PASSWORD_TO_DECRYPT:
+    # enabling emulated FBE assumes false, while setting a PIN assumes true.
+    # Explicitly disable secure start-up so a later test PIN does not rekey the
+    # underlying FDE disk and make the emulator reset its userdata on reboot.
+    startup_args = ['global', 'require_password_to_decrypt']
+    startup = value(['shell', 'settings', 'get'] + startup_args)
+    if startup != '0':
+        if not disposable:
+            raise PreparationError('Secure start-up preparation requires explicit --disposable opt-in')
+        if startup not in ('null', '-1', '1'):
+            raise PreparationError('Unsupported emulator secure start-up state')
+        changed = invoke(['shell', 'settings', 'put'] + startup_args + ['0'])
+        if changed.returncode or value(['shell', 'settings', 'get'] + startup_args) != '0':
+            raise PreparationError('Unable to disable emulator secure start-up')
+    if current == 'emulated':
+        return current
 
     before = value(['shell', 'cat', '/proc/sys/kernel/random/boot_id'])
     if not before:

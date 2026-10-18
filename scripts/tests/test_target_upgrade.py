@@ -1,8 +1,11 @@
 """Canonical migration/observation fixtures; never execute an imported path in a shell."""
 import importlib.util
 import json
+import io
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 IDS = ('telegram', 'matrix', 'whatsapp', 'custom')
@@ -66,6 +69,31 @@ class TargetUpgradeTests(unittest.TestCase):
             'telegram': '1000,2000,OK,20,1,0\n'})), 4000)
         self.assertFalse(module.has_observation(data, 'telegram', 3000))
         self.assertTrue(module.has_observation(data, 'matrix', 3000))
+
+    def await_boot_observation(self, at, boot_stat):
+        module = self.load()
+        data = module.capture(self.reader(self.generation({'telegram': f'{at},{at + 1000},OK,20,1,0\n'})), at + 1000)
+        args = SimpleNamespace(after=1000, timeout=90, foreground=True, since_boot=True,
+                               status=None, exclude_status=[])
+        def adb(*arguments):
+            return boot_stat if arguments == ('shell', 'cat', '/proc/stat') else b'isForeground=true'
+        with patch.object(module, 'state', return_value=at), patch.object(module, 'capture', return_value=data), \
+             patch.object(module, 'adb', side_effect=adb), \
+             patch.object(module.time, 'monotonic', side_effect=[0, 0, 91]), \
+             patch.object(module.time, 'sleep'), patch('sys.stdout', new_callable=io.StringIO):
+            module.wait_observation(args)
+
+    def test_preboot_check_after_old_baseline_cannot_satisfy_locked_boot_await(self):
+        with self.assertRaises(ValueError):
+            self.await_boot_observation(2000, b'cpu 1 2 3\nbtime 2\n')
+
+    def test_real_observation_after_current_kernel_boot_is_accepted(self):
+        self.await_boot_observation(3000, b'cpu 1 2 3\nbtime 2\n')
+
+    def test_missing_or_ambiguous_boot_time_cannot_fall_back_to_old_baseline(self):
+        for value in (b'cpu 1 2 3\n', b'btime 0\n', b'btime -1\n', b'btime 2\nbtime 3\n'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.await_boot_observation(3000, value)
 
     def test_offline_observation_must_be_no_network_not_unknown(self):
         module = self.load()

@@ -26,6 +26,10 @@ elif a==['wait-for-device']: pass
 elif a==['shell','id','-u']: out='0'
 elif a==['shell','getprop','sys.boot_completed']: out='1'
 elif a==['shell','sm','get-fbe-mode']: out=s['mode']
+elif a==['shell','settings','get','global','require_password_to_decrypt']: out=s['startup']
+elif a==['shell','settings','put','global','require_password_to_decrypt','0']:
+    if s.get('startup_denied'): code=1;err='Permission denied'
+    elif not s.get('startup_ignored'): s['startup']='0'
 elif a==['shell','sm','set-emulate-fbe','true']:
     if s.get('denied'): code=1;err='Permission denied'
     else:
@@ -51,7 +55,7 @@ class DirectBootPreparationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='tgwatch-fbe-') as temp:
             root = Path(temp)
             state = root / 'state.json'
-            initial = dict(mode=mode, boot='old-boot', qemu='1', calls=[])
+            initial = dict(mode=mode, boot='old-boot', qemu='1', startup='0', calls=[])
             initial.update(values)
             state.write_text(json.dumps(initial))
             adb = root / 'adb'
@@ -79,6 +83,43 @@ class DirectBootPreparationTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('old-boot', state['boot'])
         self.assertFalse(self.changed(state))
+
+    def test_unset_secure_startup_is_disabled_before_enabling_emulated_fbe(self):
+        result, state = self.run_fixture('none', disposable=True, startup='null')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('0', state['startup'])
+        commands = state['calls']
+        self.assertLess(commands.index(['shell', 'settings', 'put', 'global', 'require_password_to_decrypt', '0']),
+                        commands.index(['shell', 'sm', 'set-emulate-fbe', 'true']))
+
+    def test_existing_emulation_with_unset_startup_requires_disposable_opt_in(self):
+        result, state = self.run_fixture('emulated', startup='null')
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('disposable', result.stderr)
+        self.assertEqual('null', state['startup'])
+
+    def test_existing_emulation_can_prepare_startup_without_another_reboot(self):
+        result, state = self.run_fixture('emulated', disposable=True, startup='1')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('0', state['startup'])
+        self.assertEqual('old-boot', state['boot'])
+        self.assertFalse(self.changed(state))
+
+    def test_secure_startup_write_failure_stops_before_enabling_emulation(self):
+        result, state = self.run_fixture('none', disposable=True, startup='null', startup_denied=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.changed(state))
+
+    def test_secure_startup_write_must_be_read_back_before_emulation(self):
+        result, state = self.run_fixture('none', disposable=True, startup='null', startup_ignored=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.changed(state))
+
+    def test_native_fbe_does_not_change_or_read_legacy_secure_startup(self):
+        result, state = self.run_fixture('native', disposable=True, startup='1')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('1', state['startup'])
+        self.assertFalse(any(a[:2] == ['shell', 'settings'] for a in state['calls']))
 
     def test_fde_requires_explicit_disposable_opt_in_before_mutation(self):
         result, state = self.run_fixture('none')

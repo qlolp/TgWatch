@@ -180,7 +180,7 @@ print(f'::notice title=PIN reboot state::FBE={storage}, users={",".join(states) 
       f'lockscreen_disabled={disabled}, FBE_property={emulation}, FBE_disk={on_disk}, app_installed={installed}')
 PY_BOOT_STATE
 adb shell dumpsys user | grep -q RUNNING_LOCKED
-await_observation "$before"
+await_observation "$before" --since-boot
 # The observation must actually complete before PIN unlock, not after automatic user unlock.
 adb shell dumpsys user | grep -q RUNNING_LOCKED
 python3 scripts/adb-unlock-smoke.py
