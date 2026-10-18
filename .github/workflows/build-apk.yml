@@ -519,7 +519,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [29, 35]
+        # Minimum supported Android, intermediate baseline, current target and Android16.
+        api: [26, 29, 35, 36]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
