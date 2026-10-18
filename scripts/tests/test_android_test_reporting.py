@@ -63,6 +63,18 @@ class AndroidReportingTests(unittest.TestCase):
         self.assertNotIn('Secret.java', output)
         self.assertEqual(1, output.count('::error'))
 
+    def test_source_prefers_failing_method_over_shared_await_helper(self):
+        self.write('<testsuite><testcase classname="ru.tgwatch.TargetNotificationIntegrationTest" '
+                   'name="matrixMuteActionClearsOnlyItsOwnAlerts"><failure>private-failure-body&#10;'
+                   ' at ru.tgwatch.TargetNotificationIntegrationTest.await(TargetNotificationIntegrationTest.kt:219)&#10;'
+                   ' at ru.tgwatch.TargetNotificationIntegrationTest.matrixMuteActionClearsOnlyItsOwnAlerts'
+                   '(TargetNotificationIntegrationTest.kt:95)'
+                   '</failure></testcase></testsuite>')
+        output = self.run_report()
+        self.assertIn('TargetNotificationIntegrationTest.kt:95', output)
+        self.assertNotIn('TargetNotificationIntegrationTest.kt:219', output)
+        self.assertNotIn('private-failure-body', output)
+
     def test_unsafe_identifiers_and_exception_types_are_redacted(self):
         secret = 'token=secret-password'
         self.write('<testsuite><testcase classname="ru.tgwatch.Test&#10;::error::injected" '

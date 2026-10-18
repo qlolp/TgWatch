@@ -137,6 +137,10 @@ adb shell dumpsys deviceidle get deep | tr -d '\r' | grep -qx IDLE
 adb shell dumpsys deviceidle unforce
 adb shell dumpsys battery reset
 adb shell input keyevent KEYCODE_WAKEUP
+# Previous PIN tests can leave swipe-only keyguard enabled on reused emulators.
+# This stage has no credential yet; the later locked-boot assertions keep the PIN.
+adb shell wm dismiss-keyguard
+adb shell input keyevent 82
 adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation "$before"
 report_storage_mode after-doze
@@ -148,6 +152,9 @@ test -n "$tgwatch_boot_before_reboot"
 adb shell locksettings set-disabled false
 adb shell locksettings set-pin 1234
 report_storage_mode after-setting-pin
+# adb reboot bypasses Android's normal shutdown sequence. Flush the disposable
+# emulator's newly written platform PIN/FBE state before this abrupt reboot.
+adb shell sync
 adb reboot
 python3 scripts/adb-readiness.py --timeout 180 --after-boot-id "$tgwatch_boot_before_reboot"
 python3 - <<'PY_BOOT_STATE'
@@ -163,7 +170,14 @@ storage = storage if storage in ('native', 'emulated', 'none') else 'unknown'
 states = sorted(set(re.findall(r'\bRUNNING_(?:LOCKED|UNLOCKED|UNLOCKING)\b', value(['dumpsys', 'user']))))
 disabled = value(['locksettings', 'get-disabled', '--user', '0'])
 disabled = disabled if disabled in ('true', 'false') else 'unknown'
-print(f'::notice title=PIN reboot state::FBE={storage}, users={",".join(states) or "unknown"}, lockscreen_disabled={disabled}')
+def boolean(arguments):
+    result = value(arguments)
+    return result if result in ('true', 'false') else 'unknown'
+emulation = boolean(['getprop', 'persist.sys.emulate_fbe'])
+on_disk = boolean(['cat', '/data/property/persist.sys.emulate_fbe']) if storage != 'native' else 'unknown'
+installed = value(['pm', 'path', 'ru.tgwatch']).startswith('package:')
+print(f'::notice title=PIN reboot state::FBE={storage}, users={",".join(states) or "unknown"}, '
+      f'lockscreen_disabled={disabled}, FBE_property={emulation}, FBE_disk={on_disk}, app_installed={installed}')
 PY_BOOT_STATE
 adb shell dumpsys user | grep -q RUNNING_LOCKED
 await_observation "$before"

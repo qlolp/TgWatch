@@ -37,10 +37,16 @@ def case_source_location(case, exception):
     if not name.startswith('ru.tgwatch.') or not IDENTIFIER.fullmatch(name):
         return ''
     source = name.rsplit('.', 1)[-1].split('$', 1)[0]
-    frame = re.compile(r'^\s*at ' + re.escape(name) + r'\.[A-Za-z_$][A-Za-z0-9_$]*\('
+    frame = re.compile(r'^\s*at ' + re.escape(name) + r'\.([A-Za-z_$][A-Za-z0-9_$]*)\('
                        + re.escape(source) + r'\.(kt|java):([1-9][0-9]{0,5})\)\s*$', re.M)
-    match = frame.search(exception.text or '')
-    return f' [{source}.{match[1]}:{match[2]}]' if match else ''
+    match = None
+    for candidate in frame.finditer(exception.text or ''):
+        if match is None:
+            match = candidate
+        if candidate[1] == case.get('name'):
+            match = candidate
+            break
+    return f' [{source}.{match[2]}:{match[3]}]' if match else ''
 
 
 def case_outcome(case):

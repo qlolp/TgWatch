@@ -118,9 +118,9 @@ class TargetAutomationIntegrationTest {
         assertTrue(active.second!!.getBoolean("running"))
         TargetPreferences.stop(ctx, TargetId.MATRIX)
         var stopped = request(TargetAutomation.ACTION_GET_TARGET_STATE, "matrix")
-        // Invalidating the cache preserves the API's 200ms compute throttle. A
-        // busy response may contain no state; a successful response must already
-        // describe the stopped target, even on the first request after stop().
+        // Cache invalidation does not release a finishing compute's physical
+        // slot. A busy response may contain no state; a successful response must
+        // already describe the stopped target, even on the first request.
         val stopDeadline = SystemClock.elapsedRealtime() + 2_000
         while (stopped.first == AutomationReceiver.RESULT_RATE_LIMITED &&
             SystemClock.elapsedRealtime() < stopDeadline) {
