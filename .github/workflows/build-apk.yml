@@ -543,7 +543,9 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           disable-animations: true
-          script: bash scripts/android-smoke.sh
+          script: |
+            python3 scripts/prepare-direct-boot.py --disposable
+            bash scripts/android-smoke.sh
       - name: Connected Android test summary and bounded failure annotations
         if: always()
         run: python3 scripts/report-android-tests.py app/build/outputs/androidTest-results/connected

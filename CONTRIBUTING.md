@@ -50,9 +50,14 @@ JVM JSON использует test dependency, Android — системный `o
 должна зависеть от permissive platform coercions.
 
 Android scenarios выполняются только на отдельном disposable root-capable эмуляторе.
-Матрица CI охватывает API 26/29/35/36; target приложения пока остаётся API35:
+Матрица CI охватывает API 26/29/35/36; target приложения пока остаётся API35.
+Для проверки заблокированной credential storage нужен native или emulated FBE.
+Обычный API26-образ использует FDE: подготовка включает штатную эмуляцию FBE
+и перезагружает только явно выбранный одноразовый эмулятор перед установкой fixtures.
+На физических устройствах подготовка запрещена; native FBE не изменяется.
 
 ```bash
+python3 scripts/prepare-direct-boot.py --disposable
 bash scripts/android-smoke.sh
 ```
 
