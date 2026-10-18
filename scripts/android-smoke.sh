@@ -31,10 +31,21 @@ assert_legacy_observation() {
   python3 scripts/target-snapshot.py capture --out app/build/reports/androidTests/target-snapshot.json
   python3 scripts/target-snapshot.py contains app/build/reports/androidTests/target-snapshot.json --at "$((minute * 60000))"
 }
+report_storage_mode() {
+  local stage=$1 storage
+  if [[ "$(adb shell getprop ro.crypto.type | tr -d '\r')" == file ]]; then
+    storage=native
+  else
+    storage=$(adb shell sm get-fbe-mode | tr -d '\r')
+  fi
+  case "$storage" in native|emulated|none) ;; *) storage=unknown ;; esac
+  printf '::notice title=Direct Boot storage stage::%s: FBE=%s\n' "$stage" "$storage"
+}
 # The always-run reporter must never mistake a previous run for fresh results.
 rm -rf -- app/build/outputs/androidTest-results/connected
 bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace
 python3 scripts/adb-readiness.py
+report_storage_mode after-instrumentation
 mkdir -p app/build/reports/androidTests/ui-screenshots
 adb pull /data/local/tmp/tgwatch-settings.png app/build/reports/androidTests/ui-screenshots/settings.png
 # Runtime permission revocation kills the app; exercise denial in a fresh instrumentation.
@@ -65,6 +76,7 @@ if codes.count(0) != 2 or any(code not in (0, 1) for code in codes):
 print("Notification permission cycle: 2 passed, 0 failed/skipped")
 PY_PERMISSION
 fi
+report_storage_mode before-legacy-upgrade
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
 # This does not claim compatibility with an unrecoverable old CI debug key.
 legacy_dir=$(mktemp -d)
@@ -103,6 +115,7 @@ adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation 0
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 assert_legacy_observation
+report_storage_mode after-legacy-upgrade
 # Connectivity loss and recovery must produce new persisted observations.
 before=$(last_check)
 adb shell svc wifi disable
@@ -126,6 +139,7 @@ adb shell dumpsys battery reset
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell am start -W -n ru.tgwatch/.MainActivity
 await_observation "$before"
+report_storage_mode after-doze
 # Collect pre-reboot evidence: reboot clears the Android log buffers.
 check_crashes
 before=$(last_check)
@@ -133,6 +147,7 @@ tgwatch_boot_before_reboot=$(adb shell cat /proc/sys/kernel/random/boot_id | tr 
 test -n "$tgwatch_boot_before_reboot"
 adb shell locksettings set-disabled false
 adb shell locksettings set-pin 1234
+report_storage_mode after-setting-pin
 adb reboot
 python3 scripts/adb-readiness.py --timeout 180 --after-boot-id "$tgwatch_boot_before_reboot"
 python3 - <<'PY_BOOT_STATE'
