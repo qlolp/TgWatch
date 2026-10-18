@@ -129,12 +129,31 @@ await_observation "$before"
 # Collect pre-reboot evidence: reboot clears the Android log buffers.
 check_crashes
 before=$(last_check)
+tgwatch_boot_before_reboot=$(adb shell cat /proc/sys/kernel/random/boot_id | tr -d '\r')
+test -n "$tgwatch_boot_before_reboot"
 adb shell locksettings set-disabled false
 adb shell locksettings set-pin 1234
 adb reboot
-python3 scripts/adb-readiness.py --timeout 180
+python3 scripts/adb-readiness.py --timeout 180 --after-boot-id "$tgwatch_boot_before_reboot"
+python3 - <<'PY_BOOT_STATE'
+import re, subprocess
+def value(arguments):
+    try:
+        result = subprocess.run(['adb', 'shell'] + arguments, capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+    return result.stdout.strip() if result.returncode == 0 else ''
+storage = 'native' if value(['getprop', 'ro.crypto.type']) == 'file' else value(['sm', 'get-fbe-mode'])
+storage = storage if storage in ('native', 'emulated', 'none') else 'unknown'
+states = sorted(set(re.findall(r'\bRUNNING_(?:LOCKED|UNLOCKED|UNLOCKING)\b', value(['dumpsys', 'user']))))
+disabled = value(['locksettings', 'get-disabled', '--user', '0'])
+disabled = disabled if disabled in ('true', 'false') else 'unknown'
+print(f'::notice title=PIN reboot state::FBE={storage}, users={",".join(states) or "unknown"}, lockscreen_disabled={disabled}')
+PY_BOOT_STATE
 adb shell dumpsys user | grep -q RUNNING_LOCKED
 await_observation "$before"
+# The observation must actually complete before PIN unlock, not after automatic user unlock.
+adb shell dumpsys user | grep -q RUNNING_LOCKED
 python3 scripts/adb-unlock-smoke.py
 # Never clear the credential to make a failed PIN attempt look like an unlock.
 adb shell dumpsys user | grep -q RUNNING_UNLOCKED

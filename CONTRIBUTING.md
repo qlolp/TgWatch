@@ -71,6 +71,9 @@ bash scripts/android-smoke.sh
 эмулятор. Отчёты — `app/build/reports/androidTests/`, logcat — `smoke-logcat.txt`. Свежий
 status timestamp должен иметь собственную строку history; непустая старая история этого не
 доказывает. Restoration, minute/widget и independent Android event-channel tests сохраняются.
+После `reboot` проверка требует новый `kernel boot_id`: прежние UID0 и
+`sys.boot_completed=1` не подтверждают новую загрузку. Root и завершение загрузки
+должны принадлежать одному новому boot; это проверяет `adb-readiness.py --after-boot-id`.
 
 Upgrade baseline для CI — настоящий `v1.10.47` APK с фиксированным SHA-256
 `efd2147dae453c12288da5b3f33840f3dfb2f6b85032411f348fabb5e8e009d1`.

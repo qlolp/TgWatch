@@ -2,6 +2,7 @@
 """Prepare file-encryption lifecycle tests on an explicitly disposable emulator."""
 import argparse
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -101,6 +102,8 @@ def main():
         print(f'Direct Boot preparation failed: {error}', file=sys.stderr)
         return 1
     print(f'Direct Boot test storage ready: {current}')
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        print(f'::notice title=Direct Boot storage::Verified FBE mode: {current}')
     return 0
 
 

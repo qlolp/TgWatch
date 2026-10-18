@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify root and boot readiness, retrying bounded ADB transport reconnections."""
+"""Verify root/boot readiness and optionally require a stable new kernel boot."""
 import argparse
 import math
 import os
@@ -20,7 +20,7 @@ def positive_number(text):
     return value
 
 
-def ensure_ready(command, timeout, command_timeout, interval):
+def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None):
     deadline = time.monotonic() + timeout
     reconnect_errors = (
         re.compile(r"\b(?:adb:\s*)?unable to connect\b"),
@@ -65,11 +65,23 @@ def ensure_ready(command, timeout, command_timeout, interval):
         # root restarts adbd; even its successful exit is not device readiness.
         connected = call(["wait-for-device"])
         if rooted is not None and rooted.returncode == 0 and connected is not None and connected.returncode == 0:
-            identity = call(["shell", "id", "-u"])
-            if identity is not None and identity.returncode == 0 and identity.stdout.strip() == "0":
-                boot = call(["shell", "getprop", "sys.boot_completed"])
-                if boot is not None and boot.returncode == 0 and boot.stdout.strip() == "1":
-                    return
+            current_boot = None
+            if after_boot_id is not None:
+                observed = call(["shell", "cat", "/proc/sys/kernel/random/boot_id"])
+                if observed is not None and observed.returncode == 0:
+                    current_boot = observed.stdout.strip()
+            fresh = after_boot_id is None or bool(current_boot and current_boot != after_boot_id)
+            if fresh:
+                identity = call(["shell", "id", "-u"])
+                if identity is not None and identity.returncode == 0 and identity.stdout.strip() == "0":
+                    boot = call(["shell", "getprop", "sys.boot_completed"])
+                    if boot is not None and boot.returncode == 0 and boot.stdout.strip() == "1":
+                        if after_boot_id is None:
+                            return
+                        # UID and completion must belong to the same new boot, not cross a reboot.
+                        confirmed = call(["shell", "cat", "/proc/sys/kernel/random/boot_id"])
+                        if confirmed is not None and confirmed.returncode == 0 and confirmed.stdout.strip() == current_boot:
+                            return
         remaining = deadline - time.monotonic()
         if remaining > 0:
             time.sleep(min(interval, remaining))
@@ -85,11 +97,18 @@ def main():
     parser.add_argument("--timeout", type=positive_number, default=45)
     parser.add_argument("--command-timeout", type=positive_number, default=5)
     parser.add_argument("--interval", type=positive_number, default=1)
+    parser.add_argument("--after-boot-id", help="Require a different, stable kernel boot after reboot")
     args = parser.parse_args()
+    if args.after_boot_id is not None:
+        args.after_boot_id = args.after_boot_id.strip()
+        if not args.after_boot_id:
+            parser.error("--after-boot-id must not be empty")
     command = [args.adb] + (["-s", args.serial] if args.serial else [])
     try:
-        ensure_ready(command, args.timeout, args.command_timeout, args.interval)
+        ensure_ready(command, args.timeout, args.command_timeout, args.interval, args.after_boot_id)
         print("ADB is connected, running as root, and booted")
+        if args.after_boot_id is not None and os.environ.get("GITHUB_ACTIONS") == "true":
+            print("::notice title=Fresh Android reboot::Root and completion verified in one new kernel boot")
         return 0
     except ReadinessError as error:
         print(f"ADB readiness failed: {error}", file=sys.stderr)

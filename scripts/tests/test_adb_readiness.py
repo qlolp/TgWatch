@@ -47,12 +47,16 @@ elif a==['shell','id','-u']:
     print('2000' if mode=='late_uid' and n==1 else '0')
 elif a==['shell','getprop','sys.boot_completed']:
     print('0' if mode=='late_boot' and n==1 else '1')
+elif a==['shell','cat','/proc/sys/kernel/random/boot_id']:
+    reads=sum((x[2:] if x[:1]==['-s'] else x)==a for x in s['calls'])
+    if mode=='unstable_boot_id': print('first-new-boot' if reads==1 else 'second-new-boot')
+    else: print('' if mode=='empty_boot_id' else 'new-boot' if mode=='boot_id_changes' and n>1 else 'old-boot')
 else: sys.exit(8)
 '''
 
 
 class AdbReadinessTests(unittest.TestCase):
-    def run_fixture(self, mode, *, timeout=3, command_timeout=.4, serial=False):
+    def run_fixture(self, mode, *, timeout=3, command_timeout=.4, serial=False, after_boot=None):
         with tempfile.TemporaryDirectory(prefix="tgwatch-adb-") as temp:
             root = Path(temp)
             state = root / "state.json"
@@ -65,6 +69,8 @@ class AdbReadinessTests(unittest.TestCase):
                     "--interval", ".02"]
             if serial:
                 args.extend(["--serial", "fixture-29"])
+            if after_boot is not None:
+                args.extend(["--after-boot-id", after_boot])
             env = dict(os.environ, TGWATCH_TEST_ADB_STATE=str(state))
             env.pop("ANDROID_SERIAL", None)
             started = time.monotonic()
@@ -93,6 +99,35 @@ class AdbReadinessTests(unittest.TestCase):
         result, calls, _ = self.run_fixture("late_boot")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertGreaterEqual(calls.count(["shell", "getprop", "sys.boot_completed"]), 2)
+
+    def test_reboot_requires_a_different_boot_even_when_old_system_is_ready(self):
+        result, calls, _ = self.run_fixture('boot_id_changes', after_boot='old-boot')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertGreaterEqual(calls.count(['root']), 2)
+        self.assertGreaterEqual(calls.count(['shell', 'cat', '/proc/sys/kernel/random/boot_id']), 2)
+
+    def test_same_ready_boot_never_satisfies_a_requested_reboot(self):
+        result, calls, _ = self.run_fixture('ready', after_boot='old-boot', timeout=.4)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('ADB readiness failed', result.stderr)
+        self.assertIn(['shell', 'cat', '/proc/sys/kernel/random/boot_id'], calls)
+
+    def test_empty_boot_identity_is_not_a_fresh_boot(self):
+        result, calls, _ = self.run_fixture('empty_boot_id', after_boot='old-boot', timeout=.4)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn('ADB readiness failed', result.stderr)
+        self.assertIn(['shell', 'cat', '/proc/sys/kernel/random/boot_id'], calls)
+
+    def test_root_and_completion_checks_must_belong_to_the_same_new_boot(self):
+        result, calls, _ = self.run_fixture('unstable_boot_id', after_boot='old-boot')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertGreaterEqual(calls.count(['root']), 2)
+
+    def test_empty_requested_old_boot_is_rejected_before_adb(self):
+        for identity in ('', '   '):
+            result, calls, _ = self.run_fixture('ready', after_boot=identity)
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual([], calls)
 
     def test_permanent_root_denial_fails_without_retry(self):
         result, calls, elapsed = self.run_fixture("denied")
