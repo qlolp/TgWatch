@@ -99,6 +99,8 @@ def prepare(command, timeout, command_timeout, interval, disposable):
     current = mode()
     if current not in ('native', 'emulated'):
         raise PreparationError('FBE was not enabled after the verified reboot')
+    if value(['shell', 'settings', 'get'] + startup_args) != '0':
+        raise PreparationError('Disabled emulator secure start-up did not persist across reboot')
     return current
 
 

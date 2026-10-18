@@ -40,6 +40,7 @@ elif a==['shell','cat','/proc/sys/kernel/random/boot_id']:
         s['pending']=False
         s['boot']='new-boot'
         if not s.get('lost_setting'): s['mode']='emulated'
+        if s.get('startup_lost_on_boot'): s['startup']='null'
         code=1;err='error: device offline'
     else: out=s['boot']
 else: code=7;err='Unexpected fixture command'
@@ -120,6 +121,12 @@ class DirectBootPreparationTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('1', state['startup'])
         self.assertFalse(any(a[:2] == ['shell', 'settings'] for a in state['calls']))
+
+    def test_secure_startup_must_stay_disabled_after_the_preparation_reboot(self):
+        result, state = self.run_fixture('none', disposable=True, startup='null', startup_lost_on_boot=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual('new-boot', state['boot'])
+        self.assertEqual('emulated', state['mode'])
 
     def test_fde_requires_explicit_disposable_opt_in_before_mutation(self):
         result, state = self.run_fixture('none')
