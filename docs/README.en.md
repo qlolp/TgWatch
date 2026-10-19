@@ -153,3 +153,7 @@ steps. The code is licensed under [MIT](../LICENSE).
 Custom HTTPS optionally checks an exact HTTP code and top-level JSON string (for
 example `status=ok`). These criteria remain private and are excluded from backups
 and exports. See [health criteria and limits](multiservice.md#custom-https-health-criteria).
+
+The explicit [JSON v2 + heartbeat](automation.md#json-v2--heartbeat) format sends
+fresh measurements without new phone alarms. Its Home Assistant package expires
+measurement freshness after twelve minutes; replayed packets cannot extend it.

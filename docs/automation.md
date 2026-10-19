@@ -247,3 +247,55 @@ pending transitions and cooldowns are separate per target, while every target
 shares the existing single physical HTTPS delivery slot. Stale/unmeasured results
 are ignored; settings changes invalidate only the affected goal's pending event.
 The JSON schema remains version 1 with the same eight public fields.
+
+### JSON v2 + heartbeat
+
+Select **JSON v2 + heartbeat** explicitly to send fresh measured status while it
+is stable, including the first OK. Text and JSON v1 remain event-only. No extra
+phone alarm, probe or service is added: a new published measurement is the only
+automatic delivery trigger. Each goal sends a heartbeat at most once per five
+minutes; an admitted v2 event supplies the same freshness and starts that cooldown.
+Rejected transport submissions do not consume it. A failed admitted request does;
+only a later suitable measurement can retry. Four goals share the existing one
+physical HTTPS request and ten-second deadline. Events have priority, and a
+request that has not returned continues to own its slot after logical timeout.
+
+The existing event filters also restrict heartbeat statuses: OK follows Recovery,
+DOWN follows Unreachable, PARTIAL follows Partial, and NO_NETWORK follows Network
+lost. Network restored remains its transition event. Empty filters disable
+automatic sends. Heartbeats never create recovery events or alter their previous
+status. Disabling monitoring or losing the process does not promise a final post.
+
+V2 contains exactly the eight v1 keys plus `sent_at_ms`, `monitoring` and
+`is_stale`, with `schema_version: 2`. A heartbeat has `event: "heartbeat"` and
+`previous_status: null`; `checked_at_ms` remains the source measurement time,
+not the sending time. Accepted measurements have `monitoring: true` and
+`is_stale: false`. An explicit test has no measurement/status/latency and instead
+uses false/true, so it cannot make an availability sensor healthy. Addresses,
+conditions, credentials, IPs, logs and raw history are excluded.
+
+The [freshness-aware HA package](examples/home-assistant/tgwatch-heartbeat.yaml)
+uses your authenticated user-owned HTTPS webhook ingress with a long random
+`tgwatch_webhook_id` in HA secrets. It accepts only POST from local/VPN sources;
+configure your trusted HTTPS reverse proxy accordingly. Its four status sensors
+use persisted measurement/receipt helpers and restored 720-second HA timers.
+The timers run on Home Assistant, with no additional phone schedule. The last
+status can be DOWN, PARTIAL or NO_NETWORK while the sensor's measurement is
+available; **unavailable** means its freshness cannot be confirmed.
+
+Only a strictly newer `checked_at_ms` updates a goal. Duplicate or out-of-order
+packets cannot replace its measurement or restart expiry. Ordering is checked
+again inside the serialized action queue. Expiry uses HA receipt time, so an
+absolute phone clock offset cannot keep a sensor live. A source-clock rollback
+leaves the sensor unavailable until source order recovers or you explicitly
+clear that goal's `input_text.tgwatch_<goal>` helper after verifying the source.
+Treat that manual reset as establishing a new trusted stream. HA clock rollback
+also invalidates a receipt age; restored helpers do not make expired data fresh.
+
+Delivery remains best effort. The receiver's shared secret authenticates access,
+not a cryptographic proof of a phone measurement. A first packet establishes the
+ordering baseline; arbitrary initial network delay cannot be measured without
+shared clocks. Existing JSON v1 users can keep the
+[event-only example](examples/home-assistant/tgwatch-events.yaml), which never
+claims continuous availability. Executable fixtures render the v2 package's Jinja
+templates/actions and exercise expiry/replay; they do not run a full HA server.

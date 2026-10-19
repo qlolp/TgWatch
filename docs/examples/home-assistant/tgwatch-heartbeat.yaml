@@ -1,0 +1,140 @@
+# Home Assistant package: explicit TgWatch JSON v2 + heartbeat only.
+# Put a long random tgwatch_webhook_id in secrets.yaml; configure your own trusted HTTPS ingress.
+# No server owned by TgWatch is used. local_only permits local/VPN delivery.
+# Helpers/timers restore across HA restarts. Unknown/expired data stays unavailable.
+# A source-clock rollback expires until a trusted user clears that goal's input_text helper.
+input_text:
+  tgwatch_telegram:
+    name: "TgWatch: telegram measurement"
+    max: 255
+  tgwatch_matrix:
+    name: "TgWatch: matrix measurement"
+    max: 255
+  tgwatch_whatsapp:
+    name: "TgWatch: whatsapp measurement"
+    max: 255
+  tgwatch_custom:
+    name: "TgWatch: custom measurement"
+    max: 255
+timer:
+  tgwatch_expiry_telegram:
+    duration: "00:12:00"
+    restore: true
+  tgwatch_expiry_matrix:
+    duration: "00:12:00"
+    restore: true
+  tgwatch_expiry_whatsapp:
+    duration: "00:12:00"
+    restore: true
+  tgwatch_expiry_custom:
+    duration: "00:12:00"
+    restore: true
+automation:
+  - alias: "TgWatch: accept fresh v2 measurements"
+    triggers:
+      - trigger: webhook
+        webhook_id: !secret tgwatch_webhook_id
+        allowed_methods: [POST]
+        local_only: true
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.json is mapping
+             and trigger.json | list | sort == ['schema_version', 'service_id', 'event', 'status', 'previous_status', 'checked_at_ms', 'latency_ms', 'network', 'sent_at_ms', 'monitoring', 'is_stale'] | sort
+             and trigger.json.schema_version is integer and trigger.json.schema_version == 2
+             and trigger.json.service_id in ['telegram', 'matrix', 'whatsapp', 'custom']
+             and trigger.json.status in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK']
+             and trigger.json.event in ['heartbeat', 'unreachable', 'partial', 'network_lost', 'recovery', 'network_restored']
+             and trigger.json.monitoring is true and trigger.json.is_stale is false
+             and trigger.json.checked_at_ms is integer and 0 < trigger.json.checked_at_ms <= 9223372036854775807
+             and trigger.json.sent_at_ms is integer and trigger.json.checked_at_ms <= trigger.json.sent_at_ms <= 9223372036854775807
+             and (trigger.json.latency_ms is none or (trigger.json.latency_ms is integer and 0 <= trigger.json.latency_ms <= 9223372036854775807))
+             and trigger.json.network in ['WIFI', 'CELLULAR', 'VPN', 'ETHERNET', 'OTHER', 'UNKNOWN']
+             and (trigger.json.previous_status is none or trigger.json.previous_status in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK'])
+             and ((trigger.json.event == 'heartbeat' and trigger.json.previous_status is none)
+                  or (trigger.json.event == 'unreachable' and trigger.json.status == 'DOWN')
+                  or (trigger.json.event == 'partial' and trigger.json.status == 'PARTIAL')
+                  or (trigger.json.event == 'network_lost' and trigger.json.status == 'NO_NETWORK')
+                  or (trigger.json.event == 'recovery' and trigger.json.status == 'OK')
+                  or (trigger.json.event == 'network_restored' and trigger.json.previous_status == 'NO_NETWORK')) }}
+    actions:
+      # Recheck replay order inside the serialized queue, not only at trigger/enqueue time.
+      - condition: template
+        value_template: >-
+          {% set saved = states('input_text.tgwatch_' ~ trigger.json.service_id) | from_json({}) %}
+          {{ saved is mapping and trigger.json.checked_at_ms > (saved.get('checked_at_ms', 0) | int(0)) }}
+      - action: input_text.set_value
+        target:
+          entity_id: "{{ 'input_text.tgwatch_' ~ trigger.json.service_id }}"
+        data:
+          value: >-
+            {{ dict(checked_at_ms=trigger.json.checked_at_ms,
+                    received_at_ms=(as_timestamp(now()) * 1000) | int,
+                    status=trigger.json.status) | to_json }}
+      - action: timer.start
+        target:
+          entity_id: "{{ 'timer.tgwatch_expiry_' ~ trigger.json.service_id }}"
+    mode: queued
+    max: 20
+template:
+  - sensor:
+      - name: "TgWatch telegram"
+        unique_id: tgwatch_telegram
+        state: >-
+          {{ (states('input_text.tgwatch_telegram') | from_json({})).get('status', 'UNKNOWN') }}
+        availability: >-
+          {% set saved = states('input_text.tgwatch_telegram') | from_json({}) %}
+          {% set value = saved if saved is mapping else {} %}
+          {% set received = value.get('received_at_ms', 0) | int(0) %}
+          {% set age = as_timestamp(now()) * 1000 - received %}
+          {{ states('timer.tgwatch_expiry_telegram') == 'active'
+               and received > 0 and 0 <= age < 720000
+               and value.get('status') in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK'] }}
+        attributes:
+          checked_at_ms: >-
+            {{ (states('input_text.tgwatch_telegram') | from_json({})).get('checked_at_ms') }}
+      - name: "TgWatch matrix"
+        unique_id: tgwatch_matrix
+        state: >-
+          {{ (states('input_text.tgwatch_matrix') | from_json({})).get('status', 'UNKNOWN') }}
+        availability: >-
+          {% set saved = states('input_text.tgwatch_matrix') | from_json({}) %}
+          {% set value = saved if saved is mapping else {} %}
+          {% set received = value.get('received_at_ms', 0) | int(0) %}
+          {% set age = as_timestamp(now()) * 1000 - received %}
+          {{ states('timer.tgwatch_expiry_matrix') == 'active'
+               and received > 0 and 0 <= age < 720000
+               and value.get('status') in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK'] }}
+        attributes:
+          checked_at_ms: >-
+            {{ (states('input_text.tgwatch_matrix') | from_json({})).get('checked_at_ms') }}
+      - name: "TgWatch whatsapp"
+        unique_id: tgwatch_whatsapp
+        state: >-
+          {{ (states('input_text.tgwatch_whatsapp') | from_json({})).get('status', 'UNKNOWN') }}
+        availability: >-
+          {% set saved = states('input_text.tgwatch_whatsapp') | from_json({}) %}
+          {% set value = saved if saved is mapping else {} %}
+          {% set received = value.get('received_at_ms', 0) | int(0) %}
+          {% set age = as_timestamp(now()) * 1000 - received %}
+          {{ states('timer.tgwatch_expiry_whatsapp') == 'active'
+               and received > 0 and 0 <= age < 720000
+               and value.get('status') in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK'] }}
+        attributes:
+          checked_at_ms: >-
+            {{ (states('input_text.tgwatch_whatsapp') | from_json({})).get('checked_at_ms') }}
+      - name: "TgWatch custom"
+        unique_id: tgwatch_custom
+        state: >-
+          {{ (states('input_text.tgwatch_custom') | from_json({})).get('status', 'UNKNOWN') }}
+        availability: >-
+          {% set saved = states('input_text.tgwatch_custom') | from_json({}) %}
+          {% set value = saved if saved is mapping else {} %}
+          {% set received = value.get('received_at_ms', 0) | int(0) %}
+          {% set age = as_timestamp(now()) * 1000 - received %}
+          {{ states('timer.tgwatch_expiry_custom') == 'active'
+               and received > 0 and 0 <= age < 720000
+               and value.get('status') in ['OK', 'PARTIAL', 'DOWN', 'NO_NETWORK'] }}
+        attributes:
+          checked_at_ms: >-
+            {{ (states('input_text.tgwatch_custom') | from_json({})).get('checked_at_ms') }}
