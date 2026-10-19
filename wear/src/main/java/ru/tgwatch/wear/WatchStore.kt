@@ -10,9 +10,9 @@ import java.io.File
 internal class WatchStore(context: Context) {
     private val file = AtomicFile(File(context.filesDir, "watch-result-v1"))
     fun load(): WatchSnapshot? = runCatching {
-        require(file.baseFile.length() in 1..256)
+        require(file.baseFile.length() in 1..MAX_CACHE_BYTES)
         DataInputStream(file.openRead()).use { input ->
-            require(input.readInt() == 0x54475731)
+            require(input.readInt() == FORMAT_MAGIC)
             val status = input.readUTF()
             val wall = input.readLong()
             val elapsed = input.readLong()
@@ -23,11 +23,12 @@ internal class WatchStore(context: Context) {
             WatchSnapshot(status, wall, elapsed, latency.takeIf { it >= 0 }, revision, boot)
         }
     }.getOrNull()
+    @Suppress("TooGenericExceptionCaught") // Always release the AtomicFile write handle, then rethrow.
     fun save(snapshot: WatchSnapshot) {
         val stream = file.startWrite()
         try {
             DataOutputStream(stream).apply {
-                writeInt(0x54475731)
+                writeInt(FORMAT_MAGIC)
                 writeUTF(snapshot.status)
                 writeLong(snapshot.checkedAtMs)
                 writeLong(snapshot.checkedElapsedMs)
@@ -41,5 +42,10 @@ internal class WatchStore(context: Context) {
             file.failWrite(stream)
             throw error
         }
+    }
+
+    private companion object {
+        const val MAX_CACHE_BYTES = 256
+        const val FORMAT_MAGIC = 0x54475731
     }
 }

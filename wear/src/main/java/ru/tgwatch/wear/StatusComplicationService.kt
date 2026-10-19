@@ -24,7 +24,10 @@ class StatusComplicationService : ComplicationDataSourceService() {
         fun text(value: String) = PlainComplicationText.Builder(value).build()
         val description = text(frame.contentDescription)
         val range = if (frame.stale || snapshot == null) TimeRange.ALWAYS else TimeRange.before(
-            Instant.ofEpochMilli(wall + (WatchSnapshot.STALE_MS - (elapsed - snapshot.checkedElapsedMs)).coerceAtLeast(0)))
+            Instant.ofEpochMilli(
+                wall + (WatchSnapshot.STALE_MS - (elapsed - snapshot.checkedElapsedMs)).coerceAtLeast(0)
+            )
+        )
         val tap = WatchSurfaceAction.pendingIntent(this)
         return when (type) {
             ComplicationType.SHORT_TEXT -> ShortTextComplicationData.Builder(text(frame.shortText), description)

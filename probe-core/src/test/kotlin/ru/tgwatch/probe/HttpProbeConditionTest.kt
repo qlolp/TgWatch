@@ -50,6 +50,36 @@ class HttpProbeConditionTest {
         assertEquals(HttpConditionFailure.CODE_MISMATCH, rejected.failure)
         assertTrue(check(Connection(byteArrayOf(), 503), HttpProbeCondition(expectedCode = 503)).confirmed)
     }
+    @Test fun nestedJsonPathConfirmsStatuspageStyleIndicator() {
+        val path = HttpProbeCondition(jsonField = "status.indicator", expectedValue = "none")
+        val healthy = """{"page":{"name":"Discord"},"status":{"indicator":"none","description":"ok"}}"""
+        val degraded = """{"page":{"name":"Discord"},"status":{"indicator":"minor","description":"slow"}}"""
+        val shallow = """{"status":{"indicator":"none"}}"""
+        val flat = """{"status":"none"}"""
+        assertTrue(check(Connection(healthy.toByteArray()), path).confirmed)
+        assertTrue(check(Connection(shallow.toByteArray()), path).confirmed)
+        assertFalse(check(Connection(degraded.toByteArray()), path).confirmed)
+        assertFalse(check(Connection(flat.toByteArray()), path).confirmed)
+        // Wrong type at the path terminal is not confirmed.
+        assertFalse(check(Connection("""{"status":{"indicator":1}}""".toByteArray()), path).confirmed)
+        // Terminal string at a deeper object is not silently promoted.
+        assertFalse(check(Connection("""{"status":{"indicator":{"value":"none"}}}""".toByteArray()), path).confirmed)
+    }
+
+    @Test fun nestedPathDoesNotMatchSiblingKeysOrUnrelatedDepth() {
+        val path = HttpProbeCondition(jsonField = "status.indicator", expectedValue = "none")
+        for (text in listOf(
+            """{"status":{"description":"none"}}""",
+            """{"other":{"indicator":"none"}}""",
+            """{"status":[{"indicator":"none"}]}""",
+            """{"status":"none"}""",
+            """{"status":{"indicator":"none","indicator":"none"}}""")) {
+            assertFalse(text, check(Connection(text.toByteArray()), path).confirmed)
+        }
+        val nestedDuplicate = HttpProbeCondition(jsonField = "a.b", expectedValue = "x")
+        assertFalse(check(Connection("""{"a":{"b":"x"},"a":{"b":"x"}}""".toByteArray()), nestedDuplicate).confirmed)
+    }
+
     @Test fun jsonUsesOneGetAndRequiresStringValueAndMatchingCode() {
         val connection = Connection("{\"status\":\"ok\"}".toByteArray())
         assertTrue(check(connection).confirmed)
@@ -115,9 +145,10 @@ class HttpProbeConditionTest {
         for (code in listOf(199, 600)) assertThrows(IllegalArgumentException::class.java) {
             HttpProbeCondition(expectedCode = code)
         }
-        for (field in listOf("", "x".repeat(65))) assertThrows(IllegalArgumentException::class.java) {
-            HttpProbeCondition(jsonField = field, expectedValue = "secret")
-        }
+        for (field in listOf("", "x".repeat(65), "status.", ".status", "a..b", "a.b.c.d"))
+            assertThrows(IllegalArgumentException::class.java) {
+                HttpProbeCondition(jsonField = field, expectedValue = "secret")
+            }
         assertThrows(IllegalArgumentException::class.java) { HttpProbeCondition(jsonField = "status") }
         assertThrows(IllegalArgumentException::class.java) { HttpProbeCondition(expectedValue = "secret") }
         assertThrows(IllegalArgumentException::class.java) {

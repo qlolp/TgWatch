@@ -11,19 +11,23 @@ import java.security.SecureRandom
 /** A private installation capability prevents forged exported-activity intents from running checks. */
 internal object WatchSurfaceAction {
     const val EXTRA = "ru.tgwatch.wear.SURFACE_CHECK"
+    private const val TICKET_BYTES = 32
+    private const val TICKET_RANDOM_BYTES = 16
     @Volatile var ticket: String? = null
         private set
+    @Suppress("TooGenericExceptionCaught") // Always release the AtomicFile write handle, then rethrow.
     fun initialize(context: Context) {
         val file = AtomicFile(File(context.filesDir, "surface-capability-v1"))
         ticket = runCatching {
             file.openRead().use { stream ->
-                val bytes = ByteArray(32)
+                val bytes = ByteArray(TICKET_BYTES)
                 java.io.DataInputStream(stream).readFully(bytes)
                 require(stream.read() == -1)
                 bytes.toString(Charsets.US_ASCII).also { require(it.matches(Regex("[0-9a-f]{32}"))) }
             }
         }.getOrElse {
-            val value = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+            val value = ByteArray(TICKET_RANDOM_BYTES).also { SecureRandom().nextBytes(it) }
+                .joinToString("") { "%02x".format(it) }
             val output = file.startWrite()
             try { output.write(value.toByteArray(Charsets.US_ASCII)); file.finishWrite(output) }
             catch (error: Exception) { file.failWrite(output); throw error }

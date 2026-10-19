@@ -5,7 +5,15 @@ import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import ru.tgwatch.probe.*
+import ru.tgwatch.probe.EndpointProbe
+import ru.tgwatch.probe.MtProtoEndpoints
+import ru.tgwatch.probe.NetworkProbe
+import ru.tgwatch.probe.ProbeAdmission
+import ru.tgwatch.probe.ProbeBatch
+import ru.tgwatch.probe.ProbeEndpoint
+import ru.tgwatch.probe.ProbeGroup
+import ru.tgwatch.probe.ProbeReport
+import ru.tgwatch.probe.ProbeTransport
 
 object WatchProbePlan {
     private const val MT_COUNT = 3
@@ -21,9 +29,10 @@ object WatchProbePlan {
 /** This registry, rather than any Activity or executor generation, owns the four physical permits. */
 internal object WatchBudget {
     private const val REQUESTS = 4
+    private const val POOL_KEEP_ALIVE_SECONDS = 30L
     val admission = ProbeAdmission(REQUESTS, 0)
     val transportStarts = AtomicLong()
-    val pool = ThreadPoolExecutor(REQUESTS, REQUESTS, 30L, TimeUnit.SECONDS, SynchronousQueue(),
+    val pool = ThreadPoolExecutor(REQUESTS, REQUESTS, POOL_KEEP_ALIVE_SECONDS, TimeUnit.SECONDS, SynchronousQueue(),
         { task -> Thread(task, "tg-watch-probe").apply { isDaemon = true } })
 }
 

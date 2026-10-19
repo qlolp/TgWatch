@@ -12,6 +12,8 @@ import java.lang.ref.WeakReference
 import java.text.DateFormat
 import java.util.Date
 
+// Lifecycle callbacks plus small render helpers keep each method under the complexity threshold.
+@Suppress("TooManyFunctions")
 class WatchActivity : Activity(), WatchRuntime.Observer {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var controller: WatchCheckController
@@ -21,7 +23,7 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
     private var resumed = false
     private var surfaceConsumed = false
     private val tick = object : Runnable {
-        override fun run() { render(); main.postDelayed(this, 1_000) }
+        override fun run() { render(); main.postDelayed(this, TICK_INTERVAL_MS) }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +35,10 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
         val owner = WeakReference(this)
         val dispatch = main
         controller = WatchRuntime.controller { dispatch.post { owner.get()?.render() } }
-        check.setOnClickListener { if (WatchRuntime.ready) controller.request(); render() }
+        check.setOnClickListener {
+            if (WatchRuntime.ready) controller.request()
+            render()
+        }
         render()
     }
     override fun onStart() {
@@ -68,27 +73,42 @@ class WatchActivity : Activity(), WatchRuntime.Observer {
         }
         val value = WatchRuntime.snapshot
         val stale = value?.stale(SystemClock.elapsedRealtime(), WatchRuntime.boot) != false
-        status.text = getString(when {
-            controller.isChecking -> R.string.checking
-            value == null -> R.string.no_result
-            stale -> R.string.stale
-            value.status == "OK" -> R.string.status_ok
-            value.status == "PARTIAL" -> R.string.status_partial
-            value.status == "NO_NETWORK" -> R.string.status_no_network
-            else -> R.string.status_unknown
-        })
+        status.text = getString(statusText(value, stale))
         status.setTextColor(if (!stale && value.status == "OK") 0xffa8e6ba.toInt() else 0xffeeeeee.toInt())
-        detail.text = buildString {
-            if (value != null) {
-                append(getString(R.string.last_result, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(value.checkedAtMs))))
-                value.latencyMs?.let { append('\n'); append(getString(R.string.latency, it)) }
-            }
-            when (controller.attemptState) {
-                WatchAttemptState.BUSY, WatchAttemptState.UNMEASURED -> { append('\n'); append(getString(R.string.busy)) }
-                WatchAttemptState.FAILED, WatchAttemptState.TIMEOUT -> { append('\n'); append(getString(R.string.not_completed)) }
-                else -> Unit
-            }
-        }.trim()
+        detail.text = detailText(value)
         check.isEnabled = WatchRuntime.ready && !controller.isChecking
+    }
+
+    private fun statusText(value: WatchSnapshot?, stale: Boolean): Int = when {
+        controller.isChecking -> R.string.checking
+        value == null -> R.string.no_result
+        stale -> R.string.stale
+        value.status == "OK" -> R.string.status_ok
+        value.status == "PARTIAL" -> R.string.status_partial
+        value.status == "NO_NETWORK" -> R.string.status_no_network
+        else -> R.string.status_unknown
+    }
+
+    private fun detailText(value: WatchSnapshot?): String = buildString {
+        if (value != null) {
+            val checked = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(value.checkedAtMs))
+            append(getString(R.string.last_result, checked))
+            value.latencyMs?.let { append('\n'); append(getString(R.string.latency, it)) }
+        }
+        when (controller.attemptState) {
+            WatchAttemptState.BUSY, WatchAttemptState.UNMEASURED -> {
+                append('\n')
+                append(getString(R.string.busy))
+            }
+            WatchAttemptState.FAILED, WatchAttemptState.TIMEOUT -> {
+                append('\n')
+                append(getString(R.string.not_completed))
+            }
+            else -> Unit
+        }
+    }.trim()
+
+    private companion object {
+        const val TICK_INTERVAL_MS = 1_000L
     }
 }

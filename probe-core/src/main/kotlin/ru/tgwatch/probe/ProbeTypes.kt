@@ -18,18 +18,25 @@ enum class ProbeDetailCode {
 }
 data class ProbeDetail(val code: ProbeDetailCode, val httpCode: Int? = null, val exceptionClass: String? = null) {
     companion object {
+        private const val MAX_EXCEPTION_CLASS_CHARS = 120
         fun failure(error: Exception): ProbeDetail = ProbeDetail(when (error) {
             is UnknownHostException -> ProbeDetailCode.DNS
             is SSLException -> ProbeDetailCode.TLS
             is SocketTimeoutException, is TimeoutException -> ProbeDetailCode.TIMEOUT
             is InterruptedException -> ProbeDetailCode.CANCELLED
             else -> ProbeDetailCode.EXCEPTION
-        }, exceptionClass = error.javaClass.simpleName.take(120).ifEmpty { "Exception" })
+        }, exceptionClass = error.javaClass.simpleName.take(MAX_EXCEPTION_CLASS_CHARS).ifEmpty { "Exception" })
     }
 }
-data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
-    val latencyMs: Long = -1, val detail: ProbeDetail,
-    val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE)
+data class ProbeOutcome(
+    val endpoint: String,
+    val group: ProbeGroup,
+    val reachable: Boolean,
+    val latencyMs: Long = -1,
+    val detail: ProbeDetail,
+    val measurement: ProbeMeasurement =
+        if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE,
+)
 
 interface ProbeTransport {
     val userAgent: String
@@ -38,12 +45,15 @@ interface ProbeTransport {
 }
 
 object ProbePolicy {
-    fun isReachableHttpCode(code: Int) = code in 100..499
+    private const val HTTP_REACHABLE_FIRST = 100
+    private const val HTTP_REACHABLE_LAST = 499
+    fun isReachableHttpCode(code: Int) = code in HTTP_REACHABLE_FIRST..HTTP_REACHABLE_LAST
 }
 
 /** Classification uses evidence, not absence of permission/admission/measurement. */
 data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean = true) {
-    val publishable: Boolean get() = !connected || results.any { it.group in PRIMARY && it.reachable } || complete(results)
+    val publishable: Boolean get() = !connected ||
+        results.any { it.group in PRIMARY && it.reachable } || complete(results)
     val status: String get() = classify(results, connected)
     val latencyMs: Long get() = results.filter { it.reachable && it.group == ProbeGroup.MTPROTO }
         .minOfOrNull { it.latencyMs } ?: -1L

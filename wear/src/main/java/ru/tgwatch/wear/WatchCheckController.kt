@@ -37,7 +37,9 @@ class WatchCheckController(private val clocks: WatchClocks, private val operatio
             }
         }
         return try {
-            val cancel = execution.scheduler.schedule((token.value.deadlineElapsed - clocks.elapsed()).coerceAtLeast(0)) {
+            val cancel = execution.scheduler.schedule(
+                (token.value.deadlineElapsed - clocks.elapsed()).coerceAtLeast(0)
+            ) {
                 finishWithoutResult(token, WatchAttemptState.TIMEOUT)
             }
             token.timeout.set(cancel)

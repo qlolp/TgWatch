@@ -372,9 +372,7 @@ class MainActivity : Activity() {
         try {
             MonitorService.start(this)
         } catch (e: Exception) {
-            Toast.makeText(this, this@MainActivity.renderString(
-                R.string.copy_main_couldn_t_start_monitoring,
-                e.message), Toast.LENGTH_LONG).show()
+            UiErrors.show(this, R.string.copy_main_couldn_t_start_monitoring, e)
         }
     }
 
@@ -391,8 +389,7 @@ class MainActivity : Activity() {
         try {
             startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
-            Toast.makeText(this, this@MainActivity.renderString(
-                R.string.copy_main_couldn_t_share, e.message), Toast.LENGTH_SHORT).show()
+            UiErrors.show(this, R.string.copy_main_couldn_t_share, e, long = false)
         }
     }
 
