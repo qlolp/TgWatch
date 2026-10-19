@@ -16,7 +16,7 @@ internal class WebhookHeartbeatCandidates {
 
     fun published(observation: WebhookObservation, configuration: WebhookConfiguration, now: Long) {
         if (configuration.format != WebhookFormat.JSON_V2) return
-        if (allowed(observation, configuration.events))
+        if (observation.serviceId in configuration.services && allowed(observation, configuration.events))
             candidates[observation.serviceId] = WebhookHeartbeatCandidate(observation, now)
         else candidates.remove(observation.serviceId)
     }

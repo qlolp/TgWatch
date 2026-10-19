@@ -64,4 +64,36 @@ class NetworkTallyTest {
             NetworkKind.VPN to NetCounts(ok = 40)))!!
         assertEquals(listOf(TextKey.HISTORY_BY_NETWORK), keys(fine))
     }
+
+    @Test fun networkSummaryExplicitlyLabelsItsCalendarPeriod() {
+        val text = NetworkTally.describe(mapOf(NetworkKind.WIFI to NetCounts(ok = 5),
+            NetworkKind.CELLULAR to NetCounts(ok = 5)))!!
+        val line = (text.args.first() as TextArgument.Value).value
+        val period = (line.args.first() as TextArgument.Value).value
+        assertEquals("HISTORY_NETWORK_TODAY", period.key.name)
+        assertEquals("The period and the measured percentages must be separate arguments", 2, line.args.size)
+    }
+
+    @Test fun weeklyNetworkSummaryIncludesTodayAndNamesItsCalendarWindow() {
+        val totals = mapOf(NetworkKind.WIFI to NetCounts(ok = 5), NetworkKind.CELLULAR to NetCounts(ok = 5))
+        val text = NetworkTally.describe(totals, days = 7)!!
+        val line = (text.args.first() as TextArgument.Value).value
+        val period = (line.args.first() as TextArgument.Value).value
+        assertEquals(TextKey.HISTORY_NETWORK_CALENDAR_DAYS, period.key)
+        assertEquals(listOf(TextArgument.Number(7)), period.args)
+    }
+
+    @Test fun calendarDaysFollowTheLocalDateAcrossDaylightSavingAndMidnight() {
+        val original = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Berlin"))
+            fun day(at: String) = NetworkStats.day(java.time.Instant.parse(at).toEpochMilli())
+            val start = day("2026-10-24T22:30:00Z")
+            assertEquals(start, day("2026-10-25T22:30:00Z"))
+            assertEquals(start + 1, day("2026-10-25T23:30:00Z"))
+            assertEquals(start, day("2026-10-24T22:30:00Z"))
+        } finally {
+            java.util.TimeZone.setDefault(original)
+        }
+    }
 }

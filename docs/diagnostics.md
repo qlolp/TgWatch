@@ -107,6 +107,17 @@ A failed history read produces null aggregates and a typed failure, never zero
 availability. No target address, free-form label, credential or raw history is
 included. The existing `state.running` refers specifically to Telegram.
 
+## Local crash journal (schema 4)
+
+The explicit report adds `crashes.retained` and `crashes.last` (or null).
+At most five local exceptions are retained. Messages are never stored. Thread names
+are reduced to fixed app worker roles or `other`. Classes must resolve without
+initialization in allowed app/platform namespaces; fabricated method names are
+redacted. Source filenames must match their declaring class; paths and unknown
+names become `redacted`. This validation applies to old journal entries and again
+at the JSON export boundary. The journal is cleared with the event log; nothing
+is uploaded automatically.
+
 ## Private HTTPS health failures
 
 A custom target can display a safe HTTP-code mismatch, unconfirmed JSON, DNS,

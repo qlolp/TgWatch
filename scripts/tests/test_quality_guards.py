@@ -35,8 +35,9 @@ class DetektBaselineTests(unittest.TestCase):
 </CurrentIssues></SmellBaseline>""")
         self.assertEqual(2, len(self.module.baseline_ids(path)))
 
-    def test_empty_or_valueless_baseline_is_an_error(self):
-        for body in ("<?xml version=\"1.0\"?><SmellBaseline/>",
+    def test_fixed_empty_baseline_is_allowed_but_valueless_ids_are_an_error(self):
+        self.assertEqual([], self.module.baseline_ids(self.baseline("<SmellBaseline/>")))
+        for body in ("<NotABaseline/>",
                      "<SmellBaseline><CurrentIssues><ID>  </ID></CurrentIssues></SmellBaseline>"):
             with self.assertRaises(ValueError):
                 self.module.baseline_ids(self.baseline(body))
@@ -44,9 +45,9 @@ class DetektBaselineTests(unittest.TestCase):
     def test_budget_fails_only_when_it_grows(self):
         path = self.baseline("<SmellBaseline><CurrentIssues><ID>a</ID><ID>b</ID>"
                              "</CurrentIssues></SmellBaseline>")
-        self.assertEqual(0, self.module.main([path, "--max", "2"]))
-        self.assertEqual(0, self.module.main([path, "--max", "3"]))
-        self.assertEqual(1, self.module.main([path, "--max", "1"]))
+        self.assertEqual(0, self.module.main([path, "--reference", path, "--max", "2"]))
+        self.assertEqual(0, self.module.main([path, "--reference", path, "--max", "3"]))
+        self.assertEqual(1, self.module.main([path, "--reference", path, "--max", "1"]))
 
     def test_missing_or_malformed_baseline_is_not_a_clean_result(self):
         with tempfile.TemporaryDirectory() as directory:

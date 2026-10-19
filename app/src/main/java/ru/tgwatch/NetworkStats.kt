@@ -69,7 +69,7 @@ class NetworkTally(rows: Map<Pair<Long, NetworkKind>, NetCounts> = emptyMap()) {
             val day = p.firstOrNull()?.toLongOrNull()
             val n = p.drop(2).mapNotNull { it.toIntOrNull()?.takeIf { v -> v >= 0 } }
             val valid = kind != null && day != null && p.size == FIELDS && n.size == FIELDS - 2
-            return if (valid) (day!! to kind!!) to NetCounts(n[0], n[1], n[2]) else null
+            return if (valid) (day to kind) to NetCounts(n[0], n[1], n[2]) else null
         }
 
         fun label(kind: NetworkKind): TextValue = when (kind) {
@@ -81,7 +81,7 @@ class NetworkTally(rows: Map<Pair<Long, NetworkKind>, NetCounts> = emptyMap()) {
         }
 
         /** Lines for the statistics card; null when fewer than two networks have enough checks to compare. */
-        fun describe(totals: Map<NetworkKind, NetCounts>): TextValue? {
+        fun describe(totals: Map<NetworkKind, NetCounts>, days: Int = 1): TextValue? {
             val shown = totals.filterValues { it.total >= MIN_CHECKS }.toSortedMap()
             if (shown.size < 2) return null
             val parts = textJoin(shown.map { (kind, c) ->
@@ -90,7 +90,10 @@ class NetworkTally(rows: Map<Pair<Long, NetworkKind>, NetCounts> = emptyMap()) {
             val vpnGood = shown[NetworkKind.VPN]?.let { it.total >= INSIGHT_CHECKS && it.okPercent >= VPN_GOOD } == true
             val directBad = shown.filterKeys { it != NetworkKind.VPN }.values
                 .any { it.total >= INSIGHT_CHECKS && it.okPercent < DIRECT_BAD }
-            return textLines(listOfNotNull(textOf(TextKey.HISTORY_BY_NETWORK, TextArgument.Value(parts)),
+            val period = if (days <= 1) textOf(TextKey.HISTORY_NETWORK_TODAY)
+                else textOf(TextKey.HISTORY_NETWORK_CALENDAR_DAYS, textArgument(days.coerceIn(1, KEEP_DAYS)))
+            return textLines(listOfNotNull(textOf(TextKey.HISTORY_BY_NETWORK,
+                TextArgument.Value(period), TextArgument.Value(parts)),
                 if (vpnGood && directBad) textOf(TextKey.HISTORY_VPN_HELPS) else null))
         }
     }
@@ -136,7 +139,7 @@ object NetworkStats {
     }
 
     @Synchronized fun describe(ctx: Context, days: Int, now: Long = System.currentTimeMillis()): TextValue? =
-        NetworkTally.describe(load(ctx).totals(day(now), days))
+        NetworkTally.describe(load(ctx).totals(day(now), days), days)
 
     /** A restored history starts with fresh network statistics. */
     @Synchronized fun clear(ctx: Context) {
