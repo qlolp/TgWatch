@@ -6,22 +6,34 @@ data class WebhookBody(val contentType: String, val bytes: ByteArray)
 
 /** Versioned allowlist. No Context, history lookup, free-form names or diagnostic fields. */
 object WebhookPayload {
-    fun encode(event: WebhookEvent, format: WebhookFormat): WebhookBody = when (format) {
-        WebhookFormat.JSON -> WebhookBody("application/json; charset=utf-8", json(event).toByteArray(Charsets.UTF_8))
+    fun encode(event: WebhookEvent, format: WebhookFormat, sentAtMs: Long? = null): WebhookBody = when (format) {
+        WebhookFormat.JSON, WebhookFormat.JSON_V2 -> WebhookBody("application/json; charset=utf-8",
+            json(event, format, sentAtMs).toByteArray(Charsets.UTF_8))
         WebhookFormat.TEXT -> WebhookBody("text/plain; charset=utf-8", text(event).toByteArray(Charsets.UTF_8))
     }
 
-    private fun json(event: WebhookEvent): String {
+    private fun json(event: WebhookEvent, format: WebhookFormat, sentAtMs: Long?): String {
         val observation = event.observation.takeUnless { event.kind == WebhookEventKind.TEST }
-        return JSONObject().put("schema_version", 1)
+        val version2 = format == WebhookFormat.JSON_V2
+        if (version2) {
+            require(sentAtMs != null && sentAtMs > 0L)
+            require(event.kind == WebhookEventKind.TEST || observation?.let(WebhookStatuses::accepts) == true)
+        }
+        return JSONObject().put("schema_version", if (version2) 2 else 1)
             .put("service_id", observation?.serviceId?.takeIf { it in WebhookStatuses.services }
                 ?: if (event.kind == WebhookEventKind.TEST) "telegram" else "unknown")
             .put("event", event.kind.wireName)
             .put("status", WebhookStatuses.normalize(observation?.status) ?: JSONObject.NULL)
-            .put("previous_status", WebhookStatuses.normalize(event.previousStatus) ?: JSONObject.NULL)
+            .put("previous_status", WebhookStatuses.normalize(event.previousStatus
+                .takeUnless { event.kind == WebhookEventKind.HEARTBEAT }) ?: JSONObject.NULL)
             .put("checked_at_ms", observation?.checkedAtMs?.takeIf { it > 0L } ?: JSONObject.NULL)
             .put("latency_ms", observation?.latencyMs?.takeIf { it >= 0L } ?: JSONObject.NULL)
             .put("network", (observation?.network ?: NetworkKind.UNKNOWN).name)
+            .apply { if (version2) {
+                put("sent_at_ms", sentAtMs)
+                put("monitoring", observation != null)
+                put("is_stale", observation == null)
+            } }
             .toString()
     }
 
