@@ -289,6 +289,24 @@ def wait_observation(args):
     raise ValueError('No matching committed Telegram observation before timeout')
 
 
+def wait_legacy_start(timeout, read_state=None, is_foreground=None):
+    """Establish a configured1.6 predecessor before stopping it; its journal predates observations."""
+    read_state = read_state or state
+    is_foreground = is_foreground or (lambda: b'isForeground=true' in adb(
+        'shell', 'dumpsys', 'activity', 'services', 'ru.tgwatch'))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            checked = read_state()
+            if checked > 0 and is_foreground() and read_state() == checked:
+                print('Legacy predecessor persisted a check while foreground')
+                return
+        except (OSError, ValueError, ET.ParseError, subprocess.TimeoutExpired):
+            pass
+        time.sleep(min(2, max(0, deadline - time.monotonic())))
+    raise ValueError('Legacy predecessor did not establish a persisted foreground check')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -302,6 +320,8 @@ def main():
     wait.add_argument('--since-boot', action='store_true', help='Require an observation from the current kernel boot')
     wait.add_argument('--status', choices=sorted(KINDS))
     wait.add_argument('--exclude-status', choices=sorted(KINDS), action='append', default=[])
+    legacy = commands.add_parser('legacy-ready')
+    legacy.add_argument('--timeout', type=float, default=90)
     contains = commands.add_parser('contains')
     contains.add_argument('snapshot', type=Path)
     contains.add_argument('--at', type=int, required=True)
@@ -313,6 +333,10 @@ def main():
             data = capture(read)
             save(args.out, data)
             print(f"Captured {len(data['observations'])} public observations ({data['source']})")
+        elif args.command == 'legacy-ready':
+            if not 0 < args.timeout <= 300:
+                raise ValueError('Invalid legacy startup deadline')
+            wait_legacy_start(args.timeout)
         elif args.command == 'await':
             if args.after < 0 or not 0 < args.timeout <= 300:
                 raise ValueError('Invalid observation deadline')

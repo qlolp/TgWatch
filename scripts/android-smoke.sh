@@ -103,7 +103,11 @@ PY
 if adb shell pm path ru.tgwatch | grep -q '^package:'; then adb uninstall ru.tgwatch; fi
 adb install -g "$legacy_dir/app/build/outputs/apk/debug/app-debug.apk"
 python3 scripts/adb-readiness.py
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
+adb shell input keyevent 82
 adb shell am start -W -n ru.tgwatch/.MainActivity
+python3 scripts/target-snapshot.py legacy-ready
 adb shell am force-stop ru.tgwatch
 minute=$(( $(date +%s) / 60 - 3 ))
 printf '%s,3,0,0,150\n' "$minute" > legacy-history.csv

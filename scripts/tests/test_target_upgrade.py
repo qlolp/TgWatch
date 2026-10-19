@@ -38,6 +38,30 @@ class TargetUpgradeTests(unittest.TestCase):
             return files[path]
         return read
 
+    def test_legacy_fixture_waits_for_a_persisted_check_and_foreground_before_stopping(self):
+        module = self.load()
+        self.assertTrue(hasattr(module, 'wait_legacy_start'), 'Legacy upgrade must establish a configured predecessor')
+        clock = [0.0]
+        reads = []
+        def state():
+            reads.append(clock[0])
+            return 1234 if clock[0] >= 2 else 0
+        with patch.object(module.time, 'monotonic', side_effect=lambda: clock[0]), \
+             patch.object(module.time, 'sleep', side_effect=lambda delay: clock.__setitem__(0, clock[0] + delay)):
+            module.wait_legacy_start(10, state, lambda: clock[0] >= 4)
+        self.assertGreaterEqual(clock[0], 4)
+        self.assertGreaterEqual(len(reads), 3)
+
+    def test_legacy_fixture_cannot_pass_with_only_a_timestamp_or_only_a_service(self):
+        module = self.load()
+        self.assertTrue(hasattr(module, 'wait_legacy_start'), 'Missing legacy baseline readiness gate')
+        for checked, foreground in [(0, True), (1234, False)]:
+            clock = [0.0]
+            with patch.object(module.time, 'monotonic', side_effect=lambda: clock[0]), \
+                 patch.object(module.time, 'sleep', side_effect=lambda delay: clock.__setitem__(0, clock[0] + delay)):
+                with self.assertRaises(ValueError):
+                    module.wait_legacy_start(5, lambda: checked, lambda: foreground)
+
     def test_legacy_only_upgrade_preserves_telegram(self):
         module = self.load()
         before = module.capture(self.reader({'history-v2.csv': b'1000,2000,TG_DOWN,40,2\n'}), 2000)
