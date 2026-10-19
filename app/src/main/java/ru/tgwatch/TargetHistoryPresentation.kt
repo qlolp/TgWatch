@@ -8,8 +8,10 @@ internal object TargetHistoryPresentation {
 
     fun summary(ctx: android.content.Context, id: TargetId, stats: TimeStats, days: Int): String {
         val value = History.describeStats(stats, days, id)
-        return AndroidText.resolve(ctx, if (id == TargetId.TELEGRAM) value
-            else textLines(listOf(TargetNames.text(id), value)))
+        // Network kinds are recorded for the primary Telegram check only.
+        if (id != TargetId.TELEGRAM) return AndroidText.resolve(ctx, textLines(listOf(TargetNames.text(id), value)))
+        val byNetwork = NetworkStats.describe(ctx, days)
+        return AndroidText.resolve(ctx, if (byNetwork == null) value else textLines(listOf(value, byNetwork)))
     }
 
     fun minutes(rows: List<Observation>, count: Int, now: Long): List<History.Minute> {

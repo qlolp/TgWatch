@@ -36,6 +36,8 @@ internal val textResources: Map<TextKey, Int> = mapOf(
     TextKey.HISTORY_CHECKS to R.string.text_history_checks,
     TextKey.HISTORY_MTTR_SCOPE to R.string.text_history_mttr_scope,
     TextKey.HISTORY_CHECKS_TOTAL to R.string.text_history_checks_total,
+    TextKey.HISTORY_BY_NETWORK to R.string.text_history_by_network,
+    TextKey.HISTORY_VPN_HELPS to R.string.text_history_vpn_helps,
     TextKey.LAST_SUCCESS_EMPTY to R.string.text_last_success_empty,
     TextKey.LAST_SUCCESS to R.string.text_last_success,
     TextKey.LAST_SUCCESS_CLOCK_CHANGED to R.string.text_last_success_clock_changed,

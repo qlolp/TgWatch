@@ -131,6 +131,7 @@ object BackupManager {
                         settingKeys + transientKeys)
                 }
             }.get()
+            if (recovered) NetworkStats.clear(ctx)
             // Requests admitted while the pending gate was closed cannot outlive the completed replacement.
             AutomationReceiver.invalidateState()
             WebhookNotifier.reset()

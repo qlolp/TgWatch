@@ -514,6 +514,7 @@ class MonitorService : Service() {
         try {
         destroyed = true
         stopping = true
+        NetworkStats.flush(this)
         slowController?.close()
         targetAlertController?.close()
         targetMonitoring?.close()
@@ -839,6 +840,7 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.w(TAG, "event alert", e) }
 
         targetMonitoring?.onTelegram(newState, p.outcomes)
+        NetworkStats.record(this, now, probeNetwork, newState.status.name)
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.

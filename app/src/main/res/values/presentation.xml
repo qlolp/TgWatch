@@ -34,6 +34,8 @@
     <string name="text_history_checks">"Checks: OK %1$d; outage %2$d; partial %3$d; no internet %4$d; no data %5$d"</string>
     <string name="text_history_mttr_scope">"MTTR covers fully observed %1$s outages between OK checks; PARTIAL can extend an outage, while gaps and lost internet are excluded."</string>
     <string name="text_history_checks_total">"Checks: %1$d. Time between checks is estimated; gaps are excluded from the percentage."</string>
+    <string name="text_history_by_network">"By network (checks without issues): %1$s"</string>
+    <string name="text_history_vpn_helps">"Telegram is noticeably more stable through the VPN."</string>
     <string name="text_last_success_empty">"Last OK: —"</string>
     <string name="text_last_success">"Last OK: %1$s"</string>
     <string name="text_last_success_clock_changed">"Clock changed · OK %1$s"</string>
