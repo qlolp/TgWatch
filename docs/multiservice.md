@@ -63,10 +63,10 @@ excludes offline/unknown time; observation coverage describes those gaps separat
 ## Optional secondary-target battery saving
 
 The device option is off by default and never enables a target. With it enabled,
-Matrix, WhatsApp and CUSTOM wait at least300seconds after completion while the
-screen is off, or600seconds in system battery saver / at15% charge or lower while
+Matrix, WhatsApp and CUSTOM wait at least 300 seconds after completion while the
+screen is off, or 600 seconds in system battery saver / at 15% charge or lower while
 unplugged. Charging removes only the low-charge restriction. Telegram profiles
-and the selected60–300second secondary intervals are unchanged. Target settings
+and the selected secondary intervals of 60–300 seconds are unchanged. Target settings
 show the selected/effective interval and its cause. Manual checks and network
 changes retain their existing admission rules; no additional alarm is introduced.
 
@@ -74,3 +74,36 @@ Fresh observations, history coverage and watchdog timing use the effective
 interval. Changing power state does not extend a previous history row. The option
 is excluded from backups and is off after restore. See the [measurement procedure](power-validation.md)
 for matched physical-device tests; emulator checks do not establish a battery-saving percentage.
+
+## Custom HTTPS health criteria
+
+CUSTOM uses HEAD and accepts any 2xx response by default; GET is used only when
+HEAD returns 405 or 501. Optional criteria in **Target settings** can instead
+require one code from 200–599 and/or a top-level JSON string. For example, field
+`status` with expected value `ok` accepts `{"status":"ok"}` and rejects
+`{"status":"error"}` even when both responses have HTTP 200. Empty expected strings
+are allowed; the field name is 1–64 characters and the value at most 256 characters.
+Comparison is exact and case-sensitive; there is no JSONPath or scripting.
+
+JSON mode uses one GET with `Accept: application/json` and identity encoding,
+strict UTF-8, at most 32 KiB, depth at most 10, and full JSON validation including
+nested duplicate-key rejection. Missing/nonstring fields, truncated, oversized,
+compressed or malformed responses fail confirmation. Unknown-length responses
+that reach the cap are rejected; a complete, known-length response exactly at
+the cap is allowed. Content never overrides the required HTTP code. TLS,
+redirect restrictions, timeouts and shared connection limits are unchanged.
+
+Saved criteria are never prefilled. Blank inputs preserve the saved configuration
+when changing an interval. Entering a new address replaces its criteria; select
+**Clear health criteria; keep address** to return to 2xx without changing the URL.
+Entering criteria with a blank address changes the current private address's
+criteria. URL and criteria form one private transaction and endpoint revision:
+an older in-flight response cannot update the new configuration's status/history.
+
+The URL, JSON field and expected value are credential-protected and excluded
+from Direct Boot, both backup formats, CSV, diagnostics, sharing, webhook and
+logs. The screen reports only a safe mismatch/DNS/TLS/timeout category; response
+bodies and expected values are never error text. Existing backup/restore readers
+remain supported and a restored private target remains stopped pending review.
+A successful health response does not prove message delivery. Matrix, WhatsApp
+and Telegram checks retain their previous behavior.

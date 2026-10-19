@@ -149,3 +149,7 @@ Local release builds are unsigned unless the existing production signing key is
 configured. See [contributing](../CONTRIBUTING.md) and [F-Droid preparation](fdroid.md).
 F-Droid acceptance and a verified reproducible production build are separate
 steps. The code is licensed under [MIT](../LICENSE).
+
+Custom HTTPS optionally checks an exact HTTP code and top-level JSON string (for
+example `status=ok`). These criteria remain private and are excluded from backups
+and exports. See [health criteria and limits](multiservice.md#custom-https-health-criteria).

@@ -101,3 +101,10 @@ with fixed public IDs. Each entry has `target_id`, `running`, `status`,
 A failed history read produces null aggregates and a typed failure, never zero
 availability. No target address, free-form label, credential or raw history is
 included. The existing `state.running` refers specifically to Telegram.
+
+## Private HTTPS health failures
+
+A custom target can display a safe HTTP-code mismatch, unconfirmed JSON, DNS,
+TLS or timeout category. The HTTP response body, required JSON field/value and
+address stay private; none enter the diagnostic export or portable history.
+See [custom health criteria](multiservice.md#custom-https-health-criteria).
