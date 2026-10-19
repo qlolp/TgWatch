@@ -19,7 +19,7 @@ class DiagnosticSnapshotTest {
         val state = TargetSnapshot(TargetId.MATRIX, TargetStatus.DOWN, 1_000, 1_000)
         val json = JSONObject(snapshot().copy(targets = listOf(TargetDiagnostic(state,
             running = true, stale = false, stats = null, failure = HistoryFailure.WRITE))).toJson())
-        assertEquals(3, json.getInt("schema_version"))
+        assertEquals(4, json.getInt("schema_version"))
         val goals = json.getJSONArray("targets")
         assertEquals(1, goals.length())
         val goal = goals.getJSONObject(0)
@@ -75,7 +75,7 @@ class DiagnosticSnapshotTest {
     }
     @Test fun reportSectionsCannotContainRawHistoryLogPreferencesOrIdentifiers() {
         val json = JSONObject(snapshot().toJson())
-        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health", "targets"),
+        assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health", "targets", "crashes"),
             json.keyNames())
         assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keyNames())
         assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent", "coverage_percent", "assessed_ms", "window_ms"),
@@ -99,6 +99,26 @@ class DiagnosticSnapshotTest {
         assertEquals(setOf("check_started_elapsed_ms", "not_measured_count", "primary_busy",
             "secondary_busy", "storage_failure", "recovery_state"), health.keyNames())
         assertFalse(json.toString().contains("exception"))
+    }
+
+    @Test fun crashRecordsExportTypeAndFramesWithoutMessages() {
+        val summary = CrashJournal.Summary(2, CrashJournal.Record(1_500, "main",
+            "java.lang.IllegalStateException",
+            listOf("ru.tgwatch.MonitorService.check(MonitorService.kt:42)")))
+        val json = JSONObject(snapshot().copy(crashes = summary).toJson()).getJSONObject("crashes")
+        assertEquals(2, json.getInt("retained"))
+        val last = json.getJSONObject("last")
+        assertEquals(setOf("at_ms", "thread", "type", "frames"), last.keyNames())
+        assertEquals(1_500L, last.getLong("at_ms"))
+        assertEquals("java.lang.IllegalStateException", last.getString("type"))
+        assertEquals("ru.tgwatch.MonitorService.check(MonitorService.kt:42)",
+            last.getJSONArray("frames").getString(0))
+    }
+
+    @Test fun absentCrashRecordsAreExplicitRatherThanInvented() {
+        val json = JSONObject(snapshot().toJson()).getJSONObject("crashes")
+        assertEquals(0, json.getInt("retained"))
+        assertTrue(json.isNull("last"))
     }
 }
 

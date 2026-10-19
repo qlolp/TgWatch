@@ -82,7 +82,7 @@ class LocalDiagnosticsIntegrationTest {
                 listOf("PRIVATE_TOKEN_PASSWORD", "account@example.org", "192.168.9.4",
                     "diagnostic_private_fixture", "reason", "diagnostics", "log", "token")
                     .forEach { assertFalse(it, contents.contains(it)) }
-                assertEquals(3, json.getInt("schema_version"))
+                assertEquals(4, json.getInt("schema_version"))
                 val goals = json.getJSONArray("targets")
                 assertEquals(TargetId.entries.size, goals.length())
                 assertEquals(TargetId.entries.map { it.wire }.toSet(),
