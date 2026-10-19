@@ -1,0 +1,149 @@
+{
+  "tag": "v1.20.1",
+  "sourceRevision": "4b2aba4d1c87606ed482752cf027c85e5896dece",
+  "applications": {
+    "ru.tgwatch": {
+      "sha256": "497d5541412054467dc7a840d926be4ad60abacac1787f5a34f7675c8ec25021",
+      "version": "1.20.1",
+      "versionCode": 1020001,
+      "minSdk": 26,
+      "targetSdk": 36,
+      "compileSdk": 36,
+      "runtimeArtifacts": 22,
+      "signature": "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1",
+      "osvVerified": true,
+      "trivyVerified": true
+    },
+    "ru.tgwatch.wear": {
+      "sha256": "dffefd16a17aa387e5ae4bcf97f3f7c55ee0ca0107f41029e0735720a656b455",
+      "version": "1.20.1",
+      "versionCode": 1020001,
+      "minSdk": 30,
+      "targetSdk": 35,
+      "compileSdk": 35,
+      "runtimeArtifacts": 60,
+      "signature": "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1",
+      "osvVerified": true,
+      "trivyVerified": true
+    }
+  },
+  "assetSha256": {
+    "TgWatch-wear.apk": "dffefd16a17aa387e5ae4bcf97f3f7c55ee0ca0107f41029e0735720a656b455",
+    "TgWatch-wear.apk.sha256": "0d27542fae4cf4e7eb1747015668f7c3eb67e7730f6cf9c566b5a2fc460de5ce",
+    "TgWatch-wear.dependencies.json": "fe93b6083ee6ae2a35b2a17f7a1bc64a1b376b627c837ea7047c8cba0ff21d98",
+    "TgWatch-wear.osv.json": "f0836ac1ed3fa57aa7450e6df24550529dc377595732c27a0d6eddb548f47c74",
+    "TgWatch-wear.sbom.cdx.json": "e03f455b4032463c7a871d21bf84cb6b04a4c7098a2893f2d4e23ceab205e07f",
+    "TgWatch-wear.trivy.json": "8569c56133e872cc369c4aa3a38bb38b94b0d9ef7083085056c4aebaee1638d2",
+    "TgWatch.apk": "497d5541412054467dc7a840d926be4ad60abacac1787f5a34f7675c8ec25021",
+    "TgWatch.apk.sha256": "2823ea72eea3155f9eb486c846eb8ec79cf3e383d82703d78c3490d7c4e5afb8",
+    "TgWatch.dependencies.json": "915beb14fcf2dce8f3aed24dfe368dd4972abaaa80e0c553b1d5e43fe181479e",
+    "TgWatch.osv.json": "ac61e66e4d42b3d6c6b53b1582ffdf4f3cab4ae146180946034e33e6008d72f3",
+    "TgWatch.sbom.cdx.json": "911a1078dc93339ced278d968dae4ec62053ece6f1f067b9740a899ca520f083",
+    "TgWatch.trivy.json": "12eb813f4324b14df84ebd33cdd5ef3eefa669b05a73963d135100f621afa5b3"
+  },
+  "workflow": {
+    "id": 39241608647,
+    "url": "https://github.com/qlolp/TgWatch/actions/runs/39241608647",
+    "status": "success",
+    "requiredJobs": [
+      "android (26)",
+      "android (29)",
+      "android (35)",
+      "android (36)",
+      "build",
+      "release",
+      "wear",
+      "wear-android"
+    ],
+    "signedUpgradePaths": "legacy v1.10.47 and latest stable v1.19.1; no clearing between old and new in either pair"
+  },
+  "checks": {
+    "phoneJvm": 612,
+    "coreJvm": 30,
+    "wearJvm": 7,
+    "python": 252,
+    "heapMiB": 128,
+    "maximumV3HeapPassed": true,
+    "nativeByApi": {
+      "29": {
+        "tests": 210,
+        "passed": 205,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 5
+      },
+      "35": {
+        "tests": 210,
+        "passed": 208,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 2
+      },
+      "26": {
+        "tests": 210,
+        "passed": 205,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 5
+      },
+      "36": {
+        "tests": 210,
+        "passed": 208,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 2
+      }
+    },
+    "notificationDenialCycleApis": [
+      35,
+      36
+    ],
+    "denialCasesPerApi": 2,
+    "wearNativeApi": 30,
+    "wearNativeContracts": 5,
+    "coreJarUmasks": [
+      "022",
+      "077"
+    ],
+    "coreJarByteIdentical": true
+  },
+  "independentPhoneBuild": {
+    "tag": "v1.20.1",
+    "sourceRevision": "4b2aba4d1c87606ed482752cf027c85e5896dece",
+    "unsignedSha256": "c3821b95cc184ea6020ca106242a60b126f3e77e1aefffc8c0f2455fcd507e07",
+    "unsignedBytesIdentical": true,
+    "independentBuildSucceeded": true,
+    "fdroidBuildSucceeded": true
+  },
+  "signatureTransplant": {
+    "independentSourceExitCode": 0,
+    "fdroidRecipeExitCode": 0,
+    "tool": "apksigcopier1.1.1"
+  },
+  "fdroid": {
+    "tool": "fdroidserver2.4.5",
+    "localReadmetaExitCode": 0,
+    "localLintExitCode": 0,
+    "localRecipeBuildsSucceeded": 1,
+    "normalScannerEnabled": true,
+    "officialServerVerified": false,
+    "submissionSent": false,
+    "catalogAccepted": false
+  },
+  "unpublishedSourceSnapshot": {
+    "tag": "v1.20.0",
+    "sourceRevision": "d38ebb0e60ec872807df145d81cf583d53271d71",
+    "workflow": 39237727506,
+    "legacySignedUpgradePassed": true,
+    "reason": "Latest predecessor v1.19.1 opened its intentional first-run guide before the new APK was installed; fixed by real UI fixture preparation without moving the tag."
+  },
+  "repositoryMetadata": {
+    "applicationStatus": "blocked",
+    "reason": "GitHub API reads succeed; description/topics writes return HTTP403 Resource not accessible by integration."
+  },
+  "limits": {
+    "physicalOemBatterySavingsMeasured": false,
+    "runningHomeAssistantInstallationTested": false
+  },
+  "implementationReport": "completion-1.20.1.md"
+}

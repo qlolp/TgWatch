@@ -1,28 +1,24 @@
-# Distribution preparation:1.20.0
+# Distribution preparation:1.20.1
 
-Current candidate is1.20.1/code1020001/tagv1.20.1; its exact-tag packaging verification is pending.
-The1.20.0 results below are retained for the unpublished immutable source snapshot
-and do not claim that1.20.0 was published.
-
-Phone-only packaging candidate: `ru.tgwatch`,1.20.0/code1020000/min26/target36,
-MIT, source tag `v1.20.0` at `d38ebb0e60ec872807df145d81cf583d53271d71`.
+Phone-only packaging candidate: `ru.tgwatch`,1.20.1/code1020001/min26/target36,
+MIT, source tag `v1.20.1` at `4b2aba4d1c87606ed482752cf027c85e5896dece`.
 This is preparation for maintainer review; no F-Droid submission has been sent.
 
 | Check | Evidence/status |
 |---|---|
 | Candidate | `metadata/ru.tgwatch.yml`, disabled pending maintainer review |
-| Store text | English/Russian fastlane metadata and code1020000 changelogs |
+| Store text | English/Russian fastlane metadata and code1020001 changelogs |
 | Toolchain | Gradle8.14.6, AGP8.13.2, Kotlin2.4.21, JDK17, phone SDK36/build-tools36.0.0 |
 | Metadata | Isolated fdroidserver2.4.5 readmeta/lint exit0,19October2026 |
 | Source assembly | Clean exact-tag Git-aware unsigned APK succeeded |
 | Recipe | Normal exact-tag build succeeded; scanner enabled, no force/skip |
 | Unsigned reproducibility | Recipe and independent APKs are byte-identical |
-| Production payload comparison | Pending signed publication |
+| Production payload comparison | Passed: apksigcopier1.1.1 returned0 for both source APKs against production |
 | Repository description/topics | Prepared; GitHub API writes return403 Resource not accessible by integration |
 | Official F-Droid build/acceptance | Not performed; candidate remains disabled |
 
 Unsigned SHA256:
-`90c9d1d8f666e459c90cd47d34c882a7e20428bf72ce3c226fb3f25c9eaf4559`.
+`c3821b95cc184ea6020ca106242a60b126f3e77e1aefffc8c0f2455fcd507e07`.
 See [F-Droid tool/VCS/category details](../fdroid.md).
 
 The app uses one user-controlled foreground service, independent optional goals,
@@ -61,3 +57,6 @@ readmeta/lint/build logs, unsigned identity, inventory/SBOM and actual signed-pa
 comparison evidence. Exclude real histories, private addresses, conditions and tokens.
 
 Historical [1.19.1 verification](verification-1.19.1.json) is retained unchanged.
+
+[Published twelve-asset verification](verification-1.20.1.json) and
+[completion/review/implementation decisions](completion-1.20.1.md).

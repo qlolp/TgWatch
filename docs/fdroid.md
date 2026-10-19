@@ -1,12 +1,8 @@
 # F-Droid packaging candidate
 
-Current candidate is1.20.1/code1020001/tagv1.20.1; its exact-tag packaging verification is pending.
-The1.20.0 results below are retained for the unpublished immutable source snapshot
-and do not claim that1.20.0 was published.
-
-`metadata/ru.tgwatch.yml` is a disabled phone-only candidate for1.20.0,
-code1020000, tag `v1.20.0`, source
-`d38ebb0e60ec872807df145d81cf583d53271d71`. The separate Wear application is not
+`metadata/ru.tgwatch.yml` is a disabled phone-only candidate for1.20.1,
+code1020001, tag `v1.20.1`, source
+`4b2aba4d1c87606ed482752cf027c85e5896dece`. The separate Wear application is not
 included. The candidate has not been submitted to or accepted by the catalog.
 
 ## Exact-tag local verification
@@ -17,7 +13,7 @@ On19October2026, isolated fdroidserver2.4.5 completed normal `readmeta`,
 ```sh
 fdroid readmeta
 fdroid lint ru.tgwatch
-fdroid build --test --stop ru.tgwatch:1020000
+fdroid build --test --stop ru.tgwatch:1020001
 ```
 
 Only the owned staging recipe was enabled. Normal source scanning and signing-config
@@ -26,11 +22,13 @@ remains disabled for maintainer review. Automatic update discovery stays disable
 until a maintainer approves the properties-to-versionCode mapping.
 
 The recipe APK is byte-identical to a separate clean Git-aware source assembly.
-Both report `ru.tgwatch`,1.20.0/code1020000/min26/target36. Unsigned SHA256:
-`90c9d1d8f666e459c90cd47d34c882a7e20428bf72ce3c226fb3f25c9eaf4559`.
+Both report `ru.tgwatch`,1.20.1/code1020001/min26/target36. Unsigned SHA256:
+`c3821b95cc184ea6020ca106242a60b126f3e77e1aefffc8c0f2455fcd507e07`.
 
-Production payload comparison is pending the signed publication. This local recipe
-result is separate from F-Droid's official server validation or catalog acceptance.
+Production payload comparison passed: apksigcopier1.1.1 `compare --unsigned`
+returned0 for both independent and recipe APKs against the published production
+APK, SHA256`497d5541412054467dc7a840d926be4ad60abacac1787f5a34f7675c8ec25021`.
+This result is separate from official F-Droid server validation or catalog acceptance.
 
 ## Toolchain and assembly
 
@@ -51,7 +49,7 @@ The candidate's `subdir: app` selects the phone; root settings retain shared cor
 
 The pip fdroidserver package omits gradlew-fdroid. Staging used its supported
 `gradle` configuration pointing to verified Gradle8.14.6. Normal
-`common.read_config()` and `common.getvcs(...).gotorevision('v1.20.0')` prepared VCS
+`common.read_config()` and `common.getvcs(...).gotorevision('v1.20.1')` prepared VCS
 before its early SOURCE_DATE_EPOCH lookup. Product sources and scanner rules were
 unchanged. Category keys came from the official fdroiddata mirror, SHA256
 `edf68d8d70073fe52a52c6a33f490399ce9dc884acff3a761a3a1e34acf9d541`.
@@ -83,3 +81,5 @@ in [its immutable verification record](distribution/verification-1.19.1.json).
 - [Reproducible builds](https://f-droid.org/docs/Reproducible_Builds/)
 - [fdroidserver](https://github.com/f-droid/fdroidserver)
 - [fdroiddata mirror](https://github.com/f-droid/fdroiddata)
+
+[Published hashes, signer/audit and reproducibility evidence](distribution/verification-1.20.1.json).

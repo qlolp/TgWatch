@@ -34,3 +34,9 @@ case. Every phone job also completed legacy upgrade, network recovery, Doze and
 PIN-locked Direct Boot. Signed latest/legacy production upgrades remain mandatory
 gates of the tag publication workflow; their final results belong to the versioned
 release verification record.
+
+Final publication: [run39241608647](https://github.com/qlolp/TgWatch/actions/runs/39241608647),
+tagv1.20.1/source4b2aba4d1c87606ed482752cf027c85e5896dece, passed all eight jobs,
+including signed legacy1.10.47/latest1.19.1 upgrades. Downloaded phone and Wear APKs
+confirm min/target/compile26/36/36 and30/35/35 respectively, with the existing
+production certificate. See[versioned evidence](distribution/verification-1.20.1.json).

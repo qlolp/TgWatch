@@ -48,11 +48,11 @@
 **Files:** `version.properties`, changelog/new release note, dependency evidence/metadata, distribution docs, environment reusable instructions when changed.
 **Interfaces:** New version1.20.0/code1020000 if all planned behavior ships together; if scope changes, choose SemVer based on actual shipped behavior without rewriting1.19.1. Release still contains twelve phone/Wear assets with the current signer continuity.
 
-- [ ] After all four feature plans: run core/phone/Wear JVM and bounded heap, full Python suite, detekt/lint, both debug/release APKs, all mandatory native and signed-upgrade paths, actual core mask reproducibility and runtime/test audit gates. Collect counts from fresh reports, distinguish local/CI results.
+- [x] After all four feature plans: run core/phone/Wear JVM and bounded heap, full Python suite, detekt/lint, both debug/release APKs, all mandatory native and signed-upgrade paths, actual core mask reproducibility and runtime/test audit gates. Collect counts from fresh reports, distinguish local/CI results.
 - [x] Request one independent whole-branch review using all plans' Review Focus. Address confirmed important failures with reproducing tests; preserve privacy, physical slots and schema compatibility. Report any unresolved item by name.
-- [ ] Prepare bilingual release notes and phone/Wear APKs. Verify source revision/version/signature, exact twelve assets, SBOM/inventory and both audits, then use the existing release workflow under the user's release authorization. Existing release tags remain immutable. A blocked external publication is reported, not represented as completed.
-- [ ] Update F-Droid candidate to the actual verified tag, run normal readmeta/lint/build and unsigned/payload comparison; keep catalog submission separate. Save tested API26/36 environment setup/start instructions through the configuration draft without replacing network/secrets.
-- [ ] Commit evidence and final docs. Preserve the user's working branch and leave a clean, reviewable development branch/main according to existing integration authorization.
+- [x] Prepare bilingual release notes and phone/Wear APKs. Verify source revision/version/signature, exact twelve assets, SBOM/inventory and both audits, then use the existing release workflow under the user's release authorization. Existing release tags remain immutable. A blocked external publication is reported, not represented as completed.
+- [x] Update F-Droid candidate to the actual verified tag, run normal readmeta/lint/build and unsigned/payload comparison; keep catalog submission separate. Save tested API26/36 environment setup/start instructions through the configuration draft without replacing network/secrets.
+- [x] Commit evidence and final docs. Preserve the user's working branch and leave a clean, reviewable development branch/main according to existing integration authorization.
 
 ## Runtime qualification evidence —19October2026
 
@@ -79,3 +79,20 @@ fixture's automatic-first-observation assumption was invalid. Prepare that old
 installation through its real guide/start controls, then retain the original
 genuine-observation/data-preservation gates. New patch version1.20.1/code1020001
 uses a new immutable tag; no previous tag or release asset is changed.
+
+## Final delivered result
+
+Release[v1.20.1](https://github.com/qlolp/TgWatch/releases/tag/v1.20.1), source
+4b2aba4d1c87606ed482752cf027c85e5896dece, was published after run39241608647
+passed all eight jobs, including both real signed predecessor upgrades. All twelve
+public assets were downloaded and independently checked for identity/hash/signer,
+complete OSV/runtime Trivy evidence and phone/Wear SDK separation. Normal exact-tag
+F-Droid readmeta/lint/build and independent clean assembly matched byte-for-byte;
+apksigcopier compared both unsigned APKs to production successfully.
+
+Tested SDK36/Python install and startup instructions were saved through the cloud
+configuration draft; saving does not publish/apply the environment. Full artifact
+evidence is in docs/distribution/verification-1.20.1.json, and all20rulings/review
+findings are retained in completion-1.20.1.md. Historical1.19.1 evidence and the
+unpublished1.20.0 tag remain unchanged. No external catalog submission or physical
+OEM battery validation is claimed. GitHub metadata writes remain blocked by403.
