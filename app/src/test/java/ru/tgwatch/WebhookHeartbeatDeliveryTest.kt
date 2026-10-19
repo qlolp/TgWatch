@@ -23,13 +23,43 @@ class WebhookHeartbeatDeliveryTest {
             }
         }, schedule = { _, _ -> {} }, cancelTransport = { cancellations++ })
         private var revision = 0L
-        fun publish(id: String = "telegram", status: String = "OK") = coordinator.onPublished(
-            WebhookObservation(id, status, 1000 + ++revision, null, NetworkKind.WIFI, revision, true, false, 60))
+        fun publish(id: String = "telegram", status: String = "OK", measured: Boolean = true,
+            stale: Boolean = false) = coordinator.onPublished(
+            WebhookObservation(id, status, 1000 + ++revision, null, NetworkKind.WIFI, revision, measured, stale, 60))
         fun finish(index: Int = requests.lastIndex, code: Int = 204) {
             val request = requests[index]
             request.completed = true
             request.done(code)
         }
+    }
+    @Test fun newerInvalidObservationEvictsWaitingHeartbeatWithoutChangingMeasuredBaseline() {
+        for (invalid in listOf("unknown", "unmeasured", "stale")) {
+            val fixture = Fixture()
+            fixture.publish("matrix", "DOWN")
+            fixture.publish()
+            fixture.publish(status = if (invalid == "unknown") "UNKNOWN" else "OK",
+                measured = invalid != "unmeasured", stale = invalid == "stale")
+            fixture.finish()
+            fixture.publish("custom")
+            assertEquals(invalid, "custom", fixture.requests.last().json.getString("service_id"))
+            fixture.finish()
+            fixture.publish(status = "DOWN")
+            assertEquals(invalid, "OK", fixture.requests.last().json.getString("previous_status"))
+            assertEquals(1, fixture.maxActive)
+        }
+    }
+    @Test fun newerUnknownObservationEvictsWaitingEventWithoutResettingRecoveryBaseline() {
+        val fixture = Fixture()
+        fixture.publish("matrix", "DOWN")
+        fixture.publish(status = "DOWN")
+        fixture.publish(status = "UNKNOWN", measured = false)
+        fixture.finish()
+        fixture.publish("custom")
+        assertEquals("custom", fixture.requests.last().json.getString("service_id"))
+        fixture.finish()
+        fixture.publish()
+        assertEquals("recovery", fixture.requests.last().json.getString("event"))
+        assertEquals("DOWN", fixture.requests.last().json.getString("previous_status"))
     }
     @Test fun eventFiltersAlsoRestrictHeartbeatStatusWithoutChangingMeasuredBaseline() {
         val fixture = Fixture()

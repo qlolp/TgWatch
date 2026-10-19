@@ -205,13 +205,6 @@ class UiAccessibilityTest {
             }
         }
     }
-}
-
-/** Disabling the preference alone does not tear down an already running foreground service. */
-private fun stopMonitoringForScenario(ctx: android.content.Context) {
-    MonitorService.stopAndAwait(ctx)
-    assertFalse("Activity fixtures must disable monitoring", Prefs.isEnabled(ctx))
-    assertFalse("Activity fixtures must finish monitor teardown", MonitorService.running)
     @Test fun actualWindowInsetsKeepInteractiveControlsClearOfSystemBars() {
         assumeTrue("Target-era edge-to-edge qualification requires API35+", Build.VERSION.SDK_INT >= 35)
         val wasEnabled = Prefs.isEnabled(ctx)
@@ -248,4 +241,11 @@ private fun stopMonitoringForScenario(ctx: android.content.Context) {
             }
         } finally { Prefs.setEnabled(ctx, wasEnabled) }
     }
+}
+
+/** Disabling the preference alone does not tear down an already running foreground service. */
+private fun stopMonitoringForScenario(ctx: android.content.Context) {
+    MonitorService.stopAndAwait(ctx)
+    assertFalse("Activity fixtures must disable monitoring", Prefs.isEnabled(ctx))
+    assertFalse("Activity fixtures must finish monitor teardown", MonitorService.running)
 }

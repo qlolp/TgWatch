@@ -135,8 +135,13 @@ internal class WebhookCoordinator(
         synchronized(configurationLock) {
             val current = configuration()
             if (configurationFence.changed(current)) invalidate()
-            if (captured != current || !tracker.accepts(observation)) return
+            if (captured != current) return
             heartbeats.published(observation, current, nowElapsed())
+            if (!tracker.accepts(observation)) {
+                // V2 claims current freshness; legacy event retries keep their established measured baseline.
+                if (current.format == WebhookFormat.JSON_V2) latest.forget(observation.serviceId)
+                return
+            }
             latest.published(tracker.observe(observation), observation, nowElapsed())
             val url = current.url?.takeIf { current.enabled }
             if (url != null) {

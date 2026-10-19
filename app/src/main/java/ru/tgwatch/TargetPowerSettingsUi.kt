@@ -10,7 +10,6 @@ import android.widget.TextView
 
 internal object TargetPowerSettingsUi {
     fun add(activity: Activity, content: LinearLayout, interval: Spinner, intervals: List<Int>): CheckBox {
-        val state = TargetPowerMonitor.readState(activity.applicationContext)
         val option = CheckBox(activity).apply {
             id = R.id.targetPowerSaving
             setText(R.string.target_power_saving)
@@ -20,6 +19,7 @@ internal object TargetPowerSettingsUi {
         }
         val description = TextView(activity).apply { id = R.id.targetPowerInterval; content.addView(this) }
         fun update() {
+            val state = TargetPowerMonitor.readState(activity.applicationContext)
             val configured = intervals.getOrElse(interval.selectedItemPosition) { intervals.first() }
             val effective = TargetPowerPolicy.intervalSec(configured, option.isChecked, state)
             val reason = when {
