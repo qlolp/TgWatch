@@ -87,7 +87,7 @@ class UiAccessibilityTest {
                 })
                 Lang.update(localized)
                 assertEquals(resource, localized.getString(R.string.check_now))
-                assertEquals(dynamic, PowerProfile.BALANCED.title)
+                assertEquals(dynamic, AndroidText.resolve(localized, PowerProfile.BALANCED.title))
             }
             } finally { Locale.setDefault(systemLocale); Lang.update(ctx) }
         }

@@ -16,6 +16,14 @@ object AndroidText {
     private const val FULL = 100.0
 
     fun resolve(ctx: Context, value: TextValue): String = when (value.key) {
+        TextKey.CONCAT -> value.args.joinToString("") { argument(ctx, it).toString() }
+        TextKey.LITERAL -> (value.args.single() as TextArgument.Text).value
+        TextKey.TIME_OF_DAY -> SimpleDateFormat("HH:mm:ss", locale(ctx)).apply {
+            timeZone = TimeZone.getTimeZone((value.args[1] as TextArgument.Text).value)
+        }.format(Date((value.args[0] as TextArgument.Number).value))
+        TextKey.AGO -> resolve(ctx, (value.args.single() as TextArgument.Duration).parts.text()) +
+            ctx.getString(R.string.text_ago_suffix)
+        TextKey.JUST_NOW -> ctx.getString(R.string.text_just_now)
         TextKey.LINES, TextKey.BLOCKS -> value.args.joinToString(
             if (value.key == TextKey.LINES) "\n" else "\n\n") { argument(ctx, it).toString() }
         TextKey.PERCENT -> percent(ctx, (value.args.single() as TextArgument.Decimal).value)

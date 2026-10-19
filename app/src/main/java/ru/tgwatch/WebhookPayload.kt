@@ -2,14 +2,14 @@ package ru.tgwatch
 
 import org.json.JSONObject
 
-data class WebhookBody(val contentType: String, val bytes: ByteArray)
+data class WebhookBody(val contentType: String, val bytes: ByteArray, val textValue: TextValue? = null)
 
 /** Versioned allowlist. No Context, history lookup, free-form names or diagnostic fields. */
 object WebhookPayload {
     fun encode(event: WebhookEvent, format: WebhookFormat, sentAtMs: Long? = null): WebhookBody = when (format) {
         WebhookFormat.JSON, WebhookFormat.JSON_V2 -> WebhookBody("application/json; charset=utf-8",
             json(event, format, sentAtMs).toByteArray(Charsets.UTF_8))
-        WebhookFormat.TEXT -> WebhookBody("text/plain; charset=utf-8", text(event).toByteArray(Charsets.UTF_8))
+        WebhookFormat.TEXT -> WebhookBody("text/plain; charset=utf-8", byteArrayOf(), text(event))
     }
 
     private fun json(event: WebhookEvent, format: WebhookFormat, sentAtMs: Long?): String {
@@ -37,18 +37,18 @@ object WebhookPayload {
             .toString()
     }
 
-    private fun text(event: WebhookEvent): String {
+    private fun text(event: WebhookEvent): TextValue {
         if (event.kind == WebhookEventKind.TEST) return WebhookPolicy.testPayload()
         val observation = checkNotNull(event.observation)
         val status = WebhookStatuses.normalize(observation.status)
         val legacy = if (status == "DOWN") "TG_DOWN" else status.orEmpty()
         return if (observation.serviceId == TargetId.TELEGRAM.wire) checkNotNull(WebhookPolicy.payload(legacy)) else {
-            val name = TargetNames.label(checkNotNull(TargetId.fromWire(observation.serviceId)))
+            val name = TargetNames.text(checkNotNull(TargetId.fromWire(observation.serviceId)))
             when (status) {
-                "OK" -> Lang.t("TG Монитор: $name доступен", "TG Monitor: $name is reachable")
-                "DOWN" -> Lang.t("TG Монитор: $name недоступен", "TG Monitor: $name is unreachable")
-                "PARTIAL" -> Lang.t("TG Монитор: $name доступен частично", "TG Monitor: $name is partially reachable")
-                "NO_NETWORK" -> Lang.t("TG Монитор: $name — нет сети", "TG Monitor: $name — no network")
+                "OK" -> textOf(TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_REACHABLE, textArgument(name))
+                "DOWN" -> textOf(TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_UNREACHABLE, textArgument(name))
+                "PARTIAL" -> textOf(TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_PARTIALLY, textArgument(name))
+                "NO_NETWORK" -> textOf(TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_NO_NETWORK, textArgument(name))
                 else -> error("Unknown target status")
             }
         }

@@ -101,24 +101,38 @@ class StatusTileService : TileService() {
         val stale = s.isStale(now)
         val (tileState, icon, subtitle) = when {
             !TargetPreferences.definition(this, TargetId.TELEGRAM).enabled || !MonitorService.running ->
-                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, Lang.t("Выключен", "Off"))
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_pause, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_off))
             stale && s.status == MonitorService.Status.PARTIAL ->
-                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, Lang.t("Устарело · частично", "Stale · partial"))
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_stale_partial))
             stale && s.status == MonitorService.Status.OK ->
-                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, Lang.t("Устарело · ${agoStr(s.checkedAt, now)}", "Stale · ${agoStr(s.checkedAt, now)}"))
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_stale,
+                    agoStr(s.checkedAt, now)))
             stale && s.status == MonitorService.Status.TG_DOWN ->
-                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, Lang.t("Недоступен?", "Unreachable?"))
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_unreachable))
             stale && s.status == MonitorService.Status.NO_NETWORK ->
-                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_offline, Lang.t("Без сети?", "No internet?"))
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_offline, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_no_internet))
             s.status == MonitorService.Status.PARTIAL ->
-                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, Lang.t("Частично доступен", "Partially reachable"))
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_partially_reachable))
             s.status == MonitorService.Status.OK ->
-                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_ok, Lang.t("Доступен · ${s.latencyMs} мс", "Reachable · ${s.latencyMs} ms"))
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_ok, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_reachable_ms,
+                    s.latencyMs))
             s.status == MonitorService.Status.TG_DOWN ->
-                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, Lang.t("Недоступен", "Unreachable"))
+                Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_unreachable_a51760))
             s.status == MonitorService.Status.NO_NETWORK ->
-                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_offline, Lang.t("Нет интернета", "No internet"))
-            else -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, if (s.checkedAt > 0) Lang.t("Не определено", "Unknown") else Lang.t("Проверяю…", "Checking…"))
+                Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_offline, this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_no_internet_9dafd1))
+            else -> Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait,
+                if (s.checkedAt > 0) this@StatusTileService.renderString(
+                R.string.copy_status_tile_service_unknown) else this@StatusTileService.renderString(
+                    R.string.copy_status_tile_service_checking))
         }
         tile.state = tileState
         tile.icon = Icon.createWithResource(this, icon)

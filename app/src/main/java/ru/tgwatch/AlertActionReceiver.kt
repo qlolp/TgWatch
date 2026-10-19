@@ -37,7 +37,8 @@ class AlertActionReceiver : BroadcastReceiver() {
         fun muteNow(context: Context, id: TargetId = TargetId.TELEGRAM): String? {
             val now = System.currentTimeMillis()
             if (!TargetAlertPreferences.mute(context, id)) {
-                EventLog.add(context, Lang.t("Не удалось сохранить заглушение оповещений", "Could not save alert mute"))
+                EventLog.add(context, context.renderString(
+                    R.string.copy_alert_action_receiver_could_not_save_alert))
                 return null
             }
             // The alert has been handled; the ongoing status notification still shows the outage.
@@ -48,7 +49,7 @@ class AlertActionReceiver : BroadcastReceiver() {
             }
             val until = timeStr(AlertMute.until(now))
             EventLog.add(context, TargetNames.label(id) + ": " +
-                Lang.t("Оповещения заглушены до $until", "Alerts muted until $until"))
+                context.renderString(R.string.copy_alert_action_receiver_alerts_muted_until, until))
             return until
         }
 

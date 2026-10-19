@@ -36,18 +36,16 @@ object WebhookPolicy {
     fun notifies(status: String): Boolean = status in NOTIFIED
 
     /** One short status line. No history, diagnostics, endpoints, addresses or credentials. */
-    fun payload(status: String): String? = when (status) {
-        "OK" -> Lang.t("TG Монитор: Telegram доступен", "TG Monitor: Telegram is reachable")
-        "PARTIAL" -> Lang.t("TG Монитор: Telegram доступен частично",
-            "TG Monitor: Telegram is partially reachable")
-        "TG_DOWN" -> Lang.t("TG Монитор: Telegram недоступен",
-            "TG Monitor: Telegram is unreachable")
-        "NO_NETWORK" -> Lang.t("TG Монитор: нет сети", "TG Monitor: no network")
+    fun payload(status: String): TextValue? = when (status) {
+        "OK" -> textOf(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS)
+        "PARTIAL" -> textOf(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS_E25A0D)
+        "TG_DOWN" -> textOf(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS_B13B5F)
+        "NO_NETWORK" -> textOf(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_NO_NETWORK)
         else -> null
     }
 
-    fun testPayload(): String =
-        Lang.t("TG Монитор: тестовое сообщение", "TG Monitor: test message")
+    fun testPayload(): TextValue =
+        textOf(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TEST_MESSAGE)
 
     fun userAgent(versionName: String?): String {
         val version = versionName?.takeIf { it.isNotEmpty() && it.length <= MAX_VERSION_LENGTH &&

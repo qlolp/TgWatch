@@ -52,4 +52,6 @@
         <item quantity="one">Checks: %1$d</item>
         <item quantity="other">Checks: %1$d</item>
     </plurals>
+    <string name="text_ago_suffix">" ago"</string>
+    <string name="text_just_now">just now</string>
 </resources>

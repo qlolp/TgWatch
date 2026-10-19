@@ -57,7 +57,7 @@ object WebhookNotifier {
         coordinator ?: ctx.applicationContext.let { app ->
             WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(app) },
                 SystemClock::elapsedRealtime,
-                { url, body, finished -> transport.submit(url, body, userAgent(app), finished) },
+                { url, body, finished -> transport.submit(url, body.resolved(app), userAgent(app), finished) },
                 cancelTransport = transport::cancel)
         }.also { coordinator = it }
     }

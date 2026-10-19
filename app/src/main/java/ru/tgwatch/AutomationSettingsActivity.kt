@@ -68,8 +68,9 @@ class AutomationSettingsActivity : Activity() {
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
-            val text = WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
-                android.os.SystemClock.elapsedRealtime())
+            val text = AndroidText.resolve(this@AutomationSettingsActivity,
+                WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
+                android.os.SystemClock.elapsedRealtime()))
             if (webhookHealth.text.toString() != text) webhookHealth.text = text
             healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
         }
@@ -211,7 +212,8 @@ class AutomationSettingsActivity : Activity() {
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
         webhookDelivery.refresh()
-        val text = WebhookHealthText.format(WebhookNotifier.health(this), android.os.SystemClock.elapsedRealtime())
+        val text = AndroidText.resolve(this@AutomationSettingsActivity,
+            WebhookHealthText.format(WebhookNotifier.health(this), android.os.SystemClock.elapsedRealtime()))
         if (webhookHealth.text.toString() != text) webhookHealth.text = text
     }
 
@@ -256,7 +258,8 @@ class AutomationSettingsActivity : Activity() {
         WebhookNotifier.sendTest(this) { result ->
             if (!isDestroyed) {
                 val message = if (result == WebhookNotifier.TestResult.TIMED_OUT)
-                    Lang.t("Время ожидания webhook истекло", "Webhook timed out")
+                    this@AutomationSettingsActivity.renderString(
+                        R.string.copy_automation_settings_webhook_timed_out)
                 else getString(when (result) {
                     WebhookNotifier.TestResult.SENT -> R.string.webhook_test_sent
                     WebhookNotifier.TestResult.FAILED, WebhookNotifier.TestResult.TIMED_OUT ->

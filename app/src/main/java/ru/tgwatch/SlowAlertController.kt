@@ -39,12 +39,13 @@ internal class SlowAlertController(
         expectedIntervalSec = MonitorService.state.expectedIntervalSec
         if (status == "OK" && latency >= 0) latencyMs = latency
         when (action) {
-            SlowAlert.Action.ALERT -> log(Lang.t("Telegram тормозит: ответ за $latency мс",
-                "Telegram is slow: $latency ms response"))
+            SlowAlert.Action.ALERT -> log(ctx.renderString(
+                R.string.copy_slow_alert_controller_telegram_is_slow_ms,
+                latency))
             SlowAlert.Action.CLEAR -> if (status == "OK" && latency >= 0L &&
                 latency < TargetSlowAlert.clearLevel(TargetPreferences.storedDefinition(ctx, TargetId.TELEGRAM)
                     .alerts.slowThresholdMs))
-                log(Lang.t("Telegram больше не тормозит", "Telegram is no longer slow"))
+                log(ctx.renderString(R.string.copy_slow_alert_controller_telegram_is_no_longer))
             SlowAlert.Action.NONE -> Unit
         }
         reconcile()

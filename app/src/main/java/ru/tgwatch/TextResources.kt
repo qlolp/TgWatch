@@ -49,4 +49,64 @@ internal val textResources: Map<TextKey, Int> = mapOf(
     TextKey.TARGET_MATRIX to R.string.text_target_matrix,
     TextKey.TARGET_WHATSAPP to R.string.text_target_whatsapp,
     TextKey.TARGET_CUSTOM to R.string.text_target_custom,
+    TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_REACHABLE to R.string.copy_ongoing_notification_telegram_is_reachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_PERSISTENT_ICON_WHILE_TELEGRAM to
+        R.string.copy_ongoing_notification_persistent_icon_while_telegram,
+    TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_UNREACHABLE to
+        R.string.copy_ongoing_notification_telegram_is_unreachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_ALERT_ICON_WHEN_THERE to R.string.copy_ongoing_notification_alert_icon_when_there,
+    TextKey.COPY_ONGOING_NOTIFICATION_AWAITING_CHECK to R.string.copy_ongoing_notification_awaiting_check,
+    TextKey.COPY_ONGOING_NOTIFICATION_STALE to R.string.copy_ongoing_notification_stale,
+    TextKey.COPY_ONGOING_NOTIFICATION_REACHABLE to R.string.copy_ongoing_notification_reachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_UNREACHABLE to R.string.copy_ongoing_notification_unreachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_PARTIALLY_REACHABLE to R.string.copy_ongoing_notification_partially_reachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_NO_INTERNET to R.string.copy_ongoing_notification_no_internet,
+    TextKey.COPY_ONGOING_NOTIFICATION_UNKNOWN to R.string.copy_ongoing_notification_unknown,
+    TextKey.COPY_ONGOING_NOTIFICATION_MONITORING to R.string.copy_ongoing_notification_monitoring,
+    TextKey.COPY_ONGOING_NOTIFICATION_REACHABILITY_UNKNOWN to R.string.copy_ongoing_notification_reachability_unknown,
+    TextKey.COPY_ONGOING_NOTIFICATION_CHECKING_THE_CONNECTION_TO to
+        R.string.copy_ongoing_notification_checking_the_connection_to,
+    TextKey.COPY_ONGOING_NOTIFICATION_MONITORING_IS_DELAYED to R.string.copy_ongoing_notification_monitoring_is_delayed,
+    TextKey.COPY_ONGOING_NOTIFICATION_LAST_CHECK_A_FRESH to R.string.copy_ongoing_notification_last_check_a_fresh,
+    TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_PARTIALLY_REACHABLE to
+        R.string.copy_ongoing_notification_telegram_is_partially_reachable,
+    TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_RESPONDING_MS to
+        R.string.copy_ongoing_notification_telegram_is_responding_ms,
+    TextKey.COPY_ONGOING_NOTIFICATION_CHECKED_AT to R.string.copy_ongoing_notification_checked_at,
+    TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_UNREACHABLE_F3AB95 to
+        R.string.copy_ongoing_notification_telegram_is_unreachable_f3ab95,
+    TextKey.COPY_ONGOING_NOTIFICATION_NO_CONNECTION_SINCE to R.string.copy_ongoing_notification_no_connection_since,
+    TextKey.COPY_ONGOING_NOTIFICATION_NO_INTERNET_CONNECTION to
+        R.string.copy_ongoing_notification_no_internet_connection,
+    TextKey.COPY_ONGOING_NOTIFICATION_SINCE to R.string.copy_ongoing_notification_since,
+    TextKey.COPY_ONGOING_NOTIFICATION_CHECK to R.string.copy_ongoing_notification_check,
+    TextKey.COPY_ONGOING_NOTIFICATION_STOP to R.string.copy_ongoing_notification_stop,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_NO_ATTEMPTS to R.string.copy_webhook_health_text_no_attempts,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_SENDING to R.string.copy_webhook_health_text_sending,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERED to R.string.copy_webhook_health_text_delivered,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_FAILED to R.string.copy_webhook_health_text_delivery_failed,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_TIMED_OUT to R.string.copy_webhook_health_text_timed_out,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_YES to R.string.copy_webhook_health_text_yes,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_NO to R.string.copy_webhook_health_text_no,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_BLOCKED_THE_PREVIOUS to
+        R.string.copy_webhook_health_text_delivery_blocked_the_previous,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_WEBHOOK_DELIVERY_THIS_PROCESS to
+        R.string.copy_webhook_health_text_webhook_delivery_this_process,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_LAST_ATTEMPT to R.string.copy_webhook_health_text_last_attempt,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_LAST_SUCCESS to R.string.copy_webhook_health_text_last_success,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_OUTCOME to R.string.copy_webhook_health_text_outcome,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_REQUEST_STILL_RUNNING to R.string.copy_webhook_health_text_request_still_running,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_NONE to R.string.copy_webhook_health_text_none,
+    TextKey.COPY_WEBHOOK_HEALTH_TEXT_S_AGO to R.string.copy_webhook_health_text_s_ago,
+    TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS to R.string.copy_webhook_policy_tg_monitor_telegram_is,
+    TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS_E25A0D to
+        R.string.copy_webhook_policy_tg_monitor_telegram_is_e25a0d,
+    TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS_B13B5F to
+        R.string.copy_webhook_policy_tg_monitor_telegram_is_b13b5f,
+    TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_NO_NETWORK to R.string.copy_webhook_policy_tg_monitor_no_network,
+    TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TEST_MESSAGE to R.string.copy_webhook_policy_tg_monitor_test_message,
+    TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_REACHABLE to R.string.copy_webhook_payload_tg_monitor_is_reachable,
+    TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_UNREACHABLE to R.string.copy_webhook_payload_tg_monitor_is_unreachable,
+    TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_PARTIALLY to R.string.copy_webhook_payload_tg_monitor_is_partially,
+    TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_NO_NETWORK to R.string.copy_webhook_payload_tg_monitor_no_network,
 )

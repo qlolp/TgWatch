@@ -11,7 +11,7 @@ import android.os.Build
 import ru.tgwatch.MonitorService.State
 import ru.tgwatch.MonitorService.Status
 
-internal data class OngoingContent(val title: String, val text: String, val channel: String,
+internal data class OngoingContent(val title: TextValue, val text: TextValue, val channel: String,
     val icon: Int, val color: Int, val colorized: Boolean)
 internal data class OngoingView(val notif: OngoingContent, val whenMs: Long,
     val chronometer: Boolean, val progress: Int?, val targetId: TargetId = TargetId.TELEGRAM)
@@ -25,19 +25,21 @@ internal object OngoingNotification {
     private const val COLOR_OFFLINE = -689_152 // #F57C00
     private const val COLOR_STALE = -7_694_685 // #8A96A3
 
-    fun createChannels(manager: NotificationManager) {
-        val ok = NotificationChannel(CHANNEL_OK, Lang.t("Telegram доступен", "Telegram is reachable"),
+    fun createChannels(ctx: Context, manager: NotificationManager) {
+        val ok = NotificationChannel(CHANNEL_OK, AndroidText.resolve(ctx,
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_REACHABLE)),
             NotificationManager.IMPORTANCE_LOW).apply {
-            description = Lang.t("Постоянный значок, когда Telegram отвечает",
-                "Persistent icon while Telegram is responding")
+            description = AndroidText.resolve(ctx,
+                textOf(TextKey.COPY_ONGOING_NOTIFICATION_PERSISTENT_ICON_WHILE_TELEGRAM))
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
-        val alert = NotificationChannel(CHANNEL_ALERT, Lang.t("Telegram недоступен", "Telegram is unreachable"),
+        val alert = NotificationChannel(CHANNEL_ALERT, AndroidText.resolve(ctx,
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_UNREACHABLE)),
             NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = Lang.t("Тревожный значок, когда связи нет", "Alert icon when there is no connection")
+            description = AndroidText.resolve(ctx, textOf(TextKey.COPY_ONGOING_NOTIFICATION_ALERT_ICON_WHEN_THERE))
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
@@ -51,7 +53,8 @@ internal object OngoingNotification {
     fun view(state: State, stats: TimeStats, now: Long): OngoingView {
         val stale = state.isStale(now)
         val uptime = stats.uptimePercent
-        val uptimeText = if (uptime >= 0) " · Telegram ${formatPercent(uptime)}" else ""
+        val uptimeText = if (uptime >= 0) textLiteral(" · Telegram ") + textOf(TextKey.PERCENT,
+            TextArgument.Decimal(uptime)) else textLiteral("")
         return OngoingView(content(state, now, uptimeText, stale),
             whenMs = if (state.bad && !stale) state.since else if (state.checkedAt > 0L) state.checkedAt else now,
             chronometer = state.bad && !stale,
@@ -66,47 +69,50 @@ internal object OngoingNotification {
                 ProbeRules.isStale(state.checkedElapsedMs, elapsed, state.expectedIntervalSec)
                 else ProbeRules.isStale(state.checkedAtMs, now, state.expectedIntervalSec)
             val label = when {
-                state.checkedAtMs <= 0L -> Lang.t("ожидание проверки", "awaiting check")
-                stale -> Lang.t("устарело", "stale")
+                state.checkedAtMs <= 0L -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_AWAITING_CHECK)
+                stale -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_STALE)
                 else -> when (state.status) {
-                    TargetStatus.OK -> Lang.t("доступен", "reachable")
-                    TargetStatus.DOWN -> Lang.t("недоступен", "unreachable")
-                    TargetStatus.PARTIAL -> Lang.t("частично доступен", "partially reachable")
-                    TargetStatus.NO_NETWORK -> Lang.t("нет интернета", "no internet")
-                    TargetStatus.UNKNOWN -> Lang.t("не определено", "unknown")
+                    TargetStatus.OK -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_REACHABLE)
+                    TargetStatus.DOWN -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_UNREACHABLE)
+                    TargetStatus.PARTIAL -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_PARTIALLY_REACHABLE)
+                    TargetStatus.NO_NETWORK -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_NO_INTERNET)
+                    TargetStatus.UNKNOWN -> textOf(TextKey.COPY_ONGOING_NOTIFICATION_UNKNOWN)
                 }
             }
-            "${TargetNames.label(state.id)}: $label"
+            TargetNames.text(state.id) + ": " + label
         }
-        val title = if (states.isEmpty()) Lang.t("Мониторинг", "Monitoring")
-            else states.joinToString(" · ") { TargetNames.label(it.id) }
-        return OngoingView(OngoingContent(title, lines.joinToString("\n"), CHANNEL_OK,
+        val title = if (states.isEmpty()) textOf(TextKey.COPY_ONGOING_NOTIFICATION_MONITORING)
+            else textJoin(states.map { TargetNames.text(it.id) }, " · ")
+        return OngoingView(OngoingContent(title, textLines(lines), CHANNEL_OK,
             R.drawable.ic_stat_wait, COLOR_OK, false), states.maxOfOrNull { it.checkedAtMs }
                 ?.takeIf { it > 0L } ?: now, false, null, selected)
     }
 
-    private fun content(state: State, now: Long, uptime: String, stale: Boolean): OngoingContent = when {
+    private fun content(state: State, now: Long, uptime: TextValue, stale: Boolean): OngoingContent = when {
         state.status == Status.UNKNOWN -> OngoingContent(
-            if (state.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown")
-            else Lang.t("Проверяю связь с Telegram…", "Checking the connection to Telegram…"),
-            state.reason.ifEmpty { MonitorService.CHECK_URL }, CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_OK, false)
-        stale -> OngoingContent(Lang.t("Мониторинг задерживается", "Monitoring is delayed"),
-            Lang.t("Последняя проверка ${agoStr(state.checkedAt, now)}; нужен свежий результат",
-                "Last check ${agoStr(state.checkedAt, now)}; a fresh result is needed"),
+            if (state.checkedAt > 0) textOf(TextKey.COPY_ONGOING_NOTIFICATION_REACHABILITY_UNKNOWN)
+            else textOf(TextKey.COPY_ONGOING_NOTIFICATION_CHECKING_THE_CONNECTION_TO),
+            textLiteral(state.reason.ifEmpty { MonitorService.CHECK_URL }), CHANNEL_OK, R.drawable.ic_stat_wait,
+                COLOR_OK, false)
+        stale -> OngoingContent(textOf(TextKey.COPY_ONGOING_NOTIFICATION_MONITORING_IS_DELAYED),
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_LAST_CHECK_A_FRESH, textArgument(ageText(state.checkedAt, now))),
             CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_STALE, false)
         state.status == Status.PARTIAL -> OngoingContent(
-            Lang.t("Telegram частично доступен", "Telegram is partially reachable"), state.reason,
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_PARTIALLY_REACHABLE), textLiteral(state.reason),
             CHANNEL_OK, R.drawable.ic_stat_wait, COLOR_OFFLINE, false)
         state.status == Status.OK -> OngoingContent(
-            Lang.t("Telegram отвечает · ${state.latencyMs} мс", "Telegram is responding · ${state.latencyMs} ms"),
-            Lang.t("Проверено в ${timeStr(state.checkedAt)}$uptime", "Checked at ${timeStr(state.checkedAt)}$uptime"),
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_RESPONDING_MS, textArgument(state.latencyMs)),
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_CHECKED_AT, textArgument(timeText(state.checkedAt)),
+                textArgument(uptime)),
             CHANNEL_OK, R.drawable.ic_stat_ok, COLOR_OK, false)
-        state.status == Status.TG_DOWN -> OngoingContent(Lang.t("Telegram НЕДОСТУПЕН", "Telegram is UNREACHABLE"),
-            Lang.t("Нет связи с ${timeStr(state.since)} · ${state.reason}",
-                "No connection since ${timeStr(state.since)} · ${state.reason}"),
+        state.status == Status.TG_DOWN -> OngoingContent(
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_UNREACHABLE_F3AB95),
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_NO_CONNECTION_SINCE, textArgument(timeText(state.since)),
+                textArgument(state.reason)),
             CHANNEL_ALERT, R.drawable.ic_stat_fail_blink, COLOR_FAIL, true)
-        else -> OngoingContent(Lang.t("Нет подключения к интернету", "No internet connection"),
-            Lang.t("С ${timeStr(state.since)} · ${state.reason}", "Since ${timeStr(state.since)} · ${state.reason}"),
+        else -> OngoingContent(textOf(TextKey.COPY_ONGOING_NOTIFICATION_NO_INTERNET_CONNECTION),
+            textOf(TextKey.COPY_ONGOING_NOTIFICATION_SINCE, textArgument(timeText(state.since)),
+                textArgument(state.reason)),
             CHANNEL_ALERT, R.drawable.ic_stat_offline_blink, COLOR_OFFLINE, true)
     }
 
@@ -132,9 +138,9 @@ internal object OngoingNotification {
             .setSmallIcon(content.icon)
             .setColor(content.color)
             .setColorized(content.colorized)
-            .setContentTitle(content.title)
-            .setContentText(content.text)
-            .setStyle(Notification.BigTextStyle().bigText(content.text))
+            .setContentTitle(AndroidText.resolve(ctx, content.title))
+            .setContentText(AndroidText.resolve(ctx, content.text))
+            .setStyle(Notification.BigTextStyle().bigText(AndroidText.resolve(ctx, content.text)))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
@@ -144,8 +150,10 @@ internal object OngoingNotification {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(openApp)
             .setDeleteIntent(check)
-            .addAction(action(ctx, R.drawable.ic_stat_ok, Lang.t("Проверить", "Check"), check))
-            .addAction(action(ctx, R.drawable.ic_stat_pause, Lang.t("Остановить", "Stop"), stop))
+            .addAction(action(ctx, R.drawable.ic_stat_ok, AndroidText.resolve(ctx,
+                textOf(TextKey.COPY_ONGOING_NOTIFICATION_CHECK)), check))
+            .addAction(action(ctx, R.drawable.ic_stat_pause, AndroidText.resolve(ctx,
+                textOf(TextKey.COPY_ONGOING_NOTIFICATION_STOP)), stop))
         view.progress?.let { builder.setProgress(NotificationProgress.MAX_PERCENT, it, false) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)

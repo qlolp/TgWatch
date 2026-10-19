@@ -9,7 +9,6 @@ import org.junit.Before
 import org.junit.Test
 
 class WebhookPolicyTest {
-    @Before @After fun russianDefault() { Lang.ru = true }
 
     @Test fun urlValidationAllowsHttpsTopicsAndQueriesButNoCredentialsOrFragments() {
         for (good in listOf("https://ntfy.sh/my-topic_42", "https://ntfy.example.org:8443/alerts?title=TG&priority=4",
@@ -31,21 +30,14 @@ class WebhookPolicyTest {
         assertEquals("", HttpsUrlPolicy.hostLabel("not a url"))
     }
 
-    @Test fun payloadIsOneShortStatusLineInBothLanguages() {
-        assertEquals("TG Монитор: Telegram недоступен", WebhookPolicy.payload("TG_DOWN"))
-        assertEquals("TG Монитор: Telegram доступен", WebhookPolicy.payload("OK"))
-        Lang.ru = false
-        assertEquals("TG Monitor: Telegram is unreachable", WebhookPolicy.payload("TG_DOWN"))
-        assertEquals("TG Monitor: Telegram is partially reachable", WebhookPolicy.payload("PARTIAL"))
-        assertEquals("TG Monitor: no network", WebhookPolicy.payload("NO_NETWORK"))
-        assertEquals("TG Monitor: test message", WebhookPolicy.testPayload())
+    @Test fun payloadContainsOnlyFixedStatusKeys() {
+        assertEquals(TextKey.COPY_WEBHOOK_POLICY_TG_MONITOR_TELEGRAM_IS, WebhookPolicy.payload("OK")!!.key)
+        val values = listOf("OK", "PARTIAL", "TG_DOWN", "NO_NETWORK").map { WebhookPolicy.payload(it)!! }
+        assertEquals(4, values.toSet().size)
+        assertTrue(values.all { it.args.isEmpty() })
+        assertTrue(WebhookPolicy.testPayload().args.isEmpty())
         assertNull(WebhookPolicy.payload("UNKNOWN"))
         assertNull(WebhookPolicy.payload("garbage"))
-        for (status in listOf("OK", "PARTIAL", "TG_DOWN", "NO_NETWORK")) for (ru in listOf(true, false)) {
-            Lang.ru = ru
-            val text = WebhookPolicy.payload(status)!!
-            assertTrue(text, text.length <= 64 && '\n' !in text && "http" !in text && text.none { it.isDigit() })
-        }
     }
 
     @Test fun userAgentUsesSanitizedAppVersion() {

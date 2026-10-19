@@ -855,7 +855,7 @@ class MonitorService : Service() {
 
     // ------------------------------------------------------------ уведомление
 
-    private fun createChannels() = OngoingNotification.createChannels(nm)
+    private fun createChannels() = OngoingNotification.createChannels(this, nm)
 
     private fun goForeground(): Boolean {
         val view = notificationView(state)

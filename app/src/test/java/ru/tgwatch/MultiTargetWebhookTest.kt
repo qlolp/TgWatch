@@ -102,8 +102,8 @@ class MultiTargetWebhookTest {
     @Test fun textPayloadNamesTheMeasuredTarget() {
         val event = WebhookEvent(WebhookEventKind.UNREACHABLE,
             WebhookObservation("matrix", "DOWN", 1000, null, NetworkKind.WIFI, 1, true, false), "OK")
-        val body = WebhookPayload.encode(event, WebhookFormat.TEXT).bytes.toString(Charsets.UTF_8)
-        assertTrue(body.contains("Matrix"))
-        assertFalse(body.contains("Telegram"))
+        val body = checkNotNull(WebhookPayload.encode(event, WebhookFormat.TEXT).textValue)
+        assertTrue(body.allKeys().contains(TextKey.TARGET_MATRIX))
+        assertFalse(body.allKeys().contains(TextKey.TARGET_TELEGRAM))
     }
 }

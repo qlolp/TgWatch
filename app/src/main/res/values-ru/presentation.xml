@@ -54,4 +54,6 @@
         <item quantity="many">Проверок: %1$d</item>
         <item quantity="other">Проверок: %1$d</item>
     </plurals>
+    <string name="text_ago_suffix">" назад"</string>
+    <string name="text_just_now">только что</string>
 </resources>

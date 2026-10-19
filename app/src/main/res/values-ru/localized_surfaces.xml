@@ -1,0 +1,32 @@
+<resources>
+    <string name="copy_event_notifications_silent_events" formatted="false">"События без звука"</string>
+    <string name="copy_event_notifications_events_with_sound" formatted="false">"События со звуком"</string>
+    <string name="copy_event_notifications_daily_summary" formatted="false">"Сводка за день"</string>
+    <string name="copy_event_notifications_slow_responses" formatted="false">"Медленные ответы"</string>
+    <string name="copy_event_notifications_partially_reachable" formatted="false">"Частичная доступность"</string>
+    <string name="copy_event_notifications_connection_restored" formatted="false">"Восстановление связи"</string>
+    <string name="copy_event_notifications_telegram_is_back" formatted="false">"Telegram снова доступен"</string>
+    <string name="copy_event_notifications_the_observed_outage_lasted">"Наблюдаемый сбой длился %1$s"</string>
+    <string name="copy_event_notifications_telegram_is_unreachable" formatted="false">"Telegram недоступен"</string>
+    <string name="copy_event_notifications_telegram_is_partially_reachable" formatted="false">"Telegram частично доступен"</string>
+    <string name="copy_event_notifications_telegram_is_slow" formatted="false">"Telegram тормозит"</string>
+    <string name="copy_event_notifications_telegram_servers_have_taken">"Серверы Telegram отвечают за %1$s мс несколько проверок подряд. Сообщения и медиа могут грузиться медленно."</string>
+    <string name="copy_event_notifications_check_now" formatted="false">"Проверить сейчас"</string>
+    <string name="copy_event_notifications_mute_for_hour" formatted="false">"Заглушить на час"</string>
+    <string name="copy_status_tile_service_off" formatted="false">"Выключен"</string>
+    <string name="copy_status_tile_service_stale_partial" formatted="false">"Устарело · частично"</string>
+    <string name="copy_status_tile_service_stale">"Устарело · %1$s"</string>
+    <string name="copy_status_tile_service_unreachable" formatted="false">"Недоступен?"</string>
+    <string name="copy_status_tile_service_no_internet" formatted="false">"Без сети?"</string>
+    <string name="copy_status_tile_service_partially_reachable" formatted="false">"Частично доступен"</string>
+    <string name="copy_status_tile_service_reachable_ms">"Доступен · %1$s мс"</string>
+    <string name="copy_status_tile_service_unreachable_a51760" formatted="false">"Недоступен"</string>
+    <string name="copy_status_tile_service_no_internet_9dafd1" formatted="false">"Нет интернета"</string>
+    <string name="copy_status_tile_service_unknown" formatted="false">"Не определено"</string>
+    <string name="copy_status_tile_service_checking" formatted="false">"Проверяю…"</string>
+    <string name="copy_slow_alert_controller_telegram_is_slow_ms">"Telegram тормозит: ответ за %1$s мс"</string>
+    <string name="copy_slow_alert_controller_telegram_is_no_longer" formatted="false">"Telegram больше не тормозит"</string>
+    <string name="copy_alert_action_receiver_could_not_save_alert" formatted="false">"Не удалось сохранить заглушение оповещений"</string>
+    <string name="copy_alert_action_receiver_alerts_muted_until">"Оповещения заглушены до %1$s"</string>
+    <string name="copy_automation_settings_webhook_timed_out" formatted="false">"Время ожидания webhook истекло"</string>
+</resources>

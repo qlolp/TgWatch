@@ -292,6 +292,7 @@ class WebhookDeliveryBehaviorTest {
             connection
         }, Executor { it.run() })
         val f = Fixture { url, body, done -> transport.submit(url, body, "test") { done(it); finished.countDown() } }
+        f.config = f.config.copy(format = WebhookFormat.JSON)
         f.cancel = transport::cancel
         try {
             f.coordinator.sendTest { f.results.add(it) }

@@ -21,7 +21,7 @@ class WebhookBlockedHealthTest {
 
         fixture.requests.single()(204)
         assertFalse(fixture.coordinator.health().inFlight)
-        assertFalse(text(fixture.coordinator.health()).contains("заблокирована"))
+        assertFalse(text(fixture.coordinator.health()).allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_BLOCKED_THE_PREVIOUS))
         assertNull(fixture.coordinator.health().lastSuccessElapsed)
         fixture.coordinator.onPublished("TG_DOWN")
         assertEquals(2, fixture.requests.size)
@@ -61,22 +61,15 @@ class WebhookBlockedHealthTest {
         val fixture = Fixture()
         fixture.coordinator.sendTest {}
         assertTrue(fixture.coordinator.health().inFlight)
-        assertFalse(text(fixture.coordinator.health()).contains("заблокирована"))
+        assertFalse(text(fixture.coordinator.health()).allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_BLOCKED_THE_PREVIOUS))
         fixture.requests.single()(204)
     }
 
     private fun assertBlocked(health: WebhookHealth) {
-        assertTrue("Unfinished cancelled transport must explain that delivery is blocked",
-            text(health).contains("Доставка заблокирована"))
-        assertTrue("The block must explain that the previous request has not ended",
-            text(health).contains("предыдущий запрос ещё не завершён"))
+        assertTrue(health.inFlight)
+        assertTrue(text(health).allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_BLOCKED_THE_PREVIOUS))
     }
-
-    private fun text(health: WebhookHealth): String {
-        val previous = Lang.ru
-        return try { Lang.ru = true; WebhookHealthText.format(health, 20_000) }
-        finally { Lang.ru = previous }
-    }
+    private fun text(health: WebhookHealth) = WebhookHealthText.format(health, 20_000)
 
     private class Fixture {
         var now = 0L

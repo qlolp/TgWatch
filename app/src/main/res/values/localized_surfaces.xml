@@ -1,0 +1,32 @@
+<resources>
+    <string name="copy_event_notifications_silent_events" formatted="false">"Silent events"</string>
+    <string name="copy_event_notifications_events_with_sound" formatted="false">"Events with sound"</string>
+    <string name="copy_event_notifications_daily_summary" formatted="false">"Daily summary"</string>
+    <string name="copy_event_notifications_slow_responses" formatted="false">"Slow responses"</string>
+    <string name="copy_event_notifications_partially_reachable" formatted="false">"Partially reachable"</string>
+    <string name="copy_event_notifications_connection_restored" formatted="false">"Connection restored"</string>
+    <string name="copy_event_notifications_telegram_is_back" formatted="false">"Telegram is back"</string>
+    <string name="copy_event_notifications_the_observed_outage_lasted">"The observed outage lasted %1$s"</string>
+    <string name="copy_event_notifications_telegram_is_unreachable" formatted="false">"Telegram is unreachable"</string>
+    <string name="copy_event_notifications_telegram_is_partially_reachable" formatted="false">"Telegram is partially reachable"</string>
+    <string name="copy_event_notifications_telegram_is_slow" formatted="false">"Telegram is slow"</string>
+    <string name="copy_event_notifications_telegram_servers_have_taken">"Telegram servers have taken %1$s ms for several checks in a row. Messages and media may load slowly."</string>
+    <string name="copy_event_notifications_check_now" formatted="false">"Check now"</string>
+    <string name="copy_event_notifications_mute_for_hour" formatted="false">"Mute for 1 hour"</string>
+    <string name="copy_status_tile_service_off" formatted="false">"Off"</string>
+    <string name="copy_status_tile_service_stale_partial" formatted="false">"Stale · partial"</string>
+    <string name="copy_status_tile_service_stale">"Stale · %1$s"</string>
+    <string name="copy_status_tile_service_unreachable" formatted="false">"Unreachable?"</string>
+    <string name="copy_status_tile_service_no_internet" formatted="false">"No internet?"</string>
+    <string name="copy_status_tile_service_partially_reachable" formatted="false">"Partially reachable"</string>
+    <string name="copy_status_tile_service_reachable_ms">"Reachable · %1$s ms"</string>
+    <string name="copy_status_tile_service_unreachable_a51760" formatted="false">"Unreachable"</string>
+    <string name="copy_status_tile_service_no_internet_9dafd1" formatted="false">"No internet"</string>
+    <string name="copy_status_tile_service_unknown" formatted="false">"Unknown"</string>
+    <string name="copy_status_tile_service_checking" formatted="false">"Checking…"</string>
+    <string name="copy_slow_alert_controller_telegram_is_slow_ms">"Telegram is slow: %1$s ms response"</string>
+    <string name="copy_slow_alert_controller_telegram_is_no_longer" formatted="false">"Telegram is no longer slow"</string>
+    <string name="copy_alert_action_receiver_could_not_save_alert" formatted="false">"Could not save alert mute"</string>
+    <string name="copy_alert_action_receiver_alerts_muted_until">"Alerts muted until %1$s"</string>
+    <string name="copy_automation_settings_webhook_timed_out" formatted="false">"Webhook timed out"</string>
+</resources>

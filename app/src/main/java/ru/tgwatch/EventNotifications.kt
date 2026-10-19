@@ -36,26 +36,31 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     private val recoveryId get() = TargetEventNotifications.id(targetId, "recovery")
     private val slowId get() = TargetEventNotifications.id(targetId, "slow")
     init {
-        manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, Lang.t("События без звука", "Silent events"),
+        manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, ctx.renderString(
+            R.string.copy_event_notifications_silent_events),
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
-        manager.createNotificationChannel(NotificationChannel(outageChannel, Lang.t("События со звуком", "Events with sound"),
+        manager.createNotificationChannel(NotificationChannel(outageChannel, ctx.renderString(
+            R.string.copy_event_notifications_events_with_sound),
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        manager.createNotificationChannel(NotificationChannel(SUMMARY_CHANNEL, Lang.t("Сводка за день", "Daily summary"),
+        manager.createNotificationChannel(NotificationChannel(SUMMARY_CHANNEL, ctx.renderString(
+            R.string.copy_event_notifications_daily_summary),
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
-        manager.createNotificationChannel(NotificationChannel(SLOW_CHANNEL, Lang.t("Медленные ответы", "Slow responses"),
+        manager.createNotificationChannel(NotificationChannel(SLOW_CHANNEL, ctx.renderString(
+            R.string.copy_event_notifications_slow_responses),
             NotificationManager.IMPORTANCE_LOW).apply { setSound(null, null); enableVibration(false) })
         val legacy = manager.getNotificationChannel(outageChannel)
-        manager.createNotificationChannel(NotificationChannel(partialChannel,Lang.t("Частичная доступность", "Partially reachable"),
+        manager.createNotificationChannel(NotificationChannel(partialChannel,ctx.renderString(
+            R.string.copy_event_notifications_partially_reachable),
             NotificationManager.IMPORTANCE_DEFAULT).apply {
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             enableVibration(false)
         })
-        val recoveryName = Lang.t("Восстановление связи", "Connection restored")
+        val recoveryName = ctx.renderString(R.string.copy_event_notifications_connection_restored)
         val existingRecovery = manager.getNotificationChannel(recoveryChannel)
         if (existingRecovery == null) {
             manager.createNotificationChannel(NotificationChannel(recoveryChannel,recoveryName,
@@ -70,30 +75,33 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
         if (blocked(recoveryChannel)) { clearRecovery(); return }
-        manager.notify(recoveryId, notification(Lang.t("Telegram снова доступен", "Telegram is back"),
-            Lang.t("Наблюдаемый сбой длился ${recoveryDurationStr(event.durationMs)}", "The observed outage lasted ${recoveryDurationStr(event.durationMs)}"), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
+        manager.notify(recoveryId, notification(ctx.renderString(
+            R.string.copy_event_notifications_telegram_is_back),
+            ctx.renderString(
+                R.string.copy_event_notifications_the_observed_outage_lasted,
+                recoveryDurationStr(event.durationMs)), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(partialId)
         if (blocked(outageChannel)) { manager.cancel(outageId); return }
-        manager.notify(outageId, notification(Lang.t("Telegram недоступен", "Telegram is unreachable"),
+        manager.notify(outageId, notification(ctx.renderString(
+            R.string.copy_event_notifications_telegram_is_unreachable),
             reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(outageId)
         if (blocked(partialChannel)) { manager.cancel(partialId); return }
-        manager.notify(partialId,notification(Lang.t("Telegram частично доступен", "Telegram is partially reachable"),reason,sound && allowed,
+        manager.notify(partialId,notification(ctx.renderString(
+            R.string.copy_event_notifications_telegram_is_partially_reachable),reason,sound && allowed,
             R.drawable.ic_stat_offline,partialChannel))
     }
     /** Silent: Telegram works, only slowly. Outage alerts replace it. */
     fun slow(latencyMs: Long) {
         if (blocked(SLOW_CHANNEL)) { clearSlow(); return }
-        manager.notify(slowId, notification(Lang.t("Telegram тормозит", "Telegram is slow"),
-            Lang.t("Серверы Telegram отвечают за $latencyMs мс несколько проверок подряд. " +
-                "Сообщения и медиа могут грузиться медленно.",
-                "Telegram servers have taken $latencyMs ms for several checks in a row. " +
-                "Messages and media may load slowly."), true, R.drawable.ic_stat_wait, SLOW_CHANNEL))
+        manager.notify(slowId, notification(ctx.renderString(R.string.copy_event_notifications_telegram_is_slow),
+            ctx.renderString(R.string.copy_event_notifications_telegram_servers_have_taken, latencyMs),
+            true, R.drawable.ic_stat_wait, SLOW_CHANNEL))
     }
     fun clearSlow() { manager.cancel(slowId) }
     fun summary(title: String, text: String, canPost: () -> Boolean = { true }): Boolean {
@@ -120,9 +128,10 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             // Problem alerts only. Same check-now path as the ongoing status notification's "Check" action.
             val checkNow = AlertActionReceiver.checkPending(ctx, targetId)
             builder.addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_ok),
-                Lang.t("Проверить сейчас", "Check now"), checkNow).build())
+                ctx.renderString(R.string.copy_event_notifications_check_now), checkNow).build())
             builder.addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_pause),
-                Lang.t("Заглушить на час", "Mute for 1 hour"), AlertActionReceiver.mutePending(ctx, targetId)).build())
+                ctx.renderString(R.string.copy_event_notifications_mute_for_hour),
+                AlertActionReceiver.mutePending(ctx, targetId)).build())
         }
         // Suppress child alerts even if the user later changes this channel's sound.
         if (!audible || channel == SUMMARY_CHANNEL || channel == SLOW_CHANNEL) builder.setGroup("tgwatch_silent_events")

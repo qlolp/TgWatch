@@ -4,32 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WebhookHealthTextTest {
-    @Test fun englishUsesMonotonicAgesAndShowsTimeoutWhilePhysicalRequestRemains() {
-        withLanguage(false) {
-            val text = WebhookHealthText.format(
-                WebhookHealth(10_000, 5_000, WebhookOutcome.TIMED_OUT, true, transportBlocked = true), 20_000)
-            assertTrue(text.contains("Last attempt: 10 s ago"))
-            assertTrue(text.contains("Last success: 15 s ago"))
-            assertTrue(text.contains("Outcome: timed out"))
-            assertTrue(text.contains("Request still running: yes"))
-            assertTrue(text.contains("Delivery blocked: the previous request has not finished"))
-            assertFalse(text.contains("https://"))
-        }
+    @Test fun usesMonotonicAgesAndShowsTimeoutWhilePhysicalRequestRemains() {
+        val text = WebhookHealthText.format(
+            WebhookHealth(10_000, 5_000, WebhookOutcome.TIMED_OUT, true, transportBlocked = true), 20_000)
+        assertTrue(text.allArguments().containsAll(listOf(TextArgument.Number(10), TextArgument.Number(15))))
+        assertTrue(text.allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_TIMED_OUT))
+        assertTrue(text.allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_DELIVERY_BLOCKED_THE_PREVIOUS))
+        assertTrue(text.allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_YES))
     }
-
-    @Test fun russianShowsProcessLifetimeAndClearedHealth() {
-        withLanguage(true) {
-            val text = WebhookHealthText.format(WebhookHealth(), 500_000)
-            assertTrue(text.contains("в этом процессе"))
-            assertTrue(text.contains("Последняя попытка: нет"))
-            assertTrue(text.contains("Последний успех: нет"))
-            assertTrue(text.contains("Результат: попыток не было"))
-            assertTrue(text.contains("Запрос ещё выполняется: нет"))
-        }
-    }
-
-    private fun withLanguage(ru: Boolean, block: () -> Unit) {
-        val previous = Lang.ru
-        try { Lang.ru = ru; block() } finally { Lang.ru = previous }
+    @Test fun clearedHealthIsProcessLocalAndUnmeasured() {
+        val text = WebhookHealthText.format(WebhookHealth(), 500_000)
+        assertTrue(text.allKeys().contains(TextKey.COPY_WEBHOOK_HEALTH_TEXT_NO_ATTEMPTS))
+        assertEquals(2, text.allKeys().count { it == TextKey.COPY_WEBHOOK_HEALTH_TEXT_NONE })
+        assertFalse(text.allArguments().any { it is TextArgument.Number })
     }
 }

@@ -34,7 +34,7 @@ class WebhookPayloadTest {
             NetworkKind.WIFI, 1, true, false))!!
         val body = WebhookPayload.encode(event, WebhookFormat.TEXT)
         assertEquals("text/plain; charset=utf-8", body.contentType)
-        assertEquals(WebhookPolicy.payload("TG_DOWN"), body.bytes.toString(Charsets.UTF_8))
+        assertEquals(WebhookPolicy.payload("TG_DOWN"), body.textValue)
     }
     @Test fun invalidLatencyIsNullAndUntrustedTargetNamesCannotEscape() {
         val event = WebhookEvent(WebhookEventKind.PARTIAL,

@@ -51,6 +51,7 @@ internal class WebhookTransport(
         submit(url, WebhookBody("text/plain; charset=utf-8", body.toByteArray(Charsets.UTF_8)), agent, finished)
 
     @Synchronized fun submit(url: String, body: WebhookBody, agent: String, finished: (Int) -> Unit): Boolean {
+        require(body.textValue == null) { "Resolve presentation before transport admission" }
         if (active != null) return false
         val captured = body.copy(bytes = body.bytes.copyOf())
         val call = Call()
