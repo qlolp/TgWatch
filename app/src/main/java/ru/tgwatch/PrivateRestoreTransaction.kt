@@ -10,7 +10,7 @@ internal class PrivateRestoreTransaction(private val marker: File, private val c
     @Synchronized fun stage(payload: ByteArray, legacyEndpoint: String?,
         metadata: PrivateRestoreMetadata = PrivateRestoreMetadata()) {
         require(payload.isNotEmpty() && payload.size <= TargetBackupCodec.MAX_PLAINTEXT_BYTES)
-        require(legacyEndpoint == null || ExtraProbes.normalizeCustomUrl(legacyEndpoint) == legacyEndpoint)
+        legacyEndpoint?.let { PrivateProbeConfigCodec.decode(it) }
         check(!marker.exists()) { "A restore is already pending" }
         check(credentials.isDirectory || credentials.mkdirs())
         // A directory without a published marker is an interrupted preparation, never an accepted restore.
@@ -43,7 +43,7 @@ internal class PrivateRestoreTransaction(private val marker: File, private val c
         val endpoint = if (endpointFile.exists()) endpointFile.inputStream().use {
             BoundedInput.read(it, ENDPOINT_LIMIT).toString(Charsets.UTF_8)
         } else null
-        require(endpoint == null || ExtraProbes.normalizeCustomUrl(endpoint) == endpoint)
+        endpoint?.let { PrivateProbeConfigCodec.decode(it) }
         val metadataFile = File(directory, METADATA)
         val metadata = if (metadataFile.exists()) metadataFile.inputStream().use {
             PrivateRestoreMetadata.decode(BoundedInput.read(it, PrivateRestoreMetadata.MAX_BYTES))
@@ -76,7 +76,7 @@ internal class PrivateRestoreTransaction(private val marker: File, private val c
     companion object {
         private val ID = Regex("[a-f0-9]{32}")
         private const val ID_LIMIT = 32
-        private const val ENDPOINT_LIMIT = 256
+        private const val ENDPOINT_LIMIT = PrivateProbeConfigCodec.MAX_BYTES
         private const val PAYLOAD = "snapshot.json"
         private const val ENDPOINT = "legacy-endpoint"
         private const val METADATA = "metadata"

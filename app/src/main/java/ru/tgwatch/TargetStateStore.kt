@@ -18,6 +18,7 @@ internal object TargetStateStore {
         check(Prefs.sp(ctx).edit().putString(key("status"), state.status.name)
             .putLong(key("checked"), state.checkedAtMs).putLong(key("latency"), state.latencyMs ?: -1L)
             .putInt(key("interval"), state.expectedIntervalSec)
+            .putString(key("failure"), state.failure?.name)
             .putLong(key("endpoint"), state.endpointRevision).commit())
     }
 
@@ -31,6 +32,9 @@ internal object TargetStateStore {
             ?: TargetStatus.UNKNOWN, checkedAtMs = prefs.getLong(key("checked"), 0).coerceAtLeast(0),
             latencyMs = prefs.getLong(key("latency"), -1).takeIf { it >= 0 },
             expectedIntervalSec = prefs.getInt(key("interval"), defaults.expectedIntervalSec)
-                .coerceIn(TargetDefinition.MIN_TELEGRAM_SEC, TargetPowerPolicy.MAX_EFFECTIVE_SEC))
+                .coerceIn(TargetDefinition.MIN_TELEGRAM_SEC, TargetPowerPolicy.MAX_EFFECTIVE_SEC),
+            failure = ru.tgwatch.probe.ProbeDetailCode.entries.firstOrNull {
+                it.name == prefs.getString(key("failure"), null)
+            })
     }
 }

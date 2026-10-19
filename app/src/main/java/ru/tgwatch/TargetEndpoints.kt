@@ -8,7 +8,8 @@ object TargetEndpoints {
         ProbeEndpoint("Control Yandex", ProbeGroup.CONTROL, "https://ya.ru/"),
         ProbeEndpoint("Control Mail", ProbeGroup.CONTROL, "https://mail.ru/"))
 
-    fun resolve(definition: TargetDefinition, raw: String?): ProbeEndpoint? {
+    fun resolve(definition: TargetDefinition, raw: String?,
+        condition: ru.tgwatch.probe.HttpProbeCondition? = null): ProbeEndpoint? {
         val address = if (raw != null) HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
             else if (definition.requiresEndpoint) null else when (definition.id) {
                 TargetId.MATRIX -> ExtraProbes.MATRIX_URL
@@ -20,7 +21,7 @@ object TargetEndpoints {
                 if (url.trimEnd('/').endsWith(MATRIX_VERSIONS_PATH)) url.trimEnd('/')
                 else url.trimEnd('/') + MATRIX_VERSIONS_PATH, HttpProbeMode.MATRIX_VERSIONS)
             TargetId.WHATSAPP -> ProbeEndpoint("WhatsApp Web", ProbeGroup.EXTRA, ExtraProbes.WHATSAPP_URL)
-            TargetId.CUSTOM -> ProbeEndpoint("Custom HTTPS", ProbeGroup.EXTRA, url, HttpProbeMode.STRICT_2XX)
+            TargetId.CUSTOM -> ProbeEndpoint("Custom HTTPS", ProbeGroup.EXTRA, url, HttpProbeMode.STRICT_2XX, condition)
             TargetId.TELEGRAM -> null
         } }
     }

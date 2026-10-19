@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Looper
 import android.os.UserManager
 import java.io.File
+import ru.tgwatch.probe.HttpProbeCondition
 
 /** Accepted endpoint changes replay forward; only the affected goal is parked while private IO is unavailable. */
 internal object TargetConfigTransactions {
@@ -48,7 +49,7 @@ internal object TargetConfigTransactions {
     }
 
     /** Invoked only by the ordered worker, after all earlier accepted observations have drained. */
-    fun change(ctx: Context, id: TargetId, endpoint: String?) {
+    fun change(ctx: Context, id: TargetId, endpoint: String?, condition: HttpProbeCondition? = null) {
         TargetRestore.requireUnlocked(ctx)
         val store = TargetPersistence.storage()
         val old = TargetPreferences.storedDefinition(ctx, id)
@@ -62,7 +63,8 @@ internal object TargetConfigTransactions {
             mapOf(id to next.observations), emptyList())
         val bytes = TargetBackupCodec.encode(data)
         try {
-            transaction(ctx, id).stage(bytes, endpoint, PrivateRestoreMetadata(setOf(id), store.generationId))
+            val privateConfig = endpoint?.let { PrivateProbeConfigCodec.encode(PrivateProbeConfig(it, condition)) }
+            transaction(ctx, id).stage(bytes, privateConfig, PrivateRestoreMetadata(setOf(id), store.generationId))
         } finally {
             bytes.fill(0)
             discover(ctx)

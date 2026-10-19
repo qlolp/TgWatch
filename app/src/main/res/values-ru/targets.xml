@@ -45,4 +45,16 @@
     <string name="target_whatsapp_help">Проверяется WhatsApp Web. Доставка сообщений не проверяется.</string>
     <string name="target_custom_help">Проверяется успешный ответ настроенного HTTPS-адреса.</string>
     <string name="target_history_failed">Не удалось сохранить историю. Измеренный результат доступности не изменился.</string>
+    <string name="target_health_code">Ожидаемый HTTP-код (необязательно, 200–599)</string>
+    <string name="target_health_field">Строковое поле JSON (необязательно)</string>
+    <string name="target_health_value">Ожидаемая строка (может быть пустой)</string>
+    <string name="target_health_clear">Сбросить условия; сохранить адрес</string>
+    <string name="target_health_help">Пустые поля сохраняют условия. Новый адрес заменяет их. JSON проверяется одним GET: строгий UTF-8, не более 32 КиБ. Условия приватны и не входят в резервную копию.</string>
+    <string name="target_health_invalid_code">Укажите код от 200 до 599.</string>
+    <string name="target_health_invalid_field">Укажите имя поля JSON.</string>
+    <string name="target_health_code_mismatch">HTTP-код ответа не соответствует условию.</string>
+    <string name="target_health_json_unconfirmed">JSON-ответ не подтвердил ожидаемое состояние.</string>
+    <string name="target_health_dns">DNS не разрешил адрес.</string>
+    <string name="target_health_tls">Не удалось установить защищённое TLS-соединение.</string>
+    <string name="target_health_timeout">Истёк срок ожидания проверки.</string>
 </resources>

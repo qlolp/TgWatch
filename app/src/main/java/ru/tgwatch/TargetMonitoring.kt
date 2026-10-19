@@ -115,7 +115,9 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
 
     private fun launch(id: TargetId) {
         val cfg = repository.configuration(id)
-        val endpoint = if (cfg.definition.requiresEndpoint) TargetPreferences.endpoint(host.context, id) else null
+        val privateConfig = if (cfg.definition.requiresEndpoint)
+            TargetPreferences.configuration(host.context, id) else null
+        val endpoint = privateConfig?.url
         val parked = cfg.definition.requiresEndpoint && endpoint == null
         if (!cfg.definition.enabled || parked || closed) {
             schedule.finished(id, SystemClock.elapsedRealtime())
@@ -131,7 +133,7 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
                     TargetReport(TargetStatus.NO_NETWORK, emptyList(), true, null)
                 caps == null -> TargetReport(TargetStatus.UNKNOWN, emptyList(), false, null)
                 else -> (runnerFactory?.invoke(network) ?: secondaryRunner(host, network))
-                    .check(attempt, cfg.definition, endpoint)
+                    .check(attempt, cfg.definition, endpoint, privateConfig?.condition)
             }
             report.copy(networkKind = caps?.let(WebhookNetworks::kind) ?: NetworkKind.UNKNOWN,
                 checkedAtMs = System.currentTimeMillis(), checkedElapsedMs = SystemClock.elapsedRealtime())

@@ -93,6 +93,19 @@ class MultiTargetPublicationTest {
         assertEquals(TargetStatus.OK, monitor.repository.snapshot(TargetId.CUSTOM)!!.status)
     }
 
+    @Test fun conditionOnlyEditRejectsAnAlreadyRunningOldResponse() {
+        worker { monitor.startDue() }
+        assertTrue(customStarted.await(5, TimeUnit.SECONDS))
+        assertTrue(TargetSettingWrites.endpoint(ctx, TargetId.CUSTOM, "https://custom.example",
+            condition = ru.tgwatch.probe.HttpProbeCondition(expectedCode = 204)))
+        worker { monitor.refresh(notify = false) }
+        release.countDown()
+        await { !monitor.hasInFlight }
+        assertNull(monitor.repository.snapshot(TargetId.CUSTOM))
+        assertFalse(events.any { it.id == TargetId.CUSTOM })
+        assertEquals(204, TargetPreferences.configuration(ctx, TargetId.CUSTOM)!!.condition!!.expectedCode)
+    }
+
     @Test fun telegramBridgePreservesRestoredEndpointRevision() {
         assertTrue(Prefs.sp(ctx).edit().putLong(TargetPreferences.key(TargetId.TELEGRAM, "endpoint_revision"), 5).commit())
         worker {

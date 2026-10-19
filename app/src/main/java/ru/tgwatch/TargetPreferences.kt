@@ -6,7 +6,6 @@ import android.os.UserManager
 /** Separates public target flags from optional credential endpoint addresses. Legacy EXTRA is not opt-in. */
 object TargetPreferences {
     internal const val PRIVATE_FILE = "targets-private-v1"
-    private const val MAX_ENDPOINT_CHARS = 256
     val fence = TargetSettingsFence()
 
     fun definitions(ctx: Context): List<TargetDefinition> = TargetId.entries.map { definition(ctx, it) }
@@ -38,17 +37,10 @@ object TargetPreferences {
     }
 
     fun endpoint(ctx: Context, id: TargetId): String? {
-        val changing = fence.snapshot(id).changing || TargetConfigTransactions.isPending(id)
-        return if (changing) null else storedEndpoint(ctx, id)
+        return configuration(ctx, id)?.url
     }
 
-    internal fun storedEndpoint(ctx: Context, id: TargetId): String? {
-        val app = ctx.applicationContext
-        if (!app.getSystemService(UserManager::class.java).isUserUnlocked ||
-            Prefs.sp(ctx).getBoolean(key(id, "endpoint_review"), false)) return null
-        val raw = app.getSharedPreferences(PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
-        return HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
-    }
+    internal fun storedEndpoint(ctx: Context, id: TargetId): String? = readPrivateProbeConfig(ctx, id)?.url
 
     fun endpointRevision(ctx: Context, id: TargetId): Long =
         Prefs.sp(ctx).getLong(key(id, "endpoint_revision"), 0L).coerceAtLeast(0L)
@@ -71,3 +63,17 @@ object TargetPreferences {
 /** Worker-only convenience; alert persistence stays with the alert settings adapter. */
 fun TargetPreferences.setSlowThreshold(ctx: Context, id: TargetId, thresholdMs: Long): Boolean =
     TargetAlertPreferences.setSlowThreshold(ctx, id, thresholdMs)
+
+internal fun TargetPreferences.configuration(ctx: Context, id: TargetId): PrivateProbeConfig? {
+    val changing = fence.snapshot(id).changing || TargetConfigTransactions.isPending(id)
+    return if (changing) null else readPrivateProbeConfig(ctx, id)
+}
+
+private fun readPrivateProbeConfig(ctx: Context, id: TargetId): PrivateProbeConfig? {
+    val app = ctx.applicationContext
+    if (!app.getSystemService(UserManager::class.java).isUserUnlocked ||
+        Prefs.sp(ctx).getBoolean(TargetPreferences.key(id, "endpoint_review"), false)) return null
+    val raw = app.getSharedPreferences(TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
+    return raw?.let { runCatching { PrivateProbeConfigCodec.decode(it) }.getOrNull() }
+        ?.takeIf { id == TargetId.CUSTOM || it.condition == null }
+}

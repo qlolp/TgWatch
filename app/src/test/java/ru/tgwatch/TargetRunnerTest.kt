@@ -38,6 +38,19 @@ class TargetRunnerTest {
         override fun close() { primary.shutdownNow(); secondary.shutdownNow() }
     }
 
+    @Test fun customConditionsReachTheRealParserAndExposeOnlyASafeFailureCategory() {
+        Fixture { url -> Connection((if (url.host == "custom.example")
+            "{\"private-field\":\"error\"}" else "").toByteArray(), 200) }.use { fixture ->
+            val report = fixture.runner.check(TargetAttempt(TargetId.CUSTOM, 0, 0, 0, 0),
+                TargetDefinition.default(TargetId.CUSTOM).copy(enabled = true), "https://custom.example",
+                ru.tgwatch.probe.HttpProbeCondition(jsonField = "private-field", expectedValue = "private-value"))
+            assertEquals(TargetStatus.DOWN, report.status)
+            assertEquals(ru.tgwatch.probe.ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED, report.failure)
+            assertFalse(report.toString().contains("private-field"))
+            assertFalse(report.toString().contains("private-value"))
+        }
+    }
+
     @Test fun matrixRequiresBoundedVersionsJson() {
         for (body in listOf("{}", "{\"versions\":[]}", "{\"versions\":[42]}", "not json")) {
             Fixture { url -> Connection((if (url.host == "matrix.org") body else "").toByteArray(), 200) }.use {

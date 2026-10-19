@@ -48,4 +48,20 @@
     <string name="target_whatsapp_help">Checks WhatsApp Web. Message delivery is not checked.</string>
     <string name="target_custom_help">Checks whether the configured HTTPS endpoint responds successfully.</string>
     <string name="target_history_failed">History could not be saved. The measured reachability result is unchanged.</string>
+    <string name="target_health_code">Expected HTTP code (optional, 200–599)</string>
+    <string name="target_health_field">JSON string field (optional)</string>
+    <string name="target_health_value">Expected string value (may be empty)</string>
+    <string name="target_health_clear">Clear health criteria; keep address</string>
+    <string name="target_health_help">Blank inputs keep saved criteria. A new address replaces them. JSON checks use one GET, strict UTF-8 and at most 32 KiB. Criteria stay private and are excluded from backups.</string>
+    <string name="target_health_invalid_code">Enter a code from 200 to 599.</string>
+    <string name="target_health_invalid_field">Enter the JSON field name.</string>
+    <string name="target_health_code_mismatch">The HTTP response code did not match the health criteria.</string>
+    <string name="target_health_json_unconfirmed">The JSON response did not confirm the required health value.</string>
+    <string name="target_health_dns">DNS could not resolve the address.</string>
+    <string name="target_health_tls">A secure TLS connection could not be established.</string>
+    <string name="target_health_timeout">The check timed out.</string>
+    <item type="id" name="targetHealthCodeInput" />
+    <item type="id" name="targetHealthFieldInput" />
+    <item type="id" name="targetHealthValueInput" />
+    <item type="id" name="targetHealthClear" />
 </resources>

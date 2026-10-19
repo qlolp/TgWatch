@@ -44,7 +44,7 @@ class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(Ta
         return publish(TargetSnapshot(attempt.id, report.status, report.checkedAtMs.takeIf { it > 0L } ?: wallClock(),
             report.checkedElapsedMs.takeIf { it > 0L } ?: elapsedClock(),
             attempt.expectedIntervalSec ?: current.definition.intervalSec,
-            report.latencyMs, attempt.generation, revision, attempt.endpointRevision))
+            report.latencyMs, attempt.generation, revision, attempt.endpointRevision, failure = report.failure))
     }
 
     @Synchronized fun publish(snapshot: TargetSnapshot): Boolean {

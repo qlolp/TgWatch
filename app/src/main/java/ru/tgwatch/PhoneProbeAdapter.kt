@@ -15,9 +15,9 @@ internal object PhoneProbeAdapter {
         override fun openSocket() = socket()
     }
     fun core(value: ProbeOutcome) = ru.tgwatch.probe.ProbeOutcome(value.endpoint, value.group, value.reachable,
-        value.latencyMs, ProbeDetail(ProbeDetailCode.NONE), value.measurement)
+        value.latencyMs, ProbeDetail(value.detailCode), value.measurement)
     fun outcome(value: ru.tgwatch.probe.ProbeOutcome) = ProbeOutcome(value.endpoint, value.group, value.reachable,
-        value.latencyMs, detail(value.detail), value.measurement)
+        value.latencyMs, detail(value.detail), value.measurement, value.detail.code)
     fun report(value: ru.tgwatch.probe.ProbeReport) = ProbeReport(value.results.map(::outcome), value.connected)
     fun controls(): List<ProbeEndpoint> = ru.tgwatch.probe.NetworkProbe.controlEndpoints.map {
         if (it.address == "https://ya.ru/") it.copy(name = Lang.t("Яндекс", "Yandex")) else it

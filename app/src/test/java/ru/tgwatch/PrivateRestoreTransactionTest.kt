@@ -81,6 +81,31 @@ class PrivateRestoreTransactionTest {
             }
         } finally { root.deleteRecursively() }
     }
+    @Test fun privateConditionEnvelopeReplaysAcrossEveryDurableStagingCut() {
+        val root = Files.createTempDirectory("private-condition-cuts").toFile()
+        val secret = PrivateProbeConfigCodec.encode(PrivateProbeConfig("https://private.example/path",
+            ru.tgwatch.probe.HttpProbeCondition(204, "private-field", "private-value")))
+        try {
+            val count = Cuts()
+            PrivateRestoreTransaction(File(root, "count/dp/id"), File(root, "count/cp"), count)
+                .stage(byteArrayOf(1), secret)
+            for (step in 1..count.count) for (crash in listOf(false, true)) {
+                val directory = File(root, "cut-$step-$crash")
+                val marker = File(directory, "dp/id")
+                val credentials = File(directory, "cp")
+                val faults = if (crash) Cuts(after = step) else Cuts(before = step)
+                try { PrivateRestoreTransaction(marker, credentials, faults).stage(byteArrayOf(1), secret); fail() }
+                catch (_: IOException) { assertFalse(crash) }
+                catch (_: Crash) { assertTrue(crash) }
+                val committed = marker.exists()
+                if (committed) assertTrue(marker.readText().matches(Regex("[a-f0-9]{32}")))
+                assertEquals(committed, PrivateRestoreTransaction(marker, credentials).recover { _, value ->
+                    assertEquals(secret, value)
+                })
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun deviceProtectedMarkerContainsOnlyIdAndPrivatePayloadReplaysAfterReopen() {
         val root = Files.createTempDirectory("private-restore").toFile()
         try {

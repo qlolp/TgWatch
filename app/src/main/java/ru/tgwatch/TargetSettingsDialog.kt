@@ -53,25 +53,26 @@ internal object TargetSettingsDialog {
         val thresholdLabel = TextView(activity).also(content::addView)
         val threshold = threshold(activity, definition.alerts.slowThresholdMs, thresholdLabel).also(content::addView)
         val endpoint = if (id == TargetId.MATRIX || id == TargetId.CUSTOM) endpoint(activity, content) else null
+        val health = if (id == TargetId.CUSTOM) CustomHealthSettingsUi(activity, content) else null
         val dialog = AlertDialog.Builder(activity).setTitle(TargetNames.label(id))
             .setView(ScrollView(activity).apply { addView(content) })
             .setNegativeButton(R.string.target_cancel, null)
-            .setPositiveButton(R.string.target_save) { _, _ ->
-                val value = definition.copy(enabled = enabled.isChecked,
-                    intervalSec = intervals[interval.selectedItemPosition],
-                    alerts = TargetAlertSettings(outage.isChecked, recovery.isChecked, slow.isChecked,
-                        TargetAlertSettings.MIN_SLOW_MS + threshold.progress * TargetAlertSettings.SLOW_STEP_MS))
-                save(activity, value, endpoint?.text?.toString()?.takeIf { it.isNotBlank() }, power?.isChecked)
-            }.apply {
-                if (endpoint != null) setNeutralButton(if (id == TargetId.MATRIX)
-                    R.string.target_public_default else R.string.target_clear_endpoint) { _, _ ->
-                    clearEndpoint(activity, id)
-                }
+            .setPositiveButton(R.string.target_save, null).apply {
+                clearButton(this, activity, id, endpoint != null)
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        dialog.setOnDismissListener { endpoint?.text?.clear() }
+        dialog.setOnDismissListener { endpoint?.text?.clear(); health?.clear() }
         conversion(activity, id, content) { dialog.dismiss() }
         dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val criteria = if (health == null) null else health.selection() ?: return@setOnClickListener
+            val value = definition.copy(enabled = enabled.isChecked,
+                intervalSec = intervals[interval.selectedItemPosition],
+                alerts = TargetAlertSettings(outage.isChecked, recovery.isChecked, slow.isChecked,
+                    TargetAlertSettings.MIN_SLOW_MS + threshold.progress * TargetAlertSettings.SLOW_STEP_MS))
+            save(activity, value, endpoint?.text?.toString()?.takeIf { it.isNotBlank() }, power?.isChecked, criteria)
+            dialog.dismiss()
+        }
         return dialog
     }
 
@@ -91,13 +92,17 @@ internal object TargetSettingsDialog {
         })
     }
 
-    private fun save(activity: Activity, value: TargetDefinition, endpoint: String?, powerSaving: Boolean?) {
+    private fun save(activity: Activity, value: TargetDefinition, endpoint: String?, powerSaving: Boolean?,
+        criteria: HealthCriteriaEdit?) {
         val app = activity.applicationContext
         if (!value.enabled) TargetPreferences.stop(app, value.id)
         val expected = TargetPreferences.fence.snapshot(value.id).revision
         TargetActions.submit(activity, value.id) {
-            val changed = endpoint == null || TargetSettingWrites.endpoint(app, value.id, endpoint, expected)
-            val revision = if (endpoint == null) expected else Math.addExact(expected, ENDPOINT_FENCE_ADVANCE)
+            val replace = endpoint != null || criteria?.replace == true
+            val address = endpoint ?: if (replace) TargetPreferences.endpoint(app, value.id) else null
+            val changed = !replace || address != null &&
+                TargetSettingWrites.endpoint(app, value.id, address, expected, criteria?.condition)
+            val revision = if (!replace) expected else Math.addExact(expected, ENDPOINT_FENCE_ADVANCE)
             val current = TargetPreferences.storedDefinition(app, value.id)
             val applied = changed && TargetSettingWrites.definition(app,
                 value.copy(requiresEndpoint = current.requiresEndpoint), revision)
@@ -105,6 +110,11 @@ internal object TargetSettingsDialog {
             if (saved) TargetActions.reconcile(app, value.id)
             saved
         }
+    }
+
+    private fun clearButton(builder: AlertDialog.Builder, activity: Activity, id: TargetId, present: Boolean) {
+        if (present) builder.setNeutralButton(if (id == TargetId.MATRIX)
+            R.string.target_public_default else R.string.target_clear_endpoint) { _, _ -> clearEndpoint(activity, id) }
     }
 
     private fun clearEndpoint(activity: Activity, id: TargetId) {

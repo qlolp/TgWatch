@@ -5,7 +5,7 @@ data class TargetSnapshot(val id: TargetId, val status: TargetStatus = TargetSta
     val checkedAtMs: Long = 0L, val checkedElapsedMs: Long = 0L,
     val expectedIntervalSec: Int = TargetDefinition.MIN_TARGET_SEC, val latencyMs: Long? = null,
     val generation: Long = 0L, val revision: Long = 0L, val endpointRevision: Long = 0L,
-    val health: MonitorHealth = MonitorHealth()) {
+    val health: MonitorHealth = MonitorHealth(), val failure: ru.tgwatch.probe.ProbeDetailCode? = null) {
     init {
         require(checkedAtMs >= 0L && checkedElapsedMs >= 0L)
         require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetPowerPolicy.MAX_EFFECTIVE_SEC)

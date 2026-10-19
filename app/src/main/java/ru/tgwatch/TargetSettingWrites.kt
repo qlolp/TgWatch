@@ -3,6 +3,7 @@ package ru.tgwatch
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Looper
+import ru.tgwatch.probe.HttpProbeCondition
 
 /** Serial disk operations never hold the short publication/configuration monitor. */
 internal object TargetSettingWrites {
@@ -10,11 +11,13 @@ internal object TargetSettingWrites {
     fun definition(ctx: Context, value: TargetDefinition, expectedRevision: Long? = null): Boolean =
         change(ctx, value.id, expectedRevision) { TargetDefinitionUpdate.apply(ctx, value, it) }
 
-    fun endpoint(ctx: Context, id: TargetId, raw: String, expectedRevision: Long? = null): Boolean {
+    fun endpoint(ctx: Context, id: TargetId, raw: String, expectedRevision: Long? = null,
+        condition: HttpProbeCondition? = null): Boolean {
         val normalized = HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
-        val valid = id in setOf(TargetId.MATRIX, TargetId.CUSTOM) && (raw.isBlank() || normalized != null)
+        val valid = id in setOf(TargetId.MATRIX, TargetId.CUSTOM) && (raw.isBlank() || normalized != null) &&
+            (condition == null || id == TargetId.CUSTOM && normalized != null)
         if (!valid) return false
-        return change(ctx, id, expectedRevision) { TargetConfigTransactions.change(ctx, id, normalized) }
+        return change(ctx, id, expectedRevision) { TargetConfigTransactions.change(ctx, id, normalized, condition) }
     }
 
     private fun change(ctx: Context, id: TargetId, expectedRevision: Long?,

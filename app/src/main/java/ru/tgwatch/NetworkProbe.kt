@@ -12,7 +12,8 @@ typealias ProbeCancellation = ru.tgwatch.probe.ProbeCancellation
 /** Phone display DTO: localization stays outside the shared protocol/transport implementation. */
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
     val latencyMs: Long = -1, val detail: String,
-    val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE)
+    val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE,
+    val detailCode: ru.tgwatch.probe.ProbeDetailCode = ru.tgwatch.probe.ProbeDetailCode.NONE)
 
 data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean = true) {
     private val core = ru.tgwatch.probe.ProbeReport(results.map(PhoneProbeAdapter::core), connected)
@@ -40,7 +41,8 @@ class ProbeBatch(pool: ExecutorService, timeoutMs: Long = 6_000L,
     private val delegate = ru.tgwatch.probe.ProbeBatch(pool, timeoutMs, admission, lane)
     fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> =
         delegate.runMapped(endpoints, { endpoint, detail, measurement ->
-            ProbeOutcome(endpoint.name, endpoint.group, false, -1L, PhoneProbeAdapter.detail(detail), measurement)
+            ProbeOutcome(endpoint.name, endpoint.group, false, -1L,
+                PhoneProbeAdapter.detail(detail), measurement, detail.code)
         }, operation)
 }
 

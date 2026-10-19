@@ -22,7 +22,8 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         val interval = if (active) MonitorService.secondaryIntervals[id] ?: state.expectedIntervalSec
             else definition.intervalSec
         text(R.id.tvDiagnostics).text = title + "\n" +
-            activity.getString(R.string.target_interval, interval)
+            activity.getString(R.string.target_interval, interval) +
+            (failure(display)?.let { "\n" + activity.getString(it) } ?: "")
         val muted = TargetAlertPreferences.remaining(activity, id) > 0L
         activity.findViewById<Button>(R.id.btnResumeAlerts).visibility = if (muted) View.VISIBLE else View.GONE
     }
@@ -53,6 +54,7 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
             display.pending -> R.string.target_pending_help
             !display.active -> R.string.target_idle_help
             TargetHistories.failures[state.id] != null -> R.string.target_history_failed
+            failure(display) != null -> checkNotNull(failure(display))
             else -> help(state.id)
         })
         text(R.id.tvLatency).text = state.latencyMs?.takeIf { display.active && !display.stale }
@@ -84,6 +86,18 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         }
 
     private fun text(id: Int) = activity.findViewById<TextView>(id)
+    private fun failure(display: Display): Int? {
+        if (!display.active || display.stale || display.pending) return null
+        return when (display.state.failure) {
+            ru.tgwatch.probe.ProbeDetailCode.HTTP_CODE_MISMATCH -> R.string.target_health_code_mismatch
+            ru.tgwatch.probe.ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED -> R.string.target_health_json_unconfirmed
+            ru.tgwatch.probe.ProbeDetailCode.DNS -> R.string.target_health_dns
+            ru.tgwatch.probe.ProbeDetailCode.TLS -> R.string.target_health_tls
+            ru.tgwatch.probe.ProbeDetailCode.TIMEOUT, ru.tgwatch.probe.ProbeDetailCode.TIME_LIMIT ->
+                R.string.target_health_timeout
+            else -> null
+        }
+    }
     private fun label(status: TargetStatus): Int = when (status) {
         TargetStatus.OK -> R.string.target_ok
         TargetStatus.DOWN -> R.string.target_down
