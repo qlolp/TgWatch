@@ -45,6 +45,8 @@ internal object TargetSettingsDialog {
             setSelection(intervals.indexOf(definition.intervalSec)); isSaveEnabled = false
             content.addView(this)
         }
+        val power = if (id == TargetId.TELEGRAM) null else
+            TargetPowerSettingsUi.add(activity, content, interval, intervals)
         val outage = toggle(R.string.target_notify_outage, definition.alerts.notifyOutage)
         val recovery = toggle(R.string.target_notify_recovery, definition.alerts.notifyRecovery)
         val slow = toggle(R.string.target_notify_slow, definition.alerts.notifySlow)
@@ -59,7 +61,7 @@ internal object TargetSettingsDialog {
                     intervalSec = intervals[interval.selectedItemPosition],
                     alerts = TargetAlertSettings(outage.isChecked, recovery.isChecked, slow.isChecked,
                         TargetAlertSettings.MIN_SLOW_MS + threshold.progress * TargetAlertSettings.SLOW_STEP_MS))
-                save(activity, value, endpoint?.text?.toString()?.takeIf { it.isNotBlank() })
+                save(activity, value, endpoint?.text?.toString()?.takeIf { it.isNotBlank() }, power?.isChecked)
             }.apply {
                 if (endpoint != null) setNeutralButton(if (id == TargetId.MATRIX)
                     R.string.target_public_default else R.string.target_clear_endpoint) { _, _ ->
@@ -89,7 +91,7 @@ internal object TargetSettingsDialog {
         })
     }
 
-    private fun save(activity: Activity, value: TargetDefinition, endpoint: String?) {
+    private fun save(activity: Activity, value: TargetDefinition, endpoint: String?, powerSaving: Boolean?) {
         val app = activity.applicationContext
         if (!value.enabled) TargetPreferences.stop(app, value.id)
         val expected = TargetPreferences.fence.snapshot(value.id).revision
@@ -99,8 +101,9 @@ internal object TargetSettingsDialog {
             val current = TargetPreferences.storedDefinition(app, value.id)
             val applied = changed && TargetSettingWrites.definition(app,
                 value.copy(requiresEndpoint = current.requiresEndpoint), revision)
-            if (applied) TargetActions.reconcile(app, value.id)
-            applied
+            val saved = applied && (powerSaving == null || TargetPowerSettings.setEnabled(app, powerSaving))
+            if (saved) TargetActions.reconcile(app, value.id)
+            saved
         }
     }
 

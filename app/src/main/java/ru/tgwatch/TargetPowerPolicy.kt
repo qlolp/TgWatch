@@ -2,7 +2,8 @@ package ru.tgwatch
 
 data class TargetPowerState(val screenOn: Boolean, val powerSave: Boolean,
     val batteryPercent: Int?, val charging: Boolean) {
-    init { require(batteryPercent == null || batteryPercent in 0..100) }
+    init { require(batteryPercent == null || batteryPercent in 0..FULL_PERCENT) }
+    private companion object { const val FULL_PERCENT = 100 }
 }
 
 /** Runtime limits are separate from the portable user-selected interval. */

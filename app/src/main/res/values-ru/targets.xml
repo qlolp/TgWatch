@@ -1,4 +1,10 @@
 <resources>
+    <string name="target_power_saving">Экономить заряд всех дополнительных целей</string>
+    <string name="target_power_interval">Выбрано: %1$d с · Фактически: %2$d с · %3$s</string>
+    <string name="target_power_configured">выбранный интервал</string>
+    <string name="target_power_system">системная экономия заряда</string>
+    <string name="target_power_low_battery" formatted="false">питание отключено, заряд не выше 15%</string>
+    <string name="target_power_screen_off">экран выключен</string>
     <string name="target_select">Цель мониторинга</string>
     <string name="target_settings">Настройки цели</string>
     <string name="target_telegram_profile">Telegram — профиль: %1$s</string>

@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TargetServiceCommandsTest {
+    @Test fun serviceHealthUsesActualSecondaryIntervalWithoutChangingTelegram() {
+        val matrix = TargetDefinition.default(TargetId.MATRIX).copy(enabled = true)
+        assertEquals(600, TargetServiceCommands.expectedIntervalSec(30, listOf(matrix), mapOf(TargetId.MATRIX to 600)))
+        val telegram = TargetDefinition.default(TargetId.TELEGRAM)
+        assertEquals(30, TargetServiceCommands.expectedIntervalSec(30, listOf(telegram, matrix),
+            mapOf(TargetId.MATRIX to 600)))
+    }
     @Test fun legacyStopSelectsTelegramAndKeepsOtherTargetIntent() {
         val command = TargetServiceCommands.route(MonitorService.ACTION_STOP, null,
             setOf(TargetId.TELEGRAM, TargetId.MATRIX))

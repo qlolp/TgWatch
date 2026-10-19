@@ -19,8 +19,10 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         val title = title(display)
         showText(display, title, now)
         showIcon(display, title)
+        val interval = if (active) MonitorService.secondaryIntervals[id] ?: state.expectedIntervalSec
+            else definition.intervalSec
         text(R.id.tvDiagnostics).text = title + "\n" +
-            activity.getString(R.string.target_interval, definition.intervalSec)
+            activity.getString(R.string.target_interval, interval)
         val muted = TargetAlertPreferences.remaining(activity, id) > 0L
         activity.findViewById<Button>(R.id.btnResumeAlerts).visibility = if (muted) View.VISIBLE else View.GONE
     }

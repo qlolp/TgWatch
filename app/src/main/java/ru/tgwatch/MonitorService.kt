@@ -143,6 +143,8 @@ class MonitorService : Service() {
 
         internal val targetRepository: TargetRepository? get() = activeService
             ?.takeUnless { !running || it.destroyed || it.stopping }?.targetMonitoring?.repository
+        internal val secondaryIntervals: Map<TargetId, Int> get() = activeService
+            ?.takeUnless { !running || it.destroyed || it.stopping }?.targetMonitoring?.expectedIntervals.orEmpty()
 
         fun start(ctx: Context) {
             if (BackupManager.hasPending() && RecoveryCoordinator.state != RecoveryState.INITIALIZING) return

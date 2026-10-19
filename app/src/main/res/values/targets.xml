@@ -1,5 +1,13 @@
 <resources>
     <item name="targetEndpointInput" type="id" />
+    <item name="targetPowerSaving" type="id" />
+    <item name="targetPowerInterval" type="id" />
+    <string name="target_power_saving">Save battery for all secondary targets</string>
+    <string name="target_power_interval">Selected: %1$d s · Effective: %2$d s · %3$s</string>
+    <string name="target_power_configured">selected interval</string>
+    <string name="target_power_system">system battery saver</string>
+    <string name="target_power_low_battery" formatted="false">unplugged, battery at most 15%</string>
+    <string name="target_power_screen_off">screen off</string>
     <string name="target_select">Monitoring target</string>
     <string name="target_settings">Target settings</string>
     <string name="target_telegram_profile">Telegram — profile: %1$s</string>

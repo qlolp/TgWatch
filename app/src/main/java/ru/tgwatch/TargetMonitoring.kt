@@ -25,6 +25,7 @@ internal interface TargetMonitorHost {
 
 /** Android network/configuration adapter. The primary owner invokes this after Telegram publication. */
 internal class TargetMonitoring(private val host: TargetMonitorHost,
+    powerStateReader: (() -> TargetPowerState)? = null,
     private val runnerFactory: ((Network) -> TargetRunner)? = null) : Closeable {
     private val cm = host.context.getSystemService(ConnectivityManager::class.java)
     val repository = TargetRepository(TargetPreferences.definitions(host.context),
@@ -37,6 +38,13 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
     }
     val hasInFlight: Boolean get() = dispatch.busy
     val telegramEnabled: Boolean get() = repository.configuration(TargetId.TELEGRAM).definition.enabled
+    private val power = TargetPowerMonitor(host.context, {
+        host.worker.post {
+            if (!closed && host.isCurrent() && TargetPowerSettings.enabled(host.context)) {
+                applyPower(); host.onProgress()
+            }
+        }
+    }, powerStateReader)
     init { refresh(notify = false) }
 
     fun refresh(notify: Boolean = true) {
@@ -58,6 +66,7 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
                 }
             }
         }
+        applyPower()
         if (notify && !closed && host.isCurrent()) host.onProgress()
     }
 
@@ -94,7 +103,15 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         return schedule.request(id, SystemClock.elapsedRealtime()).also { if (it) host.onProgress() }
     }
     fun nextWakeElapsed(): Long? = schedule.nextWakeElapsed()
-    override fun close() { closed = true; dispatch.close() }
+    val expectedIntervals: Map<TargetId, Int> get() = repository.definitions()
+        .filter { it.id != TargetId.TELEGRAM }.associate {
+            it.id to TargetPowerPolicy.intervalSec(it.intervalSec,
+                TargetPowerSettings.enabled(host.context), power.state)
+        }
+    private fun applyPower() = expectedIntervals.forEach { (id, seconds) ->
+        schedule.setInterval(id, seconds, SystemClock.elapsedRealtime())
+    }
+    override fun close() { closed = true; power.close(); dispatch.close() }
 
     private fun launch(id: TargetId) {
         val cfg = repository.configuration(id)
@@ -107,13 +124,14 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
         val network = cm.activeNetwork
         val caps = network?.let(cm::getNetworkCapabilities)
         val attempt = TargetAttempt(id, cfg.generation, repository.currentNetworkRevision,
-            cfg.endpointRevision, SystemClock.elapsedRealtime())
+            cfg.endpointRevision, SystemClock.elapsedRealtime(), expectedIntervals.getValue(id))
         dispatch.submit(attempt, {
             val report = when {
                 network == null || caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true ->
                     TargetReport(TargetStatus.NO_NETWORK, emptyList(), true, null)
                 caps == null -> TargetReport(TargetStatus.UNKNOWN, emptyList(), false, null)
-                else -> (runnerFactory?.invoke(network) ?: runner(network)).check(attempt, cfg.definition, endpoint)
+                else -> (runnerFactory?.invoke(network) ?: secondaryRunner(host, network))
+                    .check(attempt, cfg.definition, endpoint)
             }
             report.copy(networkKind = caps?.let(WebhookNetworks::kind) ?: NetworkKind.UNKNOWN,
                 checkedAtMs = System.currentTimeMillis(), checkedElapsedMs = SystemClock.elapsedRealtime())
@@ -132,18 +150,24 @@ internal class TargetMonitoring(private val host: TargetMonitorHost,
                     attempt.generation == configuration.generation &&
                     attempt.endpointRevision == configuration.endpointRevision
                 if (current) {
-                    if (report != null && repository.publish(attempt, report))
+                    val actual = attempt.copy(expectedIntervalSec = expectedIntervals.getValue(attempt.id))
+                    if (report != null && repository.publish(actual, report))
                         published = repository.snapshot(attempt.id)
                     else if (report?.publishable != true) host.onUnmeasured(attempt.id)
                 }
             }
             published?.let { host.onPublished(it, checkNotNull(report)) }
-        } finally { schedule.finished(attempt.id, SystemClock.elapsedRealtime()) }
+        } finally {
+            schedule.setInterval(attempt.id, expectedIntervals.getValue(attempt.id),
+                SystemClock.elapsedRealtime())
+            schedule.finished(attempt.id, SystemClock.elapsedRealtime())
+        }
     }
 
-    private fun runner(network: Network): TargetRunner {
-        val probe = NetworkProbe(host.primaryPool, host.secondaryPool,
-            { url -> network.openConnection(url) as HttpURLConnection }, { network.socketFactory.createSocket() })
-        return TargetRunner({ error("Telegram belongs to the primary owner") }, probe::checkSecondary)
-    }
+}
+
+private fun secondaryRunner(host: TargetMonitorHost, network: Network): TargetRunner {
+    val probe = NetworkProbe(host.primaryPool, host.secondaryPool,
+        { url -> network.openConnection(url) as HttpURLConnection }, { network.socketFactory.createSocket() })
+    return TargetRunner({ error("Telegram belongs to the primary owner") }, probe::checkSecondary)
 }

@@ -36,7 +36,7 @@ internal object TargetRestore {
                     ?: TargetDefinition.default(id).copy(enabled = false)
             }, observations = TargetId.entries.associateWith { imported.snapshot.observations[it].orEmpty() })
             TargetPersistence.replaceGeneration(ctx, complete) {
-                val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false)
+                val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false).putBoolean(TargetPowerSettings.KEY, false)
                 cleared.forEach(edit::remove)
                 preferences.keys.filter { it.startsWith("target.") }.forEach(edit::remove)
                 imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }

@@ -6,5 +6,5 @@ import android.content.Context
 internal object TargetServiceHealth {
     fun expectedIntervalSec(ctx: Context): Int = TargetServiceCommands.expectedIntervalSec(
         MonitorService.state.expectedIntervalSec,
-        TargetId.entries.map { TargetPreferences.storedDefinition(ctx, it) })
+        TargetId.entries.map { TargetPreferences.storedDefinition(ctx, it) }, MonitorService.secondaryIntervals)
 }
