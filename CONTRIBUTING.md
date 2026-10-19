@@ -3,11 +3,11 @@
 Перед изменением поведения прочитайте [README](README.md), [архитектуру](docs/superpowers/architecture.md)
 и [unified 1.11 spec](docs/superpowers/specs/2026-10-10-unified-1.11-design.md). Приложение
 наблюдает доступность без аккаунта, телефона и доступа к переписке. Минимум Android API 26,
-target API 35; native UI, Direct Boot, настройки и seven-day history сохраняются.
+phone target API36, Wear target API35; native UI, Direct Boot, настройки и seven-day history сохраняются.
 
 ## Сборка и проверки
 
-Нужны JDK 17, Android SDK Platform 35 и Build Tools 35.0.0, Python 3.11+, принятые лицензии SDK.
+Нужны JDK 17, Android SDK Platforms35/36 и Build Tools35.0.0/36.0.0, Python 3.11+, принятые лицензии SDK.
 Используйте закреплённые Kotlin/AGP и Gradle Wrapper. SDK задаётся через `ANDROID_HOME` либо
 неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
@@ -25,7 +25,7 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.19.1`; код `1019001` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.20.0`; код `1020000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
@@ -50,7 +50,7 @@ JVM JSON использует test dependency, Android — системный `o
 должна зависеть от permissive platform coercions.
 
 Android scenarios выполняются только на отдельном disposable root-capable эмуляторе.
-Матрица CI охватывает API 26/29/35/36; target приложения пока остаётся API35.
+Матрица CI охватывает API 26/29/35/36; телефон собирается с target36, Wear — с target35.
 Для проверки заблокированной credential storage нужен native или emulated FBE.
 Обычный API26-образ использует FDE: подготовка включает штатную эмуляцию FBE
 и перезагружает только явно выбранный одноразовый эмулятор перед установкой fixtures.

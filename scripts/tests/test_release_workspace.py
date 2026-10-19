@@ -166,13 +166,13 @@ class ReleaseWorkspaceTests(unittest.TestCase):
 
     def test_build_tools_are_pinned_and_checked_before_signing(self):
         workflow = self.workflow()
-        self.assertEqual("35.0.0", workflow.get("env", {}).get("BUILD_TOOLS"))
+        self.assertEqual("36.0.0", workflow.get("env", {}).get("BUILD_TOOLS"))
         steps = workflow["jobs"]["release"]["steps"]
         install = next((i for i, step in enumerate(steps) if step.get("name") == "Ensure pinned Android build tools"), None)
         signing = next(i for i, step in enumerate(steps) if step.get("id") == "signed")
         self.assertIsNotNone(install)
         self.assertLess(install, signing)
-        self.assertNotIn("build-tools/35.0.0/", str(steps))
+        self.assertNotIn("build-tools/36.0.0/", str(steps))
         publish = next(step for step in steps if step.get("name") == "Publish versioned release")["run"]
         for tool in ("--apksigner", "--aapt2"):
             self.assertIn(tool, publish)

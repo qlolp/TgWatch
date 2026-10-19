@@ -32,12 +32,12 @@ require(!providers.gradleProperty("versionCode").isPresent && !providers.gradleP
     !providers.environmentVariable("TGWATCH_VERSION_NAME").isPresent) { "Version overrides are unsupported" }
 android {
     namespace = "ru.tgwatch"
-    compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
     defaultConfig {
         applicationId = "ru.tgwatch"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = sourceVersionCode.toInt()
         versionName = sourceVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

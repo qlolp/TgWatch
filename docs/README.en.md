@@ -125,7 +125,7 @@ separate `TgWatch-wear` prefix; every unified release includes both apps' six fi
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.19.1` (Android code `1019001`), Android target API35.
+The source version is `1.20.0` (Android code `1020000`), phone target API36, Wear target API35.
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed
@@ -139,7 +139,7 @@ Published versions and signed APKs are recorded on
 [GitHub Releases](https://github.com/qlolp/TgWatch/releases/latest). The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
-Use JDK17, Android SDK35 and the checked-in Gradle wrapper:
+Use JDK17, Android SDK36 (phone), SDK35 (Wear) and the checked-in Gradle wrapper:
 
 ```sh
 bash ./gradlew :probe-core:test :app:testDebugUnitTest :app:detekt :app:lintDebug :app:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug

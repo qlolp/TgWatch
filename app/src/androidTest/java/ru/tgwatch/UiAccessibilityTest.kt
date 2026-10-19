@@ -212,4 +212,40 @@ private fun stopMonitoringForScenario(ctx: android.content.Context) {
     MonitorService.stopAndAwait(ctx)
     assertFalse("Activity fixtures must disable monitoring", Prefs.isEnabled(ctx))
     assertFalse("Activity fixtures must finish monitor teardown", MonitorService.running)
+    @Test fun actualWindowInsetsKeepInteractiveControlsClearOfSystemBars() {
+        assumeTrue("Target-era edge-to-edge qualification requires API35+", Build.VERSION.SDK_INT >= 35)
+        val wasEnabled = Prefs.isEnabled(ctx)
+        Prefs.setEnabled(ctx, false)
+        try {
+            stopMonitoringForScenario(ctx)
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                val deadline = android.os.SystemClock.elapsedRealtime() + 5000
+                var ready = false
+                while (!ready && android.os.SystemClock.elapsedRealtime() < deadline) {
+                    scenario.onActivity {
+                        val root = it.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                        ready = root.isLaidOut && root.rootWindowInsets != null
+                    }
+                    if (!ready) android.os.SystemClock.sleep(50)
+                }
+                assertTrue("Real platform insets must reach the displayed screen", ready)
+                scenario.onActivity {
+                    val root = it.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                    val safe = checkNotNull(root.rootWindowInsets).getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+                    assertTrue(root.paddingTop >= safe.top)
+                    assertTrue(root.paddingBottom >= safe.bottom)
+                    assertTrue(root.paddingLeft >= safe.left)
+                    assertTrue(root.paddingRight >= safe.right)
+                    val button = it.findViewById<Button>(R.id.btnCheck)
+                    button.requestRectangleOnScreen(android.graphics.Rect(0, 0, button.width, button.height), true)
+                    val bounds = android.graphics.Rect()
+                    assertTrue("Manual check remains visibly reachable", button.getGlobalVisibleRect(bounds))
+                    val window = android.graphics.Rect()
+                    it.window.decorView.getGlobalVisibleRect(window)
+                    assertTrue(bounds.top >= window.top + safe.top)
+                    assertTrue(bounds.bottom <= window.bottom - safe.bottom)
+                }
+            }
+        } finally { Prefs.setEnabled(ctx, wasEnabled) }
+    }
 }
