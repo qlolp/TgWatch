@@ -1,19 +1,21 @@
 package ru.tgwatch.probe
 
-import java.io.ByteArrayOutputStream
 import java.io.StringReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
+import java.nio.charset.CharacterCodingException
 
 /** HTTP semantics are explicit: general web reachability, exact2xx, or Matrix versions evidence. */
 enum class HttpProbeMode { REACHABLE, STRICT_2XX, MATRIX_VERSIONS }
-data class HttpProbeResult(val code: Int, val confirmed: Boolean)
+data class HttpProbeResult(val code: Int, val confirmed: Boolean, val failure: HttpConditionFailure? = null)
 
 class HttpEndpointProbe(private val transport: ProbeTransport) {
     fun check(endpoint: ProbeEndpoint, cancellation: ProbeCancellation): HttpProbeResult {
-        if (endpoint.httpMode == HttpProbeMode.MATRIX_VERSIONS) return request(endpoint, "GET", cancellation)
+        require(endpoint.condition == null || endpoint.httpMode == HttpProbeMode.STRICT_2XX)
+        if (endpoint.httpMode == HttpProbeMode.MATRIX_VERSIONS || endpoint.condition?.jsonField != null)
+            return request(endpoint, "GET", cancellation)
         val head = request(endpoint, "HEAD", cancellation)
         return if (head.code == METHOD_NOT_ALLOWED || head.code == NOT_IMPLEMENTED)
             request(endpoint, "GET", cancellation) else head
@@ -30,11 +32,14 @@ class HttpEndpointProbe(private val transport: ProbeTransport) {
             connection.instanceFollowRedirects = false
             connection.useCaches = false
             connection.setRequestProperty("User-Agent", transport.userAgent)
-            if (endpoint.httpMode == HttpProbeMode.MATRIX_VERSIONS) {
+            if (endpoint.httpMode == HttpProbeMode.MATRIX_VERSIONS || endpoint.condition?.jsonField != null) {
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setRequestProperty("Accept-Encoding", "identity")
             }
             val code = connection.responseCode
+            endpoint.condition?.let { condition ->
+                return CustomHttpHealth.confirm(connection, cancellation, condition, code)
+            }
             val confirmed = when (endpoint.httpMode) {
                 HttpProbeMode.REACHABLE -> ProbePolicy.isReachableHttpCode(code)
                 HttpProbeMode.STRICT_2XX -> code in HTTP_OK..HTTP_LAST_SUCCESS
@@ -56,11 +61,10 @@ class HttpEndpointProbe(private val transport: ProbeTransport) {
 
 private object MatrixVersions {
     private const val MAX_BYTES = 64 * 1024
-    private const val BUFFER_BYTES = 2048
     private const val MAX_VERSION_CHARS = 128
 
     fun confirm(connection: HttpURLConnection, cancellation: ProbeCancellation): Boolean {
-        val bytes = body(connection, cancellation) ?: return false
+        val bytes = BoundedHttpBody.read(connection, cancellation, MAX_BYTES) ?: return false
         val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
         val reader = StrictJsonReader(StringReader(text))
@@ -75,22 +79,35 @@ private object MatrixVersions {
         return versions > 0
     }
 
-    private fun body(connection: HttpURLConnection, cancellation: ProbeCancellation): ByteArray? {
-        val length = connection.contentLengthLong
-        if (length > MAX_BYTES) return null
-        val output = ByteArrayOutputStream()
-        val buffer = ByteArray(BUFFER_BYTES)
-        connection.inputStream.use { input ->
-            while (output.size() < MAX_BYTES) {
-                cancellation.check()
-                val count = input.read(buffer, 0, minOf(buffer.size, MAX_BYTES - output.size()))
-                if (count < 0) break
-                if (count > 0) output.write(buffer, 0, count)
+}
+
+private object CustomHttpHealth {
+    private const val MAX_BYTES = 32 * 1024
+    private const val MAX_VALUE_CHARS = 256
+    fun confirm(connection: HttpURLConnection, cancellation: ProbeCancellation,
+        condition: HttpProbeCondition, code: Int): HttpProbeResult {
+        val codeMatches = condition.expectedCode?.let { it == code } ?: (code in 200..299)
+        if (!codeMatches) return HttpProbeResult(code, false, HttpConditionFailure.CODE_MISMATCH)
+        if (condition.jsonField == null) return HttpProbeResult(code, true)
+        val encoding = connection.contentEncoding
+        if (encoding != null && !encoding.equals("identity", ignoreCase = true)) return unconfirmed(code)
+        val bytes = BoundedHttpBody.read(connection, cancellation, MAX_BYTES,
+            errorBody = code >= HttpURLConnection.HTTP_BAD_REQUEST) ?: return unconfirmed(code)
+        val matches = try {
+            val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
+            val reader = StrictJsonReader(StringReader(text))
+            var found = false
+            reader.objectFields { key ->
+                if (key == condition.jsonField && reader.nextType == '"')
+                    found = reader.string(MAX_VALUE_CHARS) == condition.expectedValue
+                else reader.skipValue()
             }
-        }
-        // Unknown-length bodies reaching the cap are rejected without reading an extra byte.
-        return output.toByteArray().takeIf {
-            (it.size < MAX_BYTES || length == MAX_BYTES.toLong()) && (length < 0 || length == it.size.toLong())
-        }
+            reader.finish()
+            found
+        } catch (_: IllegalArgumentException) { false }
+        catch (_: CharacterCodingException) { false }
+        return if (matches) HttpProbeResult(code, true) else unconfirmed(code)
     }
+    private fun unconfirmed(code: Int) = HttpProbeResult(code, false, HttpConditionFailure.JSON_NOT_CONFIRMED)
 }

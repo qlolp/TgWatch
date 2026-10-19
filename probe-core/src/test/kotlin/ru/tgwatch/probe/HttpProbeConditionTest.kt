@@ -1,0 +1,162 @@
+package ru.tgwatch.probe
+
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.Socket
+import java.net.URL
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import org.junit.Assert.*
+import org.junit.Test
+
+class HttpProbeConditionTest {
+    private class Connection(val body: ByteArray, val status: Int = 200,
+        val length: Long = body.size.toLong(), val encoding: String? = null,
+        val stream: InputStream? = null) : HttpURLConnection(URL("https://fixture.invalid/health")) {
+        var reads = 0
+        var usedMethod = ""
+        val disconnected = CountDownLatch(1)
+        override fun connect() = Unit
+        override fun usingProxy() = false
+        override fun disconnect() { disconnected.countDown() }
+        override fun getResponseCode(): Int { usedMethod = requestMethod; return status }
+        override fun getContentLengthLong() = length
+        override fun getContentEncoding() = encoding
+        override fun getInputStream(): InputStream = stream ?: object : ByteArrayInputStream(body) {
+            override fun read(b: ByteArray, off: Int, len: Int): Int = super.read(b, off, len).also {
+                if (it > 0) reads += it
+            }
+        }
+        override fun getErrorStream() = inputStream
+    }
+    private class Transport(private val connections: List<Connection>) : ProbeTransport {
+        val opened = mutableListOf<Connection>()
+        override val userAgent = "fixture"
+        override fun openSocket() = Socket()
+        override fun openConnection(url: URL) = connections[opened.size].also(opened::add)
+    }
+    private fun endpoint(condition: HttpProbeCondition? = null) = ProbeEndpoint("custom", ProbeGroup.EXTRA,
+        "https://fixture.invalid/health", HttpProbeMode.STRICT_2XX, condition)
+    private fun jsonCondition(value: String = "ok") = HttpProbeCondition(jsonField = "status", expectedValue = value)
+    private fun check(connection: Connection, condition: HttpProbeCondition? = jsonCondition()): HttpProbeResult =
+        ProbeCancellation().use { HttpEndpointProbe(Transport(listOf(connection))).check(endpoint(condition), it) }
+    private fun confirm(text: String) = check(Connection(text.toByteArray()))
+
+    @Test fun exactCodeCanRequireNonSuccessAndRejectsUnexpected200() {
+        val rejected = check(Connection(byteArrayOf(), 200), HttpProbeCondition(expectedCode = 204))
+        assertFalse(rejected.confirmed)
+        assertEquals(HttpConditionFailure.CODE_MISMATCH, rejected.failure)
+        assertTrue(check(Connection(byteArrayOf(), 503), HttpProbeCondition(expectedCode = 503)).confirmed)
+    }
+    @Test fun jsonUsesOneGetAndRequiresStringValueAndMatchingCode() {
+        val connection = Connection("{\"status\":\"ok\"}".toByteArray())
+        assertTrue(check(connection).confirmed)
+        assertEquals("GET", connection.usedMethod)
+        assertEquals("application/json", connection.getRequestProperty("Accept"))
+        assertEquals("identity", connection.getRequestProperty("Accept-Encoding"))
+        assertFalse(connection.instanceFollowRedirects)
+        assertEquals(3000, connection.connectTimeout)
+        assertEquals(3000, connection.readTimeout)
+        for (text in listOf("{}", "{\"status\":\"error\"}", "{\"status\":true}", "{\"status\":[\"ok\"]}")) {
+            val rejected = confirm(text)
+            assertFalse(text, rejected.confirmed)
+            assertEquals(HttpConditionFailure.JSON_NOT_CONFIRMED, rejected.failure)
+        }
+        assertFalse(check(Connection("{\"status\":\"ok\"}".toByteArray(), 500)).confirmed)
+        assertTrue(check(Connection("{\"status\":\"\"}".toByteArray()), jsonCondition("")).confirmed)
+    }
+    @Test fun wholeObjectRejectsNestedDuplicatesTrailingDataAndExcessiveDepth() {
+        for (text in listOf("{\"status\":\"ok\",\"status\":\"ok\"}",
+            "{\"status\":\"ok\",\"unused\":{\"x\":1,\"x\":2}}",
+            "{\"status\":\"ok\"} true", "{\"status\":\"ok\"",
+            "{\"status\":\"ok\",\"extra\":" + "[".repeat(10) + "0" + "]".repeat(10) + "}")) {
+            assertFalse(text, confirm(text).confirmed)
+        }
+        assertTrue(confirm("{\"status\":\"ok\",\"extra\":" + "[".repeat(9) + "0" + "]".repeat(9) + "}").confirmed)
+    }
+    @Test fun malformedUtf8AndUnexpectedCompressionFailWithoutEchoingBody() {
+        assertEquals(HttpConditionFailure.JSON_NOT_CONFIRMED,
+            check(Connection(byteArrayOf(0xc3.toByte(), 0x28))).failure)
+        val compressed = Connection("{\"status\":\"ok\"}".toByteArray(), encoding = "gzip")
+        assertFalse(check(compressed).confirmed)
+        assertEquals(0, compressed.reads)
+        assertTrue(check(Connection("{\"status\":\"ok\"}".toByteArray(), encoding = "identity")).confirmed)
+    }
+    @Test fun exactKnownCapWorksButUnknownCapOversizeAndTruncationFail() {
+        val prefix = "{\"status\":\"ok\"}"
+        val cap = 32 * 1024
+        val bytes = prefix.padEnd(cap).toByteArray()
+        assertTrue(check(Connection(bytes)).confirmed)
+        val unknown = Connection(bytes, length = -1)
+        assertFalse(check(unknown).confirmed)
+        assertTrue(unknown.reads <= cap)
+        val oversized = Connection(bytes + 32.toByte())
+        assertFalse(check(oversized).confirmed)
+        assertEquals(0, oversized.reads)
+        assertFalse(check(Connection(prefix.toByteArray(), length = cap.toLong())).confirmed)
+        assertTrue(check(Connection(prefix.padEnd(cap - 1).toByteArray(), length = -1)).confirmed)
+    }
+    @Test fun defaultHeadAndUnsupportedMethodFallbackStayUnchanged() {
+        for (code in listOf(405, 501)) {
+            val first = Connection(byteArrayOf(), code)
+            val second = Connection(byteArrayOf(), 204)
+            val transport = Transport(listOf(first, second))
+            ProbeCancellation().use { assertTrue(HttpEndpointProbe(transport).check(endpoint(), it).confirmed) }
+            assertEquals(listOf("HEAD", "GET"), transport.opened.map { it.usedMethod })
+        }
+        val ordinary = Connection(byteArrayOf(), 200)
+        assertTrue(check(ordinary, null).confirmed)
+        assertEquals("HEAD", ordinary.usedMethod)
+        assertEquals(0, ordinary.reads)
+    }
+    @Test fun conditionBoundsAndDebugRenderingNeverExposePrivateValues() {
+        for (code in listOf(199, 600)) assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(expectedCode = code)
+        }
+        for (field in listOf("", "x".repeat(65))) assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(jsonField = field, expectedValue = "secret")
+        }
+        assertThrows(IllegalArgumentException::class.java) { HttpProbeCondition(jsonField = "status") }
+        assertThrows(IllegalArgumentException::class.java) { HttpProbeCondition(expectedValue = "secret") }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(jsonField = "status", expectedValue = "x".repeat(257))
+        }
+        val value = HttpProbeCondition(jsonField = "private-field", expectedValue = "private-token")
+        assertFalse(value.toString().contains("private-field"))
+        assertFalse(value.toString().contains("private-token"))
+    }
+    @Test fun cancellationDisconnectsButPhysicalSlotStaysOwnedUntilBodyReturns() {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val stream = object : InputStream() {
+            override fun read(): Int { block(); return -1 }
+            override fun read(b: ByteArray, off: Int, len: Int): Int { block(); return -1 }
+            private fun block() {
+                started.countDown()
+                while (release.count > 0) try { release.await() } catch (_: InterruptedException) { }
+            }
+        }
+        val connection = Connection(byteArrayOf(), length = -1, stream = stream)
+        val admission = ProbeAdmission(0, 1)
+        val worker = Executors.newSingleThreadExecutor()
+        val owner = Executors.newSingleThreadExecutor()
+        val endpoint = endpoint(jsonCondition())
+        try {
+            val result = owner.submit<List<ProbeOutcome>> { ProbeBatch(worker, 1000, admission, ProbeLane.SECONDARY)
+                .run(listOf(endpoint), EndpointProbe(Transport(listOf(connection)))::probe) }
+            assertTrue(started.await(2, TimeUnit.SECONDS))
+            val timedOut = result.get(2, TimeUnit.SECONDS).single()
+            assertEquals(ProbeMeasurement.FAILURE, timedOut.measurement)
+            assertEquals(ProbeDetailCode.TIME_LIMIT, timedOut.detail.code)
+            assertTrue(connection.disconnected.await(2, TimeUnit.SECONDS))
+            assertEquals(1, admission.snapshot().secondary)
+            assertNull(admission.tryAcquire("${endpoint.group}:${endpoint.name}:${endpoint.address}", ProbeLane.SECONDARY))
+        } finally {
+            release.countDown(); owner.shutdownNow(); worker.shutdownNow()
+            assertTrue(worker.awaitTermination(2, TimeUnit.SECONDS))
+        }
+        assertEquals(0, admission.snapshot().secondary)
+    }
+}

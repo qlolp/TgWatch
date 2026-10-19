@@ -16,7 +16,11 @@ class EndpointProbe(private val transport: ProbeTransport) {
         }
         val http = HttpEndpointProbe(transport).check(endpoint, cancellation)
         return ProbeOutcome(endpoint.name, endpoint.group, http.confirmed, elapsed(start),
-            ProbeDetail(ProbeDetailCode.HTTP_RESPONSE, http.code))
+            ProbeDetail(when (http.failure) {
+                HttpConditionFailure.CODE_MISMATCH -> ProbeDetailCode.HTTP_CODE_MISMATCH
+                HttpConditionFailure.JSON_NOT_CONFIRMED -> ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED
+                null -> ProbeDetailCode.HTTP_RESPONSE
+            }, http.code))
     }
     private fun elapsed(start: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
 }

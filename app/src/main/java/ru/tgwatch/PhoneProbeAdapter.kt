@@ -30,6 +30,7 @@ internal object PhoneProbeAdapter {
     fun detail(value: ProbeDetail): String = when (value.code) {
         ProbeDetailCode.NONE -> ""
         ProbeDetailCode.HTTP_RESPONSE -> "HTTP ${value.httpCode}"
+        ProbeDetailCode.HTTP_CODE_MISMATCH, ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED -> "HTTP ${value.httpCode}"
         ProbeDetailCode.MTPROTO_CONFIRMED -> Lang.t("MTProto resPQ; nonce совпал", "MTProto resPQ; nonce matched")
         ProbeDetailCode.MTPROTO_UNCONFIRMED -> Lang.t("Ответ MTProto не подтверждён", "MTProto response not confirmed")
         ProbeDetailCode.BUSY -> Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing")
