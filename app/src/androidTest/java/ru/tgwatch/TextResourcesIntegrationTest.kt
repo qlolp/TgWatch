@@ -70,6 +70,14 @@ class TextResourcesIntegrationTest {
             AndroidText.resolve(context("en"), ongoing.body).lines().first())
     }
 
+    @Test fun contextFormattingResolvesTypedArgumentsBeforeAndroidInterpolation() {
+        val value = DurationParts.from(5000).text()
+        assertEquals("Custom HTTPS outage: 5 s; no internet: 5 s", context("en").renderString(
+            R.string.text_history_outage, TargetNames.text(TargetId.CUSTOM), value, value))
+        assertEquals("Сбой Свой HTTPS: 5 с; нет сети: 5 с", context("ru").renderString(
+            R.string.text_history_outage, TargetNames.text(TargetId.CUSTOM), value, value))
+    }
+
     @Test fun lastSuccessAndSemanticTitlesUseTheSuppliedResourceLocale() {
         val utc = TimeZone.getTimeZone("UTC")
         val value = LastSuccessPolicy.label(2000, 1000, utc)

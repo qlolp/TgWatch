@@ -95,38 +95,26 @@ class OnboardingActivity : Activity() {
 
     private fun buildPages() = listOf(
         Page(
-            Lang.t("Что проверяется", "What is checked"),
-            Lang.t(
-                "TG Монитор сам, без аккаунта и серверов автора, раз в несколько секунд проверяет " +
-                    "доступность серверов Telegram с вашего телефона и ведёт историю только на устройстве.",
-                "TG Monitor checks Telegram server reachability from your phone every few seconds, " +
-                    "with no account and no author-run servers. History stays on the device."
-            ), null
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_what_is_checked),
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_tg_monitor_checks_telegram), null
         ),
         Page(
-            Lang.t("Уведомления", "Notifications"),
-            Lang.t(
-                "Уведомления нужны, чтобы вы узнали о сбое и восстановлении связи. " +
-                    "Без них Android 13+ скрывает и значок службы.",
-                "Notifications tell you about outages and recoveries. " +
-                    "Without them Android 13+ also hides the service icon."
-            ),
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_notifications),
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_notifications_tell_you_about),
             when {
                 Onboarding.notificationsAllowed(this) -> getString(R.string.onboarding_notifications_ready)
-                Onboarding.canRequestNotifications(this) -> Lang.t("Разрешить уведомления", "Allow notifications")
-                else -> Lang.t("Открыть настройки уведомлений", "Open notification settings")
+                Onboarding.canRequestNotifications(this) -> this@OnboardingActivity.renderString(
+                    R.string.copy_onboarding_allow_notifications)
+                else -> this@OnboardingActivity.renderString(R.string.copy_onboarding_open_notification_settings)
             }, enabled = !Onboarding.notificationsAllowed(this)
         ) { requestNotifications() },
         Page(
-            Lang.t("Работа в фоне", "Background use"),
-            Lang.t(
-                "Чтобы Android не «усыплял» проверки при выключенном экране, " +
-                    "снимите ограничения батареи.",
-                "So Android does not put checks to sleep while the screen is off, remove battery restrictions."
-            ) + (OemTips.manufacturerHint()?.let { "\n\n$it" } ?: ""),
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_background_use),
+            this@OnboardingActivity.renderString(R.string.copy_onboarding_so_android_does_not) +
+                (OemTips.manufacturerHint()?.let { "\n\n$it" } ?: ""),
             if (getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
                 getString(R.string.onboarding_battery_ready)
-                else Lang.t("Снять ограничения батареи", "Remove battery restrictions"),
+                else this@OnboardingActivity.renderString(R.string.copy_onboarding_remove_battery_restrictions),
             enabled = !getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
         ) { openBattery() }
     )
@@ -141,7 +129,9 @@ class OnboardingActivity : Activity() {
         action.text = page.action.orEmpty()
         action.isEnabled = page.enabled
         findViewById<Button>(R.id.btnOnboardingNext).text =
-            if (index == pages.lastIndex) Lang.t("Готово", "Done") else Lang.t("Далее", "Next")
+            if (index == pages.lastIndex) this@OnboardingActivity.renderString(R.string.copy_onboarding_done)
+                else this@OnboardingActivity.renderString(
+                R.string.copy_onboarding_next)
     }
 
     private fun requestNotifications() {

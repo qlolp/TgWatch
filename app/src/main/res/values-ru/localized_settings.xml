@@ -1,0 +1,112 @@
+<resources>
+    <string name="copy_main_tg_monitor_summary" formatted="false">"Сводка TG Монитор"</string>
+    <string name="copy_main_s_sleep_s_outage">"%1$s: %2$s с / сон %3$s с / сбой %4$s с"</string>
+    <string name="copy_main_version" formatted="false">"Версия "</string>
+    <string name="copy_main_outage_vibration_pattern" formatted="false">"Сигнал вибрации при сбое"</string>
+    <string name="copy_main_tg_monitor_log" formatted="false">"Журнал TG Монитор"</string>
+    <string name="copy_main_vibration_pattern">"Сигнал вибрации: %1$s"</string>
+    <string name="copy_main_couldn_t_start_monitoring">"Не удалось запустить: %1$s"</string>
+    <string name="copy_main_couldn_t_share">"Не удалось поделиться: %1$s"</string>
+    <string name="copy_main_daily_summary_at">"Сводка за день в %1$s"</string>
+    <string name="copy_main_daily_summary_time" formatted="false">"Время сводки за день"</string>
+    <string name="copy_main_quiet_hours_no_vibration">"Тихие часы %1$s (без вибрации)"</string>
+    <string name="copy_main_quiet_hours_end" formatted="false">"Конец тихих часов"</string>
+    <string name="copy_main_quiet_hours_start" formatted="false">"Начало тихих часов"</string>
+    <string name="copy_main_clear_the_log" formatted="false">"Очистить журнал?"</string>
+    <string name="copy_main_status_change_entries_will" formatted="false">"Записи о сменах статуса будут удалены. График и статистика останутся."</string>
+    <string name="copy_main_clear" formatted="false">"Очистить"</string>
+    <string name="copy_main_cancel" formatted="false">"Отмена"</string>
+    <string name="copy_main_monitoring_is_off" formatted="false">"Мониторинг выключен"</string>
+    <string name="copy_main_checks_are_stopped" formatted="false">"Проверки остановлены"</string>
+    <string name="copy_main_tap_start_and_the" formatted="false">"Нажми «Запустить», и приложение начнёт следить за Telegram."</string>
+    <string name="copy_main_alerts_muted_until">"\nОповещения заглушены до %1$s"</string>
+    <string name="copy_main_ms">"%1$s мс"</string>
+    <string name="copy_main_last_known_reachable" formatted="false">"Последний раз: доступен"</string>
+    <string name="copy_main_last_known_partially_reachable" formatted="false">"Последний раз: частично доступен"</string>
+    <string name="copy_main_last_known_unreachable" formatted="false">"Последний раз: недоступен"</string>
+    <string name="copy_main_last_known_no_internet" formatted="false">"Последний раз: нет сети"</string>
+    <string name="copy_main_checking" formatted="false">"Проверяю…"</string>
+    <string name="copy_main_checked_waiting_for_a">"Проверено %1$s — жду свежую проверку"</string>
+    <string name="copy_main_monitoring_is_delayed_android" formatted="false">"Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить»."</string>
+    <string name="copy_main_telegram_is_responding" formatted="false">"Telegram отвечает"</string>
+    <string name="copy_main_telegram_is_partially_reachable" formatted="false">"Telegram частично доступен"</string>
+    <string name="copy_main_telegram_is_unreachable" formatted="false">"Telegram недоступен"</string>
+    <string name="copy_main_no_internet" formatted="false">"Нет интернета"</string>
+    <string name="copy_main_reachability_unknown" formatted="false">"Доступность не определена"</string>
+    <string name="copy_main_checked">"Проверено %1$s"</string>
+    <string name="copy_main_first_check_in_progress" formatted="false">"Первая проверка идёт прямо сейчас"</string>
+    <string name="copy_main_for_since">"Уже %1$s · с %2$s"</string>
+    <string name="copy_main_mtproto_and_web_resources" formatted="false">"MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется."</string>
+    <string name="copy_main_reason">"Причина: %1$s"</string>
+    <string name="copy_main_checking_web_resources_and" formatted="false">"Проверяю веб-ресурсы и MTProto"</string>
+    <string name="copy_main_last_vibration">"\nПоследняя вибрация: %1$s"</string>
+    <string name="copy_main_restore_not_finished" formatted="false">"Незавершённое восстановление"</string>
+    <string name="copy_main_tap_restore_backup_to" formatted="false">"Нажмите «Восстановить резервную копию», чтобы завершить замену данных."</string>
+    <string name="copy_main_diagnostics_will_appear_after" formatted="false">"Диагностика появится после первой проверки."</string>
+    <string name="copy_main_last_result_interval_s">"\nВозраст результата: %1$s. Интервал: %2$s с."</string>
+    <string name="copy_main_nothing_yet" formatted="false">"Пока пусто"</string>
+    <string name="copy_main_notifications_are_on_the" formatted="false">"✓ Уведомления включены, значок виден в строке состояния."</string>
+    <string name="copy_main_notifications_are_off_so" formatted="false">"Уведомления выключены, поэтому значка в строке состояния не будет."</string>
+    <string name="copy_main_unrestricted_background_use_is" formatted="false">"✓ Работа в фоне без ограничений разрешена."</string>
+    <string name="copy_main_android_may_put_the" formatted="false">"Android может «усыплять» приложение при выключенном экране, и тогда проверки будут останавливаться."</string>
+    <string name="copy_main_exact_alarms_are_allowed" formatted="false">"✓ Точные будильники разрешены. Android всё равно может откладывать проверки в глубоком сне."</string>
+    <string name="copy_main_without_exact_alarms_android" formatted="false">"Без точных будильников Android откладывает проверки во сне, и статус устаревает."</string>
+    <string name="copy_main_without_these_permissions_the" formatted="false">"Без этих разрешений значок в строке состояния может пропасть или врать."</string>
+    <string name="copy_main_turn_on_notifications_or" formatted="false">"• Включи уведомления — иначе постоянного значка не будет."</string>
+    <string name="copy_main_allow_unrestricted_background_use" formatted="false">"• Разреши работу без ограничений — иначе Android усыпит проверки."</string>
+    <string name="copy_main_allow_exact_alarms_or" formatted="false">"• Разреши точные будильники — иначе проверки замирают при выключенном экране."</string>
+    <string name="copy_backup_ui_backup_format" formatted="false">"Формат резервной копии"</string>
+    <string name="copy_backup_ui_all_targets_v" formatted="false">"Все цели — v3"</string>
+    <string name="copy_backup_ui_telegram_only_compatible_v" formatted="false">"Только Telegram — совместимый v2"</string>
+    <string name="copy_backup_ui_finish_restoring" formatted="false">"Завершить восстановление?"</string>
+    <string name="copy_backup_ui_the_previous_restore_was" formatted="false">"Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения."</string>
+    <string name="copy_backup_ui_continue" formatted="false">"Продолжить"</string>
+    <string name="copy_backup_ui_restoring" formatted="false">"Восстановление…"</string>
+    <string name="copy_backup_ui_couldn_t_finish_restoring" formatted="false">"Не удалось завершить восстановление. Повторите попытку."</string>
+    <string name="copy_backup_ui_cancel" formatted="false">"Отмена"</string>
+    <string name="copy_backup_ui_couldn_t_open_the" formatted="false">"Не удалось открыть выбор файла"</string>
+    <string name="copy_backup_ui_creating_backup" formatted="false">"Создание копии…"</string>
+    <string name="copy_backup_ui_encrypted_backup_saved_you" formatted="false">"Зашифрованная копия сохранена. Для восстановления потребуется пароль."</string>
+    <string name="copy_backup_ui_couldn_t_save_the" formatted="false">"Не удалось сохранить копию"</string>
+    <string name="copy_backup_ui_checking_backup" formatted="false">"Проверка копии…"</string>
+    <string name="copy_backup_ui_wrong_password_or_damaged" formatted="false">"Неверный пароль или повреждённая копия"</string>
+    <string name="copy_backup_ui_checking_csv" formatted="false">"Проверка CSV…"</string>
+    <string name="copy_backup_ui_the_csv_is_damaged" formatted="false">"CSV повреждён или имеет неподдерживаемый формат"</string>
+    <string name="copy_backup_ui_password_to_characters" formatted="false">"Пароль: от 12 до 256 символов"</string>
+    <string name="copy_backup_ui_password_for_this_backup" formatted="false">"Пароль этой копии"</string>
+    <string name="copy_backup_ui_repeat_the_password" formatted="false">"Повторите пароль"</string>
+    <string name="copy_backup_ui_backup_password" formatted="false">"Пароль копии"</string>
+    <string name="copy_backup_ui_open_backup" formatted="false">"Открыть копию"</string>
+    <string name="copy_backup_ui_remember_the_password_it" formatted="false">"Запомните пароль: восстановить его невозможно."</string>
+    <string name="copy_backup_ui_enter_the_password_for" formatted="false">"Введите пароль этой копии."</string>
+    <string name="copy_backup_ui_check_the_password_length" formatted="false">"Проверьте длину и совпадение паролей"</string>
+    <string name="copy_backup_ui_restore_this_backup" formatted="false">"Восстановить копию?"</string>
+    <string name="copy_backup_ui_targets_history_records_data">"Целей: %1$s. Записей истории: %2$s.\n\nДанные будут заменены. Все цели останутся выключены; приватные адреса нужно проверить заново."</string>
+    <string name="copy_backup_ui_replace_data" formatted="false">"Заменить данные"</string>
+    <string name="copy_backup_ui_data_restored_all_targets" formatted="false">"Данные восстановлены. Все цели выключены."</string>
+    <string name="copy_backup_ui_restore_interrupted_please_retry" formatted="false">"Восстановление прервано. Повторите попытку."</string>
+    <string name="copy_backup_ui_import_csv" formatted="false">"Импортировать CSV?"</string>
+    <string name="copy_backup_ui_targets_records_history_for">"Цели: %1$s. Записей: %2$s.\n\nИстория указанных целей будет заменена. Настройки, журнал и история других целей сохранятся. Все цели будут остановлены."</string>
+    <string name="copy_backup_ui_history_restored_all_targets" formatted="false">"История восстановлена. Все цели выключены."</string>
+    <string name="copy_recovery_ui_preparing_data" formatted="false">"Подготовка данных…"</string>
+    <string name="copy_recovery_ui_data_recovery_failed" formatted="false">"Не удалось восстановить данные"</string>
+    <string name="copy_recovery_ui_checks_are_paused" formatted="false">"Проверки приостановлены"</string>
+    <string name="copy_recovery_ui_wait_for_preparation_to" formatted="false">"Дождитесь завершения подготовки или повторите восстановление копии."</string>
+    <string name="copy_onboarding_what_is_checked" formatted="false">"Что проверяется"</string>
+    <string name="copy_onboarding_tg_monitor_checks_telegram" formatted="false">"TG Монитор сам, без аккаунта и серверов автора, раз в несколько секунд проверяет доступность серверов Telegram с вашего телефона и ведёт историю только на устройстве."</string>
+    <string name="copy_onboarding_notifications" formatted="false">"Уведомления"</string>
+    <string name="copy_onboarding_notifications_tell_you_about" formatted="false">"Уведомления нужны, чтобы вы узнали о сбое и восстановлении связи. Без них Android 13+ скрывает и значок службы."</string>
+    <string name="copy_onboarding_allow_notifications" formatted="false">"Разрешить уведомления"</string>
+    <string name="copy_onboarding_open_notification_settings" formatted="false">"Открыть настройки уведомлений"</string>
+    <string name="copy_onboarding_background_use" formatted="false">"Работа в фоне"</string>
+    <string name="copy_onboarding_so_android_does_not" formatted="false">"Чтобы Android не «усыплял» проверки при выключенном экране, снимите ограничения батареи."</string>
+    <string name="copy_onboarding_remove_battery_restrictions" formatted="false">"Снять ограничения батареи"</string>
+    <string name="copy_onboarding_done" formatted="false">"Готово"</string>
+    <string name="copy_onboarding_next" formatted="false">"Далее"</string>
+    <string name="copy_target_csv_export_ui_couldn_t_open_the" formatted="false">"Не удалось открыть сохранение файла"</string>
+    <string name="copy_target_csv_export_ui_csv_saved" formatted="false">"CSV сохранён"</string>
+    <string name="copy_target_csv_export_ui_couldn_t_save_the" formatted="false">"Не удалось сохранить CSV"</string>
+    <string name="copy_local_diagnostics_could_not_open_the" formatted="false">"Не удалось открыть выбор файла"</string>
+    <string name="copy_local_diagnostics_diagnostics_saved" formatted="false">"Диагностика сохранена"</string>
+    <string name="copy_local_diagnostics_could_not_save_diagnostics" formatted="false">"Не удалось сохранить диагностику"</string>
+</resources>

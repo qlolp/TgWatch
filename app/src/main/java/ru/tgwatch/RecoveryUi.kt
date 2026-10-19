@@ -19,12 +19,12 @@ internal class RecoveryUi(private val activity: Activity) {
         disableControls(activity.findViewById(android.R.id.content))
         val preparing = RecoveryCoordinator.state == RecoveryState.INITIALIZING
         activity.findViewById<TextView>(R.id.tvTitle).text = if (preparing)
-            Lang.t("Подготовка данных…", "Preparing data…")
-            else Lang.t("Не удалось восстановить данные", "Data recovery failed")
-        activity.findViewById<TextView>(R.id.tvSince).text = Lang.t("Проверки приостановлены", "Checks are paused")
-        activity.findViewById<TextView>(R.id.tvReason).text = Lang.t(
-            "Дождитесь завершения подготовки или повторите восстановление копии.",
-            "Wait for preparation to finish, or retry restoring the backup.")
+            activity.renderString(R.string.copy_recovery_ui_preparing_data)
+            else activity.renderString(R.string.copy_recovery_ui_data_recovery_failed)
+        activity.findViewById<TextView>(R.id.tvSince).text = activity.renderString(
+            R.string.copy_recovery_ui_checks_are_paused)
+        activity.findViewById<TextView>(R.id.tvReason).text = activity.renderString(
+            R.string.copy_recovery_ui_wait_for_preparation_to)
         activity.findViewById<Button>(R.id.btnRestoreBackup).isEnabled = !preparing
         return true
     }

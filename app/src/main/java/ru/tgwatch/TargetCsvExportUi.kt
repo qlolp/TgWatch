@@ -25,7 +25,7 @@ internal class TargetCsvExportUi(private val activity: Activity, saved: Bundle?)
                 .addCategory(Intent.CATEGORY_OPENABLE).setType("text/csv")
                 .putExtra(Intent.EXTRA_TITLE, "tgwatch-${id.wire}-${if (days == 1) "day" else "week"}.csv"), REQUEST)
         } catch (_: Exception) {
-            message(Lang.t("Не удалось открыть сохранение файла", "Couldn’t open the file save dialog"))
+            message(activity.renderString(R.string.copy_target_csv_export_ui_couldn_t_open_the))
         }
     }
     fun save(out: Bundle) { out.putInt("export_days", days); out.putString("export_target", targetId.wire) }
@@ -54,8 +54,10 @@ internal class TargetCsvExportUi(private val activity: Activity, saved: Bundle?)
             finally { writing.set(false) }
             screen.get()?.runOnUiThread {
                 screen.get()?.takeUnless { it.isFinishing || it.isDestroyed }?.let {
-                    Toast.makeText(it, if (success) Lang.t("CSV сохранён", "CSV saved")
-                        else Lang.t("Не удалось сохранить CSV", "Couldn’t save the CSV"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(it, if (success) activity.renderString(
+                        R.string.copy_target_csv_export_ui_csv_saved)
+                        else activity.renderString(R.string.copy_target_csv_export_ui_couldn_t_save_the),
+                        Toast.LENGTH_LONG).show()
                 }
             }
         }, "tg-export").start()

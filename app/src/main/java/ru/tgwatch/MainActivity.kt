@@ -27,8 +27,6 @@ import android.widget.Toast
 /** Экран приложения: статус, график, кнопки и настройки. */
 class MainActivity : Activity() {
 
-    private lateinit var setupCard: View
-    private lateinit var tvSetup: TextView
     private lateinit var btnSetupNotif: Button
     private lateinit var btnSetupBattery: Button
     private lateinit var btnSetupAlarm: Button
@@ -102,7 +100,7 @@ class MainActivity : Activity() {
         if (firstRunGuide) Prefs.setEnabled(this, false)
         setContentView(R.layout.activity_main)
         historyUi = MainHistoryUi(this) { text ->
-            shareText(Lang.t("Сводка TG Монитор", "TG Monitor summary"), text)
+            shareText(this@MainActivity.renderString(R.string.copy_main_tg_monitor_summary), text)
         }
         applySystemBarInsets()
         findViewById<Button>(R.id.btnLatency).setOnClickListener { LatencyActivity.open(this, targetUi.selected) }
@@ -148,7 +146,12 @@ class MainActivity : Activity() {
         updateProfileLabel()
         btnProfile.setOnClickListener {
             AlertDialog.Builder(this).setTitle(R.string.battery_title)
-                .setItems(PowerProfile.entries.map { Lang.t("${AndroidText.resolve(this, it.title)}: ${it.awake} с / сон ${it.asleep} с / сбой ${it.failure} с", "${AndroidText.resolve(this, it.title)}: ${it.awake} s / sleep ${it.asleep} s / outage ${it.failure} s") }.toTypedArray()) { _, index ->
+                .setItems(PowerProfile.entries.map { this@MainActivity.renderString(
+                    R.string.copy_main_s_sleep_s_outage,
+                    AndroidText.resolve(this, it.title),
+                    it.awake,
+                    it.asleep,
+                    it.failure) }.toTypedArray()) { _, index ->
                     val profile = PowerProfile.entries[index]
                     Prefs.setProfile(this, profile)
                     changingProfile = true
@@ -160,8 +163,6 @@ class MainActivity : Activity() {
         }
         MonitorService.restorePersistedState(this)
 
-        setupCard = findViewById(R.id.setupCard)
-        tvSetup = findViewById(R.id.tvSetup)
         btnSetupNotif = findViewById(R.id.btnSetupNotif)
         btnSetupBattery = findViewById(R.id.btnSetupBattery)
         btnSetupAlarm = findViewById(R.id.btnSetupAlarm)
@@ -202,7 +203,8 @@ class MainActivity : Activity() {
         statusCard.backgroundTintList = ColorStateList.valueOf(cardColor)
 
         findViewById<TextView>(R.id.tvVersion).text = try {
-            Lang.t("Версия ", "Version ") + packageManager.getPackageInfo(packageName, 0).versionName
+            this@MainActivity.renderString(R.string.copy_main_version) +
+                packageManager.getPackageInfo(packageName, 0).versionName
         } catch (_: Exception) {
             ""
         }
@@ -267,7 +269,8 @@ class MainActivity : Activity() {
         channelButton(R.id.btnChannelRecovery, "RECOVERY")
         updateAlarmPatternLabel()
         btnAlarmPattern.setOnClickListener {
-            AlertDialog.Builder(this).setTitle(Lang.t("Сигнал вибрации при сбое", "Outage vibration pattern"))
+            AlertDialog.Builder(this).setTitle(this@MainActivity.renderString(
+                R.string.copy_main_outage_vibration_pattern))
                 .setSingleChoiceItems(AlarmPattern.entries.map { AndroidText.resolve(this, it.title) }.toTypedArray(),
                     Prefs.alarmPattern(this).ordinal) { dialog, index ->
                     Prefs.setAlarmPattern(this, AlarmPattern.entries[index])
@@ -314,7 +317,8 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.btnAppDetails).setOnClickListener { OemTips.openAppDetails(this) }
         findViewById<Button>(R.id.btnOnboarding).setOnClickListener { OnboardingActivity.open(this) }
         findViewById<Button>(R.id.btnVibe).setOnClickListener { Vibe.alarm(this) }
-        btnShareLog.setOnClickListener { shareText(Lang.t("Журнал TG Монитор", "TG Monitor log"), EventLog.exportText(this)) }
+        btnShareLog.setOnClickListener { shareText(this@MainActivity.renderString(
+            R.string.copy_main_tg_monitor_log), EventLog.exportText(this)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
         val oem = OemTips.manufacturerHint()
@@ -336,7 +340,9 @@ class MainActivity : Activity() {
         advancedSettings.visibility = if (advancedExpanded) View.VISIBLE else View.GONE
         btnAdvanced.text = getString(if (advancedExpanded) R.string.advanced_hide else R.string.advanced_show)
     }
-    private fun updateAlarmPatternLabel() { btnAlarmPattern.text = Lang.t("Сигнал вибрации: ${AndroidText.resolve(this, Prefs.alarmPattern(this).title)}", "Vibration pattern: ${AndroidText.resolve(this, Prefs.alarmPattern(this).title)}") }
+    private fun updateAlarmPatternLabel() { btnAlarmPattern.text = this@MainActivity.renderString(
+        R.string.copy_main_vibration_pattern,
+        AndroidText.resolve(this, Prefs.alarmPattern(this).title)) }
 
     override fun onResume() {
         super.onResume()
@@ -366,7 +372,9 @@ class MainActivity : Activity() {
         try {
             MonitorService.start(this)
         } catch (e: Exception) {
-            Toast.makeText(this, Lang.t("Не удалось запустить: ${e.message}", "Couldn’t start monitoring: ${e.message}"), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, this@MainActivity.renderString(
+                R.string.copy_main_couldn_t_start_monitoring,
+                e.message), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -383,12 +391,15 @@ class MainActivity : Activity() {
         try {
             startActivity(Intent.createChooser(send, subject))
         } catch (e: Exception) {
-            Toast.makeText(this, Lang.t("Не удалось поделиться: ${e.message}", "Couldn’t share: ${e.message}"), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, this@MainActivity.renderString(
+                R.string.copy_main_couldn_t_share, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun updateDailySummaryLabel() {
-        swDailySummary.text = Lang.t("Сводка за день в ${DailySummary.timeLabel(Prefs.dailySummaryMinute(this))}", "Daily summary at ${DailySummary.timeLabel(Prefs.dailySummaryMinute(this))}")
+        swDailySummary.text = this@MainActivity.renderString(
+            R.string.copy_main_daily_summary_at,
+            DailySummary.timeLabel(Prefs.dailySummaryMinute(this)))
     }
 
     private fun pickDailySummaryTime() {
@@ -399,14 +410,14 @@ class MainActivity : Activity() {
             swDailySummary.isChecked = true
             updateDailySummaryLabel()
         }, minute / 60, minute % 60, true).apply {
-            setTitle(Lang.t("Время сводки за день", "Daily summary time"))
+            setTitle(this@MainActivity.renderString(R.string.copy_main_daily_summary_time))
             show()
         }
     }
 
     private fun updateQuietHoursLabel() {
         val label = ProbeRules.quietHoursMinutesLabel(Prefs.quietStartMinute(this), Prefs.quietEndMinute(this))
-        swQuietHours.text = Lang.t("Тихие часы $label (без вибрации)", "Quiet hours $label (no vibration)")
+        swQuietHours.text = this@MainActivity.renderString(R.string.copy_main_quiet_hours_no_vibration, label)
     }
 
     /** Сначала время начала тихих часов, затем время окончания. */
@@ -418,25 +429,25 @@ class MainActivity : Activity() {
                 swQuietHours.isChecked = true
                 updateQuietHoursLabel()
             }, Prefs.quietEndMinute(this) / 60, Prefs.quietEndMinute(this) % 60, true).apply {
-                setTitle(Lang.t("Конец тихих часов", "Quiet hours end"))
+                setTitle(this@MainActivity.renderString(R.string.copy_main_quiet_hours_end))
                 show()
             }
         }, Prefs.quietStartMinute(this) / 60, Prefs.quietStartMinute(this) % 60, true).apply {
-            setTitle(Lang.t("Начало тихих часов", "Quiet hours start"))
+            setTitle(this@MainActivity.renderString(R.string.copy_main_quiet_hours_start))
             show()
         }
     }
 
     private fun confirmClearLog() {
         AlertDialog.Builder(this)
-            .setTitle(Lang.t("Очистить журнал?", "Clear the log?"))
-            .setMessage(Lang.t("Записи о сменах статуса будут удалены. График и статистика останутся.", "Status change entries will be deleted. The chart and statistics will stay."))
-            .setPositiveButton(Lang.t("Очистить", "Clear")) { _, _ ->
+            .setTitle(this@MainActivity.renderString(R.string.copy_main_clear_the_log))
+            .setMessage(this@MainActivity.renderString(R.string.copy_main_status_change_entries_will))
+            .setPositiveButton(this@MainActivity.renderString(R.string.copy_main_clear)) { _, _ ->
                 EventLog.clear(this)
                 shownLog = null
                 render()
             }
-            .setNegativeButton(Lang.t("Отмена", "Cancel"), null)
+            .setNegativeButton(this@MainActivity.renderString(R.string.copy_main_cancel), null)
             .show()
     }
 
@@ -469,9 +480,9 @@ class MainActivity : Activity() {
         var color = getColor(R.color.status_idle)
         if (!running) {
             ivStatus.setImageResource(R.drawable.ic_stat_pause)
-            tvTitle.text = Lang.t("Мониторинг выключен", "Monitoring is off")
-            tvSince.text = Lang.t("Проверки остановлены", "Checks are stopped")
-            tvReason.text = Lang.t("Нажми «Запустить», и приложение начнёт следить за Telegram.", "Tap “Start” and the app will begin monitoring Telegram.")
+            tvTitle.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_off)
+            tvSince.text = this@MainActivity.renderString(R.string.copy_main_checks_are_stopped)
+            tvReason.text = this@MainActivity.renderString(R.string.copy_main_tap_start_and_the)
         } else if (stale) {
             color = getColor(R.color.status_idle)
             renderTelegramStale(s, now)
@@ -480,26 +491,34 @@ class MainActivity : Activity() {
         }
         val mutedUntil = Prefs.alertsMutedUntil(this, now)
         btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
-        if (running && mutedUntil > 0L) tvReason.append(Lang.t("\nОповещения заглушены до ${timeStr(mutedUntil)}",
-            "\nAlerts muted until ${timeStr(mutedUntil)}"))
+        if (running && mutedUntil > 0L) tvReason.append(this@MainActivity.renderString(
+            R.string.copy_main_alerts_muted_until,
+            timeStr(mutedUntil)))
         ivStatus.contentDescription = tvTitle.text
         animateCardColor(color)
 
-        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) Lang.t("${s.latencyMs} мс", "${s.latencyMs} ms") else "—"
+        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) this@MainActivity.renderString(
+            R.string.copy_main_ms,
+            s.latencyMs) else "—"
         tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
     }
 
     private fun renderTelegramStale(s: MonitorService.State, now: Long) {
         ivStatus.setImageResource(R.drawable.ic_stat_wait)
         tvTitle.text = when (s.status) {
-            MonitorService.Status.OK -> Lang.t("Последний раз: доступен", "Last known: reachable")
-            MonitorService.Status.PARTIAL -> Lang.t("Последний раз: частично доступен", "Last known: partially reachable")
-            MonitorService.Status.TG_DOWN -> Lang.t("Последний раз: недоступен", "Last known: unreachable")
-            MonitorService.Status.NO_NETWORK -> Lang.t("Последний раз: нет сети", "Last known: no internet")
-            MonitorService.Status.UNKNOWN -> Lang.t("Проверяю…", "Checking…")
+            MonitorService.Status.OK -> this@MainActivity.renderString(R.string.copy_main_last_known_reachable)
+            MonitorService.Status.PARTIAL -> this@MainActivity.renderString(
+                R.string.copy_main_last_known_partially_reachable)
+            MonitorService.Status.TG_DOWN -> this@MainActivity.renderString(
+                R.string.copy_main_last_known_unreachable)
+            MonitorService.Status.NO_NETWORK -> this@MainActivity.renderString(
+                R.string.copy_main_last_known_no_internet)
+            MonitorService.Status.UNKNOWN -> this@MainActivity.renderString(R.string.copy_main_checking)
         }
-        tvSince.text = Lang.t("Проверено ${agoStr(s.checkedAt, now)} — жду свежую проверку", "Checked ${agoStr(s.checkedAt, now)} — waiting for a fresh check")
-        tvReason.text = Lang.t("Мониторинг задерживается. Android мог отложить проверку; нажми «Проверить».", "Monitoring is delayed. Android may have postponed the check; tap “Check now”.")
+        tvSince.text = this@MainActivity.renderString(
+            R.string.copy_main_checked_waiting_for_a,
+            agoStr(s.checkedAt, now))
+        tvReason.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_delayed_android)
     }
 
     private fun renderTelegramCurrent(s: MonitorService.State, now: Long): Int {
@@ -508,32 +527,40 @@ class MainActivity : Activity() {
             MonitorService.Status.OK -> {
                 color = getColor(R.color.status_ok)
                 ivStatus.setImageResource(R.drawable.ic_stat_ok)
-                tvTitle.text = Lang.t("Telegram отвечает", "Telegram is responding")
+                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_responding)
             }
             MonitorService.Status.PARTIAL -> {
                 color = getColor(R.color.status_offline)
                 ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                tvTitle.text = Lang.t("Telegram частично доступен", "Telegram is partially reachable")
+                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_partially_reachable)
             }
             MonitorService.Status.TG_DOWN -> {
                 color = getColor(R.color.status_fail)
                 ivStatus.setImageResource(R.drawable.ic_stat_fail)
-                tvTitle.text = Lang.t("Telegram недоступен", "Telegram is unreachable")
+                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_unreachable)
             }
             MonitorService.Status.NO_NETWORK -> {
                 color = getColor(R.color.status_offline)
                 ivStatus.setImageResource(R.drawable.ic_stat_offline)
-                tvTitle.text = Lang.t("Нет интернета", "No internet")
+                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_no_internet)
             }
             MonitorService.Status.UNKNOWN -> {
                 ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                tvTitle.text = if (s.checkedAt > 0) Lang.t("Доступность не определена", "Reachability unknown") else Lang.t("Проверяю…", "Checking…")
+                tvTitle.text = if (s.checkedAt > 0) this@MainActivity.renderString(
+                    R.string.copy_main_reachability_unknown) else this@MainActivity.renderString(
+                        R.string.copy_main_checking)
             }
         }
         tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
-            if (s.checkedAt > 0) Lang.t("Проверено ${agoStr(s.checkedAt, now)}", "Checked ${agoStr(s.checkedAt, now)}") else Lang.t("Первая проверка идёт прямо сейчас", "First check in progress")
+            if (s.checkedAt > 0) this@MainActivity.renderString(
+                R.string.copy_main_checked,
+                agoStr(s.checkedAt, now)) else this@MainActivity.renderString(
+                    R.string.copy_main_first_check_in_progress)
         } else {
-            Lang.t("Уже ${durationStr(now - s.since)} · с ${timeStr(s.since)}", "For ${durationStr(now - s.since)} · since ${timeStr(s.since)}")
+            this@MainActivity.renderString(
+                R.string.copy_main_for_since,
+                durationStr(now - s.since),
+                timeStr(s.since))
         }
         tvReason.text = telegramReason(s)
         return color
@@ -541,12 +568,16 @@ class MainActivity : Activity() {
 
     private fun telegramReason(s: MonitorService.State): String {
         return when (s.status) {
-            MonitorService.Status.OK -> Lang.t("MTProto и веб-ресурсы отвечают. Доставка сообщений не проверяется.", "MTProto and web resources are responding. Message delivery is not checked.")
+            MonitorService.Status.OK -> this@MainActivity.renderString(
+                R.string.copy_main_mtproto_and_web_resources)
             MonitorService.Status.PARTIAL -> s.reason
-            MonitorService.Status.TG_DOWN -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
-            MonitorService.Status.NO_NETWORK -> Lang.t("Причина: ${s.reason}", "Reason: ${s.reason}")
-            MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { Lang.t("Проверяю веб-ресурсы и MTProto", "Checking web resources and MTProto") }
-        } + if (s.lastVibrationAt > 0L) Lang.t("\nПоследняя вибрация: ${timeStr(s.lastVibrationAt)}", "\nLast vibration: ${timeStr(s.lastVibrationAt)}") else ""
+            MonitorService.Status.TG_DOWN -> this@MainActivity.renderString(R.string.copy_main_reason, s.reason)
+            MonitorService.Status.NO_NETWORK -> this@MainActivity.renderString(R.string.copy_main_reason, s.reason)
+            MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { this@MainActivity.renderString(
+                R.string.copy_main_checking_web_resources_and) }
+        } + if (s.lastVibrationAt > 0L) this@MainActivity.renderString(
+            R.string.copy_main_last_vibration,
+            timeStr(s.lastVibrationAt)) else ""
     }
 
     private fun render() {
@@ -554,9 +585,9 @@ class MainActivity : Activity() {
         if (BackupManager.hasPending()) {
             btnToggle.isEnabled = false
             btnCheck.isEnabled = false
-            tvTitle.text = Lang.t("Незавершённое восстановление", "Restore not finished")
-            tvSince.text = Lang.t("Мониторинг выключен", "Monitoring is off")
-            tvReason.text = Lang.t("Нажмите «Восстановить резервную копию», чтобы завершить замену данных.", "Tap “Restore backup” to finish replacing the data.")
+            tvTitle.text = this@MainActivity.renderString(R.string.copy_main_restore_not_finished)
+            tvSince.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_off)
+            tvReason.text = this@MainActivity.renderString(R.string.copy_main_tap_restore_backup_to)
             ivStatus.contentDescription = tvTitle.text
             return
         }
@@ -569,64 +600,50 @@ class MainActivity : Activity() {
         val batteryOk = ignoringBatteryOptimizations()
         val alarmOk = Prefs.exactAlarmsAllowed(this)
 
-        renderSetup(notifOk, batteryOk, alarmOk)
+        MainSetupUi.render(this, notifOk, batteryOk, alarmOk)
         TargetLegacySettingsUi.refresh(this, intervalButtons) { changingProfile = it }
 
         if (targetUi.selected == TargetId.TELEGRAM) renderTelegramStatus(s, now, running, stale)
         historyUi.refresh(historyDays, now)
         if (tvDiagnostics.visibility == View.VISIBLE && targetUi.selected == TargetId.TELEGRAM) {
-            tvDiagnostics.text = s.diagnostics.ifEmpty { Lang.t("Диагностика появится после первой проверки.", "Diagnostics will appear after the first check.") } +
-                Lang.t("\nВозраст результата: ${agoStr(s.checkedAt, now)}. Интервал: ${s.expectedIntervalSec} с.", "\nLast result: ${agoStr(s.checkedAt, now)}. Interval: ${s.expectedIntervalSec} s.")
+            tvDiagnostics.text = s.diagnostics.ifEmpty { this@MainActivity.renderString(
+                R.string.copy_main_diagnostics_will_appear_after) } +
+                this@MainActivity.renderString(
+                    R.string.copy_main_last_result_interval_s,
+                    agoStr(s.checkedAt, now),
+                    s.expectedIntervalSec)
         }
         val log = EventLog.all(this)
         if (log !== shownLog) {
             shownLog = log
-            tvLog.text = if (log.isEmpty()) Lang.t("Пока пусто", "Nothing yet") else log.joinToString("\n")
+            tvLog.text = if (log.isEmpty()) this@MainActivity.renderString(R.string.copy_main_nothing_yet)
+                else log.joinToString("\n")
         }
 
         if (notifOk) {
-            tvNotif.text = Lang.t("✓ Уведомления включены, значок виден в строке состояния.", "✓ Notifications are on; the icon is visible in the status bar.")
+            tvNotif.text = this@MainActivity.renderString(R.string.copy_main_notifications_are_on_the)
             btnNotif.visibility = View.GONE
         } else {
-            tvNotif.text = Lang.t("Уведомления выключены, поэтому значка в строке состояния не будет.", "Notifications are off, so there will be no status bar icon.")
+            tvNotif.text = this@MainActivity.renderString(R.string.copy_main_notifications_are_off_so)
             btnNotif.visibility = View.VISIBLE
         }
 
         if (batteryOk) {
-            tvBattery.text = Lang.t("✓ Работа в фоне без ограничений разрешена.", "✓ Unrestricted background use is allowed.")
+            tvBattery.text = this@MainActivity.renderString(R.string.copy_main_unrestricted_background_use_is)
             btnBattery.visibility = View.GONE
         } else {
-            tvBattery.text = Lang.t("Android может «усыплять» приложение при выключенном экране, " +
-                "и тогда проверки будут останавливаться.",
-                "Android may put the app to sleep while the screen is off, and then checks will stop.")
+            tvBattery.text = this@MainActivity.renderString(R.string.copy_main_android_may_put_the)
             btnBattery.visibility = View.VISIBLE
         }
 
         if (alarmOk) {
-            tvAlarm.text = Lang.t("✓ Точные будильники разрешены. Android всё равно может откладывать проверки в глубоком сне.", "✓ Exact alarms are allowed. Android may still postpone checks in deep sleep.")
+            tvAlarm.text = this@MainActivity.renderString(R.string.copy_main_exact_alarms_are_allowed)
             btnAlarm.visibility = View.GONE
         } else {
-            tvAlarm.text = Lang.t("Без точных будильников Android откладывает проверки во сне, и статус устаревает.", "Without exact alarms, Android postpones checks during sleep and the status goes stale.")
+            tvAlarm.text = this@MainActivity.renderString(R.string.copy_main_without_exact_alarms_android)
             btnAlarm.visibility = View.VISIBLE
         }
         targetUi.render(now)
-    }
-
-    private fun renderSetup(notifOk: Boolean, batteryOk: Boolean, alarmOk: Boolean) {
-        if (notifOk && batteryOk && alarmOk) {
-            setupCard.visibility = View.GONE
-            return
-        }
-        setupCard.visibility = View.VISIBLE
-        val lines = mutableListOf(Lang.t("Без этих разрешений значок в строке состояния может пропасть или врать.", "Without these permissions, the status bar icon may disappear or show the wrong status."))
-        if (!notifOk) lines += Lang.t("• Включи уведомления — иначе постоянного значка не будет.", "• Turn on notifications, or there will be no persistent icon.")
-        if (!batteryOk) lines += Lang.t("• Разреши работу без ограничений — иначе Android усыпит проверки.", "• Allow unrestricted background use, or Android will put checks to sleep.")
-        if (!alarmOk) lines += Lang.t("• Разреши точные будильники — иначе проверки замирают при выключенном экране.", "• Allow exact alarms, or checks will stall while the screen is off.")
-        OemTips.manufacturerHint()?.let { lines += "• $it" }
-        tvSetup.text = lines.joinToString("\n")
-        btnSetupNotif.visibility = if (notifOk) View.GONE else View.VISIBLE
-        btnSetupBattery.visibility = if (batteryOk) View.GONE else View.VISIBLE
-        btnSetupAlarm.visibility = if (alarmOk) View.GONE else View.VISIBLE
     }
 
     private fun updateProfileLabel() {

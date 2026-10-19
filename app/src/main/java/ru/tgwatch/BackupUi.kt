@@ -23,21 +23,23 @@ class BackupUi(private val activity: Activity) {
     fun close() { dialogs.forEach { it.dismiss() }; dialogs.clear() }
 
     fun export() {
-        AlertDialog.Builder(activity).setTitle(Lang.t("Формат резервной копии", "Backup format"))
-            .setItems(arrayOf(Lang.t("Все цели — v3", "All targets — v3"),
-                Lang.t("Только Telegram — совместимый v2", "Telegram only — compatible v2"))) { _, index ->
+        AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_backup_format))
+            .setItems(arrayOf(activity.renderString(R.string.copy_backup_ui_all_targets_v),
+                activity.renderString(R.string.copy_backup_ui_telegram_only_compatible_v))) { _, index ->
                 document(Intent.ACTION_CREATE_DOCUMENT, if (index == 0) EXPORT else EXPORT_LEGACY,
                     "application/octet-stream", if (index == 0) "tgwatch.tgwb" else "tgwatch-telegram-v2.tgwb")
             }.show().also { dialogs.add(it) }
     }
     fun restore() {
         if (BackupManager.hasPending()) {
-            AlertDialog.Builder(activity).setTitle(Lang.t("Завершить восстановление?", "Finish restoring?"))
-                .setMessage(Lang.t("Предыдущее восстановление было прервано. Мониторинг останется выключен до завершения.", "The previous restore was interrupted. Monitoring stays off until it is finished."))
-                .setPositiveButton(Lang.t("Продолжить", "Continue")) { _, _ -> work(Lang.t("Восстановление…", "Restoring…"), {
+            AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_finish_restoring))
+                .setMessage(activity.renderString(R.string.copy_backup_ui_the_previous_restore_was))
+                .setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue)) { _, _ -> work(activity.renderString(
+                    R.string.copy_backup_ui_restoring), {
                     BackupManager.recoverPending(activity.applicationContext)
-                }, { activity.recreate() }, Lang.t("Не удалось завершить восстановление. Повторите попытку.", "Couldn’t finish restoring. Please try again.")) }
-                .setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
+                }, { activity.recreate() }, activity.renderString(
+                    R.string.copy_backup_ui_couldn_t_finish_restoring)) }
+                .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
             return
         }
         document(Intent.ACTION_OPEN_DOCUMENT, RESTORE, "*/*")
@@ -53,7 +55,7 @@ class BackupUi(private val activity: Activity) {
                 this.type = type
                 if (name != null) putExtra(Intent.EXTRA_TITLE, name)
             }, code)
-        } catch (_: Exception) { message(Lang.t("Не удалось открыть выбор файла", "Couldn’t open the file picker")) }
+        } catch (_: Exception) { message(activity.renderString(R.string.copy_backup_ui_couldn_t_open_the)) }
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {
@@ -61,25 +63,27 @@ class BackupUi(private val activity: Activity) {
         if (result != Activity.RESULT_OK) return true
         val uri = data?.data ?: return true
         when (code) {
-            EXPORT, EXPORT_LEGACY -> password(true) { pass -> work(Lang.t("Создание копии…", "Creating backup…"), {
+            EXPORT, EXPORT_LEGACY -> password(true) { pass -> work(activity.renderString(
+                R.string.copy_backup_ui_creating_backup), {
                 try {
                     val archive = if (code == EXPORT) BackupManager.export(activity.applicationContext, pass)
                         else BackupManager.exportTelegram(activity.applicationContext, pass)
                     activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(archive) }
                         ?: error("No output")
                 } finally { pass.fill('\u0000') }
-            }, { message(Lang.t("Зашифрованная копия сохранена. Для восстановления потребуется пароль.", "Encrypted backup saved. You will need the password to restore it.")) },
-                Lang.t("Не удалось сохранить копию", "Couldn’t save the backup")) }
-            RESTORE -> password(false) { pass -> work(Lang.t("Проверка копии…", "Checking backup…"), {
+            }, { message(activity.renderString(R.string.copy_backup_ui_encrypted_backup_saved_you)) },
+                activity.renderString(R.string.copy_backup_ui_couldn_t_save_the)) }
+            RESTORE -> password(false) { pass -> work(activity.renderString(
+                R.string.copy_backup_ui_checking_backup), {
                 try { PortableBackupCodec.decryptTargetImport(read(uri, PortableBackupCodec.MAX_ENVELOPE_BYTES), pass) }
                 finally { pass.fill('\u0000') }
-            }, { previewTargets(it) }, Lang.t("Неверный пароль или повреждённая копия", "Wrong password or damaged backup")) }
-            CSV -> work(Lang.t("Проверка CSV…", "Checking CSV…"), {
+            }, { previewTargets(it) }, activity.renderString(R.string.copy_backup_ui_wrong_password_or_damaged)) }
+            CSV -> work(activity.renderString(R.string.copy_backup_ui_checking_csv), {
                 val bytes = read(uri, TargetBackupCodec.MAX_PLAINTEXT_BYTES)
                 val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
                 CsvDocument(TargetCsv.parse(text), TargetCsv.isLegacy(text))
-            }, { previewCsv(it) }, Lang.t("CSV повреждён или имеет неподдерживаемый формат", "The CSV is damaged or in an unsupported format"))
+            }, { previewCsv(it) }, activity.renderString(R.string.copy_backup_ui_the_csv_is_damaged))
         }
         return true
     }
@@ -102,11 +106,16 @@ class BackupUi(private val activity: Activity) {
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             layout.addView(this)
         }
-        val first = field(if (confirm) Lang.t("Пароль: от 12 до 256 символов", "Password: 12 to 256 characters") else Lang.t("Пароль этой копии", "Password for this backup"))
-        val second = if (confirm) field(Lang.t("Повторите пароль", "Repeat the password")) else null
-        val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) Lang.t("Пароль копии", "Backup password") else Lang.t("Открыть копию", "Open backup"))
-            .setMessage(if (confirm) Lang.t("Запомните пароль: восстановить его невозможно.", "Remember the password: it cannot be recovered.") else Lang.t("Введите пароль этой копии.", "Enter the password for this backup."))
-            .setView(layout).setPositiveButton(Lang.t("Продолжить", "Continue"), null).setNegativeButton(Lang.t("Отмена", "Cancel"), null).create()
+        val first = field(if (confirm) activity.renderString(R.string.copy_backup_ui_password_to_characters) else activity.renderString(
+            R.string.copy_backup_ui_password_for_this_backup))
+        val second = if (confirm) field(activity.renderString(R.string.copy_backup_ui_repeat_the_password)) else null
+        val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) activity.renderString(
+            R.string.copy_backup_ui_backup_password) else activity.renderString(
+                R.string.copy_backup_ui_open_backup))
+            .setMessage(if (confirm) activity.renderString(R.string.copy_backup_ui_remember_the_password_it) else activity.renderString(
+                R.string.copy_backup_ui_enter_the_password_for))
+            .setView(layout).setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue), null).setNegativeButton(activity.renderString(
+                R.string.copy_backup_ui_cancel), null).create()
         dialog.setOnDismissListener { first.text.clear(); second?.text?.clear() }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -115,7 +124,8 @@ class BackupUi(private val activity: Activity) {
                 val valid = pass.size in (if (confirm) 12..256 else 1..1024) &&
                     (repeated == null || pass.contentEquals(repeated))
                 repeated?.fill('\u0000')
-                if (!valid) { pass.fill('\u0000'); first.error = Lang.t("Проверьте длину и совпадение паролей", "Check the password length and that both entries match") }
+                if (!valid) { pass.fill('\u0000'); first.error = activity.renderString(
+                    R.string.copy_backup_ui_check_the_password_length) }
                 else { dialog.dismiss(); action(pass) }
             }
         }
@@ -127,40 +137,35 @@ class BackupUi(private val activity: Activity) {
     private fun previewTargets(imported: TargetBackupImport) {
         val snapshot = imported.snapshot
         val count = snapshot.observations.values.sumOf { it.size }
-        AlertDialog.Builder(activity).setTitle(Lang.t("Восстановить копию?", "Restore this backup?"))
-            .setMessage(Lang.t("Целей: ${snapshot.targets.size}. Записей истории: $count.\n\n" +
-                "Данные будут заменены. Все цели останутся выключены; приватные адреса нужно проверить заново.",
-                "Targets: ${snapshot.targets.size}. History records: $count.\n\n" +
-                    "Data will be replaced. All targets stay off; private endpoints require review."))
-            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ ->
-                work(Lang.t("Восстановление…", "Restoring…"), {
+        AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_restore_this_backup))
+            .setMessage(activity.renderString(
+                R.string.copy_backup_ui_targets_history_records_data,
+                snapshot.targets.size,
+                count))
+            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ ->
+                work(activity.renderString(R.string.copy_backup_ui_restoring), {
                     TargetRestore.stage(activity.applicationContext, imported)
                     BackupManager.recoverPending(activity.applicationContext)
-                }, { message(Lang.t("Данные восстановлены. Все цели выключены.",
-                    "Data restored. All targets are off.")); activity.recreate() },
-                    Lang.t("Восстановление прервано. Повторите попытку.", "Restore interrupted. Please retry."))
-            }.setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
+                }, { message(activity.renderString(R.string.copy_backup_ui_data_restored_all_targets)); activity.recreate() },
+                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
+            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
     }
 
     private fun previewCsv(document: CsvDocument) {
         val rows = document.rows
         val names = rows.keys.joinToString(", ", transform = TargetNames::label)
         val count = rows.values.sumOf { it.size }
-        AlertDialog.Builder(activity).setTitle(Lang.t("Импортировать CSV?", "Import CSV?"))
-            .setMessage(Lang.t("Цели: $names. Записей: $count.\n\nИстория указанных целей будет заменена. " +
-                "Настройки, журнал и история других целей сохранятся. Все цели будут остановлены.",
-                "Targets: $names. Records: $count.\n\nHistory for these targets will be replaced. " +
-                    "Settings, log and other targets' histories are kept. All targets will stop."))
-            .setPositiveButton(Lang.t("Заменить данные", "Replace data")) { _, _ ->
-                work(Lang.t("Восстановление…", "Restoring…"), {
+        AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_import_csv))
+            .setMessage(activity.renderString(R.string.copy_backup_ui_targets_records_history_for, names, count))
+            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ ->
+                work(activity.renderString(R.string.copy_backup_ui_restoring), {
                     if (document.legacy) BackupManager.importHistory(activity.applicationContext,
                         rows.getValue(TargetId.TELEGRAM).map { value ->
                             value.row.copy(kind = Timeline.canonicalKind(value.row.kind)) })
                     else BackupManager.importHistories(activity.applicationContext, rows)
-                }, { message(Lang.t("История восстановлена. Все цели выключены.",
-                    "History restored. All targets are off.")); activity.recreate() },
-                    Lang.t("Восстановление прервано. Повторите попытку.", "Restore interrupted. Please retry."))
-            }.setNegativeButton(Lang.t("Отмена", "Cancel"), null).show().also { dialogs.add(it) }
+                }, { message(activity.renderString(R.string.copy_backup_ui_history_restored_all_targets)); activity.recreate() },
+                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
+            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
     }
 
     @Suppress("DEPRECATION")

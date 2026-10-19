@@ -1,0 +1,112 @@
+<resources>
+    <string name="copy_main_tg_monitor_summary" formatted="false">"TG Monitor summary"</string>
+    <string name="copy_main_s_sleep_s_outage">"%1$s: %2$s s / sleep %3$s s / outage %4$s s"</string>
+    <string name="copy_main_version" formatted="false">"Version "</string>
+    <string name="copy_main_outage_vibration_pattern" formatted="false">"Outage vibration pattern"</string>
+    <string name="copy_main_tg_monitor_log" formatted="false">"TG Monitor log"</string>
+    <string name="copy_main_vibration_pattern">"Vibration pattern: %1$s"</string>
+    <string name="copy_main_couldn_t_start_monitoring">"Couldn’t start monitoring: %1$s"</string>
+    <string name="copy_main_couldn_t_share">"Couldn’t share: %1$s"</string>
+    <string name="copy_main_daily_summary_at">"Daily summary at %1$s"</string>
+    <string name="copy_main_daily_summary_time" formatted="false">"Daily summary time"</string>
+    <string name="copy_main_quiet_hours_no_vibration">"Quiet hours %1$s (no vibration)"</string>
+    <string name="copy_main_quiet_hours_end" formatted="false">"Quiet hours end"</string>
+    <string name="copy_main_quiet_hours_start" formatted="false">"Quiet hours start"</string>
+    <string name="copy_main_clear_the_log" formatted="false">"Clear the log?"</string>
+    <string name="copy_main_status_change_entries_will" formatted="false">"Status change entries will be deleted. The chart and statistics will stay."</string>
+    <string name="copy_main_clear" formatted="false">"Clear"</string>
+    <string name="copy_main_cancel" formatted="false">"Cancel"</string>
+    <string name="copy_main_monitoring_is_off" formatted="false">"Monitoring is off"</string>
+    <string name="copy_main_checks_are_stopped" formatted="false">"Checks are stopped"</string>
+    <string name="copy_main_tap_start_and_the" formatted="false">"Tap “Start” and the app will begin monitoring Telegram."</string>
+    <string name="copy_main_alerts_muted_until">"\nAlerts muted until %1$s"</string>
+    <string name="copy_main_ms">"%1$s ms"</string>
+    <string name="copy_main_last_known_reachable" formatted="false">"Last known: reachable"</string>
+    <string name="copy_main_last_known_partially_reachable" formatted="false">"Last known: partially reachable"</string>
+    <string name="copy_main_last_known_unreachable" formatted="false">"Last known: unreachable"</string>
+    <string name="copy_main_last_known_no_internet" formatted="false">"Last known: no internet"</string>
+    <string name="copy_main_checking" formatted="false">"Checking…"</string>
+    <string name="copy_main_checked_waiting_for_a">"Checked %1$s — waiting for a fresh check"</string>
+    <string name="copy_main_monitoring_is_delayed_android" formatted="false">"Monitoring is delayed. Android may have postponed the check; tap “Check now”."</string>
+    <string name="copy_main_telegram_is_responding" formatted="false">"Telegram is responding"</string>
+    <string name="copy_main_telegram_is_partially_reachable" formatted="false">"Telegram is partially reachable"</string>
+    <string name="copy_main_telegram_is_unreachable" formatted="false">"Telegram is unreachable"</string>
+    <string name="copy_main_no_internet" formatted="false">"No internet"</string>
+    <string name="copy_main_reachability_unknown" formatted="false">"Reachability unknown"</string>
+    <string name="copy_main_checked">"Checked %1$s"</string>
+    <string name="copy_main_first_check_in_progress" formatted="false">"First check in progress"</string>
+    <string name="copy_main_for_since">"For %1$s · since %2$s"</string>
+    <string name="copy_main_mtproto_and_web_resources" formatted="false">"MTProto and web resources are responding. Message delivery is not checked."</string>
+    <string name="copy_main_reason">"Reason: %1$s"</string>
+    <string name="copy_main_checking_web_resources_and" formatted="false">"Checking web resources and MTProto"</string>
+    <string name="copy_main_last_vibration">"\nLast vibration: %1$s"</string>
+    <string name="copy_main_restore_not_finished" formatted="false">"Restore not finished"</string>
+    <string name="copy_main_tap_restore_backup_to" formatted="false">"Tap “Restore backup” to finish replacing the data."</string>
+    <string name="copy_main_diagnostics_will_appear_after" formatted="false">"Diagnostics will appear after the first check."</string>
+    <string name="copy_main_last_result_interval_s">"\nLast result: %1$s. Interval: %2$s s."</string>
+    <string name="copy_main_nothing_yet" formatted="false">"Nothing yet"</string>
+    <string name="copy_main_notifications_are_on_the" formatted="false">"✓ Notifications are on; the icon is visible in the status bar."</string>
+    <string name="copy_main_notifications_are_off_so" formatted="false">"Notifications are off, so there will be no status bar icon."</string>
+    <string name="copy_main_unrestricted_background_use_is" formatted="false">"✓ Unrestricted background use is allowed."</string>
+    <string name="copy_main_android_may_put_the" formatted="false">"Android may put the app to sleep while the screen is off, and then checks will stop."</string>
+    <string name="copy_main_exact_alarms_are_allowed" formatted="false">"✓ Exact alarms are allowed. Android may still postpone checks in deep sleep."</string>
+    <string name="copy_main_without_exact_alarms_android" formatted="false">"Without exact alarms, Android postpones checks during sleep and the status goes stale."</string>
+    <string name="copy_main_without_these_permissions_the" formatted="false">"Without these permissions, the status bar icon may disappear or show the wrong status."</string>
+    <string name="copy_main_turn_on_notifications_or" formatted="false">"• Turn on notifications, or there will be no persistent icon."</string>
+    <string name="copy_main_allow_unrestricted_background_use" formatted="false">"• Allow unrestricted background use, or Android will put checks to sleep."</string>
+    <string name="copy_main_allow_exact_alarms_or" formatted="false">"• Allow exact alarms, or checks will stall while the screen is off."</string>
+    <string name="copy_backup_ui_backup_format" formatted="false">"Backup format"</string>
+    <string name="copy_backup_ui_all_targets_v" formatted="false">"All targets — v3"</string>
+    <string name="copy_backup_ui_telegram_only_compatible_v" formatted="false">"Telegram only — compatible v2"</string>
+    <string name="copy_backup_ui_finish_restoring" formatted="false">"Finish restoring?"</string>
+    <string name="copy_backup_ui_the_previous_restore_was" formatted="false">"The previous restore was interrupted. Monitoring stays off until it is finished."</string>
+    <string name="copy_backup_ui_continue" formatted="false">"Continue"</string>
+    <string name="copy_backup_ui_restoring" formatted="false">"Restoring…"</string>
+    <string name="copy_backup_ui_couldn_t_finish_restoring" formatted="false">"Couldn’t finish restoring. Please try again."</string>
+    <string name="copy_backup_ui_cancel" formatted="false">"Cancel"</string>
+    <string name="copy_backup_ui_couldn_t_open_the" formatted="false">"Couldn’t open the file picker"</string>
+    <string name="copy_backup_ui_creating_backup" formatted="false">"Creating backup…"</string>
+    <string name="copy_backup_ui_encrypted_backup_saved_you" formatted="false">"Encrypted backup saved. You will need the password to restore it."</string>
+    <string name="copy_backup_ui_couldn_t_save_the" formatted="false">"Couldn’t save the backup"</string>
+    <string name="copy_backup_ui_checking_backup" formatted="false">"Checking backup…"</string>
+    <string name="copy_backup_ui_wrong_password_or_damaged" formatted="false">"Wrong password or damaged backup"</string>
+    <string name="copy_backup_ui_checking_csv" formatted="false">"Checking CSV…"</string>
+    <string name="copy_backup_ui_the_csv_is_damaged" formatted="false">"The CSV is damaged or in an unsupported format"</string>
+    <string name="copy_backup_ui_password_to_characters" formatted="false">"Password: 12 to 256 characters"</string>
+    <string name="copy_backup_ui_password_for_this_backup" formatted="false">"Password for this backup"</string>
+    <string name="copy_backup_ui_repeat_the_password" formatted="false">"Repeat the password"</string>
+    <string name="copy_backup_ui_backup_password" formatted="false">"Backup password"</string>
+    <string name="copy_backup_ui_open_backup" formatted="false">"Open backup"</string>
+    <string name="copy_backup_ui_remember_the_password_it" formatted="false">"Remember the password: it cannot be recovered."</string>
+    <string name="copy_backup_ui_enter_the_password_for" formatted="false">"Enter the password for this backup."</string>
+    <string name="copy_backup_ui_check_the_password_length" formatted="false">"Check the password length and that both entries match"</string>
+    <string name="copy_backup_ui_restore_this_backup" formatted="false">"Restore this backup?"</string>
+    <string name="copy_backup_ui_targets_history_records_data">"Targets: %1$s. History records: %2$s.\n\nData will be replaced. All targets stay off; private endpoints require review."</string>
+    <string name="copy_backup_ui_replace_data" formatted="false">"Replace data"</string>
+    <string name="copy_backup_ui_data_restored_all_targets" formatted="false">"Data restored. All targets are off."</string>
+    <string name="copy_backup_ui_restore_interrupted_please_retry" formatted="false">"Restore interrupted. Please retry."</string>
+    <string name="copy_backup_ui_import_csv" formatted="false">"Import CSV?"</string>
+    <string name="copy_backup_ui_targets_records_history_for">"Targets: %1$s. Records: %2$s.\n\nHistory for these targets will be replaced. Settings, log and other targets\' histories are kept. All targets will stop."</string>
+    <string name="copy_backup_ui_history_restored_all_targets" formatted="false">"History restored. All targets are off."</string>
+    <string name="copy_recovery_ui_preparing_data" formatted="false">"Preparing data…"</string>
+    <string name="copy_recovery_ui_data_recovery_failed" formatted="false">"Data recovery failed"</string>
+    <string name="copy_recovery_ui_checks_are_paused" formatted="false">"Checks are paused"</string>
+    <string name="copy_recovery_ui_wait_for_preparation_to" formatted="false">"Wait for preparation to finish, or retry restoring the backup."</string>
+    <string name="copy_onboarding_what_is_checked" formatted="false">"What is checked"</string>
+    <string name="copy_onboarding_tg_monitor_checks_telegram" formatted="false">"TG Monitor checks Telegram server reachability from your phone every few seconds, with no account and no author-run servers. History stays on the device."</string>
+    <string name="copy_onboarding_notifications" formatted="false">"Notifications"</string>
+    <string name="copy_onboarding_notifications_tell_you_about" formatted="false">"Notifications tell you about outages and recoveries. Without them Android 13+ also hides the service icon."</string>
+    <string name="copy_onboarding_allow_notifications" formatted="false">"Allow notifications"</string>
+    <string name="copy_onboarding_open_notification_settings" formatted="false">"Open notification settings"</string>
+    <string name="copy_onboarding_background_use" formatted="false">"Background use"</string>
+    <string name="copy_onboarding_so_android_does_not" formatted="false">"So Android does not put checks to sleep while the screen is off, remove battery restrictions."</string>
+    <string name="copy_onboarding_remove_battery_restrictions" formatted="false">"Remove battery restrictions"</string>
+    <string name="copy_onboarding_done" formatted="false">"Done"</string>
+    <string name="copy_onboarding_next" formatted="false">"Next"</string>
+    <string name="copy_target_csv_export_ui_couldn_t_open_the" formatted="false">"Couldn’t open the file save dialog"</string>
+    <string name="copy_target_csv_export_ui_csv_saved" formatted="false">"CSV saved"</string>
+    <string name="copy_target_csv_export_ui_couldn_t_save_the" formatted="false">"Couldn’t save the CSV"</string>
+    <string name="copy_local_diagnostics_could_not_open_the" formatted="false">"Could not open the file picker"</string>
+    <string name="copy_local_diagnostics_diagnostics_saved" formatted="false">"Diagnostics saved"</string>
+    <string name="copy_local_diagnostics_could_not_save_diagnostics" formatted="false">"Could not save diagnostics"</string>
+</resources>

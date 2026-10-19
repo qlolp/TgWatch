@@ -27,7 +27,7 @@ object LocalDiagnostics {
                 .addCategory(Intent.CATEGORY_OPENABLE).setType("application/json")
                 .putExtra(Intent.EXTRA_TITLE, "TgWatch-diagnostics.json"), EXPORT_REQUEST_CODE)
         } catch (_: Exception) {
-            toast(activity, Lang.t("Не удалось открыть выбор файла", "Could not open the file picker"))
+            toast(activity, activity.renderString(R.string.copy_local_diagnostics_could_not_open_the))
         }
     }
 
@@ -57,8 +57,9 @@ object LocalDiagnostics {
             activity.runOnUiThread {
                 if (!activity.isFinishing && !activity.isDestroyed) {
                     Lang.update(activity)
-                    toast(activity, if (success) Lang.t("Диагностика сохранена", "Diagnostics saved")
-                        else Lang.t("Не удалось сохранить диагностику", "Could not save diagnostics"))
+                    toast(activity, if (success) activity.renderString(
+                        R.string.copy_local_diagnostics_diagnostics_saved)
+                        else activity.renderString(R.string.copy_local_diagnostics_could_not_save_diagnostics))
                 }
             }
         }, "diagnostic-export").start()

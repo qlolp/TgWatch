@@ -7,7 +7,7 @@ final class ResourceTextFormat {
     private ResourceTextFormat() {}
 
     static String string(Resources resources, int id, Object[] arguments) {
-        return resources.getString(id, arguments);
+        return arguments.length == 0 ? resources.getString(id) : resources.getString(id, arguments);
     }
 
     static String quantity(Resources resources, int id, int count, Object[] arguments) {
