@@ -11,7 +11,7 @@ enum class WebhookEventKind(val wireName: String) {
 data class WebhookObservation(val serviceId: String, val status: String, val checkedAtMs: Long,
     val latencyMs: Long?, val network: NetworkKind, val revision: Long, val measured: Boolean, val stale: Boolean,
     val expectedIntervalSec: Int = TargetDefinition.DEFAULT_TELEGRAM_SEC) {
-    init { require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetDefinition.MAX_TARGET_SEC) }
+    init { require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetPowerPolicy.MAX_EFFECTIVE_SEC) }
 }
 data class WebhookEvent(val kind: WebhookEventKind, val observation: WebhookObservation?, val previousStatus: String?)
 

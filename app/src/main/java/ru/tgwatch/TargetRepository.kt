@@ -43,7 +43,8 @@ class TargetRepository(initial: List<TargetDefinition> = TargetId.entries.map(Ta
         val revision = Math.addExact(snapshots[attempt.id]?.revision ?: -1L, 1L)
         return publish(TargetSnapshot(attempt.id, report.status, report.checkedAtMs.takeIf { it > 0L } ?: wallClock(),
             report.checkedElapsedMs.takeIf { it > 0L } ?: elapsedClock(),
-            current.definition.intervalSec, report.latencyMs, attempt.generation, revision, attempt.endpointRevision))
+            attempt.expectedIntervalSec ?: current.definition.intervalSec,
+            report.latencyMs, attempt.generation, revision, attempt.endpointRevision))
     }
 
     @Synchronized fun publish(snapshot: TargetSnapshot): Boolean {

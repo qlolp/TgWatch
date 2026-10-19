@@ -31,6 +31,6 @@ internal object TargetStateStore {
             ?: TargetStatus.UNKNOWN, checkedAtMs = prefs.getLong(key("checked"), 0).coerceAtLeast(0),
             latencyMs = prefs.getLong(key("latency"), -1).takeIf { it >= 0 },
             expectedIntervalSec = prefs.getInt(key("interval"), defaults.expectedIntervalSec)
-                .coerceIn(TargetDefinition.MIN_TELEGRAM_SEC, TargetDefinition.MAX_TARGET_SEC))
+                .coerceIn(TargetDefinition.MIN_TELEGRAM_SEC, TargetPowerPolicy.MAX_EFFECTIVE_SEC))
     }
 }

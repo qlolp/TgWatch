@@ -8,7 +8,7 @@ data class TargetSnapshot(val id: TargetId, val status: TargetStatus = TargetSta
     val health: MonitorHealth = MonitorHealth()) {
     init {
         require(checkedAtMs >= 0L && checkedElapsedMs >= 0L)
-        require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetDefinition.MAX_TARGET_SEC)
+        require(expectedIntervalSec in TargetDefinition.MIN_TELEGRAM_SEC..TargetPowerPolicy.MAX_EFFECTIVE_SEC)
         require(latencyMs == null || latencyMs >= 0L)
         require(generation >= 0L && revision >= 0L && endpointRevision >= 0L)
     }
