@@ -66,7 +66,7 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
     private val testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {
     /** Identity belongs to one physical request; callbacks must retain this exact token. */
     class Request internal constructor(internal val generation: Long, internal val status: String?,
-        internal val previousSent: String?) {
+        internal val previousSent: String?, internal val heartbeatServiceId: String? = null) {
         internal var superseded = false
     }
 
@@ -88,7 +88,9 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
         val prefix = "$serviceId:"
         sentAt.keys.removeAll { it.startsWith(prefix) }
         if (lastSent?.startsWith(prefix) == true) lastSent = null
-        inFlight?.takeIf { it.status?.startsWith(prefix) == true }?.superseded = true
+        inFlight?.takeIf {
+            it.status?.startsWith(prefix) == true || it.heartbeatServiceId == serviceId
+        }?.superseded = true
     }
 
     /** The token to post [status] now and later pass to [finished], or null when no post is due. */
@@ -138,6 +140,12 @@ internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS
             lastTestAt = nowElapsed
             inFlight = it
         }
+    }
+
+    /** Uses the physical slot without touching event history or the explicit-test throttle. */
+    @Synchronized fun beginHeartbeat(serviceId: String): Request? {
+        require(serviceId in WebhookStatuses.services)
+        return if (inFlight != null) null else Request(generation, null, lastSent, serviceId).also { inFlight = it }
     }
 
     /** Elapsed time going backwards (a new boot cannot share this process) never blocks a post. */

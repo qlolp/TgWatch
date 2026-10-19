@@ -80,12 +80,8 @@ internal class WebhookCoordinator(
 ) {
     private val gate = WebhookGate()
     private var tracker = WebhookEventTracker()
-    private data class PendingEvent(val id: Long, val event: WebhookEvent, val refreshedElapsed: Long) {
-        fun fresh(now: Long): Boolean = now >= refreshedElapsed && now - refreshedElapsed <=
-            checkNotNull(event.observation).expectedIntervalSec * FRESH_INTERVALS * MILLIS_PER_SECOND
-    }
-    private var sequence = 0L
-    private val latest = linkedMapOf<String, PendingEvent>()
+    private val heartbeats = WebhookHeartbeatCandidates()
+    private val latest = WebhookPendingEvents()
     private val configurationFence = WebhookConfigurationFence()
     private var generation = 0L
     private var active: Attempt? = null
@@ -118,7 +114,8 @@ internal class WebhookCoordinator(
 
     fun forget(serviceId: String) = synchronized(configurationLock) {
         tracker.forget(serviceId)
-        latest.remove(serviceId)
+        heartbeats.forget(serviceId)
+        latest.forget(serviceId)
         gate.forget(serviceId)
         active?.takeIf { it.request.superseded }?.let {
             lastHealth = WebhookHealth(lastSuccessElapsed = lastHealth.lastSuccessElapsed)
@@ -139,12 +136,8 @@ internal class WebhookCoordinator(
             val current = configuration()
             if (configurationFence.changed(current)) invalidate()
             if (captured != current || !tracker.accepts(observation)) return
-            val event = tracker.observe(observation)
-            if (event != null) latest[observation.serviceId] = PendingEvent(++sequence, event, nowElapsed())
-            else latest[observation.serviceId]?.takeIf {
-                it.event.observation?.status == WebhookStatuses.normalize(observation.status)
-            }?.let { latest[observation.serviceId] = it.copy(event = it.event.copy(observation = observation),
-                refreshedElapsed = nowElapsed()) }
+            heartbeats.published(observation, current, nowElapsed())
+            latest.published(tracker.observe(observation), observation, nowElapsed())
             val url = current.url?.takeIf { current.enabled }
             if (url != null) {
                 val due = latest.values.firstNotNullOfOrNull { pending ->
@@ -153,8 +146,18 @@ internal class WebhookCoordinator(
                     if (pending.event.kind !in current.events || !pending.fresh(nowElapsed())) null else
                         gate.beginEvent(key, nowElapsed())?.let { pending to it }
                 }
-                due?.let { (pending, request) ->
-                    dispatch(request, url, WebhookPayload.encode(pending.event, current.format), eventId = pending.id)
+                if (due != null) {
+                    val (pending, request) = due
+                    dispatch(request, url, WebhookPayload.encode(pending.event, current.format,
+                        System.currentTimeMillis()), eventId = pending.id)?.let {
+                        heartbeats.eventStarted(checkNotNull(pending.event.observation), current.format, it)
+                    }
+                } else heartbeats.next(nowElapsed())?.let { candidate ->
+                    gate.beginHeartbeat(candidate.observation.serviceId)?.let { request ->
+                        dispatch(request, url, WebhookPayload.encode(
+                            WebhookEvent(WebhookEventKind.HEARTBEAT, candidate.observation, null), current.format,
+                            System.currentTimeMillis()))?.let { heartbeats.started(candidate, it) }
+                    }
                 }
             }
         }
@@ -171,7 +174,7 @@ internal class WebhookCoordinator(
                 url == null -> done(WebhookNotifier.TestResult.NOT_CONFIGURED)
                 request == null -> done(WebhookNotifier.TestResult.BUSY)
                 else -> dispatch(request, url, WebhookPayload.encode(
-                    WebhookEvent(WebhookEventKind.TEST, null, null), current.format), done)
+                    WebhookEvent(WebhookEventKind.TEST, null, null), current.format, System.currentTimeMillis()), done)
             }
         }
     }
@@ -179,16 +182,19 @@ internal class WebhookCoordinator(
     /** Caller holds settings monitor; submit/cancel only enqueue work and never perform network I/O. */
     @Suppress("TooGenericExceptionCaught")
     private fun dispatch(request: WebhookGate.Request, url: String, body: WebhookBody,
-        done: ((WebhookNotifier.TestResult) -> Unit)? = null, eventId: Long? = null) {
+        done: ((WebhookNotifier.TestResult) -> Unit)? = null, eventId: Long? = null): Long? {
         val attempt = Attempt(request, generation, nowElapsed(), done, eventId)
         active = attempt
+        var admitted = false
         lastHealth = lastHealth.copy(lastAttemptElapsed = attempt.started, outcome = WebhookOutcome.SENDING)
         try {
             attempt.cancelDeadline = schedule(WebhookPolicy.RESULT_DEADLINE_MS) { deadline(attempt) }
             if (!submit(url, body) { complete(attempt, it) }) complete(attempt, NO_RESPONSE)
+            else admitted = true
         } catch (_: RuntimeException) {
             complete(attempt, NO_RESPONSE)
         }
+        return attempt.started.takeIf { admitted && attempt.generation == generation && !request.superseded }
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -235,7 +241,7 @@ internal class WebhookCoordinator(
         attempt.cancelDeadline = null
         if (attempt.generation == generation && !attempt.request.superseded) {
             if (result == WebhookNotifier.TestResult.SENT)
-                latest.entries.removeAll { it.value.id == attempt.eventId }
+                latest.delivered(attempt.eventId)
             lastHealth = lastHealth.copy(outcome = when (result) {
                 WebhookNotifier.TestResult.SENT -> WebhookOutcome.SENT
                 WebhookNotifier.TestResult.TIMED_OUT -> WebhookOutcome.TIMED_OUT
@@ -254,7 +260,8 @@ internal class WebhookCoordinator(
         generation++
         gate.reset()
         tracker = WebhookEventTracker()
-        latest.clear()
+        heartbeats.reset()
+        latest.reset()
         lastHealth = WebhookHealth()
         active?.cancel(cancelTransport)
     }
@@ -262,8 +269,6 @@ internal class WebhookCoordinator(
 
     private companion object {
         const val NO_RESPONSE = -1
-        const val FRESH_INTERVALS = 3L
-        const val MILLIS_PER_SECOND = 1_000L
     }
 }
 

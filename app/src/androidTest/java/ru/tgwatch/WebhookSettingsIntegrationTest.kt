@@ -152,7 +152,7 @@ class WebhookSettingsIntegrationTest {
     @Test fun formatAndFiltersArePrivateAndSurviveScreenRecreation() {
         val before = BackupManager.snapshot(ctx).settings
         assertEquals(WebhookFormat.TEXT, WebhookSettings.configuration(ctx).format)
-        assertEquals(WebhookEventKind.entries.toSet() - WebhookEventKind.TEST,
+        assertEquals(WebhookEventKind.DELIVERY_EVENTS,
             WebhookSettings.configuration(ctx).events)
         assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setDeliveryResult(ctx,
             WebhookFormat.JSON, setOf(WebhookEventKind.RECOVERY)))
@@ -182,6 +182,55 @@ class WebhookSettingsIntegrationTest {
         assertEquals(saved, WebhookSettings.configuration(ctx))
         assertTrue(WebhookSettings.clear(ctx))
         assertEquals(WebhookFormat.TEXT, WebhookSettings.configuration(ctx).format)
+    }
+
+    @Test fun heartbeatFormatTestMessageCannotClaimLiveMeasurementAndStaysOptIn() {
+        assertTrue(WebhookSettings.setUrl(ctx, secret))
+        val previous = WebhookSettings.configuration(ctx)
+        assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setDeliveryResult(ctx,
+            WebhookFormat.JSON_V2, WebhookEventKind.DELIVERY_EVENTS))
+        val current = WebhookSettings.configuration(ctx)
+        assertTrue(current.generation > previous.generation)
+        assertFalse(current.enabled)
+        assertNull(WebhookSettings.activeUrl(ctx))
+        val sent = mutableListOf<org.json.JSONObject>()
+        val coordinator = WebhookCoordinator(Any(), { WebhookSettings.configuration(ctx) }, { 0L },
+            { _, body, done -> sent.add(org.json.JSONObject(body.bytes.toString(Charsets.UTF_8))); done(204); true },
+            schedule = { _, _ -> {} })
+        val result = mutableListOf<WebhookNotifier.TestResult>()
+        coordinator.sendTest(result::add)
+        assertEquals(listOf(WebhookNotifier.TestResult.SENT), result)
+        assertEquals("test", sent.single().getString("event"))
+        assertFalse(sent.single().getBoolean("monitoring"))
+        assertTrue(sent.single().getBoolean("is_stale"))
+        assertTrue(sent.single().isNull("checked_at_ms"))
+        assertEquals(11, sent.single().length())
+        assertFalse(WebhookSettings.enabled(ctx))
+    }
+    @Test fun explicitFormatChooserShowsAndSavesAllThreeActualChoices() {
+        ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val field = AutomationSettingsActivity::class.java.getDeclaredField("webhookDelivery")
+                    .apply { isAccessible = true }
+                val helper = field.get(activity) as WebhookDeliverySettingsUi
+                val dialog = helper.chooseFormat()
+                assertTrue(dialog.isShowing)
+                val list = dialog.listView
+                assertNotNull("Format list must be attached, not hidden behind an AlertDialog message", list.parent)
+                assertEquals(3, list.adapter.count)
+                assertEquals(activity.getString(R.string.webhook_format_json_v2), list.adapter.getItem(2))
+                list.performItemClick(list.getChildAt(2), 2, list.adapter.getItemId(2))
+                assertEquals(WebhookFormat.JSON_V2, WebhookSettings.configuration(ctx).format)
+                assertFalse(WebhookSettings.enabled(ctx))
+            }
+        }
+    }
+
+    @Test fun heartbeatCannotBeInjectedAsAnEventFilter() {
+        val previous = WebhookSettings.configuration(ctx)
+        assertEquals(WebhookSettings.WriteResult.INVALID, WebhookSettings.setDeliveryResult(ctx,
+            WebhookFormat.TEXT, setOf(WebhookEventKind.HEARTBEAT)))
+        assertEquals(previous, WebhookSettings.configuration(ctx))
     }
 
     @Test fun failedSaveInvalidatesInMemoryGeneration() {

@@ -29,4 +29,6 @@
     <string name="webhook_test_failed">Test message was not delivered.</string>
     <string name="webhook_test_busy">Another request is in progress. Try again in a few seconds.</string>
     <string name="automation_token_hidden">•••••••• · Length (characters): %1$d</string>
+    <string name="webhook_format_json_v2">JSON v2 + heartbeat</string>
+    <string name="webhook_heartbeat_help">Adds fresh measured status at most every five minutes per target. No new checks or timers. Heartbeats follow status filters: OK uses Recovery; DOWN uses Unreachable; PARTIAL and No network use their matching filters. Network restored remains an event. Test messages never claim live monitoring.</string>
 </resources>

@@ -53,7 +53,7 @@ object WebhookSettings {
     /** Format and filter form one credential configuration generation; an empty filter is allowed. */
     @Synchronized fun setDeliveryResult(ctx: Context, format: WebhookFormat,
         events: Set<WebhookEventKind>): WriteResult = when {
-        WebhookEventKind.TEST in events -> WriteResult.INVALID
+        !WebhookEventKind.DELIVERY_EVENTS.containsAll(events) -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
         else -> committed(store(ctx).edit().putString(KEY_FORMAT, format.name)
             .putStringSet(KEY_EVENTS, events.map { it.name }.toSet()))

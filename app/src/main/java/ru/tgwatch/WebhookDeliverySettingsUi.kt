@@ -6,6 +6,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Toast
+import android.widget.TextView
 
 /** Delivery choices live beside the credential URL; none enter saved view state or backup. */
 internal class WebhookDeliverySettingsUi(private val activity: Activity) {
@@ -22,6 +23,10 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
             column.addView(button, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
+        column.addView(TextView(activity).apply {
+            setText(R.string.webhook_heartbeat_help)
+            isSaveEnabled = false
+        })
         format.id = AutomationSettingsActivity.ID_WEBHOOK_FORMAT
         filters.id = AutomationSettingsActivity.ID_WEBHOOK_FILTERS
         format.setOnClickListener { chooseFormat() }
@@ -31,15 +36,15 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
 
     fun refresh() {
         val current = WebhookSettings.configuration(activity)
-        format.text = activity.getString(R.string.webhook_format_current, current.format.name)
+        format.text = activity.getString(R.string.webhook_format_current,
+            activity.getString(formatLabel(current.format)))
         filters.text = activity.getString(R.string.webhook_filters_current, current.events.size, events.size)
     }
 
-    private fun chooseFormat() {
+    fun chooseFormat(): AlertDialog {
         val current = WebhookSettings.configuration(activity)
-        val options = arrayOf(activity.getString(R.string.webhook_format_text),
-            activity.getString(R.string.webhook_format_json))
-        secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_format_title)
+        val options = WebhookFormat.entries.map { activity.getString(formatLabel(it)) }.toTypedArray()
+        return secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_format_title)
             .setSingleChoiceItems(options, current.format.ordinal) { dialog, choice ->
                 save(WebhookFormat.entries[choice], WebhookSettings.configuration(activity).events)
                 dialog.dismiss()
@@ -65,9 +70,16 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
         refresh()
     }
 
-    private fun secure(dialog: AlertDialog) {
+    private fun secure(dialog: AlertDialog): AlertDialog {
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.show()
+        return dialog
+    }
+
+    private fun formatLabel(format: WebhookFormat): Int = when (format) {
+        WebhookFormat.TEXT -> R.string.webhook_format_text
+        WebhookFormat.JSON -> R.string.webhook_format_json
+        WebhookFormat.JSON_V2 -> R.string.webhook_format_json_v2
     }
 
     private companion object { const val BUTTON_DP = 48 }
