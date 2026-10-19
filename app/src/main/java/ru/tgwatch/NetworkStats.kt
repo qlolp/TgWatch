@@ -30,14 +30,15 @@ class NetworkTally(rows: Map<Pair<Long, NetworkKind>, NetCounts> = emptyMap()) {
     val snapshot: Map<Pair<Long, NetworkKind>, NetCounts> get() = rows.toMap()
 
     fun record(day: Long, kind: NetworkKind, status: String): Boolean {
-        if (kind == NetworkKind.UNKNOWN) return false
         val key = day to kind
         val current = rows[key] ?: NetCounts()
         val updated = current.plus(status)
-        if (updated == current) return false
-        rows[key] = updated
-        rows.keys.removeAll { it.first <= day - KEEP_DAYS }
-        return true
+        val changed = kind != NetworkKind.UNKNOWN && updated != current
+        if (changed) {
+            rows[key] = updated
+            rows.keys.removeAll { it.first <= day - KEEP_DAYS }
+        }
+        return changed
     }
 
     /** Totals for the last [days] local days, including [today]. */
