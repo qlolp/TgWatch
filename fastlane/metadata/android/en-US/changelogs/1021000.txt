@@ -1,1 +1,1 @@
-Telegram statistics show the share of checks without issues per network (Wi-Fi, mobile, VPN, Ethernet) and point out when only the VPN is stable. Counters stay local for 7 days and are not backed up.
+Telegram statistics show the share of checks without issues per network (Wi-Fi, mobile, VPN, Ethernet) and point out when only the VPN is stable. The diagnostics report gains a local crash journal without error messages. The watch APK is about 2.6x smaller.
