@@ -35,7 +35,7 @@ internal object LatencyPresentation {
             summary.count, ms(ctx, summary.meanMs), ms(ctx, summary.p50Ms), ms(ctx, summary.p95Ms)))
         if (summary.smallSample) add(ctx.getString(R.string.latency_small_sample))
         add(ctx.getString(R.string.latency_counts, value.errorCount, value.missingCount,
-            value.coverage.percent?.let(::formatPercent) ?: "—"))
+            value.coverage.percent?.let({ formatPercent(ctx, it) }) ?: "—"))
     }.joinToString("\n")
 
     private fun currentDc(source: HistoryRead<List<DcLatencyBucket>>, scalar: LatencyDisplay,

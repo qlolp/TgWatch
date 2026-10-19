@@ -27,7 +27,7 @@ class ShortcutActivity : Activity() {
         }
         try {
             MonitorService.send(this, MonitorService.ACTION_CHECK_NOW)
-            toast(Lang.t("Проверяю…", "Checking…"))
+            toast(this.renderString(R.string.copy_shortcut_checking))
         } catch (_: Exception) {
             // The foreground service may be refused; the app screen restarts monitoring itself.
             openApp()

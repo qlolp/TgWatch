@@ -289,7 +289,8 @@ class MonitorService : Service() {
         // Primary checks have a 12-second network budget. If overdue, cancel wait and retry.
         if (checkStartedMono > 0 && now - checkStartedMono > 30_000L) {
             workerThread.interrupt()
-        } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now, TargetServiceHealth.expectedIntervalSec(this))) {
+        } else if (checkStartedMono == 0L && ServiceHealth.isOverdue(lastProgressMono, now,
+            TargetServiceHealth.expectedIntervalSec(this))) {
             scheduleCheck(0L)
         }
     }
@@ -489,7 +490,7 @@ class MonitorService : Service() {
         val first = !loopStarted
         loopStarted = true
         if (first) HistorySessions.queue(this).submit(historySession) {
-            EventLog.add(this, Lang.t("Мониторинг запущен", "Monitoring started"))
+            EventLog.add(this, this.renderString(R.string.copy_monitor_service_monitoring_started))
         }
         return first
     }
@@ -678,8 +679,9 @@ class MonitorService : Service() {
             else if (acceptsRunningCheck(this)) {
                 try {
                     publishCheckedResult(Probe(Status.UNKNOWN, -1,
-                        Lang.t("Проверка не завершена: ${describeProbeError(e)}",
-                            "Check did not finish: ${describeProbeError(e)}")), revision)
+                        this.renderString(
+                            R.string.copy_monitor_service_check_did_not_finish,
+                            describeProbeError(e))), revision)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     retryDelayMs = INTERRUPTED_RETRY_MS
@@ -702,7 +704,8 @@ class MonitorService : Service() {
         val result = PrimaryAndroidProbe.create(cm, probeExecutor, extraProbeExecutor,
             extraCoordinator, ::informationalEndpoints).check(revision)
         probeNetwork = result.networkKind
-        return Probe(result.status, result.latencyMs, result.reason, result.diagnostics, result.outcomes,
+        return Probe(result.status, result.latencyMs, AndroidText.resolve(this, result.reason),
+            AndroidText.resolve(this, result.diagnostics), result.outcomes,
             result.extras?.let { ExtraCheck(it.token, it.probe, it.endpoints) })
     }
 
@@ -757,9 +760,8 @@ class MonitorService : Service() {
     @Synchronized private fun publishExtras(primary: Probe, token: ExtraProbeCoordinator.Token,
         outcomes: List<ProbeOutcome>) {
         if (!acceptsExtras(token)) return
-        val details = primary.diagnostics + Lang.t("\nДругие сервисы (не влияют на статус Telegram):\n",
-            "\nOther services (do not affect Telegram status):\n") +
-            outcomes.joinToString("\n", transform = PrimaryAndroidProbe::outcomeLine)
+        val details = primary.diagnostics + this.renderString(R.string.copy_monitor_service_other_services_do_not) +
+            outcomes.joinToString("\n") { AndroidText.resolve(this, PrimaryAndroidProbe.outcomeLine(it)) }
         lastEndpoints = primary.outcomes + outcomes
         state = state.copy(diagnostics = details)
         broadcastState()
@@ -802,12 +804,14 @@ class MonitorService : Service() {
             lastVibrationAt = lastVibration,
             diagnostics = p.diagnostics,
             expectedIntervalSec = offlineBackoff.next(p.status.name,
-                Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK, !pm.isInteractive)),
+                Prefs.effectiveIntervalSec(this, p.status == Status.TG_DOWN || p.status == Status.NO_NETWORK,
+                    !pm.isInteractive)),
         )
         state = newState
         Prefs.saveLastState(
             this, newState.status, newState.checkedAt, newState.since,
-            newState.latencyMs, newState.reason, newState.lastVibrationAt, newState.diagnostics, newState.expectedIntervalSec,
+            newState.latencyMs, newState.reason, newState.lastVibrationAt, newState.diagnostics,
+                newState.expectedIntervalSec,
         )
 
         MonitorHistory.publish(this, historySession,
@@ -950,14 +954,4 @@ class MonitorService : Service() {
         }
     }
 }
-
-/** 99,8 % in Russian, 99.8% in English. */
-fun formatPercent(p: Double): String =
-    if (Lang.ru) {
-        if (p >= 99.95 && p < 100.0) "99,9 %"
-        else String.format(java.util.Locale("ru"), "%.1f %%", p).replace(",0 %", " %")
-    } else {
-        if (p >= 99.95 && p < 100.0) "99.9%"
-        else String.format(java.util.Locale.US, "%.1f%%", p).replace(".0%", "%")
-    }
 

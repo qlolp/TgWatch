@@ -64,9 +64,9 @@ class TargetUiIntegrationTest {
                     TargetPreferences.endpointRevision(ctx, TargetId.MATRIX))))
         }.get()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            awaitText(scenario, R.id.tvUptime, formatPercent(100.0))
+            awaitText(scenario, R.id.tvUptime, formatPercent(ctx, 100.0))
             select(scenario, TargetId.MATRIX)
-            awaitText(scenario, R.id.tvUptime, formatPercent(0.0))
+            awaitText(scenario, R.id.tvUptime, formatPercent(ctx, 0.0))
             scenario.onActivity {
                 assertTrue(it.findViewById<TextView>(R.id.tvDayStats).text.contains("Matrix"))
             }
@@ -74,9 +74,9 @@ class TargetUiIntegrationTest {
             scenario.onActivity {
                 assertEquals(TargetId.MATRIX.ordinal, it.findViewById<Spinner>(R.id.targetSelector).selectedItemPosition)
             }
-            awaitText(scenario, R.id.tvUptime, formatPercent(0.0))
+            awaitText(scenario, R.id.tvUptime, formatPercent(ctx, 0.0))
             select(scenario, TargetId.TELEGRAM)
-            awaitText(scenario, R.id.tvUptime, formatPercent(100.0))
+            awaitText(scenario, R.id.tvUptime, formatPercent(ctx, 100.0))
         }
     }
 

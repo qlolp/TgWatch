@@ -28,7 +28,7 @@ class TargetSummaryTest {
     @Test fun incidentNamesOnlySelectedGoal() {
         val episode = OutageEpisode(1_000, 2_000, true, false, 1_000, 0, 0, 0, 0)
         val card = IncidentPresentation.describe(episode, targetId = TargetId.MATRIX)
-        assertTrue(card.contains("Matrix"))
-        assertFalse(card.contains("Telegram"))
+        assertTrue(card.allKeys().contains(TextKey.TARGET_MATRIX))
+        assertFalse(card.allKeys().contains(TextKey.TARGET_TELEGRAM))
     }
 }

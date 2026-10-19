@@ -109,4 +109,58 @@ internal val textResources: Map<TextKey, Int> = mapOf(
     TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_UNREACHABLE to R.string.copy_webhook_payload_tg_monitor_is_unreachable,
     TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_IS_PARTIALLY to R.string.copy_webhook_payload_tg_monitor_is_partially,
     TextKey.COPY_WEBHOOK_PAYLOAD_TG_MONITOR_NO_NETWORK to R.string.copy_webhook_payload_tg_monitor_no_network,
+    TextKey.COPY_PROBE_RULES_SERVER_RETURNED_HTTP_ERROR to R.string.copy_probe_rules_server_returned_http_error,
+    TextKey.COPY_PROBE_RULES_INVALID_SERVER_RESPONSE_HTTP to R.string.copy_probe_rules_invalid_server_response_http,
+    TextKey.COPY_NETWORK_PROBE_MTPROTO_AND_WEB_RESOURCES to R.string.copy_network_probe_mtproto_and_web_resources,
+    TextKey.COPY_NETWORK_PROBE_MTPROTO_IS_RESPONDING_WEB to R.string.copy_network_probe_mtproto_is_responding_web,
+    TextKey.COPY_NETWORK_PROBE_WEB_RESOURCES_ARE_RESPONDING to R.string.copy_network_probe_web_resources_are_responding,
+    TextKey.COPY_NETWORK_PROBE_CONTROL_SITES_ARE_RESPONDING to R.string.copy_network_probe_control_sites_are_responding,
+    TextKey.COPY_NETWORK_PROBE_NO_ACTIVE_NETWORK_OR to R.string.copy_network_probe_no_active_network_or,
+    TextKey.COPY_NETWORK_PROBE_REACHABILITY_UNKNOWN_NO_ADDRESS to
+        R.string.copy_network_probe_reachability_unknown_no_address,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_YANDEX to R.string.copy_phone_probe_adapter_yandex,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_MTPROTO_RESPQ_NONCE_MATCHED to
+        R.string.copy_phone_probe_adapter_mtproto_respq_nonce_matched,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_MTPROTO_RESPONSE_NOT_CONFIRMED to
+        R.string.copy_phone_probe_adapter_mtproto_response_not_confirmed,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_THE_PREVIOUS_REQUEST_IS to
+        R.string.copy_phone_probe_adapter_the_previous_request_is,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_CHECK_CANCELLED to R.string.copy_phone_probe_adapter_check_cancelled,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_OVERALL_TIME_LIMIT_EXPIRED to
+        R.string.copy_phone_probe_adapter_overall_time_limit_expired,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_DNS_ADDRESS_NOT_FOUND to R.string.copy_phone_probe_adapter_dns_address_not_found,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_TLS_SECURE_CONNECTION_NOT to
+        R.string.copy_phone_probe_adapter_tls_secure_connection_not,
+    TextKey.COPY_PHONE_PROBE_ADAPTER_TIMEOUT to R.string.copy_phone_probe_adapter_timeout,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NO_ACTIVE_NETWORK to R.string.copy_primary_android_probe_no_active_network,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NETWORK_NONE to R.string.copy_primary_android_probe_network_none,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NETWORK_IS_SWITCHING to R.string.copy_primary_android_probe_network_is_switching,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_WI_FI_SIGN_IN to R.string.copy_primary_android_probe_wi_fi_sign_in,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NETWORK_CAPTIVE_PORTAL to
+        R.string.copy_primary_android_probe_network_captive_portal,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NETWORK_CHECK to R.string.copy_primary_android_probe_network_check,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_MTPROTO_HANDSHAKE_ONLY_WITHOUT to
+        R.string.copy_primary_android_probe_mtproto_handshake_only_without,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_A_PROXY_CONFIGURED_INSIDE to
+        R.string.copy_primary_android_probe_a_proxy_configured_inside,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_NETWORK_CHANGED_DURING_THE to
+        R.string.copy_primary_android_probe_network_changed_during_the,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_MOBILE to R.string.copy_primary_android_probe_mobile,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_OTHER to R.string.copy_primary_android_probe_other,
+    TextKey.COPY_PRIMARY_ANDROID_PROBE_MS to R.string.copy_primary_android_probe_ms,
+    TextKey.COPY_INCIDENT_PRESENTATION_TG_MONITOR_INCIDENT to R.string.copy_incident_presentation_tg_monitor_incident,
+    TextKey.COPY_INCIDENT_PRESENTATION_OBSERVED_ONSET to R.string.copy_incident_presentation_observed_onset,
+    TextKey.COPY_INCIDENT_PRESENTATION_THE_FULL_ONSET_WAS to R.string.copy_incident_presentation_the_full_onset_was,
+    TextKey.COPY_INCIDENT_PRESENTATION_OBSERVED_RECOVERY to R.string.copy_incident_presentation_observed_recovery,
+    TextKey.COPY_INCIDENT_PRESENTATION_RECOVERY_WAS_NOT_OBSERVED to
+        R.string.copy_incident_presentation_recovery_was_not_observed,
+    TextKey.COPY_INCIDENT_PRESENTATION_OUTAGE to R.string.copy_incident_presentation_outage,
+    TextKey.COPY_INCIDENT_PRESENTATION_PARTIAL_AVAILABILITY to R.string.copy_incident_presentation_partial_availability,
+    TextKey.COPY_INCIDENT_PRESENTATION_NO_INTERNET to R.string.copy_incident_presentation_no_internet,
+    TextKey.COPY_INCIDENT_PRESENTATION_NO_DATA to R.string.copy_incident_presentation_no_data,
+    TextKey.COPY_INCIDENT_PRESENTATION_INTERVALS_ARE_ESTIMATED_FROM to
+        R.string.copy_incident_presentation_intervals_are_estimated_from,
+    TextKey.COPY_LAUNCH_FAILURES_WIDGET to R.string.copy_launch_failures_widget,
+    TextKey.COPY_LAUNCH_FAILURES_TILE to R.string.copy_launch_failures_tile,
+    TextKey.COPY_LAUNCH_FAILURES_COULD_NOT_REACH_MONITORING to R.string.copy_launch_failures_could_not_reach_monitoring,
 )

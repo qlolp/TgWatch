@@ -9,22 +9,22 @@ import android.provider.Settings
 /** Подсказки по снятию ограничений батареи на разных оболочках. */
 object OemTips {
 
-    fun manufacturerHint(): String? {
+    fun manufacturerHint(ctx: Context): String? {
         val m = Build.MANUFACTURER.orEmpty().lowercase()
         val brand = Build.BRAND.orEmpty().lowercase()
         return when {
             listOf("xiaomi", "redmi", "poco", "blackshark").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("Xiaomi / Redmi / POCO: в настройках приложения включи «Автозапуск» и в «Контроле активности» выбери «Нет ограничений».", "Xiaomi / Redmi / POCO: in the app settings, turn on “Autostart” and set “Battery saver” to “No restrictions”.")
+                ctx.renderString(R.string.copy_oem_tips_xiaomi_redmi_poco_in)
             listOf("samsung").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("Samsung: Настройки → Приложения → TG Монитор → Батарея → «Без ограничений». Убери приложение из «Спящих».", "Samsung: Settings → Apps → TG Monitor → Battery → “Unrestricted”. Remove the app from “Sleeping apps”.")
+                ctx.renderString(R.string.copy_oem_tips_samsung_settings_apps_tg)
             listOf("huawei", "honor").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("Huawei / Honor: Настройки → Батарея → Запуск приложений → TG Монитор → «Управлять вручную» и включи все переключатели.", "Huawei / Honor: Settings → Battery → App launch → TG Monitor → “Manage manually”, then turn on all switches.")
+                ctx.renderString(R.string.copy_oem_tips_huawei_honor_settings_battery)
             listOf("oppo", "realme", "oneplus").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("OPPO / Realme / OnePlus: разреши автозапуск и отключи оптимизацию батареи для TG Монитор в настройках приложения.", "OPPO / Realme / OnePlus: allow auto-launch and turn off battery optimization for TG Monitor in the app settings.")
+                ctx.renderString(R.string.copy_oem_tips_oppo_realme_oneplus_allow)
             listOf("vivo", "iqoo").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("vivo / iQOO: в настройках батареи разреши работу в фоне и автозапуск для TG Монитор.", "vivo / iQOO: in the battery settings, allow background activity and auto-start for TG Monitor.")
+                ctx.renderString(R.string.copy_oem_tips_vivo_iqoo_in_the)
             listOf("meizu").any { m.contains(it) || brand.contains(it) } ->
-                Lang.t("Meizu: отключи энергосбережение для TG Монитор и разреши автозапуск.", "Meizu: turn off power saving for TG Monitor and allow auto-start.")
+                ctx.renderString(R.string.copy_oem_tips_meizu_turn_off_power)
             else -> null
         }
     }

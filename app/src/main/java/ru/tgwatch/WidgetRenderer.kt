@@ -15,7 +15,7 @@ internal object WidgetRenderer {
     fun render(ctx: Context, snapshot: WidgetSnapshot, expanded: Boolean): RemoteViews {
         val layout = if (expanded) R.layout.widget_status_expanded else R.layout.widget_status
         val title = title(ctx, snapshot)
-        val age = age(snapshot)
+        val age = age(ctx, snapshot)
         val latency = latency(ctx, snapshot)
         return RemoteViews(ctx.packageName, layout).apply {
             setInt(R.id.widgetRoot, "setBackgroundResource", background(snapshot))
@@ -30,14 +30,14 @@ internal object WidgetRenderer {
                 LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis()))
             setContentDescription(R.id.widgetRoot, announcement(ctx, snapshot) + " · " + age + " · " + latency + " · " +
                 success + " · " +
-                ctx.getString(R.string.widget_check_goal, TargetNames.label(snapshot.target)))
+                ctx.getString(R.string.widget_check_goal, TargetNames.label(ctx, snapshot.target)))
             if (snapshot.widgetId > 0 && snapshot.token != null) {
                 val check = WidgetIdentity(snapshot.widgetId, snapshot.target, "check", snapshot.token)
                 setOnClickPendingIntent(R.id.widgetRoot, StatusWidget.pending(ctx, check))
                 if (expanded) {
                     setOnClickPendingIntent(R.id.widgetCheck, StatusWidget.pending(ctx, check))
                     setContentDescription(R.id.widgetCheck,
-                        ctx.getString(R.string.widget_check_goal, TargetNames.label(snapshot.target)))
+                        ctx.getString(R.string.widget_check_goal, TargetNames.label(ctx, snapshot.target)))
                     setOnClickPendingIntent(R.id.widgetMute, StatusWidget.pending(ctx, check.copy(action = "mute")))
                 }
             }
@@ -56,7 +56,7 @@ internal object WidgetRenderer {
             else -> R.drawable.bg_widget_offline
         }
     private fun title(ctx: Context, value: WidgetSnapshot): String {
-        val name = TargetNames.label(value.target)
+        val name = TargetNames.label(ctx, value.target)
         return when {
             value.token == null -> ctx.getString(R.string.widget_configure)
             value.locked -> ctx.getString(R.string.widget_locked, name)
@@ -66,7 +66,8 @@ internal object WidgetRenderer {
         }
     }
     private fun measured(ctx: Context, value: WidgetSnapshot): String =
-        ctx.getString(R.string.target_title, TargetNames.label(value.target), ctx.getString(when (value.state.status) {
+        ctx.getString(R.string.target_title, TargetNames.label(ctx, value.target), ctx.getString(when (
+            value.state.status) {
             TargetStatus.OK -> R.string.target_ok
             TargetStatus.DOWN -> R.string.target_down
             TargetStatus.PARTIAL -> R.string.target_partial
@@ -74,10 +75,10 @@ internal object WidgetRenderer {
             TargetStatus.UNKNOWN -> R.string.target_unknown
         }))
     private fun RemoteViews.showExpanded(ctx: Context, value: WidgetSnapshot) {
-        val coverage = value.aggregate?.coverage?.let(::formatPercent) ?: "—"
+        val coverage = value.aggregate?.coverage?.let({ formatPercent(ctx, it) }) ?: "—"
         val coverageLabel = ctx.getString(R.string.widget_coverage_day, coverage)
         setTextViewText(R.id.widgetCoverage, coverageLabel)
-        val age = age(value)
+        val age = age(ctx, value)
         setTextViewText(R.id.widgetSubtitle, ctx.getString(R.string.widget_age_coverage, age, coverage))
         val metadata = if (ctx.resources.configuration.fontScale > LARGE_FONT_SCALE) View.GONE else View.VISIBLE
         setViewVisibility(R.id.widgetSubtitle, metadata)
@@ -85,7 +86,7 @@ internal object WidgetRenderer {
         setViewVisibility(R.id.widgetCoverage, View.GONE)
         setViewVisibility(R.id.widgetMute, if (value.running && !value.locked) View.VISIBLE else View.GONE)
         setContentDescription(R.id.widgetMute,
-            ctx.getString(R.string.widget_mute_goal, TargetNames.label(value.target)))
+            ctx.getString(R.string.widget_mute_goal, TargetNames.label(ctx, value.target)))
         val bins = value.aggregate?.bins.orEmpty()
         setImageViewBitmap(R.id.widgetGraph, graph(ctx, bins))
         setContentDescription(R.id.widgetGraph, ctx.getString(R.string.widget_graph_description,
@@ -94,8 +95,8 @@ internal object WidgetRenderer {
             AndroidText.resolve(ctx, LastSuccessPolicy.label(value.lastSuccessAt, System.currentTimeMillis())) + " · " +
             latency(ctx, value))
     }
-    private fun age(value: WidgetSnapshot) = value.state.checkedAtMs.takeIf { it > 0 }
-        ?.let { agoStr(it, System.currentTimeMillis()) } ?: "—"
+    private fun age(ctx: Context, value: WidgetSnapshot) = value.state.checkedAtMs.takeIf { it > 0 }
+        ?.let { agoStr(ctx, it, System.currentTimeMillis()) } ?: "—"
     private fun latency(ctx: Context, value: WidgetSnapshot) = value.state.latencyMs?.takeIf { value.fresh }
         ?.let { ctx.getString(R.string.target_latency, it) } ?: "—"
     private fun announcement(ctx: Context, value: WidgetSnapshot): String {

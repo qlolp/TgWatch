@@ -1,0 +1,22 @@
+<resources>
+    <string name="copy_oem_tips_xiaomi_redmi_poco_in" formatted="false">"Xiaomi / Redmi / POCO: в настройках приложения включи «Автозапуск» и в «Контроле активности» выбери «Нет ограничений»."</string>
+    <string name="copy_oem_tips_samsung_settings_apps_tg" formatted="false">"Samsung: Настройки → Приложения → TG Монитор → Батарея → «Без ограничений». Убери приложение из «Спящих»."</string>
+    <string name="copy_oem_tips_huawei_honor_settings_battery" formatted="false">"Huawei / Honor: Настройки → Батарея → Запуск приложений → TG Монитор → «Управлять вручную» и включи все переключатели."</string>
+    <string name="copy_oem_tips_oppo_realme_oneplus_allow" formatted="false">"OPPO / Realme / OnePlus: разреши автозапуск и отключи оптимизацию батареи для TG Монитор в настройках приложения."</string>
+    <string name="copy_oem_tips_vivo_iqoo_in_the" formatted="false">"vivo / iQOO: в настройках батареи разреши работу в фоне и автозапуск для TG Монитор."</string>
+    <string name="copy_oem_tips_meizu_turn_off_power" formatted="false">"Meizu: отключи энергосбережение для TG Монитор и разреши автозапуск."</string>
+    <string name="copy_monitor_history_observed_outage">" (наблюдаемый сбой %1$s)"</string>
+    <string name="copy_monitor_history_mtproto_and_web_are">"MTProto и веб отвечают, %1$s мс%2$s"</string>
+    <string name="copy_monitor_history_telegram_is_partially_reachable">"Telegram частично доступен: %1$s"</string>
+    <string name="copy_monitor_history_telegram_is_unreachable">"Telegram НЕДОСТУПЕН: %1$s"</string>
+    <string name="copy_monitor_history_no_internet">"Нет интернета: %1$s"</string>
+    <string name="copy_monitor_history_status_unknown" formatted="false">"Статус неизвестен"</string>
+    <string name="copy_history_history_is_temporarily_unavailable" formatted="false">"История временно недоступна"</string>
+    <string name="copy_history_the_log_is_empty" formatted="false">"Журнал пуст"</string>
+    <string name="copy_recovery_coordinator_monitoring_stopped" formatted="false">"Мониторинг остановлен"</string>
+    <string name="copy_monitor_service_monitoring_started" formatted="false">"Мониторинг запущен"</string>
+    <string name="copy_monitor_service_check_did_not_finish">"Проверка не завершена: %1$s"</string>
+    <string name="copy_monitor_service_other_services_do_not" formatted="false">"\nДругие сервисы (не влияют на статус Telegram):\n"</string>
+    <string name="copy_shortcut_checking" formatted="false">"Проверяю…"</string>
+    <string name="extra_custom_label">Свой URL</string>
+</resources>

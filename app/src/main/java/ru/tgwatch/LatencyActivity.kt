@@ -38,7 +38,7 @@ class LatencyActivity : Activity() {
         series = (savedInstanceState?.getInt(SERIES) ?: 0).coerceIn(0, MAX_SERIES)
         setContentView(R.layout.activity_latency)
         ScreenInsets.apply(this, findViewById(R.id.latencyRoot))
-        title = getString(R.string.latency_title) + " · " + TargetNames.label(target)
+        title = getString(R.string.latency_title) + " · " + TargetNames.label(this@LatencyActivity, target)
         findViewById<TextView>(R.id.latencyMeaning).setText(if (target == TargetId.TELEGRAM)
             R.string.latency_tg_meaning else R.string.latency_http_meaning)
         val app = applicationContext

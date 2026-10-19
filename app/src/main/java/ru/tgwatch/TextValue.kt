@@ -44,3 +44,6 @@ internal fun ageText(at: Long, now: Long) = when {
 }
 
 private const val JUST_NOW_MS = 2_000L
+
+internal fun absoluteTimeText(at: Long, zone: java.util.TimeZone) = textOf(TextKey.ABSOLUTE_TIME,
+    TextArgument.Number(at), TextArgument.Text(zone.id))

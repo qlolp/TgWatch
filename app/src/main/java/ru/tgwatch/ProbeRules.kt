@@ -16,9 +16,9 @@ object ProbeRules {
 
     fun isReachableHttpCode(code: Int): Boolean = ru.tgwatch.probe.ProbePolicy.isReachableHttpCode(code)
 
-    fun describeHttpFailure(code: Int): String = when (code) {
-        in 500..599 -> Lang.t("сервер вернул ошибку HTTP $code", "server returned HTTP error $code")
-        else -> Lang.t("некорректный ответ сервера (HTTP $code)", "invalid server response (HTTP $code)")
+    fun describeHttpFailure(code: Int): TextValue = when (code) {
+        in 500..599 -> textOf(TextKey.COPY_PROBE_RULES_SERVER_RETURNED_HTTP_ERROR, textArgument(code))
+        else -> textOf(TextKey.COPY_PROBE_RULES_INVALID_SERVER_RESPONSE_HTTP, textArgument(code))
     }
 
     /**

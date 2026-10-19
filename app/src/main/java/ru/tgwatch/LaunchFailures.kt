@@ -9,22 +9,22 @@ import android.util.Log
  * токенов и текста ошибки, который может их содержать.
  */
 internal object LaunchFailures {
-    enum class Source(val ru: String, val en: String) {
-        WIDGET("Виджет", "Widget"),
-        TILE("Плитка", "Tile"),
-    }
+    enum class Source { WIDGET, TILE }
 
-    fun message(source: Source, e: Throwable): String {
+    fun message(source: Source, e: Throwable): TextValue {
         val kind = e.javaClass.simpleName.ifEmpty { "Exception" }
-        return Lang.t("${source.ru}: не удалось обратиться к мониторингу ($kind)",
-            "${source.en}: could not reach monitoring ($kind)")
+        val label = when (source) {
+            Source.WIDGET -> textOf(TextKey.COPY_LAUNCH_FAILURES_WIDGET)
+            Source.TILE -> textOf(TextKey.COPY_LAUNCH_FAILURES_TILE)
+        }
+        return textOf(TextKey.COPY_LAUNCH_FAILURES_COULD_NOT_REACH_MONITORING, textArgument(label), textArgument(kind))
     }
 
     @Suppress("TooGenericExceptionCaught") // The journal is best-effort; any storage failure only logs its class.
     fun record(ctx: Context, source: Source, e: Throwable) {
         Log.w("TgWatch", "${source.name} launch failed: ${e.javaClass.simpleName}")
         try {
-            EventLog.add(ctx, message(source, e))
+            EventLog.add(ctx, AndroidText.resolve(ctx, message(source, e)))
         } catch (logError: Exception) {
             Log.w("TgWatch", "event log: ${logError.javaClass.simpleName}")
         }

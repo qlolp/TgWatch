@@ -321,7 +321,7 @@ class MainActivity : Activity() {
             R.string.copy_main_tg_monitor_log), EventLog.exportText(this)) }
         btnClearLog.setOnClickListener { confirmClearLog() }
 
-        val oem = OemTips.manufacturerHint()
+        val oem = OemTips.manufacturerHint(this)
         if (oem != null) {
             tvOem.visibility = View.VISIBLE
             tvOem.text = oem
@@ -463,7 +463,8 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 31) {
             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
                 .setData(Uri.parse("package:$packageName"))
-            if (!safeStart(intent)) safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+            if (!safeStart(intent)) safeStart(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(
+                Uri.parse("package:$packageName")))
         }
     }
 
@@ -493,14 +494,14 @@ class MainActivity : Activity() {
         btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
         if (running && mutedUntil > 0L) tvReason.append(this@MainActivity.renderString(
             R.string.copy_main_alerts_muted_until,
-            timeStr(mutedUntil)))
+            timeStr(this@MainActivity, mutedUntil)))
         ivStatus.contentDescription = tvTitle.text
         animateCardColor(color)
 
         tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) this@MainActivity.renderString(
             R.string.copy_main_ms,
             s.latencyMs) else "—"
-        tvChecked.text = if (running) agoStr(s.checkedAt, now) else "—"
+        tvChecked.text = if (running) agoStr(this@MainActivity, s.checkedAt, now) else "—"
     }
 
     private fun renderTelegramStale(s: MonitorService.State, now: Long) {
@@ -517,7 +518,7 @@ class MainActivity : Activity() {
         }
         tvSince.text = this@MainActivity.renderString(
             R.string.copy_main_checked_waiting_for_a,
-            agoStr(s.checkedAt, now))
+            agoStr(this@MainActivity, s.checkedAt, now))
         tvReason.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_delayed_android)
     }
 
@@ -554,13 +555,13 @@ class MainActivity : Activity() {
         tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
             if (s.checkedAt > 0) this@MainActivity.renderString(
                 R.string.copy_main_checked,
-                agoStr(s.checkedAt, now)) else this@MainActivity.renderString(
+                agoStr(this@MainActivity, s.checkedAt, now)) else this@MainActivity.renderString(
                     R.string.copy_main_first_check_in_progress)
         } else {
             this@MainActivity.renderString(
                 R.string.copy_main_for_since,
-                durationStr(now - s.since),
-                timeStr(s.since))
+                durationStr(this@MainActivity, now - s.since),
+                timeStr(this@MainActivity, s.since))
         }
         tvReason.text = telegramReason(s)
         return color
@@ -577,7 +578,7 @@ class MainActivity : Activity() {
                 R.string.copy_main_checking_web_resources_and) }
         } + if (s.lastVibrationAt > 0L) this@MainActivity.renderString(
             R.string.copy_main_last_vibration,
-            timeStr(s.lastVibrationAt)) else ""
+            timeStr(this@MainActivity, s.lastVibrationAt)) else ""
     }
 
     private fun render() {
@@ -610,7 +611,7 @@ class MainActivity : Activity() {
                 R.string.copy_main_diagnostics_will_appear_after) } +
                 this@MainActivity.renderString(
                     R.string.copy_main_last_result_interval_s,
-                    agoStr(s.checkedAt, now),
+                    agoStr(this@MainActivity, s.checkedAt, now),
                     s.expectedIntervalSec)
         }
         val log = EventLog.all(this)

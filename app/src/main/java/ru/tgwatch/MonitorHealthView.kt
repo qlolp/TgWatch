@@ -14,10 +14,10 @@ internal class MonitorHealthView(private val activity: Activity) {
         val stale = !MonitorService.running || state.checkedAt <= 0L || state.isStale(now)
         val elapsed = SystemClock.elapsedRealtime()
         val current = if (health.checkStartedElapsed > 0L)
-            durationStr((elapsed - health.checkStartedElapsed).coerceAtLeast(0))
+            durationStr(activity, (elapsed - health.checkStartedElapsed).coerceAtLeast(0))
             else activity.getString(R.string.health_idle)
         view.text = listOfNotNull(
-            activity.getString(R.string.health_completed, agoStr(state.checkedAt, now),
+            activity.getString(R.string.health_completed, agoStr(activity, state.checkedAt, now),
                 activity.getString(if (stale) R.string.health_stale else R.string.health_fresh)),
             activity.getString(R.string.health_check, current),
             activity.getString(R.string.health_slots, health.notMeasuredCount,

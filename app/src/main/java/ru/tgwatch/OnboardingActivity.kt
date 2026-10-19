@@ -111,7 +111,7 @@ class OnboardingActivity : Activity() {
         Page(
             this@OnboardingActivity.renderString(R.string.copy_onboarding_background_use),
             this@OnboardingActivity.renderString(R.string.copy_onboarding_so_android_does_not) +
-                (OemTips.manufacturerHint()?.let { "\n\n$it" } ?: ""),
+                (OemTips.manufacturerHint(this)?.let { "\n\n$it" } ?: ""),
             if (getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName))
                 getString(R.string.onboarding_battery_ready)
                 else this@OnboardingActivity.renderString(R.string.copy_onboarding_remove_battery_restrictions),

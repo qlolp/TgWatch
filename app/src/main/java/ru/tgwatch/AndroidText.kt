@@ -18,9 +18,7 @@ object AndroidText {
     fun resolve(ctx: Context, value: TextValue): String = when (value.key) {
         TextKey.CONCAT -> value.args.joinToString("") { argument(ctx, it).toString() }
         TextKey.LITERAL -> (value.args.single() as TextArgument.Text).value
-        TextKey.TIME_OF_DAY -> SimpleDateFormat("HH:mm:ss", locale(ctx)).apply {
-            timeZone = TimeZone.getTimeZone((value.args[1] as TextArgument.Text).value)
-        }.format(Date((value.args[0] as TextArgument.Number).value))
+        TextKey.TIME_OF_DAY, TextKey.ABSOLUTE_TIME -> date(ctx, value)
         TextKey.AGO -> resolve(ctx, (value.args.single() as TextArgument.Duration).parts.text()) +
             ctx.getString(R.string.text_ago_suffix)
         TextKey.JUST_NOW -> ctx.getString(R.string.text_just_now)
@@ -56,6 +54,11 @@ object AndroidText {
         }.format(BigDecimal.valueOf(measured))
         return ctx.getString(R.string.text_percent_value, number)
     }
+    private fun date(ctx: Context, value: TextValue): String = SimpleDateFormat(
+        if (value.key == TextKey.TIME_OF_DAY) "HH:mm:ss" else "yyyy-MM-dd HH:mm:ss XXX", locale(ctx)).apply {
+            timeZone = TimeZone.getTimeZone((value.args[1] as TextArgument.Text).value)
+        }.format(Date((value.args[0] as TextArgument.Number).value))
+
     private fun argument(ctx: Context, value: TextArgument): Any = when (value) {
         is TextArgument.Number -> value.value
         is TextArgument.Decimal -> percent(ctx, value.value)

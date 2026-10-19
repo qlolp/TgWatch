@@ -24,7 +24,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
 
     init {
         spinner.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
-            TargetId.entries.map(TargetNames::label))
+            TargetId.entries.map { TargetNames.label(activity, it) })
         spinner.setSelection(selected.ordinal)
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
@@ -58,7 +58,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
         activity.findViewById<Button>(R.id.btnToggle).apply {
             isEnabled = true
             text = activity.getString(if (stopping) R.string.target_stop else R.string.target_start,
-                TargetNames.label(selected))
+                TargetNames.label(activity, selected))
         }
         activity.findViewById<Button>(R.id.btnCheck).isEnabled =
             MonitorService.running && TargetPreferences.definition(activity, selected).enabled

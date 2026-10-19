@@ -13,7 +13,7 @@ object HistorySessions {
         val app = ctx.applicationContext
         return instance ?: HistorySessionQueue(executor, {}, sessionClosed = { session, at ->
             TargetHistories.end(app, session, at)
-            EventLog.add(app, Lang.t("Мониторинг остановлен", "Monitoring stopped"))
+            EventLog.add(app, app.renderString(R.string.copy_recovery_coordinator_monitoring_stopped))
         }).also { instance = it }
     }
     fun awaitClosed(ctx: Context, timeoutMs: Long) {

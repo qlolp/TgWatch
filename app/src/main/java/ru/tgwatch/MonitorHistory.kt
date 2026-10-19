@@ -26,22 +26,29 @@ internal object MonitorHistory {
             val event = if (state.status == MonitorService.Status.OK)
                 History.recovery(ctx, state.checkedAt, publication.partial) else null
             event?.let { runCatching { recovery(it) } }
-            if (publication.changed) EventLog.add(ctx, transitionMessage(state, event))
+            if (publication.changed) EventLog.add(ctx, transitionMessage(ctx, state, event))
             refreshed()
         }
 
-    private fun transitionMessage(state: MonitorService.State, event: RecoveryEvent?): String {
-        val duration = event?.let { Lang.t(" (наблюдаемый сбой ${recoveryDurationStr(it.durationMs)})",
-            " (observed outage ${recoveryDurationStr(it.durationMs)})") }.orEmpty()
+    private fun transitionMessage(ctx: Context, state: MonitorService.State, event: RecoveryEvent?): String {
+        val duration = event?.let { ctx.renderString(
+            R.string.copy_monitor_history_observed_outage,
+            recoveryDurationStr(ctx, it.durationMs)) }.orEmpty()
         return when (state.status) {
-            MonitorService.Status.OK -> Lang.t("MTProto и веб отвечают, ${state.latencyMs} мс$duration",
-                "MTProto and web are responding, ${state.latencyMs} ms$duration")
-            MonitorService.Status.PARTIAL -> Lang.t("Telegram частично доступен: ${state.reason}",
-                "Telegram is partially reachable: ${state.reason}")
-            MonitorService.Status.TG_DOWN -> Lang.t("Telegram НЕДОСТУПЕН: ${state.reason}",
-                "Telegram is UNREACHABLE: ${state.reason}")
-            MonitorService.Status.NO_NETWORK -> Lang.t("Нет интернета: ${state.reason}", "No internet: ${state.reason}")
-            MonitorService.Status.UNKNOWN -> Lang.t("Статус неизвестен", "Status unknown")
+            MonitorService.Status.OK -> ctx.renderString(
+                R.string.copy_monitor_history_mtproto_and_web_are,
+                state.latencyMs,
+                duration)
+            MonitorService.Status.PARTIAL -> ctx.renderString(
+                R.string.copy_monitor_history_telegram_is_partially_reachable,
+                state.reason)
+            MonitorService.Status.TG_DOWN -> ctx.renderString(
+                R.string.copy_monitor_history_telegram_is_unreachable,
+                state.reason)
+            MonitorService.Status.NO_NETWORK -> ctx.renderString(
+                R.string.copy_monitor_history_no_internet,
+                state.reason)
+            MonitorService.Status.UNKNOWN -> ctx.renderString(R.string.copy_monitor_history_status_unknown)
         }
     }
 }

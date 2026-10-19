@@ -17,9 +17,11 @@ object History {
         val total get() = ok + fail + offline + partial + unknown
         val avgLatency get() = latencyTotal.average(ok)
         val isFailDominant get() = fail > 0 && fail >= ok && fail >= offline && fail >= partial && fail >= unknown
-        val isOfflineDominant get() = offline > 0 && offline >= ok && offline > fail && offline >= partial && offline >= unknown
+        val isOfflineDominant get() =
+            offline > 0 && offline >= ok && offline > fail && offline >= partial && offline >= unknown
         val isPartialDominant get() = partial > 0 && partial >= ok && partial >= fail && partial >= offline
-        val isUnknownDominant get() = unknown > 0 && unknown >= ok && unknown >= fail && unknown >= offline && unknown >= partial
+        val isUnknownDominant get() =
+            unknown > 0 && unknown >= ok && unknown >= fail && unknown >= offline && unknown >= partial
         fun addLatency(latency: Long) { ok++; latencyTotal.add(latency) }
         fun copy() = Minute(minute, ok, fail, offline, 0L, partial, unknown).also {
             it.latencyTotal = latencyTotal.copy()
@@ -252,7 +254,8 @@ object History {
         val s = stats(ctx)
         if (s.checks == 0) return null
         return DayStats(s.uptimePercent, s.checks.toLong(), s.checks.toLong(), (s.downMs / 60_000).toInt(),
-            (s.offlineMs / 60_000).toInt(), (s.longestOutageMs / 60_000).toInt(), s.avgLatencyMs, (s.unknownMs / 60_000).toInt())
+            (s.offlineMs / 60_000).toInt(), (s.longestOutageMs / 60_000).toInt(), s.avgLatencyMs, (
+                s.unknownMs / 60_000).toInt())
     }
     @Synchronized fun lastMinutes(ctx: Context, count: Int, now: Long = System.currentTimeMillis()): List<Minute> {
         if (!ready(ctx)) return emptyList()
@@ -274,14 +277,14 @@ object History {
         return bins.values.map { it.copy() }
     }
     @Synchronized fun exportCsv(ctx: Context, days: Int = 7): String {
-        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
+        check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
         val now = System.currentTimeMillis()
         ensureClock(ctx, now)
         prune(now)
         return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
     }
     @Synchronized fun snapshot(ctx: Context): List<Observation> {
-        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
+        check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
         prune(System.currentTimeMillis())
         return samples.toList()
     }
@@ -313,7 +316,7 @@ object History {
     fun exportSummary(ctx: Context, days: Int = 1): String =
         AndroidText.resolve(ctx, describeStats(stats(ctx, days), days))
     @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
-        check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
+        check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
         ensureClock(ctx,now)
         prune(now)
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
@@ -416,7 +419,7 @@ object EventLog {
 
     fun exportText(ctx: Context): String {
         val log = all(ctx)
-        return if (log.isEmpty()) Lang.t("Журнал пуст", "The log is empty") else log.joinToString("\n")
+        return if (log.isEmpty()) ctx.renderString(R.string.copy_history_the_log_is_empty) else log.joinToString("\n")
     }
 }
 

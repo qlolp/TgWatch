@@ -17,30 +17,29 @@ internal object PhoneProbeAdapter {
     fun core(value: ProbeOutcome) = ru.tgwatch.probe.ProbeOutcome(value.endpoint, value.group, value.reachable,
         value.latencyMs, ProbeDetail(value.detailCode), value.measurement)
     fun outcome(value: ru.tgwatch.probe.ProbeOutcome) = ProbeOutcome(value.endpoint, value.group, value.reachable,
-        value.latencyMs, detail(value.detail), value.measurement, value.detail.code)
+        value.latencyMs, "", value.measurement, value.detail.code, detail(value.detail))
     fun report(value: ru.tgwatch.probe.ProbeReport) = ProbeReport(value.results.map(::outcome), value.connected)
     fun controls(): List<ProbeEndpoint> = ru.tgwatch.probe.NetworkProbe.controlEndpoints.map {
-        if (it.address == "https://ya.ru/") it.copy(name = Lang.t("Яндекс", "Yandex")) else it
+        if (it.address == "https://ya.ru/") it.copy(name = "Yandex") else it
     }
-    fun error(error: Exception): String {
+    fun error(error: Exception): TextValue {
         val structured = ProbeDetail.failure(error)
         return if (structured.code == ProbeDetailCode.EXCEPTION)
-            "${error.javaClass.simpleName}: ${error.message.orEmpty().take(MAX_MESSAGE)}" else detail(structured)
+            textLiteral(error.javaClass.simpleName.ifEmpty { "Exception" }) else detail(structured)
     }
-    fun detail(value: ProbeDetail): String = when (value.code) {
-        ProbeDetailCode.NONE -> ""
-        ProbeDetailCode.HTTP_RESPONSE -> "HTTP ${value.httpCode}"
-        ProbeDetailCode.HTTP_CODE_MISMATCH, ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED -> "HTTP ${value.httpCode}"
-        ProbeDetailCode.MTPROTO_CONFIRMED -> Lang.t("MTProto resPQ; nonce совпал", "MTProto resPQ; nonce matched")
-        ProbeDetailCode.MTPROTO_UNCONFIRMED -> Lang.t("Ответ MTProto не подтверждён", "MTProto response not confirmed")
-        ProbeDetailCode.BUSY -> Lang.t("Предыдущий запрос ещё завершается", "The previous request is still finishing")
-        ProbeDetailCode.CANCELLED -> Lang.t("Проверка отменена", "Check cancelled")
-        ProbeDetailCode.TIME_LIMIT -> Lang.t("Общий срок ожидания истёк", "Overall time limit expired")
-        ProbeDetailCode.DNS -> Lang.t("DNS: адрес не найден", "DNS: address not found")
-        ProbeDetailCode.TLS -> Lang.t("TLS: защищённое соединение не установлено",
-            "TLS: secure connection not established")
-        ProbeDetailCode.TIMEOUT -> Lang.t("Таймаут", "Timeout")
-        ProbeDetailCode.EXCEPTION -> value.exceptionClass ?: "Exception"
+    fun detail(value: ProbeDetail): TextValue = when (value.code) {
+        ProbeDetailCode.NONE -> textLiteral("")
+        ProbeDetailCode.HTTP_RESPONSE -> textLiteral("HTTP ${value.httpCode}")
+        ProbeDetailCode.HTTP_CODE_MISMATCH, ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED -> textLiteral(
+            "HTTP ${value.httpCode}")
+        ProbeDetailCode.MTPROTO_CONFIRMED -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_MTPROTO_RESPQ_NONCE_MATCHED)
+        ProbeDetailCode.MTPROTO_UNCONFIRMED -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_MTPROTO_RESPONSE_NOT_CONFIRMED)
+        ProbeDetailCode.BUSY -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_THE_PREVIOUS_REQUEST_IS)
+        ProbeDetailCode.CANCELLED -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_CHECK_CANCELLED)
+        ProbeDetailCode.TIME_LIMIT -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_OVERALL_TIME_LIMIT_EXPIRED)
+        ProbeDetailCode.DNS -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_DNS_ADDRESS_NOT_FOUND)
+        ProbeDetailCode.TLS -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_TLS_SECURE_CONNECTION_NOT)
+        ProbeDetailCode.TIMEOUT -> textOf(TextKey.COPY_PHONE_PROBE_ADAPTER_TIMEOUT)
+        ProbeDetailCode.EXCEPTION -> textLiteral(value.exceptionClass ?: "Exception")
     }
-    private const val MAX_MESSAGE = 120
 }

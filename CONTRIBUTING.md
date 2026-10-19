@@ -183,3 +183,5 @@ CI должен проверить production certificate и upgrade реаль�
 4. В PR объясните поведение, совместимость и ограничения. Не коммитьте secrets/device data.
 
 Код и вклад распространяются под [MIT](LICENSE).
+
+User-visible phone copy belongs in Android resources (`values` English fallback and `values-ru`). Use numbered format arguments and plurals for grammatical quantities. Pure policies return semantic `TextValue`/`DurationParts`; resolve them through `AndroidText` with the caller's configuration at an Android boundary. String formatter adapters require an explicit Context. Do not introduce a process-wide language flag, store a Context in a translator, or translate already persisted historical log strings again. Add typed JVM assertions and exact RU/EN native output assertions when changing presentation contracts.

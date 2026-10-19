@@ -1,0 +1,22 @@
+<resources>
+    <string name="copy_oem_tips_xiaomi_redmi_poco_in" formatted="false">"Xiaomi / Redmi / POCO: in the app settings, turn on “Autostart” and set “Battery saver” to “No restrictions”."</string>
+    <string name="copy_oem_tips_samsung_settings_apps_tg" formatted="false">"Samsung: Settings → Apps → TG Monitor → Battery → “Unrestricted”. Remove the app from “Sleeping apps”."</string>
+    <string name="copy_oem_tips_huawei_honor_settings_battery" formatted="false">"Huawei / Honor: Settings → Battery → App launch → TG Monitor → “Manage manually”, then turn on all switches."</string>
+    <string name="copy_oem_tips_oppo_realme_oneplus_allow" formatted="false">"OPPO / Realme / OnePlus: allow auto-launch and turn off battery optimization for TG Monitor in the app settings."</string>
+    <string name="copy_oem_tips_vivo_iqoo_in_the" formatted="false">"vivo / iQOO: in the battery settings, allow background activity and auto-start for TG Monitor."</string>
+    <string name="copy_oem_tips_meizu_turn_off_power" formatted="false">"Meizu: turn off power saving for TG Monitor and allow auto-start."</string>
+    <string name="copy_monitor_history_observed_outage">" (observed outage %1$s)"</string>
+    <string name="copy_monitor_history_mtproto_and_web_are">"MTProto and web are responding, %1$s ms%2$s"</string>
+    <string name="copy_monitor_history_telegram_is_partially_reachable">"Telegram is partially reachable: %1$s"</string>
+    <string name="copy_monitor_history_telegram_is_unreachable">"Telegram is UNREACHABLE: %1$s"</string>
+    <string name="copy_monitor_history_no_internet">"No internet: %1$s"</string>
+    <string name="copy_monitor_history_status_unknown" formatted="false">"Status unknown"</string>
+    <string name="copy_history_history_is_temporarily_unavailable" formatted="false">"History is temporarily unavailable"</string>
+    <string name="copy_history_the_log_is_empty" formatted="false">"The log is empty"</string>
+    <string name="copy_recovery_coordinator_monitoring_stopped" formatted="false">"Monitoring stopped"</string>
+    <string name="copy_monitor_service_monitoring_started" formatted="false">"Monitoring started"</string>
+    <string name="copy_monitor_service_check_did_not_finish">"Check did not finish: %1$s"</string>
+    <string name="copy_monitor_service_other_services_do_not" formatted="false">"\nOther services (do not affect Telegram status):\n"</string>
+    <string name="copy_shortcut_checking" formatted="false">"Checking…"</string>
+    <string name="extra_custom_label">Custom URL</string>
+</resources>

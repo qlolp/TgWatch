@@ -14,7 +14,6 @@ import java.net.URL
 import java.net.UnknownHostException
 
 class ExtraProbesTest {
-    @Before @After fun russianDefault() { Lang.ru = true }
 
     @Test fun customUrlAcceptsOnlyPublicHttpsWithoutCredentialsQueryOrFragment() {
         for (good in listOf("https://example.org", "https://example.org/", "https://status.example.org:8443/health",
@@ -45,9 +44,8 @@ class ExtraProbesTest {
             all.map { it.address })
         assertTrue(all.all { it.group == ProbeGroup.EXTRA })
         assertEquals("Batch results are matched by name", all.size, all.map { it.name }.toSet().size)
-        assertEquals("Свой URL (status.example.org)", all.last().name)
-        Lang.ru = false
-        assertEquals("Custom URL (status.example.org)",
+        assertEquals("custom (status.example.org)", all.last().name)
+        assertEquals("custom (status.example.org)",
             ExtraProbes.endpoints(false, false, true, "https://status.example.org/health").single().name)
     }
 
@@ -98,7 +96,7 @@ class ExtraProbesTest {
             assertEquals("Controls reachable and Telegram blocked stays TG_DOWN", "TG_DOWN", report.status)
             val extras = report.results.filter { it.group == ProbeGroup.EXTRA }
             assertEquals(3, extras.size)
-            assertTrue(extras.all { it.reachable && it.detail == "HTTP 200" })
+            assertTrue(extras.all { it.reachable && it.detailCode == ru.tgwatch.probe.ProbeDetailCode.HTTP_RESPONSE && it.detailText == textLiteral("HTTP 200") })
             assertTrue(requested.containsAll(listOf("matrix.org", "web.whatsapp.com", "status.example.org")))
             assertEquals(-1L, report.latencyMs)
         } finally { pool.shutdownNow(); extraPool.shutdownNow() }

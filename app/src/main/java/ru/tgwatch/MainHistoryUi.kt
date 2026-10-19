@@ -91,15 +91,16 @@ internal class MainHistoryUi(private val activity: Activity, share: (String) -> 
                 chart.setData(ChartView.prepare(emptyList(), System.currentTimeMillis(), HOUR_MINUTES))
             }
         } else {
-            uptime.text = if (value.uptime >= 0) formatPercent(value.uptime) else "—"
+            uptime.text = if (value.uptime >= 0) formatPercent(activity, value.uptime) else "—"
             summary.text = value.summary
             val measured = value.coverage
-            val percent = measured.percent?.let(::formatPercent) ?: activity.getString(R.string.coverage_no_data)
+            val percent = measured.percent?.let({ formatPercent(activity, it) }) ?: activity.getString(
+                R.string.coverage_no_data)
             coverage.text = activity.getString(R.string.coverage_summary, percent,
-                    durationStr(measured.assessedMs), durationStr(measured.windowMs),
-                    durationStr(measured.offlineMs), durationStr(measured.unknownMs))
+                    durationStr(activity, measured.assessedMs), durationStr(activity, measured.windowMs),
+                    durationStr(activity, measured.offlineMs), durationStr(activity, measured.unknownMs))
             chart.setData(value.chart)
-            chart.contentDescription = TargetNames.label(targetId) + ": " + chart.contentDescription
+            chart.contentDescription = TargetNames.label(activity, targetId) + ": " + chart.contentDescription
             activity.findViewById<TextView>(R.id.tvChartTitle).setText(
                 if (key.days == 1) R.string.chart_last_hour else R.string.chart_last_week)
             shareButton.isEnabled = true

@@ -15,13 +15,14 @@ object ExtraProbes {
     fun normalizeCustomUrl(raw: String?): String? =
         HttpsUrlPolicy.normalize(raw, MAX_CUSTOM_URL_LENGTH, allowQuery = false)
 
-    fun endpoints(matrix: Boolean, whatsapp: Boolean, custom: Boolean, customUrl: String?): List<ProbeEndpoint> =
+    fun endpoints(matrix: Boolean, whatsapp: Boolean, custom: Boolean, customUrl: String?, customLabel: String =
+        "custom"): List<ProbeEndpoint> =
         buildList {
             if (matrix) add(ProbeEndpoint("Matrix", ProbeGroup.EXTRA, MATRIX_URL))
             if (whatsapp) add(ProbeEndpoint("WhatsApp Web", ProbeGroup.EXTRA, WHATSAPP_URL))
             val url = if (custom) normalizeCustomUrl(customUrl) else null
             if (url != null) {
-                add(ProbeEndpoint(Lang.t("Свой URL", "Custom URL") + " (" + HttpsUrlPolicy.hostLabel(url) + ")",
+                add(ProbeEndpoint(customLabel + " (" + HttpsUrlPolicy.hostLabel(url) + ")",
                     ProbeGroup.EXTRA, url))
             }
         }

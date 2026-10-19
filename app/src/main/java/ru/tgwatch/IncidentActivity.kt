@@ -56,7 +56,7 @@ class IncidentActivity : Activity() {
         days = if ((savedInstanceState?.getInt(DAYS) ?: intent.getIntExtra(DAYS, WEEK)) == 1) 1 else WEEK
         targetId = TargetId.fromWire((savedInstanceState?.getString(TargetAutomation.EXTRA_TARGET_ID)
             ?: intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID)).orEmpty()) ?: TargetId.TELEGRAM
-        title = getString(R.string.incidents_title) + " · " + TargetNames.label(targetId)
+        title = getString(R.string.incidents_title) + " · " + TargetNames.label(this@IncidentActivity, targetId)
         val app = applicationContext
         loader = LatestRequestLoader(worker, Executor { ui.post(it) },
             { key -> IncidentDisplay.load(app, key.days, key.targetId) }, ::show)
@@ -100,7 +100,7 @@ class IncidentActivity : Activity() {
     }
 
     private fun updatePeriod() {
-        period.text = TargetNames.label(targetId) + " · " +
+        period.text = TargetNames.label(this@IncidentActivity, targetId) + " · " +
             getString(if (days == 1) R.string.period_day else R.string.period_week)
     }
 

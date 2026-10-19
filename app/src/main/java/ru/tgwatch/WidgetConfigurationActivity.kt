@@ -34,7 +34,7 @@ class WidgetConfigurationActivity : Activity() {
         content.addView(TextView(this).apply { setText(R.string.widget_configure) })
         selector = Spinner(this).apply {
             adapter = ArrayAdapter(this@WidgetConfigurationActivity, android.R.layout.simple_spinner_dropdown_item,
-                TargetId.entries.map(TargetNames::label))
+                TargetId.entries.map { TargetNames.label(this@WidgetConfigurationActivity, it) })
             setSelection(savedInstanceState?.getInt(SELECTION) ?: WidgetPreferences.target(context, widgetId).ordinal)
             minimumHeight = (TOUCH_DP * resources.displayMetrics.density).toInt()
             contentDescription = getString(R.string.widget_configure)

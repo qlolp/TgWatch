@@ -13,7 +13,8 @@ typealias ProbeCancellation = ru.tgwatch.probe.ProbeCancellation
 data class ProbeOutcome(val endpoint: String, val group: ProbeGroup, val reachable: Boolean,
     val latencyMs: Long = -1, val detail: String,
     val measurement: ProbeMeasurement = if (reachable) ProbeMeasurement.SUCCESS else ProbeMeasurement.FAILURE,
-    val detailCode: ru.tgwatch.probe.ProbeDetailCode = ru.tgwatch.probe.ProbeDetailCode.NONE)
+    val detailCode: ru.tgwatch.probe.ProbeDetailCode = ru.tgwatch.probe.ProbeDetailCode.NONE,
+    val detailText: TextValue? = null)
 
 data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean = true) {
     private val core = ru.tgwatch.probe.ProbeReport(results.map(PhoneProbeAdapter::core), connected)
@@ -21,13 +22,13 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
     val status: String get() = core.status
     val latencyMs: Long get() = core.latencyMs
     val reason get() = when (status) {
-        "OK" -> Lang.t("MTProto и веб-ресурсы отвечают; доставка сообщений не проверяется", "MTProto and web resources are responding; message delivery is not checked")
+        "OK" -> textOf(TextKey.COPY_NETWORK_PROBE_MTPROTO_AND_WEB_RESOURCES)
         "PARTIAL" -> if (results.any { it.group == ProbeGroup.MTPROTO && it.reachable })
-            Lang.t("MTProto отвечает, веб-ресурсы не подтвердили доступность", "MTProto is responding; web resources did not confirm reachability") else
-            Lang.t("Веб-ресурсы отвечают, MTProto не подтвердил доступность", "Web resources are responding; MTProto did not confirm reachability")
-        "TG_DOWN" -> Lang.t("Контрольные сайты отвечают, Telegram не отвечает", "Control sites are responding; Telegram is not")
-        "NO_NETWORK" -> Lang.t("Нет активной сети или требуется вход в Wi-Fi", "No active network, or Wi-Fi sign-in is required")
-        else -> Lang.t("Доступность не определена: ни один адрес не подтвердил связь", "Reachability unknown: no address confirmed a connection")
+            textOf(TextKey.COPY_NETWORK_PROBE_MTPROTO_IS_RESPONDING_WEB) else
+            textOf(TextKey.COPY_NETWORK_PROBE_WEB_RESOURCES_ARE_RESPONDING)
+        "TG_DOWN" -> textOf(TextKey.COPY_NETWORK_PROBE_CONTROL_SITES_ARE_RESPONDING)
+        "NO_NETWORK" -> textOf(TextKey.COPY_NETWORK_PROBE_NO_ACTIVE_NETWORK_OR)
+        else -> textOf(TextKey.COPY_NETWORK_PROBE_REACHABILITY_UNKNOWN_NO_ADDRESS)
     }
     companion object {
         fun classify(results: List<ProbeOutcome>, connected: Boolean): String =
@@ -39,14 +40,15 @@ data class ProbeReport(val results: List<ProbeOutcome>, val connected: Boolean =
 class ProbeBatch(pool: ExecutorService, timeoutMs: Long = 6_000L,
     admission: ProbeAdmission = ProbeAdmission.process, lane: ProbeLane = ProbeLane.PRIMARY) {
     private val delegate = ru.tgwatch.probe.ProbeBatch(pool, timeoutMs, admission, lane)
-    fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> =
+    fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) ->
+        ProbeOutcome): List<ProbeOutcome> =
         delegate.runMapped(endpoints, { endpoint, detail, measurement ->
             ProbeOutcome(endpoint.name, endpoint.group, false, -1L,
-                PhoneProbeAdapter.detail(detail), measurement, detail.code)
+                "", measurement, detail.code, PhoneProbeAdapter.detail(detail))
         }, operation)
 }
 
-fun describeProbeError(error: Exception): String = PhoneProbeAdapter.error(error)
+fun describeProbeError(error: Exception): TextValue = PhoneProbeAdapter.error(error)
 
 class NetworkProbe(pool: ExecutorService, extraPool: ExecutorService,
     openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },

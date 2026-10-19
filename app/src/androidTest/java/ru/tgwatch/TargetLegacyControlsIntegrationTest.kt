@@ -85,7 +85,7 @@ class TargetLegacyControlsIntegrationTest {
                 val root = WidgetRenderer.render(ctx, snapshot, false).apply(ctx, FrameLayout(ctx))
                 title = root.findViewById<TextView>(R.id.widgetTitle).text.toString()
             }
-            assertEquals(ctx.getString(R.string.widget_goal_off, TargetNames.label(TargetId.TELEGRAM)), title)
+            assertEquals(ctx.getString(R.string.widget_goal_off, TargetNames.label(ctx, TargetId.TELEGRAM)), title)
         } finally {
             try {
                 host.deleteHost()

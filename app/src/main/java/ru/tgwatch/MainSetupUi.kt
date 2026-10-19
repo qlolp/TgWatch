@@ -17,7 +17,7 @@ internal object MainSetupUi {
         if (!batteryOk) lines += activity.renderString(
             R.string.copy_main_allow_unrestricted_background_use)
         if (!alarmOk) lines += activity.renderString(R.string.copy_main_allow_exact_alarms_or)
-        OemTips.manufacturerHint()?.let { lines += "• $it" }
+        OemTips.manufacturerHint(activity)?.let { lines += "• $it" }
         activity.findViewById<TextView>(R.id.tvSetup).text = lines.joinToString("\n")
         activity.findViewById<Button>(R.id.btnSetupNotif).visibility = if (notifOk) View.GONE else View.VISIBLE
         activity.findViewById<Button>(R.id.btnSetupBattery).visibility = if (batteryOk) View.GONE else View.VISIBLE

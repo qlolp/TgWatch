@@ -182,7 +182,7 @@ class ExtraProbeWorkerIsolationTest {
             assertEquals(baseline.reason, after.reason)
             assertEquals(3 + MtProtoEndpoints.all.size, after.results.size)
             assertTrue(after.results.all { it.reachable })
-            assertEquals(MtProtoEndpoints.all.size, after.results.count { it.group == ProbeGroup.MTPROTO && it.detail.contains("resPQ") })
+            assertEquals(MtProtoEndpoints.all.size, after.results.count { it.group == ProbeGroup.MTPROTO && it.detailCode == ru.tgwatch.probe.ProbeDetailCode.MTPROTO_CONFIRMED })
             awaitIdle(pool)
 
             val repeatStart = System.nanoTime()

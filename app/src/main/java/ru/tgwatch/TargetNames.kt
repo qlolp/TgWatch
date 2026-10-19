@@ -8,10 +8,5 @@ object TargetNames {
         TargetId.WHATSAPP -> TextKey.TARGET_WHATSAPP
         TargetId.CUSTOM -> TextKey.TARGET_CUSTOM
     })
-    fun label(id: TargetId): String = when (id) {
-        TargetId.TELEGRAM -> "Telegram"
-        TargetId.MATRIX -> "Matrix"
-        TargetId.WHATSAPP -> Lang.t("WhatsApp (веб)", "WhatsApp (web)")
-        TargetId.CUSTOM -> Lang.t("Свой HTTPS", "Custom HTTPS")
-    }
+    fun label(ctx: android.content.Context, id: TargetId): String = AndroidText.resolve(ctx, text(id))
 }

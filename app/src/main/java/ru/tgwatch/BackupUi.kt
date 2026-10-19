@@ -34,12 +34,14 @@ class BackupUi(private val activity: Activity) {
         if (BackupManager.hasPending()) {
             AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_finish_restoring))
                 .setMessage(activity.renderString(R.string.copy_backup_ui_the_previous_restore_was))
-                .setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue)) { _, _ -> work(activity.renderString(
+                .setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue)) { _, _ -> work(
+                    activity.renderString(
                     R.string.copy_backup_ui_restoring), {
                     BackupManager.recoverPending(activity.applicationContext)
                 }, { activity.recreate() }, activity.renderString(
                     R.string.copy_backup_ui_couldn_t_finish_restoring)) }
-                .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
+                .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
+                    ).also { dialogs.add(it) }
             return
         }
         document(Intent.ACTION_OPEN_DOCUMENT, RESTORE, "*/*")
@@ -106,15 +108,18 @@ class BackupUi(private val activity: Activity) {
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             layout.addView(this)
         }
-        val first = field(if (confirm) activity.renderString(R.string.copy_backup_ui_password_to_characters) else activity.renderString(
+        val first = field(if (confirm) activity.renderString(
+            R.string.copy_backup_ui_password_to_characters) else activity.renderString(
             R.string.copy_backup_ui_password_for_this_backup))
         val second = if (confirm) field(activity.renderString(R.string.copy_backup_ui_repeat_the_password)) else null
         val dialog = AlertDialog.Builder(activity).setTitle(if (confirm) activity.renderString(
             R.string.copy_backup_ui_backup_password) else activity.renderString(
                 R.string.copy_backup_ui_open_backup))
-            .setMessage(if (confirm) activity.renderString(R.string.copy_backup_ui_remember_the_password_it) else activity.renderString(
+            .setMessage(if (confirm) activity.renderString(
+                R.string.copy_backup_ui_remember_the_password_it) else activity.renderString(
                 R.string.copy_backup_ui_enter_the_password_for))
-            .setView(layout).setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue), null).setNegativeButton(activity.renderString(
+            .setView(layout).setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue),
+                null).setNegativeButton(activity.renderString(
                 R.string.copy_backup_ui_cancel), null).create()
         dialog.setOnDismissListener { first.text.clear(); second?.text?.clear() }
         dialog.setOnShowListener {
@@ -146,14 +151,16 @@ class BackupUi(private val activity: Activity) {
                 work(activity.renderString(R.string.copy_backup_ui_restoring), {
                     TargetRestore.stage(activity.applicationContext, imported)
                     BackupManager.recoverPending(activity.applicationContext)
-                }, { message(activity.renderString(R.string.copy_backup_ui_data_restored_all_targets)); activity.recreate() },
+                }, { message(activity.renderString(
+                    R.string.copy_backup_ui_data_restored_all_targets)); activity.recreate() },
                     activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
-            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
+            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
+                ).also { dialogs.add(it) }
     }
 
     private fun previewCsv(document: CsvDocument) {
         val rows = document.rows
-        val names = rows.keys.joinToString(", ", transform = TargetNames::label)
+        val names = rows.keys.joinToString(", ") { TargetNames.label(activity, it) }
         val count = rows.values.sumOf { it.size }
         AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_import_csv))
             .setMessage(activity.renderString(R.string.copy_backup_ui_targets_records_history_for, names, count))
@@ -163,9 +170,11 @@ class BackupUi(private val activity: Activity) {
                         rows.getValue(TargetId.TELEGRAM).map { value ->
                             value.row.copy(kind = Timeline.canonicalKind(value.row.kind)) })
                     else BackupManager.importHistories(activity.applicationContext, rows)
-                }, { message(activity.renderString(R.string.copy_backup_ui_history_restored_all_targets)); activity.recreate() },
+                }, { message(activity.renderString(
+                    R.string.copy_backup_ui_history_restored_all_targets)); activity.recreate() },
                     activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
-            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show().also { dialogs.add(it) }
+            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
+                ).also { dialogs.add(it) }
     }
 
     @Suppress("DEPRECATION")

@@ -82,7 +82,7 @@ class RecoveryAndStatsTest {
         assertEquals(0, Timeline.stats(rows, 0, 1500).outageCount)
     }
     @Test fun durationInRecoveryKeepsSeconds() {
-        assertEquals("17 мин 24 с", recoveryDurationStr(1_044_000))
-        assertEquals("1 ч 2 мин 3 с", recoveryDurationStr(3_723_000))
+        assertEquals(listOf(TextArgument.Number(17), TextArgument.Number(24)), DurationParts.from(1_044_000).text(true).args)
+        assertEquals(listOf(TextArgument.Number(1), TextArgument.Number(2), TextArgument.Number(3)), DurationParts.from(3_723_000).text(true).args)
     }
 }

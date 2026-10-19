@@ -45,7 +45,7 @@ class EndpointFallbackTest {
         assertEquals("TG_DOWN", report.status)
         assertTrue(urls.isNotEmpty())
         assertTrue(urls.all { it.protocol == "https" })
-        assertTrue(report.results.filter { it.group == ProbeGroup.WEB }.all { !it.reachable && it.detail.startsWith("TLS") })
+        assertTrue(report.results.filter { it.group == ProbeGroup.WEB }.all { !it.reachable && it.detailCode == ru.tgwatch.probe.ProbeDetailCode.TLS })
     }
 
     private fun checkWithOnlyDc3Available(wrongNonce: Boolean): ProbeReport {

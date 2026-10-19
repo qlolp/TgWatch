@@ -67,7 +67,8 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
                 legacy.importance).apply { setSound(legacy.sound,legacy.audioAttributes); enableVibration(false) })
         } else if (existingRecovery.name?.toString() != recoveryName) {
             // Only the visible name follows the UI language; importance and sound stay the user's.
-            manager.createNotificationChannel(NotificationChannel(recoveryChannel,recoveryName,existingRecovery.importance))
+            manager.createNotificationChannel(NotificationChannel(
+                recoveryChannel,recoveryName,existingRecovery.importance))
         }
     }
     fun clearRecovery() { manager.cancel(recoveryId) }
@@ -79,7 +80,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
             R.string.copy_event_notifications_telegram_is_back),
             ctx.renderString(
                 R.string.copy_event_notifications_the_observed_outage_lasted,
-                recoveryDurationStr(event.durationMs)), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
+                recoveryDurationStr(ctx, event.durationMs)), sound && allowed, R.drawable.ic_stat_ok,recoveryChannel))
     }
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
@@ -113,16 +114,17 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         // Notification/channel/PendingIntent preparation can block; recheck immediately before admission.
         return if (canPost()) { manager.notify(SUMMARY_ID, prepared); true } else false
     }
-    private fun blocked(channel: String) = manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
+    private fun blocked(channel: String) = manager.getNotificationChannel(
+        channel)?.importance == NotificationManager.IMPORTANCE_NONE
     private fun notification(title: String, text: String, audible: Boolean, icon: Int, channel: String): Notification {
         val open = PendingIntent.getActivity(ctx, outageId,
             Intent(ctx, MainActivity::class.java).setData(android.net.Uri.parse("tgwatch://target/${targetId.wire}"))
                 .putExtra(TargetAutomation.EXTRA_TARGET_ID, targetId.wire),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val builder = Notification.Builder(ctx, if (audible) channel else SILENT_CHANNEL)
-            .setSmallIcon(icon).setContentTitle(targetEventText(targetId, title))
-            .setContentText(targetEventText(targetId, text))
-            .setStyle(Notification.BigTextStyle().bigText(targetEventText(targetId, text))).setAutoCancel(true)
+            .setSmallIcon(icon).setContentTitle(targetEventText(ctx, targetId, title))
+            .setContentText(targetEventText(ctx, targetId, text))
+            .setStyle(Notification.BigTextStyle().bigText(targetEventText(ctx, targetId, text))).setAutoCancel(true)
             .setContentIntent(open).setCategory(Notification.CATEGORY_STATUS)
         if (channel == outageChannel || channel == partialChannel) {
             // Problem alerts only. Same check-now path as the ongoing status notification's "Check" action.
@@ -140,5 +142,5 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     }
 }
 
-private fun targetEventText(id: TargetId, text: String): String = if (id == TargetId.TELEGRAM) text
-    else text.replace("Telegram", TargetNames.label(id))
+private fun targetEventText(ctx: Context, id: TargetId, text: String): String = if (id == TargetId.TELEGRAM) text
+    else text.replace("Telegram", TargetNames.label(ctx, id))

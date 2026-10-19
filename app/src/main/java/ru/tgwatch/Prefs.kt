@@ -7,10 +7,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.os.UserManager
 import android.provider.Settings
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 /** Настройки приложения, хранятся в SharedPreferences. */
 object Prefs {
@@ -134,7 +131,8 @@ object Prefs {
         }
     }
     fun effectiveIntervalSec(ctx: Context, bad: Boolean, screenOff: Boolean): Int =
-        profile(ctx)?.interval(bad, screenOff) ?: ProbeRules.nextIntervalSec(intervalSec(ctx).coerceIn(10, 120), bad, screenOff)
+        profile(ctx)?.interval(bad, screenOff) ?: ProbeRules.nextIntervalSec(intervalSec(ctx).coerceIn(10, 120),
+            bad, screenOff)
 
     /** Будить процессор на время каждой проверки при выключенном экране. */
     fun keepAwake(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_KEEP_AWAKE, true)
@@ -172,7 +170,8 @@ object Prefs {
     }
 
     fun notifyRecovery(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_NOTIFY_RECOVERY, true)
-    fun setNotifyRecovery(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_NOTIFY_RECOVERY, value).apply() }
+    fun setNotifyRecovery(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_NOTIFY_RECOVERY,
+        value).apply() }
     fun eventSound(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EVENT_SOUND, false)
     fun setEventSound(ctx: Context, value: Boolean) { sp(ctx).edit().putBoolean(KEY_EVENT_SOUND, value).apply() }
     fun soundFor(ctx: Context, event: String): Boolean = EventPreferences.sound(event,
@@ -188,7 +187,8 @@ object Prefs {
     fun alarmPattern(ctx: Context): AlarmPattern = AlarmPattern.entries.firstOrNull {
         it.name == sp(ctx).getString(KEY_ALARM_PATTERN, AlarmPattern.STANDARD.name)
     } ?: AlarmPattern.STANDARD
-    fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN, pattern.name).apply() }
+    fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN,
+        pattern.name).apply() }
 
     /** Opt-in: an upgrade must not start posting a new daily notification. */
     fun dailySummary(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_DAILY_SUMMARY, false)
@@ -217,7 +217,8 @@ object Prefs {
     fun setExtraCustomUrl(ctx: Context, value: String): Boolean = PrivateEndpoints.setLegacy(ctx, value)
 
     fun extraProbeEndpoints(ctx: Context): List<ProbeEndpoint> =
-        ExtraProbes.endpoints(extraMatrix(ctx), extraWhatsapp(ctx), extraCustom(ctx), extraCustomUrl(ctx))
+        ExtraProbes.endpoints(extraMatrix(ctx), extraWhatsapp(ctx), extraCustom(ctx), extraCustomUrl(ctx),
+            ctx.getString(R.string.extra_custom_label))
 
     /** Не вибрировать ночью. */
     fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)
@@ -394,26 +395,4 @@ internal class OneTimeMigration {
         }
     }
 }
-
-/** Время в виде 15:42:10, либо прочерк, если времени нет. */
-fun timeStr(millis: Long): String =
-    if (millis <= 0L) "—" else SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(millis))
-
-/** Длительность словами: «12 с», «5 мин», «2 ч 15 мин», «3 д 4 ч» (English: 12 s, 5 min, 2 h 15 min, 3 d 4 h). */
-fun durationStr(ms: Long): String {
-    val sec = (ms / 1000L).coerceAtLeast(0L)
-    val min = sec / 60
-    val hours = min / 60
-    val days = hours / 24
-    return when {
-        sec < 60 -> Lang.t("$sec с", "$sec s")
-        min < 60 -> Lang.t("$min мин", "$min min")
-        hours < 24 -> if (min % 60 == 0L) Lang.t("$hours ч", "$hours h") else Lang.t("$hours ч ${min % 60} мин", "$hours h ${min % 60} min")
-        else -> if (hours % 24 == 0L) Lang.t("$days д", "$days d") else Lang.t("$days д ${hours % 24} ч", "$days d ${hours % 24} h")
-    }
-}
-
-/** «5 с назад» или прочерк, если события ещё не было. */
-fun agoStr(millis: Long, now: Long = System.currentTimeMillis()): String =
-    if (millis <= 0L) "—" else if (now - millis < 2000L) Lang.t("только что", "just now") else durationStr(now - millis) + Lang.t(" назад", " ago")
 

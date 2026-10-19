@@ -33,7 +33,7 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         else ProbeRules.isStale(state.checkedAtMs, now, state.expectedIntervalSec)
 
     private fun title(display: Display): String {
-        val name = TargetNames.label(display.state.id)
+        val name = TargetNames.label(activity, display.state.id)
         val measured = activity.getString(R.string.target_title, name,
             activity.getString(label(display.state.status)))
         return when {
@@ -49,7 +49,7 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         val state = display.state
         text(R.id.tvTitle).text = title
         text(R.id.tvSince).text = if (state.checkedAtMs > 0L)
-            activity.getString(R.string.target_checked, agoStr(state.checkedAtMs, now)) else ""
+            activity.getString(R.string.target_checked, agoStr(activity, state.checkedAtMs, now)) else ""
         text(R.id.tvReason).setText(when {
             display.pending -> R.string.target_pending_help
             !display.active -> R.string.target_idle_help
@@ -59,7 +59,7 @@ internal class TargetStatusUi(private val activity: Activity, private val color:
         })
         text(R.id.tvLatency).text = state.latencyMs?.takeIf { display.active && !display.stale }
             ?.let { activity.getString(R.string.target_latency, it) } ?: "—"
-        text(R.id.tvChecked).text = if (display.active) agoStr(state.checkedAtMs, now) else "—"
+        text(R.id.tvChecked).text = if (display.active) agoStr(activity, state.checkedAtMs, now) else "—"
     }
 
     private fun showIcon(display: Display, title: String) {

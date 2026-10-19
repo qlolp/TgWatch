@@ -25,15 +25,6 @@ data class TimeStats(val okMs: Long, val downMs: Long, val partialMs: Long, val 
 
 data class RecoveryEvent(val durationMs: Long)
 
-fun recoveryDurationStr(ms: Long): String {
-    val seconds = (ms / 1000).coerceAtLeast(0)
-    return buildList {
-        if (seconds >= 3600) add(Lang.t("${seconds / 3600} ч", "${seconds / 3600} h"))
-        if (seconds >= 60) add(Lang.t("${seconds / 60 % 60} мин", "${seconds / 60 % 60} min"))
-        add(Lang.t("${seconds % 60} с", "${seconds % 60} s"))
-    }.joinToString(" ")
-}
-
 /** Observations expire. Neither a dead service nor two distant failures fill a gap. */
 object Timeline {
     val kinds = setOf("OK", "TG_DOWN", "PARTIAL", "NO_NETWORK", "UNKNOWN")
@@ -143,7 +134,8 @@ object Timeline {
         return TimeStats(duration["OK"] ?: 0, duration["TG_DOWN"] ?: 0, duration["PARTIAL"] ?: 0,
             duration["NO_NETWORK"] ?: 0, duration["UNKNOWN"] ?: 0, longest, inRange.size,
             // Divide before summing so valid large Long latencies cannot overflow the mean.
-            if (latency.isEmpty()) -1 else latency.sumOf { it / latency.size } + latency.sumOf { it % latency.size } / latency.size,
+            if (latency.isEmpty()) -1 else latency.sumOf { it / latency.size } +
+                latency.sumOf { it % latency.size } / latency.size,
             outages, lastOutage, previous == "TG_DOWN", offlineCount,
             inRange.count { it.kind == "OK" }, inRange.count { it.kind == "TG_DOWN" },
             inRange.count { it.kind == "PARTIAL" }, inRange.count { it.kind == "NO_NETWORK" },
@@ -169,7 +161,8 @@ object Timeline {
         return if (elapsed > 0 && (hardFailure || partialEnabled)) RecoveryEvent(elapsed) else null
     }
     fun csv(samples: List<Observation>, from: Long, until: Long): String {
-        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).apply { timeZone =
+            TimeZone.getTimeZone("UTC") }
         return buildString {
             append("from_utc,until_utc,status,duration_ms,latency_ms,clock_epoch,in_current_statistics\n")
             val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0L

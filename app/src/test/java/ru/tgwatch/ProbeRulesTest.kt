@@ -84,6 +84,6 @@ class ProbeRulesTest {
 
     @Test
     fun describeHttpFailure_mentionsCode() {
-        assertEquals("сервер вернул ошибку HTTP 503", ProbeRules.describeHttpFailure(503))
+        assertEquals(listOf(TextArgument.Number(503)), ProbeRules.describeHttpFailure(503).args)
     }
 }

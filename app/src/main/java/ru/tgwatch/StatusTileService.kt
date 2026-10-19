@@ -35,7 +35,8 @@ class StatusTileService : TileService() {
         }
     }
 
-    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag") // API < 33 compatibility branch; newer Android uses NOT_EXPORTED below.
+    @android.annotation.SuppressLint(
+        "UnspecifiedRegisterReceiverFlag") // API < 33 compatibility branch; newer Android uses NOT_EXPORTED below.
     override fun onStartListening() {
         super.onStartListening()
         listening = true
@@ -109,7 +110,7 @@ class StatusTileService : TileService() {
             stale && s.status == MonitorService.Status.OK ->
                 Triple(Tile.STATE_INACTIVE, R.drawable.ic_stat_wait, this@StatusTileService.renderString(
                     R.string.copy_status_tile_service_stale,
-                    agoStr(s.checkedAt, now)))
+                    agoStr(this@StatusTileService, s.checkedAt, now)))
             stale && s.status == MonitorService.Status.TG_DOWN ->
                 Triple(Tile.STATE_ACTIVE, R.drawable.ic_stat_fail, this@StatusTileService.renderString(
                     R.string.copy_status_tile_service_unreachable))

@@ -47,8 +47,8 @@ class AlertActionReceiver : BroadcastReceiver() {
                 it.cancel(TargetEventNotifications.id(id, "partial"))
                 it.cancel(TargetEventNotifications.id(id, "slow"))
             }
-            val until = timeStr(AlertMute.until(now))
-            EventLog.add(context, TargetNames.label(id) + ": " +
+            val until = timeStr(context, AlertMute.until(now))
+            EventLog.add(context, TargetNames.label(context, id) + ": " +
                 context.renderString(R.string.copy_alert_action_receiver_alerts_muted_until, until))
             return until
         }
