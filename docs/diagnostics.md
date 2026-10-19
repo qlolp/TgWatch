@@ -14,6 +14,11 @@ The report is limited to 16 KiB and contains an explicit field allowlist:
   typed storage failure and recovery state.
 - Last completed probe's known endpoint names, group, reachability, and latency.
 - Scheduling counters for the latest service session.
+- A bounded crash journal: the newest five uncaught exceptions as exception class,
+  crashing thread name and up to 24 stack frames. Exception messages are never stored,
+  so endpoints, tokens and document paths cannot reach the report. Records live in
+  device-protected storage, rotate by count and byte budget, and are cleared with
+  **Clear the log**.
 
 The report excludes raw history, logs, settings, account information, passwords,
 automation tokens, IP addresses, device identifiers, network names, and free-form

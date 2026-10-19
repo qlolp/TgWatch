@@ -48,6 +48,14 @@ android {
             if (!releaseStore.isNullOrBlank()) signingConfig = signingConfigs.getByName("production")
         }
     }
+    packaging {
+        dex {
+            // AGP stores dex uncompressed for minSdk >= 28: on this watch that costs more than a
+            // megabyte of transfer and storage for a small cold-start gain. Compressed dex keeps
+            // the standalone APK close to its code size; revisit with R8 before changing this.
+            useLegacyPackaging = true
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

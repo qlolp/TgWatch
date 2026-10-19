@@ -6,6 +6,10 @@ import android.content.res.Configuration
 class TgWatchApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Debug builds surface accidental main-thread disk or network access in logcat only.
+        if (BuildConfig.DEBUG) DebugStrictMode.enable()
+        // The crash journal must exist before any other component can throw on this process.
+        CrashJournal.install(this)
         // Text built in code (notifications, widget, tile) follows the resource locale.
 
         RecoveryCoordinator.start(this)

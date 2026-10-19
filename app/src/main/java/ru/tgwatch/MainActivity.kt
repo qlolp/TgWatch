@@ -444,6 +444,7 @@ class MainActivity : Activity() {
             .setMessage(this@MainActivity.renderString(R.string.copy_main_status_change_entries_will))
             .setPositiveButton(this@MainActivity.renderString(R.string.copy_main_clear)) { _, _ ->
                 EventLog.clear(this)
+                CrashJournal.clear(this)
                 shownLog = null
                 render()
             }
