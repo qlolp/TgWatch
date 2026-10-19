@@ -1,6 +1,6 @@
 # Compatibility and Release Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Verify the supported Android floor/new Android runtime and package the completed features with truthful evidence.
 **Architecture:** Reuse existing emulator smoke, signed upgrade, dual-app audit and reproducible release pipeline. Qualify target36 separately from widening the runtime test matrix.
@@ -28,20 +28,20 @@
 **Files:** `.github/workflows/build-apk.yml`, `README.md`, `docs/README.en.md`, `CONTRIBUTING.md`, `docs/development-roadmap.md`; existing scripts/native tests only if actual runtime failures demonstrate a required compatibility fix.
 **Interfaces:** Existing scripts unchanged unless a named failure is reproduced; CI matrix `api: [26,29,35,36]`, same x86_64 default images and root-capable disposable emulator contract.
 
-- [ ] Correct private backup URL, v3/v2, p50/p95, webhook fields and version documentation against current implementation. Preserve historical release evidence.
-- [ ] Install official images26/36 with verified SDK metadata; create owned disposable AVDs and run current-target35 phone tests/smoke on both. Record exact executed cases, failures/skips and smoke stages. Keep26/36 reports separately. No tests are skipped merely to make the new matrix green.
-- [ ] If an actual runtime bug appears, add a regression and observe RED before a minimal fix; rerun that regression and suite. Emulator setup issues are diagnosed independently and do not justify product deadline/TLS changes.
-- [ ] Run Python suite and `git diff --check`; commit `ci: verify minimum Android and Android16 runtimes` with documentation fixes separately where useful.
+- [x] Correct private backup URL, v3/v2, p50/p95, webhook fields and version documentation against current implementation. Preserve historical release evidence.
+- [x] Install official images26/36 with verified SDK metadata; create owned disposable AVDs and run current-target35 phone tests/smoke on both. Record exact executed cases, failures/skips and smoke stages. Keep26/36 reports separately. No tests are skipped merely to make the new matrix green.
+- [x] If an actual runtime bug appears, add a regression and observe RED before a minimal fix; rerun that regression and suite. Emulator setup issues are diagnosed independently and do not justify product deadline/TLS changes.
+- [x] Run Python suite and `git diff --check`; commit `ci: verify minimum Android and Android16 runtimes` with documentation fixes separately where useful.
 
 ### Task 2: Qualify phone target36
 
 **Files:** `app/build.gradle.kts`, Android build/setup documentation, relevant native tests; exact behavior changes determined from official Android16 target-change documentation.
 **Interfaces:** Phone compileSdk/targetSdk36 and pinned compatible SDK/build tools after qualification; Wear stays target35. No incidental toolchain upgrade.
 
-- [ ] Record applicable official target36 behavior changes in `docs/android16-compatibility.md`: edge-to-edge/insets, large screens/resizing, foreground/background execution, exact alarms, notifications and file grants. Distinguish changes that affect this app from irrelevant API notes.
-- [ ] Add failing native assertions for applicable behavior gaps under target36; assertions check actual visible controls/insets and lifecycle behavior, not source strings. Run RED against changed target before implementing fixes.
-- [ ] Upgrade only phone SDK values and required SDK pin; implement proven compatibility fixes, run phone matrix26/29/35/36 plus existing Wear checks. Do not bump target36 if required checks remain unresolved; record actual blocker.
-- [ ] Commit `build: qualify phone Android16 target behavior` when checks pass.
+- [x] Record applicable official target36 behavior changes in `docs/android16-compatibility.md`: edge-to-edge/insets, large screens/resizing, foreground/background execution, exact alarms, notifications and file grants. Distinguish changes that affect this app from irrelevant API notes.
+- [x] Add failing native assertions for applicable behavior gaps under target36; assertions check actual visible controls/insets and lifecycle behavior, not source strings. Run RED against changed target before implementing fixes.
+- [x] Upgrade only phone SDK values and required SDK pin; implement proven compatibility fixes, run phone matrix26/29/35/36 plus existing Wear checks. Do not bump target36 if required checks remain unresolved; record actual blocker.
+- [x] Commit `build: qualify phone Android16 target behavior` when checks pass.
 
 ### Task 3: Integrated verification, review and publishable package
 
@@ -49,7 +49,22 @@
 **Interfaces:** New version1.20.0/code1020000 if all planned behavior ships together; if scope changes, choose SemVer based on actual shipped behavior without rewriting1.19.1. Release still contains twelve phone/Wear assets with the current signer continuity.
 
 - [ ] After all four feature plans: run core/phone/Wear JVM and bounded heap, full Python suite, detekt/lint, both debug/release APKs, all mandatory native and signed-upgrade paths, actual core mask reproducibility and runtime/test audit gates. Collect counts from fresh reports, distinguish local/CI results.
-- [ ] Request one independent whole-branch review using all plans' Review Focus. Address confirmed important failures with reproducing tests; preserve privacy, physical slots and schema compatibility. Report any unresolved item by name.
+- [x] Request one independent whole-branch review using all plans' Review Focus. Address confirmed important failures with reproducing tests; preserve privacy, physical slots and schema compatibility. Report any unresolved item by name.
 - [ ] Prepare bilingual release notes and phone/Wear APKs. Verify source revision/version/signature, exact twelve assets, SBOM/inventory and both audits, then use the existing release workflow under the user's release authorization. Existing release tags remain immutable. A blocked external publication is reported, not represented as completed.
 - [ ] Update F-Droid candidate to the actual verified tag, run normal readmeta/lint/build and unsigned/payload comparison; keep catalog submission separate. Save tested API26/36 environment setup/start instructions through the configuration draft without replacing network/secrets.
 - [ ] Commit evidence and final docs. Preserve the user's working branch and leave a clean, reviewable development branch/main according to existing integration authorization.
+
+## Runtime qualification evidence —19October2026
+
+Whole-branch review completed against baseeb22af6 and candidatedf68285; the confirmed
+queued-v2-heartbeat defect was reproduced and fixed, including preservation of legacy
+event retry semantics. The minor power explanation issue was fixed. No deferred
+review finding remains. Later native fixture fixes preserve production behavior and
+physical slot ownership; their RED/GREEN evidence is retained in the SDD ledger.
+
+Current integrated run39236704240, sourcee2d4992, passed all seven required build/device
+jobs. The SDK bump introduced no demonstrated production compatibility gap: the new
+real-window assertion passes alongside existing layout/lifecycle cases, rather than
+inventing a production failure to satisfy a RED checkbox. Official source applicability
+is documented in docs/android16-compatibility.md. Publication, signed upgrades and
+exact-tag F-Droid/payload verification remain Task3 gates until actually completed.

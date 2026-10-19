@@ -22,3 +22,15 @@ The official Android developer website was inaccessible from this environment (H
 - [ActivityInfo.java](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-16.0.0_r1/core/java/android/content/pm/ActivityInfo.java): activity orientation/resizability contracts.
 
 SDK platform 36 and build tools 36.0.0 were installed using official SDK metadata. This document separates source applicability from executed qualification. Final target/version and CI evidence are recorded in the release evidence document; no physical-device or OEM battery validation is implied.
+
+## Integrated runtime result
+
+[Run39236704240](https://github.com/qlolp/TgWatch/actions/runs/39236704240), source
+`e2d4992bbcf2bee62744e34126f2ae3b27ac37ed`, passed all phone APIs26/29/35/36,
+standalone Wear, JVM/lint/detekt, core-mask reproducibility and both dependency
+audits. Phone compiles/targets36 with build-tools36.0.0; Wear remains35.
+API35/36 execute the actual platform-inset assertion and language-switch sharing
+case. Every phone job also completed legacy upgrade, network recovery, Doze and
+PIN-locked Direct Boot. Signed latest/legacy production upgrades remain mandatory
+gates of the tag publication workflow; their final results belong to the versioned
+release verification record.
