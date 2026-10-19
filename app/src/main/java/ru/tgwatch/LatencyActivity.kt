@@ -31,7 +31,7 @@ class LatencyActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         target = TargetId.fromWire(savedInstanceState?.getString(TARGET)
             ?: intent.getStringExtra(TARGET).orEmpty()) ?: TargetId.TELEGRAM
         window = LatencyWindow.entries.getOrElse(savedInstanceState?.getInt(WINDOW) ?: 0) { LatencyWindow.HOUR }

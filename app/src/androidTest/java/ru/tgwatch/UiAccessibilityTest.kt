@@ -42,7 +42,7 @@ class UiAccessibilityTest {
             val english = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply {
                 setLocales(LocaleList(Locale.ENGLISH))
             })
-            Lang.update(english)
+
             val chart = ChartView(english)
             chart.setData(listOf(History.Minute(10, ok = 1, fail = 2, offline = 3,
                 latencySum = 100, partial = 4, unknown = 5)), 10 * 60_000L)
@@ -53,7 +53,7 @@ class UiAccessibilityTest {
             chart.setData(emptyList(), 10 * 60_000L)
             assertTrue(chart.contentDescription.toString(), chart.contentDescription.contains("No checks"))
             assertTrue("Keyboard and accessibility users can open period details", chart.isClickable && chart.isFocusable)
-            Lang.update(ctx)
+
         }
     }
 
@@ -85,11 +85,11 @@ class UiAccessibilityTest {
                 val localized = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply {
                     setLocales(LocaleList(locale))
                 })
-                Lang.update(localized)
+
                 assertEquals(resource, localized.getString(R.string.check_now))
                 assertEquals(dynamic, AndroidText.resolve(localized, PowerProfile.BALANCED.title))
             }
-            } finally { Locale.setDefault(systemLocale); Lang.update(ctx) }
+            } finally { Locale.setDefault(systemLocale) }
         }
     }
 
@@ -117,7 +117,7 @@ class UiAccessibilityTest {
         } finally {
             InstrumentationRegistry.getInstrumentation().runOnMainSync { AppLocales.set(ctx, previous) }
             Prefs.setEnabled(ctx, wasEnabled)
-            Lang.update(ctx)
+
         }
     }
 

@@ -15,10 +15,11 @@ import android.widget.Toast
 class StatusShareActivity : Activity() {
     private var target = TargetId.TELEGRAM
     private var request = 0L
+    private var captureLocaleTag: String? = null
     private var card: PreparedStatusCard? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         target = TargetId.fromWire(intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty())
             ?: TargetId.TELEGRAM
         setContentView(R.layout.activity_share_status)
@@ -28,14 +29,16 @@ class StatusShareActivity : Activity() {
         findViewById<Button>(R.id.shareStatusRetry).setOnClickListener { capture() }
         findViewById<Button>(R.id.shareStatusDone).setOnClickListener { finish() }
         val retained = lastNonConfigurationInstance as? PreparedStatusCard
-        if (retained == null) capture() else bind(retained)
+        if (retained == null) capture(savedInstanceState?.getString(CAPTURE_LOCALE)) else bind(retained)
     }
-    private fun capture() {
+    private fun capture(pendingLocale: String? = null) {
+        captureLocaleTag = pendingLocale?.takeIf(StatusShareSnapshot::validLocaleTag)
+            ?: resources.configuration.locales[0].toLanguageTag()
         request++
         findViewById<Button>(R.id.shareStatusText).isEnabled = false
         findViewById<Button>(R.id.shareStatusPng).isEnabled = false
         findViewById<TextView>(R.id.shareStatusPreview).setText(R.string.history_loading)
-        if (!StatusShareJobs.submit(this, target, request))
+        if (!StatusShareJobs.submit(this, target, request, checkNotNull(captureLocaleTag)))
             findViewById<TextView>(R.id.shareStatusPreview).setText(R.string.share_status_busy)
     }
     internal fun accept(revision: Long, result: Result<PreparedStatusCard>): Boolean {
@@ -48,6 +51,7 @@ class StatusShareActivity : Activity() {
     private fun bind(value: PreparedStatusCard) {
         if (card !== value) card?.bitmap?.recycle()
         card = value
+        captureLocaleTag = value.snapshot.localeTag
         findViewById<TextView>(R.id.shareStatusPreview).text = value.text
         findViewById<ImageView>(R.id.shareStatusImage).apply {
             visibility = if (value.bitmap == null) View.GONE else View.VISIBLE
@@ -80,12 +84,18 @@ class StatusShareActivity : Activity() {
     }
     @Deprecated("Activity retention API is used for the immutable preview in this Views screen")
     override fun onRetainNonConfigurationInstance(): Any? = card
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(CAPTURE_LOCALE, captureLocaleTag)
+    }
     override fun onDestroy() {
         request++
+        StatusShareJobs.discardQueued(this)
         if (!isChangingConfigurations) card?.bitmap?.recycle()
         super.onDestroy()
     }
     companion object {
+        private const val CAPTURE_LOCALE = "capture_locale"
         fun open(ctx: Context, id: TargetId) {
             ctx.startActivity(Intent(ctx, StatusShareActivity::class.java)
                 .putExtra(TargetAutomation.EXTRA_TARGET_ID, id.wire).apply {

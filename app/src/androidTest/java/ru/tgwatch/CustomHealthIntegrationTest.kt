@@ -69,7 +69,7 @@ class CustomHealthIntegrationTest {
             LocalDiagnostics.snapshot(ctx).toJson(),
             WebhookPayload.encode(WebhookEvent(WebhookEventKind.TEST, null, null), WebhookFormat.JSON)
                 .bytes.toString(Charsets.UTF_8),
-            StatusCardRenderer.text(StatusShareSnapshot.capture(ctx, id)))
+            StatusShareDocument.prepare(ctx, StatusShareSnapshot.capture(ctx, id)).text)
         for (value in exports) for (secret in listOf(address, "private-field", "private-value"))
             assertFalse("Private configuration escaped an export allowlist", value.contains(secret))
         assertTrue(TargetSettingWrites.endpoint(ctx, id, address))

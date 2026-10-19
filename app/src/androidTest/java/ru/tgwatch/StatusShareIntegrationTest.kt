@@ -56,7 +56,7 @@ class StatusShareIntegrationTest {
     @Test fun actualPreviewAndSharesUseTheSameRedactedSnapshotAcrossRotation() {
         TargetId.entries.forEach { id ->
             val captured = StatusShareSnapshot.capture(ctx, id)
-            val text = StatusCardRenderer.text(captured)
+            val text = StatusShareDocument.prepare(ctx, captured).text
             secrets.forEach { secret -> assertFalse(text.contains(secret)) }
             assertTrue(captured.chart.isEmpty())
         }
@@ -107,7 +107,7 @@ class StatusShareIntegrationTest {
     }
     @Test fun otherUidNeedsGrantAndCleanupRevokesItAndRemovesExpiredPng() {
         val snapshot = StatusShareSnapshot.capture(ctx, TargetId.TELEGRAM)
-        val file = StatusShareCache.write(ctx, snapshot)
+        val file = StatusShareCache.write(ctx, StatusShareDocument.prepare(ctx, snapshot))
         val uri = StatusShareCache.uri(ctx, file)
         assertFalse(helperRead(uri, false))
         assertTrue(helperRead(uri, true))

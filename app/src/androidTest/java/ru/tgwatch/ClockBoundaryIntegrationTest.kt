@@ -97,8 +97,7 @@ class ClockBoundaryIntegrationTest {
         instrumentation.runOnMainSync {
             val chart = ChartView(ctx)
             chart.setData(minutes, now, 120)
-            assertTrue(chart.contentDescription.toString().contains(Lang.t("Среднее время ответа: 6148914691236517204 мс",
-                "Average response time: 6148914691236517204 ms")))
+            assertTrue(chart.contentDescription.toString().contains((if (ctx.getString(R.string.lang) == "ru") "Среднее время ответа: 6148914691236517204 мс" else "Average response time: 6148914691236517204 ms")))
         }
     }
 }

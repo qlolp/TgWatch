@@ -185,3 +185,5 @@ CI должен проверить production certificate и upgrade реаль�
 Код и вклад распространяются под [MIT](LICENSE).
 
 User-visible phone copy belongs in Android resources (`values` English fallback and `values-ru`). Use numbered format arguments and plurals for grammatical quantities. Pure policies return semantic `TextValue`/`DurationParts`; resolve them through `AndroidText` with the caller's configuration at an Android boundary. String formatter adapters require an explicit Context. Do not introduce a process-wide language flag, store a Context in a translator, or translate already persisted historical log strings again. Add typed JVM assertions and exact RU/EN native output assertions when changing presentation contracts.
+
+Status sharing prepares one `StatusShareDocument` from resources under a captured BCP47 locale before export. Preview, text and PNG use its immutable labels; renderers must not read current app language or private configuration. Test the real Canvas draw path and Android resources, rather than maintaining a second test translation catalog.

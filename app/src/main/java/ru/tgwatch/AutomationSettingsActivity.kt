@@ -80,7 +80,7 @@ class AutomationSettingsActivity : Activity() {
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL

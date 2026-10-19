@@ -21,7 +21,7 @@ object LocalDiagnostics {
     private val writing = AtomicBoolean(false)
 
     fun export(activity: Activity) {
-        Lang.update(activity)
+
         try {
             activity.startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE).setType("application/json")
@@ -56,7 +56,7 @@ object LocalDiagnostics {
             } finally { writing.set(false) }
             activity.runOnUiThread {
                 if (!activity.isFinishing && !activity.isDestroyed) {
-                    Lang.update(activity)
+
                     toast(activity, if (success) activity.renderString(
                         R.string.copy_local_diagnostics_diagnostics_saved)
                         else activity.renderString(R.string.copy_local_diagnostics_could_not_save_diagnostics))

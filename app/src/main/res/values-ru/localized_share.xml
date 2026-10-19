@@ -1,0 +1,21 @@
+<resources>
+    <string name="copy_status_share_document_ms" formatted="false">"мс"</string>
+    <string name="copy_status_share_document_last_result" formatted="false">"Последний результат: "</string>
+    <string name="copy_status_share_document_monitoring_enabled_at_capture" formatted="false">"Мониторинг включён на момент снимка"</string>
+    <string name="copy_status_share_document_monitoring_stopped" formatted="false">"Мониторинг остановлен"</string>
+    <string name="copy_status_share_document_captured" formatted="false">"Снимок: "</string>
+    <string name="copy_status_share_document_checked" formatted="false">"Проверено: "</string>
+    <string name="copy_status_share_document_measurement_is_stale_or" formatted="false">"Измерение устарело или не подтверждено"</string>
+    <string name="copy_status_share_document_measurement_was_fresh_at" formatted="false">"Измерение свежее на момент снимка"</string>
+    <string name="copy_status_share_document_response_time" formatted="false">"Время ответа: "</string>
+    <string name="copy_status_share_document_one_hour_coverage" formatted="false">"Покрытие за час: "</string>
+    <string name="copy_status_share_document_no_history_data_for" formatted="false">"Нет данных истории для оценки доступности"</string>
+    <string name="copy_status_share_document_last_hour_gaps_are" formatted="false">"Последний час · пробелы не означают сбои"</string>
+    <string name="copy_status_share_document_whatsapp_web" formatted="false">"WhatsApp (веб)"</string>
+    <string name="copy_status_share_document_custom_service" formatted="false">"Свой сервис"</string>
+    <string name="copy_status_share_document_reachable" formatted="false">"Доступен"</string>
+    <string name="copy_status_share_document_partially_reachable" formatted="false">"Частично доступен"</string>
+    <string name="copy_status_share_document_unreachable" formatted="false">"Недоступен"</string>
+    <string name="copy_status_share_document_no_network" formatted="false">"Нет сети"</string>
+    <string name="copy_status_share_document_unknown" formatted="false">"Не определено"</string>
+</resources>

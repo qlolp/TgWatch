@@ -11,15 +11,19 @@ import java.util.TimeZone
 class StatusShareSnapshot(val targetId: TargetId, val status: TargetStatus, val capturedAtMs: Long,
     val checkedAtMs: Long, val zoneOffsetMinutes: Int, val stale: Boolean, val running: Boolean,
     val latencyMs: Long?, val coveragePercent: Double?, chart: List<TargetStatus>, val revision: Long,
-    val russian: Boolean = Lang.ru) {
+    val localeTag: String) {
     val chart: List<TargetStatus> = Collections.unmodifiableList(ArrayList(chart))
     init {
         require(capturedAtMs >= 0 && checkedAtMs >= 0 && revision >= 0 && zoneOffsetMinutes in -MAX_OFFSET..MAX_OFFSET)
         require(latencyMs == null || latencyMs >= 0)
         require(coveragePercent == null || coveragePercent.isFinite() && coveragePercent in 0.0..MAX_PERCENT)
         require(chart.size <= BINS)
+        require(validLocaleTag(localeTag))
     }
     companion object {
+        internal fun validLocaleTag(tag: String): Boolean = tag.length in 2..MAX_LOCALE_LENGTH &&
+            java.util.Locale.forLanguageTag(tag).let { it.language.isNotEmpty() && it.toLanguageTag() == tag }
+        private const val MAX_LOCALE_LENGTH = 64
         private const val MAX_OFFSET = 14 * 60
         private const val MINUTE_MS = 60_000L
         private const val HOUR_MS = 3_600_000L
@@ -50,7 +54,7 @@ class StatusShareSnapshot(val targetId: TargetId, val status: TargetStatus, val 
                     .coerceIn(-MAX_OFFSET, MAX_OFFSET)
                 StatusShareSnapshot(id, state.status, nowMs, state.checkedAtMs, offset,
                     !fresh, running, state.latencyMs, coverage, bins,
-                    TargetHistoryPresentation.version(id))
+                    TargetHistoryPresentation.version(id), ctx.resources.configuration.locales[0].toLanguageTag())
             }
     }
 }

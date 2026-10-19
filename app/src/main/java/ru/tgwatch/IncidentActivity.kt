@@ -50,7 +50,7 @@ class IncidentActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         setContentView(R.layout.activity_incidents)
         ScreenInsets.apply(this, findViewById(R.id.incidentRoot))
         days = if ((savedInstanceState?.getInt(DAYS) ?: intent.getIntExtra(DAYS, WEEK)) == 1) 1 else WEEK
@@ -79,7 +79,7 @@ class IncidentActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        Lang.update(this)
+
         resumed = true
         requested = null
         ui.post(ticker)

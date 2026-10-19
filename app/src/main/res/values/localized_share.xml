@@ -1,0 +1,21 @@
+<resources>
+    <string name="copy_status_share_document_ms" formatted="false">"ms"</string>
+    <string name="copy_status_share_document_last_result" formatted="false">"Last result: "</string>
+    <string name="copy_status_share_document_monitoring_enabled_at_capture" formatted="false">"Monitoring enabled at capture time"</string>
+    <string name="copy_status_share_document_monitoring_stopped" formatted="false">"Monitoring stopped"</string>
+    <string name="copy_status_share_document_captured" formatted="false">"Captured: "</string>
+    <string name="copy_status_share_document_checked" formatted="false">"Checked: "</string>
+    <string name="copy_status_share_document_measurement_is_stale_or" formatted="false">"Measurement is stale or unconfirmed"</string>
+    <string name="copy_status_share_document_measurement_was_fresh_at" formatted="false">"Measurement was fresh at capture time"</string>
+    <string name="copy_status_share_document_response_time" formatted="false">"Response time: "</string>
+    <string name="copy_status_share_document_one_hour_coverage" formatted="false">"One-hour coverage: "</string>
+    <string name="copy_status_share_document_no_history_data_for" formatted="false">"No history data for reachability assessment"</string>
+    <string name="copy_status_share_document_last_hour_gaps_are" formatted="false">"Last hour · gaps are not outages"</string>
+    <string name="copy_status_share_document_whatsapp_web" formatted="false">"WhatsApp (web)"</string>
+    <string name="copy_status_share_document_custom_service" formatted="false">"Custom service"</string>
+    <string name="copy_status_share_document_reachable" formatted="false">"Reachable"</string>
+    <string name="copy_status_share_document_partially_reachable" formatted="false">"Partially reachable"</string>
+    <string name="copy_status_share_document_unreachable" formatted="false">"Unreachable"</string>
+    <string name="copy_status_share_document_no_network" formatted="false">"No network"</string>
+    <string name="copy_status_share_document_unknown" formatted="false">"Unknown"</string>
+</resources>

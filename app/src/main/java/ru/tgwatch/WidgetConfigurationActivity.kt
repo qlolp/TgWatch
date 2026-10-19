@@ -21,7 +21,7 @@ class WidgetConfigurationActivity : Activity() {
     private var initialToken: String? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         setResult(RESULT_CANCELED)
         widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
         if (widgetId !in WidgetUpdates.ids(this)) { finish(); return }

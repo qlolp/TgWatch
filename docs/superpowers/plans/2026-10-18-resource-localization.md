@@ -1,6 +1,6 @@
 # Resource Localization Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make all phone user-visible text resource-based while preserving RU/EN behavior and a frozen share preview.
 **Architecture:** Android presentation boundaries resolve resources. Pure decisions and measurements carry typed values rather than translated strings; no global Context, duplicated bilingual catalog or new UI stack.
@@ -41,17 +41,17 @@
 **Files:** Modify all remaining `Lang.t` callers under `app/src/main/java/ru/tgwatch`, grouped by settings/dialogs, notifications/surfaces, history/diagnostics; `PhoneProbeAdapter.kt` resolves structured probe details at Android boundary; `Lang.kt` is removed when empty. Modify `values/strings.xml`, `values-ru/strings.xml`; corresponding JVM/native tests. Update CONTRIBUTING language rules.
 **Interfaces:** Android classes use ctx.getString or AndroidText.resolve, never a global language switch. Pure probe/core remains Android-independent. Typed status/action enums are the source of resource selection. No localization API is added to portable backup/automation schema.
 
-- [ ] Before each group, add native assertions for visible text under RU/EN and pure typed-output tests for corresponding policies. Include app startup without MainActivity, notification/Tile/widget paths and activity recreation. Run targeted tests to verify the missing resource path fails.
-- [ ] Move one complete caller group at a time, add exact RU/EN resources, replace interpolated bilingual strings with numbered arguments. Preserve multiline formatting and accessibility descriptions. Do not suppress lint or regenerate detekt baseline to hide issues.
-- [ ] After each group run complete JVM suite and relevant native tests. Final `rg 'Lang\.t|Lang\.ru|fun t\(ru: String' app/src/main/java` must find no production bilingual resolver. Resource lint must pass; historical persisted strings remain unchanged.
-- [ ] Commit each complete group independently: `refactor: localize settings with resources`, `refactor: localize notifications and surfaces`, `refactor: localize history and diagnostics`.
+- [x] Before each group, add native assertions for visible text under RU/EN and pure typed-output tests for corresponding policies. Include app startup without MainActivity, notification/Tile/widget paths and activity recreation. Run targeted tests to verify the missing resource path fails.
+- [x] Move one complete caller group at a time, add exact RU/EN resources, replace interpolated bilingual strings with numbered arguments. Preserve multiline formatting and accessibility descriptions. Do not suppress lint or regenerate detekt baseline to hide issues.
+- [x] After each group run complete JVM suite and relevant native tests. Final `rg 'Lang\.t|Lang\.ru|fun t\(ru: String' app/src/main/java` must find no production bilingual resolver. Resource lint must pass; historical persisted strings remain unchanged.
+- [x] Commit each complete group independently: `refactor: localize settings with resources`, `refactor: localize notifications and surfaces`, `refactor: localize history and diagnostics`.
 
 ### Task 3: Frozen share locale and large-font acceptance
 
 **Files:** Modify `StatusShareSnapshot.kt`, `StatusCardRenderer.kt`, `StatusShareJobs.kt`, `StatusShareActivity.kt`; create `StatusShareDocument.kt`; update `StatusCardRendererTest.kt`, `StatusShareIntegrationTest.kt`, resource locale tests, docs.
 **Interfaces:** Internal `StatusShareDocument.prepare(ctx: Context,snapshot: StatusShareSnapshot): StatusShareDocument` freezes immutable labels under the capture locale. Document exposes snapshot and read-only labels, has no public arbitrary-label constructor. Renderer text/PNG and preview consume this same document; no live Context/state lookup during export. Remove the russian boolean from the internal snapshot model after migrating its callers/tests; retain a captured BCP47 locale tag for formatting. No snapshot persistence/wire migration is needed.
 
-- [ ] Write native test: capture RU preview, change system/activity locale to EN, export text and PNG; all labels remain captured RU and identical to preview. A second capture uses EN. Assert typed allowlist still excludes endpoint, conditions, logs and token. Add200% font, TalkBack and activity recreation checks for modified screens.
-- [ ] Run targeted tests to observe RED for live/binary-language formatting, then freeze resource labels during worker preparation and share the document across all output paths.
-- [ ] Run full JVM/native privacy/share suites, lint and resource validation. Assert PNG bounds1024x768, cache expiry/read grants and existing no-IO-on-main behavior remain. Compare captures to actual rendered labels rather than only prepared DTOs.
-- [ ] Commit `refactor: freeze resource-based share labels at capture`.
+- [x] Write native test: capture RU preview, change system/activity locale to EN, export text and PNG; all labels remain captured RU and identical to preview. A second capture uses EN. Assert typed allowlist still excludes endpoint, conditions, logs and token. Add200% font, TalkBack and activity recreation checks for modified screens.
+- [x] Run targeted tests to observe RED for live/binary-language formatting, then freeze resource labels during worker preparation and share the document across all output paths.
+- [x] Run full JVM/native privacy/share suites, lint and resource validation. Assert PNG bounds1024x768, cache expiry/read grants and existing no-IO-on-main behavior remain. Compare captures to actual rendered labels rather than only prepared DTOs.
+- [x] Commit `refactor: freeze resource-based share labels at capture`.

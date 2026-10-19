@@ -95,7 +95,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         val firstRunGuide = savedInstanceState == null && Onboarding.shouldShow(this)
         if (firstRunGuide) Prefs.setEnabled(this, false)
         setContentView(R.layout.activity_main)
@@ -346,7 +346,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        Lang.update(this)
+
         historyUi.resume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)

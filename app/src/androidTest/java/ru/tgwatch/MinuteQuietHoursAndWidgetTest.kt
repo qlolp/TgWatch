@@ -153,7 +153,7 @@ class MinuteQuietHoursAndWidgetTest {
         }
         assertEquals(AndroidText.resolve(ctx, LastSuccessPolicy.label(now - 60_000, now)), lastSuccessText())
         LastSuccessStore.record(ctx, "OK", now + 86_400_000)
-        assertTrue(lastSuccessText().contains(Lang.t("Часы изменились · OK", "Clock changed · OK")))
+        assertTrue(lastSuccessText().contains((if (ctx.getString(R.string.lang) == "ru") "Часы изменились · OK" else "Clock changed · OK")))
         LastSuccessStore.clear(ctx)
         assertEquals(AndroidText.resolve(ctx, LastSuccessPolicy.label(0, now)), lastSuccessText())
     }
@@ -166,8 +166,8 @@ class MinuteQuietHoursAndWidgetTest {
                 val timestamp = SimpleDateFormat("dd.MM HH:mm:ss", Locale.getDefault()).format(Date(checkedAt))
                 val text = lastSuccess.text.toString()
                 assertTrue("Full date and time must be present", text.contains(timestamp))
-                assertTrue(text.contains(if (checkedAt > now) Lang.t("Часы изменились · OK", "Clock changed · OK")
-                    else Lang.t("Последний OK:", "Last OK:")))
+                assertTrue(text.contains(if (checkedAt > now) (if (ctx.getString(R.string.lang) == "ru") "Часы изменились · OK" else "Clock changed · OK")
+                    else (if (ctx.getString(R.string.lang) == "ru") "Последний OK:" else "Last OK:")))
                 val layout = lastSuccess.layout
                     ?: throw AssertionError("Text must be laid out at exactly 200dp × 72dp")
                 assertTrue(layout.lineCount in 1..2)

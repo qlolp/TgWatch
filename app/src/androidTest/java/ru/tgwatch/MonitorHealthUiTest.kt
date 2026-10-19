@@ -88,7 +88,7 @@ class MonitorHealthUiTest {
             while (!displayed && SystemClock.elapsedRealtime() < deadline) {
                 scenario.onActivity { activity ->
                     displayed = activity.findViewById<TextView>(healthId)?.text?.contains(
-                        Lang.t("История недоступна", "History unavailable")) == true
+                        (if (ctx.getString(R.string.lang) == "ru") "История недоступна" else "History unavailable")) == true
                 }
                 if (!displayed) SystemClock.sleep(100)
             }

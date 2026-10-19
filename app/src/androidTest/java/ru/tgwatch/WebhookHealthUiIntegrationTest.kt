@@ -35,9 +35,9 @@ class WebhookHealthUiIntegrationTest {
             ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
                     val health = activity.findViewById<TextView>(AutomationSettingsActivity.ID_WEBHOOK_HEALTH)
-                    assertTrue(health.text.contains(Lang.t("время ожидания истекло", "timed out")))
-                    assertTrue(health.text.contains(Lang.t("Запрос ещё выполняется: да", "Request still running: yes")))
-                    assertTrue(health.text.contains(Lang.t("Доставка заблокирована", "Delivery blocked")))
+                    assertTrue(health.text.contains((if (ctx.getString(R.string.lang) == "ru") "время ожидания истекло" else "timed out")))
+                    assertTrue(health.text.contains((if (ctx.getString(R.string.lang) == "ru") "Запрос ещё выполняется: да" else "Request still running: yes")))
+                    assertTrue(health.text.contains((if (ctx.getString(R.string.lang) == "ru") "Доставка заблокирована" else "Delivery blocked")))
                     assertFalse(health.text.contains(secret))
                     assertFalse(health.isSaveEnabled)
                     assertTrue(activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)

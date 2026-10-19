@@ -72,7 +72,7 @@ class HistoryUiIntegrationTest {
         while (!matched && SystemClock.elapsedRealtime() < deadline) {
             scenario.onActivity { activity ->
                 val text = activity.findViewById<TextView>(R.id.tvDayStats).text.toString()
-                matched = text.contains(Lang.t("Проверок: $checks.", "Checks: $checks.")) &&
+                matched = text.contains((if (ctx.getString(R.string.lang) == "ru") "Проверок: $checks." else "Checks: $checks.")) &&
                     activity.findViewById<Button>(R.id.btnShareStats).isEnabled
             }
             if (!matched) SystemClock.sleep(100)
@@ -196,8 +196,8 @@ class HistoryUiIntegrationTest {
                     val list = activity.findViewById<ListView>(R.id.incidentList)
                     val row = list.adapter.getView(0, null, list)
                     val body = row.findViewById<TextView>(R.id.incidentText).text.toString()
-                    assertTrue(body, body.contains(Lang.t("Нет сети:", "No internet:")))
-                    assertTrue(body, body.contains(Lang.t("Нет данных:", "No data:")))
+                    assertTrue(body, body.contains((if (ctx.getString(R.string.lang) == "ru") "Нет сети:" else "No internet:")))
+                    assertTrue(body, body.contains((if (ctx.getString(R.string.lang) == "ru") "Нет данных:" else "No data:")))
                     row.findViewById<Button>(R.id.incidentShare).performClick()
                 }
                 @Suppress("DEPRECATION")

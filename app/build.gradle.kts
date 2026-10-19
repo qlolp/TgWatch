@@ -67,8 +67,8 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
     lint {
         abortOnError = true
-        // Existing native UI still has inline copy; new Android target is checked in source.
-        disable += setOf("GradleDependency", "HardcodedText")
+        // Dependency versions are pinned and audited separately.
+        disable += setOf("GradleDependency")
     }
 }
 kotlin {

@@ -13,14 +13,14 @@ internal object StatusShareCache {
     private const val TTL_MS = 86_400_000L
     private const val KEEP_FILES = 32
     fun directory(ctx: Context) = File(ctx.cacheDir, "status-share")
-    fun write(ctx: Context, snapshot: StatusShareSnapshot): File {
+    fun write(ctx: Context, document: StatusShareDocument): File {
         cleanup(ctx)
         val root = directory(ctx)
         check(root.isDirectory || root.mkdirs())
         val file = File(root, UUID.randomUUID().toString() + ".png")
         var complete = false
         try {
-            FileOutputStream(file).use { StatusCardRenderer.png(snapshot, it); it.fd.sync() }
+            FileOutputStream(file).use { StatusCardRenderer.png(document, it); it.fd.sync() }
             complete = true
             return file
         } finally { if (!complete) file.delete() }

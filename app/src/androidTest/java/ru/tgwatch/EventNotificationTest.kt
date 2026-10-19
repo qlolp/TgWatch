@@ -24,7 +24,7 @@ class EventNotificationTest {
             events.recovered(RecoveryEvent(1_044_000), sound = true, allowed = false)
             val recovery = awaitNotification(manager, EventNotifications.RECOVERY_ID)
             // Event text follows the app language (Lang is set from resources, so en-US emulators see English).
-            assertEquals(Lang.t("Telegram снова доступен", "Telegram is back"), recovery.extras.getString(Notification.EXTRA_TITLE))
+            assertEquals((if (ctx.getString(R.string.lang) == "ru") "Telegram снова доступен" else "Telegram is back"), recovery.extras.getString(Notification.EXTRA_TITLE))
             assertTrue(recovery.extras.getString(Notification.EXTRA_TEXT)!!.contains(recoveryDurationStr(ctx, 1_044_000)))
             assertEquals(EventNotifications.SILENT_CHANNEL, recovery.channelId)
             assertNull("Recovery needs no check/mute actions", recovery.actions)
@@ -33,7 +33,7 @@ class EventNotificationTest {
             events.outage("Контрольный сайт отвечает", sound = true, allowed = true)
             val outage = awaitNotification(manager, EventNotifications.OUTAGE_ID)
             assertEquals(EventNotifications.SOUND_CHANNEL, outage.channelId)
-            assertEquals(listOf(Lang.t("Проверить сейчас", "Check now"), Lang.t("Заглушить на час", "Mute for 1 hour")),
+            assertEquals(listOf((if (ctx.getString(R.string.lang) == "ru") "Проверить сейчас" else "Check now"), (if (ctx.getString(R.string.lang) == "ru") "Заглушить на час" else "Mute for 1 hour")),
                 outage.actions.map { it.title.toString() })
             if (Build.VERSION.SDK_INT >= 31) assertTrue("Alert actions must not be mutable by other apps",
                 outage.actions.all { it.actionIntent.isImmutable })
@@ -257,7 +257,7 @@ class EventNotificationTest {
             events.slow(1500)
             val slow = awaitNotification(manager, EventNotifications.SLOW_ID)
             assertEquals(EventNotifications.SLOW_CHANNEL, slow.channelId)
-            assertEquals(Lang.t("Telegram тормозит", "Telegram is slow"), slow.extras.getString(Notification.EXTRA_TITLE))
+            assertEquals((if (ctx.getString(R.string.lang) == "ru") "Telegram тормозит" else "Telegram is slow"), slow.extras.getString(Notification.EXTRA_TITLE))
             assertTrue(slow.extras.getString(Notification.EXTRA_TEXT)!!.contains("1500"))
             val channel = manager.getNotificationChannel(EventNotifications.SLOW_CHANNEL)
             assertTrue("A slow Telegram is not an alarm", channel.importance <= NotificationManager.IMPORTANCE_LOW)
@@ -313,7 +313,7 @@ class EventNotificationTest {
             controller!!.reconcile()
             awaitAbsent(manager, EventNotifications.SLOW_ID)
             assertTrue("Notification changes must not invent measurement recovery events",
-                EventLog.all(ctx).none { it.contains(Lang.t("Telegram больше не тормозит", "Telegram is no longer slow")) &&
+                EventLog.all(ctx).none { it.contains((if (ctx.getString(R.string.lang) == "ru") "Telegram больше не тормозит" else "Telegram is no longer slow")) &&
                     it !in originalLog })
         } finally {
             controller?.close()

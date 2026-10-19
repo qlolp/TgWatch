@@ -74,7 +74,7 @@ class OnboardingActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         setContentView(R.layout.activity_onboarding)
         askedNotifications = savedInstanceState?.getBoolean(STATE_ASKED, false) ?: false
         pages = buildPages()

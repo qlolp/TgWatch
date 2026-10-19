@@ -12,7 +12,7 @@ import android.widget.Toast
 class ShortcutActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Lang.update(this)
+
         when (intent?.action) {
             ACTION_CHECK_NOW -> checkNow()
             ACTION_MUTE -> mute()
