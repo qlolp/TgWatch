@@ -1,6 +1,6 @@
 {
-  "sourceVersion": "1.19.1",
-  "applyAfterRelease": "v1.19.1",
+  "sourceVersion": "1.20.1",
+  "applyAfterRelease": "v1.20.1",
   "status": "prepared",
   "description": "Private Android reachability monitor for Telegram, Matrix, WhatsApp Web and custom HTTPS services.",
   "topicAdditions": [
@@ -17,6 +17,7 @@
   "labels": [],
   "labelPolicy": "Create missing good first issue/help wanted labels only after identifying suitable issues; never bulk-assign.",
   "applicationStatus": "blocked",
-  "applicationReason": "GitHub REST read denied (Forbidden) with existing GH_TOKEN; native authenticated Git read/write succeeds. Current topics cannot be read/merged safely in this runtime. Prepared values remain unapplied.",
-  "protectedBranch": "claude/project-thread-s0ejzl"
+  "applicationReason": "GitHub API reads succeed; PATCH repository description and PUT repository topics return HTTP403 Resource not accessible by integration. Description remains null and topics empty. Prepared values remain unapplied because the integration cannot update repository metadata.",
+  "protectedBranch": "claude/project-thread-s0ejzl",
+  "lastCheckedDate": "2026-10-19"
 }

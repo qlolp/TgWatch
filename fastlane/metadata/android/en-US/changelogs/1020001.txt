@@ -1,0 +1,1 @@
+Optional secondary-target power saving; custom HTTPS status/JSON conditions; opt-in JSON v2 heartbeat with Home Assistant expiry; resource-based RU/EN copy and a frozen share locale. Private configuration stays outside portable backups and public cards. Android API26+; standalone Wear remains separate.

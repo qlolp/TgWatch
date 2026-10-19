@@ -16,6 +16,7 @@ await_observation() {
 python3 scripts/adb-readiness.py --timeout 180
 adb install -g "$old_apk"
 adb shell am start -W -n ru.tgwatch/.MainActivity
+python3 scripts/prepare-upgrade-predecessor.py
 await_observation 0
 adb shell am force-stop ru.tgwatch
 adb pull "$prefs" upgrade-before-prefs.xml

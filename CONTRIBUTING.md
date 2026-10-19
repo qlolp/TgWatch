@@ -25,7 +25,7 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.20.0`; код `1020000` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.20.1`; код `1020001` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,

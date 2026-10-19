@@ -68,3 +68,14 @@ real-window assertion passes alongside existing layout/lifecycle cases, rather t
 inventing a production failure to satisfy a RED checkbox. Official source applicability
 is documented in docs/android16-compatibility.md. Publication, signed upgrades and
 exact-tag F-Droid/payload verification remain Task3 gates until actually completed.
+
+## Signed-predecessor fixture follow-up
+
+Tagv1.20.0/source d38ebb0 remains immutable and unpublished. Run39237727506 passed
+all seven quality/native jobs, signed both APKs, verified signer continuity and
+completed the real signed1.10.47 upgrade. Its latest-stable path installed1.19.1
+fresh, which deliberately opened OnboardingActivity with monitoring off. The
+fixture's automatic-first-observation assumption was invalid. Prepare that old
+installation through its real guide/start controls, then retain the original
+genuine-observation/data-preservation gates. New patch version1.20.1/code1020001
+uses a new immutable tag; no previous tag or release asset is changed.
