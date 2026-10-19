@@ -59,3 +59,18 @@ Telegram rows and 11,000 for each other target; legacy CSV retains its 8 MiB lim
 History charts, incidents, CSV, daily summaries and diagnostics keep targets
 separate. There is no combined cross-service availability percentage. Availability
 excludes offline/unknown time; observation coverage describes those gaps separately.
+
+## Optional secondary-target battery saving
+
+The device option is off by default and never enables a target. With it enabled,
+Matrix, WhatsApp and CUSTOM wait at least300seconds after completion while the
+screen is off, or600seconds in system battery saver / at15% charge or lower while
+unplugged. Charging removes only the low-charge restriction. Telegram profiles
+and the selected60–300second secondary intervals are unchanged. Target settings
+show the selected/effective interval and its cause. Manual checks and network
+changes retain their existing admission rules; no additional alarm is introduced.
+
+Fresh observations, history coverage and watchdog timing use the effective
+interval. Changing power state does not extend a previous history row. The option
+is excluded from backups and is off after restore. See the [measurement procedure](power-validation.md)
+for matched physical-device tests; emulator checks do not establish a battery-saving percentage.
