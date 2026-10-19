@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="webhook_targets_current">Цели: %1$d из %2$d</string>
+    <string name="webhook_targets_title">Отправлять события и heartbeat этих целей</string>
     <string name="automation_title">Автоматизация</string>
     <string name="automation_enable">Разрешить запросы автоматизации</string>
     <string name="automation_description">Разрешить явные запросы CHECK_NOW и GET_STATE с приватным токеном доступа. Проверки работают только при запущенном мониторинге. Любой обладатель токена получает этот доступ; передавайте его только доверенному приложению автоматизации.</string>

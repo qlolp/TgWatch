@@ -26,12 +26,7 @@ object CrashJournal {
     private const val MAX_ENTRY_BYTES = 8 * 1024
     private const val MAX_RECORDS = 5
     private const val MAX_FRAMES = 24
-    private const val MAX_FRAME_CHARS = 200
-    private const val MAX_THREAD_CHARS = 64
-    private const val MAX_TYPE_CHARS = 160
     private const val MAX_TIME_MS = 4_102_444_800_000L
-    private const val MIN_PRINTABLE = ' '
-    private const val MAX_PRINTABLE = '~'
 
     data class Record(val atMs: Long, val thread: String, val type: String, val frames: List<String>)
     data class Summary(val retained: Int, val last: Record?)
@@ -73,10 +68,14 @@ object CrashJournal {
 
     internal fun format(thread: Thread, error: Throwable, now: Long): Record = Record(
         atMs = now.coerceIn(0L, MAX_TIME_MS),
-        thread = sanitize(thread.name, MAX_THREAD_CHARS),
-        type = sanitize(error.javaClass.name, MAX_TYPE_CHARS),
+        thread = CrashMetadata.thread(thread.name),
+        type = CrashMetadata.type(error.javaClass.name),
         frames = error.stackTrace.asSequence().take(MAX_FRAMES)
-            .map { sanitize(it.toString(), MAX_FRAME_CHARS) }.toList())
+            .map(CrashMetadata::frame).toList())
+
+    internal fun redacted(record: Record): Record = Record(record.atMs.coerceIn(0L, MAX_TIME_MS),
+        CrashMetadata.thread(record.thread), CrashMetadata.type(record.type),
+        record.frames.take(MAX_FRAMES).map(CrashMetadata::frame))
 
     internal fun read(dir: File): List<Record> {
         val file = File(dir, FILE)
@@ -113,9 +112,9 @@ object CrashJournal {
             ?.takeIf { it.size == HEADER_FIELDS }
         val at = fields?.firstOrNull()?.toLongOrNull()?.coerceIn(0L, MAX_TIME_MS)
         if (fields == null || at == null) null
-        else Record(at, fields[1], fields[2], lines.drop(1).asSequence()
+        else redacted(Record(at, fields[1], fields[2], lines.drop(1).asSequence()
             .filter { it.startsWith(FRAME_PREFIX) }
-            .map { it.removePrefix(FRAME_PREFIX) }.take(MAX_FRAMES).toList())
+            .map { it.removePrefix(FRAME_PREFIX) }.take(MAX_FRAMES).toList()))
     }
 
     private fun retained(records: List<Record>): List<Record> {
@@ -158,10 +157,4 @@ object CrashJournal {
         }
     }
 
-    /** Keeps the on-disk format one sanitized ASCII line per field: no control characters. */
-    private fun sanitize(raw: String, limit: Int): String = buildString {
-        for (symbol in raw.take(limit)) {
-            append(if (symbol in MIN_PRINTABLE..MAX_PRINTABLE && symbol != FIELD_SEPARATOR) symbol else '_')
-        }
-    }
 }

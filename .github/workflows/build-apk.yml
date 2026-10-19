@@ -50,7 +50,9 @@ jobs:
       - name: Unit tests, Android lint and APKs
         run: bash ./gradlew :probe-core:test :app:detekt :app:testDebugUnitTest :app:targetBackupHeapTest :app:lintDebug :app:assembleDebug :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon --stacktrace
       - name: Detekt baseline may only shrink
-        run: python3 scripts/check-detekt-baseline.py config/detekt/baseline.xml --max 408
+        env:
+          DETEKT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python3 scripts/check-detekt-baseline.py config/detekt/baseline.xml --base-ref "${DETEKT_BASE_SHA:-HEAD^}" --max 408
       - name: Phone release APK size budget (3 MiB)
         run: python3 scripts/check-apk-size.py 'app/build/outputs/apk/release/*.apk' --budget-bytes 3145728
       - name: Audit all exact resolved runtime and test dependencies against OSV

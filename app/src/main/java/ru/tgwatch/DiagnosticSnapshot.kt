@@ -105,7 +105,7 @@ data class DiagnosticSnapshot(
     }
 
     private fun crashesJson(): JSONObject {
-        val last = crashes.last
+        val last = crashes.last?.let(CrashJournal::redacted)
         return JSONObject().put("retained", crashes.retained.coerceIn(0, MAX_CRASH_RECORDS))
             .put("last", last?.let { record ->
                 JSONObject().put("at_ms", record.atMs.coerceAtLeast(0))

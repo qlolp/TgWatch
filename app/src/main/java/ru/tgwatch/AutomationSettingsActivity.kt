@@ -37,6 +37,7 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_HEALTH = 0x00a71008
         const val ID_WEBHOOK_FORMAT = 0x00a71009
         const val ID_WEBHOOK_FILTERS = 0x00a7100a
+        const val ID_WEBHOOK_TARGETS = 0x00a7100b
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24

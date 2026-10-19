@@ -104,14 +104,14 @@ class DiagnosticSnapshotTest {
     @Test fun crashRecordsExportTypeAndFramesWithoutMessages() {
         val summary = CrashJournal.Summary(2, CrashJournal.Record(1_500, "main",
             "java.lang.IllegalStateException",
-            listOf("ru.tgwatch.MonitorService.check(MonitorService.kt:42)")))
+            listOf("ru.tgwatch.MonitorService.onCreate(MonitorService.kt:42)")))
         val json = JSONObject(snapshot().copy(crashes = summary).toJson()).getJSONObject("crashes")
         assertEquals(2, json.getInt("retained"))
         val last = json.getJSONObject("last")
         assertEquals(setOf("at_ms", "thread", "type", "frames"), last.keyNames())
         assertEquals(1_500L, last.getLong("at_ms"))
         assertEquals("java.lang.IllegalStateException", last.getString("type"))
-        assertEquals("ru.tgwatch.MonitorService.check(MonitorService.kt:42)",
+        assertEquals("ru.tgwatch.MonitorService.onCreate(MonitorService.kt:42)",
             last.getJSONArray("frames").getString(0))
     }
 
@@ -119,6 +119,18 @@ class DiagnosticSnapshotTest {
         val json = JSONObject(snapshot().toJson()).getJSONObject("crashes")
         assertEquals(0, json.getInt("retained"))
         assertTrue(json.isNull("last"))
+    }
+
+    @Test fun crashExportValidatesMetadataEvenWhenItsCallerBypassesTheJournal() {
+        val summary = CrashJournal.Summary(1, CrashJournal.Record(1_500,
+            "https://private.example/SECRET_EXPORT", "private.SECRET_EXPORT",
+            listOf("ru.tgwatch.MonitorService.check(/private/SECRET_EXPORT/document.kt:42)",
+                "https://private.example/SECRET_EXPORT")))
+        val output = snapshot().copy(crashes = summary).toJson()
+        for (secret in listOf("SECRET_EXPORT", "private.example", "/private/")) {
+            assertFalse(output, output.contains(secret))
+        }
+        assertEquals("other", JSONObject(output).getJSONObject("crashes").getJSONObject("last").getString("thread"))
     }
 }
 

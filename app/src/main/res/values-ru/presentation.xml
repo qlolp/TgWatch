@@ -34,7 +34,9 @@
     <string name="text_history_checks">"Проверки: OK %1$d; сбой %2$d; частично %3$d; нет сети %4$d; нет данных %5$d"</string>
     <string name="text_history_mttr_scope">"В MTTR входят полностью наблюдённые сбои %1$s между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются."</string>
     <string name="text_history_checks_total">"Проверок: %1$d. Промежутки между проверками оцениваются; пробелы исключены из процента."</string>
-    <string name="text_history_by_network">"По сетям (проверки без сбоев): %1$s"</string>
+    <string name="text_history_by_network">"По сетям, %1$s (полностью успешные проверки): %2$s"</string>
+    <string name="text_history_network_today">"сегодня, местный календарный день"</string>
+    <string name="text_history_network_calendar_days">"%1$d календарных дней, включая сегодня"</string>
     <string name="text_history_vpn_helps">"Через VPN Telegram работает заметно стабильнее."</string>
     <string name="text_last_success_empty">"Последний OK: —"</string>
     <string name="text_last_success">"Последний OK: %1$s"</string>

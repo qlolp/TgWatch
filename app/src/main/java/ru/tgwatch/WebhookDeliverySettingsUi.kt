@@ -12,12 +12,13 @@ import android.widget.TextView
 internal class WebhookDeliverySettingsUi(private val activity: Activity) {
     private val format = Button(activity)
     private val filters = Button(activity)
+    private val targets = Button(activity)
     private val events = WebhookEventKind.DELIVERY_EVENTS.toList()
     private val eventLabels = intArrayOf(R.string.webhook_event_unreachable, R.string.webhook_event_partial,
         R.string.webhook_event_network_lost, R.string.webhook_event_recovery, R.string.webhook_event_network_restored)
 
     fun attach(column: LinearLayout) {
-        listOf(format, filters).forEach { button ->
+        listOf(format, filters, targets).forEach { button ->
             button.isSaveEnabled = false
             button.minHeight = (BUTTON_DP * activity.resources.displayMetrics.density).toInt()
             column.addView(button, LinearLayout.LayoutParams(
@@ -29,8 +30,10 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
         })
         format.id = AutomationSettingsActivity.ID_WEBHOOK_FORMAT
         filters.id = AutomationSettingsActivity.ID_WEBHOOK_FILTERS
+        targets.id = AutomationSettingsActivity.ID_WEBHOOK_TARGETS
         format.setOnClickListener { chooseFormat() }
         filters.setOnClickListener { chooseFilters() }
+        targets.setOnClickListener { chooseTargets() }
         refresh()
     }
 
@@ -39,6 +42,26 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
         format.text = activity.getString(R.string.webhook_format_current,
             activity.getString(formatLabel(current.format)))
         filters.text = activity.getString(R.string.webhook_filters_current, current.events.size, events.size)
+        targets.text = activity.getString(R.string.webhook_targets_current,
+            current.services.size, TargetId.entries.size)
+    }
+
+    fun chooseTargets(): AlertDialog {
+        val goals = TargetId.entries
+        val current = WebhookSettings.configuration(activity)
+        val selected = BooleanArray(goals.size) { goals[it].wire in current.services }
+        return secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_targets_title)
+            .setMultiChoiceItems(goals.map { TargetNames.label(activity, it) }.toTypedArray(),
+                selected) { _, index, checked ->
+                selected[index] = checked
+            }.setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_save) { _, _ ->
+                if (WebhookSettings.setTargetsResult(activity,
+                        goals.filterIndexed { index, _ -> selected[index] }.map { it.wire }.toSet()) !=
+                    WebhookSettings.WriteResult.SAVED)
+                    Toast.makeText(activity, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()
+                refresh()
+            }.create())
     }
 
     fun chooseFormat(): AlertDialog {

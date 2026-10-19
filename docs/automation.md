@@ -147,6 +147,10 @@ when finished if it is only needed for setup/testing.
 **Advanced → Automation and webhook** sends optional status-change events to one
 user-owned HTTPS address. It is off by default. Save an address, choose **Text**
 (the default, suitable for an ntfy topic) or **JSON**, and select event filters.
+Use **Targets** to select Telegram, Matrix, WhatsApp Web and/or Custom HTTPS.
+Existing installations retain all four selections. This only filters delivery: it
+never enables a target or monitoring. An empty selection suppresses automatic events
+and heartbeats; the explicit test button still works. The same one HTTPS address is used.
 **Send test message** also works while delivery is disabled; it never changes the
 measured baseline and is not an observation.
 
@@ -197,7 +201,7 @@ attempt the latest allowed event. Retries retain a minimum 60-second gap per sta
 NO_NETWORK delivery is best effort and normally cannot leave the device.
 
 The private screen shows sanitized delivery health without the address, response
-body or transport exception. URL, enabled switch, format and filters form one
+body or transport exception. URL, enabled switch, format, event and target filters form one
 configuration generation. Saving any of them isolates old callbacks and rate/health
 history, including after a failed disk commit that changed SharedPreferences memory.
 Changing settings does not free an old physical request or send automatically.
@@ -222,6 +226,11 @@ Missing messages never prove continued availability. Explicit test events, unkno
 statuses, wrong service IDs and missing timestamps do not replace the helpers.
 The fixture test checks YAML structure, mappings and the documented payload contract;
 it does not certify a running Home Assistant instance or render every HA template.
+
+The supplied packages explicitly select `service_id: telegram`. For another goal,
+adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp` or
+`custom`; use separate entities for separate goals. A target filter in TgWatch
+does not change the receiving package's service-ID validation.
 
 Native MQTT, multiple destinations and custom headers remain separate extensions.
 
