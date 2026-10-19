@@ -73,9 +73,7 @@ class OnboardingFlowTest {
         Onboarding.markSeen(ctx)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                MainActivity::class.java.getDeclaredMethod("renderSetup", Boolean::class.javaPrimitiveType,
-                    Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
-                    .apply { isAccessible = true }.invoke(activity, true, true, true)
+                MainSetupUi.render(activity, true, true, true)
                 assertEquals(View.GONE, activity.findViewById<View>(R.id.setupCard).visibility)
                 assertTrue("The guide must remain available for configured users",
                     activity.findViewById<Button>(R.id.btnOnboarding).isShown)
