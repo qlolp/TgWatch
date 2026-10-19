@@ -603,7 +603,8 @@ class SignedUpgradeWorkflowTests(unittest.TestCase):
         scripts, tools = self.work / "scripts", self.work / "bin"
         scripts.mkdir()
         tools.mkdir()
-        for name in ("signed-upgrade-smoke.sh", "upgrade-policy.py", "target-snapshot.py"):
+        for name in ("signed-upgrade-smoke.sh", "upgrade-policy.py", "target-snapshot.py",
+                     "prepare-upgrade-predecessor.py"):
             (scripts / name).write_text((SCRIPTS / name).read_text())
         self.log, self.state = self.work / "calls.jsonl", self.work / "state.json"
         self.state.write_text(json.dumps({"installed": None, "checked": 0, "prefs": "", "history": ""}))
@@ -621,26 +622,48 @@ path = Path(os.environ['UPGRADE_STATE'])
 state = json.loads(path.read_text())
 if args[0] in ('root', 'wait-for-device'): pass
 elif args[:3] == ['shell', 'id', '-u']: print('0')
+elif args == ['shell', 'getprop', 'ro.kernel.qemu']: print('1')
+elif args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+    print('isForeground=true' if state['checked'] > 0 and state['enabled'] else '')
 elif args[0] == 'install':
     if '-r' not in args:
         if state['installed'] is not None: sys.exit(17)
-        state.update(installed=args[-1], checked=0, prefs='<map><long name="last_checked" value="0"/></map>', history='')
+        guide = args[-1].startswith('previous-latest/')
+        state.update(installed=args[-1], checked=0, onboarding=guide, enabled=not guide,
+            prefs='<map><long name="last_checked" value="0"/><boolean name="enabled" value="' +
+                  str(not guide).lower() + '"/></map>', history='')
     elif state['installed'] is None: sys.exit(18)
     else: state['installed'] = args[-1]
 elif args[0] == 'uninstall':
     if state['installed'] is None: sys.exit(19)
     state.update(installed=None, checked=0, prefs='', history='')
 elif args[:3] == ['shell', 'am', 'start']:
-    state['checked'] += 100
-    tree = ET.fromstring(state['prefs'])
-    tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
-    state['prefs'] = ET.tostring(tree, encoding='unicode')
-    state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
+    if state['enabled']:
+        state['checked'] += 100
+        tree = ET.fromstring(state['prefs'])
+        tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
+        state['prefs'] = ET.tostring(tree, encoding='unicode')
+        state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
+elif args[:3] == ['shell', 'uiautomator', 'dump']: pass
+elif args[:3] == ['shell', 'input', 'tap']:
+    if state['onboarding']: state['onboarding'] = False
+    else:
+        state['enabled'] = True
+        state['checked'] += 100
+        tree = ET.fromstring(state['prefs'])
+        tree.find(".//*[@name='enabled']").set('value', 'true')
+        tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
+        state['prefs'] = ET.tostring(tree, encoding='unicode')
+        state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
 elif args[:3] == ['shell', 'am', 'force-stop']: pass
 elif args[:3] == ['shell', '-T', 'cat']:
     if args[-1].endswith('targets-v1/active-generation'):
         print('cat: No such file or directory', file=sys.stderr); sys.exit(1)
-    print(state['prefs'] if 'shared_prefs' in args[-1] else state['history'])
+    if args[-1].endswith('tgwatch-upgrade-ui.xml'):
+        button = 'btnOnboardingSkip' if state['onboarding'] else 'btnToggle'
+        print('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/' + button +
+              '" enabled="true" clickable="true" bounds="[0,0][100,60]"/></hierarchy>')
+    else: print(state['prefs'] if 'shared_prefs' in args[-1] else state['history'])
 elif args[:2] == ['shell', 'cat']:
     print(state['prefs'] if 'shared_prefs' in args[2] else state['history'])
 elif args[0] == 'pull':
@@ -675,6 +698,9 @@ path.write_text(json.dumps(state))
         self.assertEqual(1, len(resets))
         self.assertLess(installations[1][0], resets[0])
         self.assertLess(resets[0], installations[2][0])
+        taps = [i for i, call in enumerate(calls) if call[:4] == ['adb', 'shell', 'input', 'tap']]
+        self.assertEqual(2, len(taps), 'Latest predecessor must complete onboarding and start monitoring')
+        self.assertTrue(all(installations[2][0] < i < installations[3][0] for i in taps))
         self.assertFalse(any(call[:3] == ["adb", "shell", "pm"] for call in calls))
         self.assertLess(next(i for i, call in enumerate(calls) if call[:1] == ["readiness"]), installations[0][0])
         for path in ("legacy", "latest"):
