@@ -60,11 +60,11 @@ class TargetAutomationIntegrationTest {
         val now = System.currentTimeMillis()
         TargetStateStore.persist(ctx, TargetSnapshot(TargetId.MATRIX, TargetStatus.DOWN, now, latencyMs = 50))
         TargetStateStore.persist(ctx, TargetSnapshot(TargetId.WHATSAPP, TargetStatus.OK, now, latencyMs = 20))
-        val legacy = request(AutomationReceiver.ACTION_GET_STATE, "matrix")
+        val legacy = readState(AutomationReceiver.ACTION_GET_STATE, "matrix")
         assertEquals(AutomationReceiver.RESULT_OK, legacy.first)
         assertEquals(1, legacy.second!!.getInt("api_version"))
         assertFalse(legacy.second!!.containsKey("target_id"))
-        val matrix = request(TargetAutomation.ACTION_GET_TARGET_STATE, "matrix")
+        val matrix = readState(TargetAutomation.ACTION_GET_TARGET_STATE, "matrix")
         assertEquals(AutomationReceiver.RESULT_OK, matrix.first)
         assertEquals("matrix", matrix.second!!.getString("target_id"))
         assertEquals(2, matrix.second!!.getInt("api_version"))
@@ -72,7 +72,7 @@ class TargetAutomationIntegrationTest {
         assertEquals(50L, matrix.second!!.getLong("latency_ms"))
         assertFalse(matrix.second!!.getBoolean("running"))
         assertTrue(matrix.second!!.getBoolean("stale"))
-        val whatsapp = request(TargetAutomation.ACTION_GET_TARGET_STATE, "whatsapp")
+        val whatsapp = readState(TargetAutomation.ACTION_GET_TARGET_STATE, "whatsapp")
         assertEquals(AutomationReceiver.RESULT_OK, whatsapp.first)
         assertEquals("OK", whatsapp.second!!.getString("status"))
         assertEquals("whatsapp", whatsapp.second!!.getString("target_id"))
@@ -134,7 +134,21 @@ class TargetAutomationIntegrationTest {
         assertTrue(TargetPreferences.definition(ctx, TargetId.TELEGRAM).enabled)
     }
 
-    private fun request(action: String, target: String?, supplied: String = token): Pair<Int, Bundle?> {
+    /** Ordered delivery may precede the previous compute's physical finally. Keep the original total deadline. */
+    private fun readState(action: String, target: String): Pair<Int, Bundle?> {
+        val deadline = SystemClock.elapsedRealtime() + 12_000
+        var reply = request(action, target, replyDeadline = deadline)
+        while (reply.first == AutomationReceiver.RESULT_RATE_LIMITED && SystemClock.elapsedRealtime() < deadline) {
+            assertNull("Busy replies cannot expose another goal's cached state", reply.second)
+            SystemClock.sleep(25)
+            if (SystemClock.elapsedRealtime() >= deadline) break
+            reply = request(action, target, replyDeadline = deadline)
+        }
+        return reply
+    }
+
+    private fun request(action: String, target: String?, supplied: String = token,
+        replyDeadline: Long = SystemClock.elapsedRealtime() + 12_000): Pair<Int, Bundle?> {
         val done = CountDownLatch(1)
         var reply: Pair<Int, Bundle?>? = null
         ctx.sendOrderedBroadcast(Intent(ctx, AutomationReceiver::class.java).setAction(action)
@@ -144,7 +158,8 @@ class TargetAutomationIntegrationTest {
                     reply = resultCode to getResultExtras(false); done.countDown()
                 }
             }, Handler(Looper.getMainLooper()), -1, null, null)
-        assertTrue("Ordered API response timed out", done.await(12, TimeUnit.SECONDS))
+        val remaining = (replyDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+        assertTrue("Ordered API response timed out", done.await(remaining, TimeUnit.MILLISECONDS))
         return checkNotNull(reply)
     }
     private fun restore(store: SharedPreferences, saved: Map<String, *>) {

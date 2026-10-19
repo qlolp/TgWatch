@@ -46,7 +46,7 @@ cancel a queued check. Poll GET_STATE later to observe freshness.
 | `1` | Unauthorized or automation disabled; no extras. |
 | `2` | Invalid action/component/input; no extras. |
 | `3` | Monitoring stopped/disabled, restore pending, or check handoff unavailable; no extras. |
-| `4` | Rate limited: CHECK_NOW within its 10-second budget, or GET_STATE recomputation within the 200 ms compute gap without a fresh one-second cache; no extras. |
+| `4` | Rate limited: CHECK_NOW within its 10-second budget, GET_STATE within the 200 ms compute gap without a fresh one-second cache, or a computation still holding the single physical slot (including another target); no extras. |
 
 Result data is null. Only success includes these result extras:
 

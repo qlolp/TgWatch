@@ -24,6 +24,33 @@ class AutomationStateDispatcherTest {
     private val snapshot = AutomationStateSnapshot("OK", 100, false, true)
     @After fun clear() { AutomationStateCache.clear() }
 
+    @Test fun successfulReplyStillOwnsPhysicalSlotUntilFinishReturns() {
+        val worker = Executors.newSingleThreadExecutor()
+        val replyDelivered = CountDownLatch(1)
+        val releaseFinish = CountDownLatch(1)
+        val dispatcher = AutomationStateDispatcher(worker, { 0L }, Deadline()::schedule)
+        try {
+            assertTrue(dispatcher.submit({ snapshot }, { assertEquals(snapshot, it.getOrThrow()) }, {
+                replyDelivered.countDown()
+                releaseFinish.await()
+            }))
+            assertTrue(replyDelivered.await(2, TimeUnit.SECONDS))
+            assertTrue(dispatcher.health().busy)
+            var rejected: Throwable? = null
+            val matrix = AutomationStateKey(TargetId.MATRIX, 2)
+            assertFalse(dispatcher.submit({ error("A second physical computation must not start") }, {
+                rejected = it.exceptionOrNull()
+            }, {}, matrix))
+            assertTrue(rejected is RejectedExecutionException)
+            assertNull("A busy target must not borrow another target's cache", AutomationStateCache.take(0, matrix))
+        } finally {
+            releaseFinish.countDown()
+            worker.shutdown()
+            assertTrue(worker.awaitTermination(2, TimeUnit.SECONDS))
+        }
+        assertFalse(dispatcher.health().busy)
+    }
+
     @Test fun restoreInvalidatesPendingReplyAndCacheWithoutReleasingPhysicalCompute() {
         val deadline = Deadline()
         var work: Runnable? = null
