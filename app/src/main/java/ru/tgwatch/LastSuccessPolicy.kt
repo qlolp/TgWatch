@@ -1,8 +1,5 @@
 package ru.tgwatch
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.TimeZone
 
 /** Timestamp of the last published OK, independent of current diagnostic state. */
@@ -14,12 +11,9 @@ object LastSuccessPolicy {
     fun ageMs(lastSuccessAt: Long, now: Long): Long? =
         if (lastSuccessAt <= 0L || now < lastSuccessAt) null else now - lastSuccessAt
 
-    fun label(lastSuccessAt: Long, now: Long, timeZone: TimeZone = TimeZone.getDefault()): String {
-        if (lastSuccessAt <= 0L) return Lang.t("Последний OK: —", "Last OK: —")
-        val timestamp = SimpleDateFormat("dd.MM HH:mm:ss", Locale.getDefault()).apply {
-            this.timeZone = timeZone
-        }.format(Date(lastSuccessAt))
-        return if (ageMs(lastSuccessAt, now) == null) Lang.t("Часы изменились · OK $timestamp", "Clock changed · OK $timestamp")
-            else Lang.t("Последний OK: $timestamp", "Last OK: $timestamp")
+    fun label(lastSuccessAt: Long, now: Long, timeZone: TimeZone = TimeZone.getDefault()): TextValue {
+        if (lastSuccessAt <= 0L) return TextValue(TextKey.LAST_SUCCESS_EMPTY)
+        return textOf(if (ageMs(lastSuccessAt, now) == null) TextKey.LAST_SUCCESS_CLOCK_CHANGED else TextKey.LAST_SUCCESS,
+            TextArgument.Number(lastSuccessAt), TextArgument.Text(timeZone.id))
     }
 }

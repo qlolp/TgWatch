@@ -6,11 +6,11 @@ enum class AlarmPattern(private val waveform: LongArray) {
     LONG(longArrayOf(0, 1200));
 
     /** Follows the current UI language, so it is computed rather than stored. */
-    val title: String get() = when (this) {
-        STANDARD -> Lang.t("Тройной", "Triple")
-        SHORT -> Lang.t("Короткий", "Short")
-        LONG -> Lang.t("Длинный", "Long")
-    }
+    val title: TextValue get() = TextValue(when (this) {
+        STANDARD -> TextKey.PATTERN_STANDARD
+        SHORT -> TextKey.PATTERN_SHORT
+        LONG -> TextKey.PATTERN_LONG
+    })
 
     fun timings(): LongArray = waveform.copyOf()
 }

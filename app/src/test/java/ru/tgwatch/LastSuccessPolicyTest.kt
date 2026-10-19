@@ -28,10 +28,12 @@ class LastSuccessPolicyTest {
         assertEquals(1000L, LastSuccessPolicy.ageMs(1000, 2000))
     }
 
-    @Test fun labelShowsAbsoluteTimestampAndHonestRollbackMarker() {
+    @Test fun labelPreservesAbsoluteTimestampAndHonestRollbackMarkerAsTypedData() {
         val utc = TimeZone.getTimeZone("UTC")
-        assertEquals("Последний OK: —", LastSuccessPolicy.label(0, 3000, utc))
-        assertEquals("Последний OK: 01.01 00:00:02", LastSuccessPolicy.label(2000, 3000, utc))
-        assertEquals("Часы изменились · OK 01.01 00:00:02", LastSuccessPolicy.label(2000, 1000, utc))
+        assertEquals(TextKey.LAST_SUCCESS_EMPTY, LastSuccessPolicy.label(0, 3000, utc).key)
+        val observed = LastSuccessPolicy.label(2000, 3000, utc)
+        assertEquals(TextKey.LAST_SUCCESS, observed.key)
+        assertEquals(listOf(TextArgument.Number(2000), TextArgument.Text("UTC")), observed.args)
+        assertEquals(TextKey.LAST_SUCCESS_CLOCK_CHANGED, LastSuccessPolicy.label(2000, 1000, utc).key)
     }
 }

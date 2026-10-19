@@ -144,7 +144,7 @@ class MultiWidgetIntegrationTest {
                             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
                         root.layout(0, 0, width, height)
                         assertTrue(root.contentDescription.toString().contains(
-                            LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis())))
+                            AndroidText.resolve(display, LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis()))))
                         val children = mutableListOf(R.id.widgetTitle, R.id.widgetSubtitle, R.id.widgetLastSuccess)
                         if (expanded) children.addAll(listOf(R.id.widgetCoverage, R.id.widgetGraph, R.id.widgetCheck, R.id.widgetMute))
                         for (childId in children) {

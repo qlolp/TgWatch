@@ -25,9 +25,11 @@ internal object WidgetRenderer {
             setTextViewText(R.id.widgetTitle, title)
             setTextViewText(R.id.widgetSubtitle, "$age · $latency")
             setTextViewText(R.id.widgetLastSuccess,
+                AndroidText.resolve(ctx, LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis())))
+            val success = AndroidText.resolve(ctx,
                 LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis()))
             setContentDescription(R.id.widgetRoot, announcement(ctx, snapshot) + " · " + age + " · " + latency + " · " +
-                LastSuccessPolicy.label(snapshot.lastSuccessAt, System.currentTimeMillis()) + " · " +
+                success + " · " +
                 ctx.getString(R.string.widget_check_goal, TargetNames.label(snapshot.target)))
             if (snapshot.widgetId > 0 && snapshot.token != null) {
                 val check = WidgetIdentity(snapshot.widgetId, snapshot.target, "check", snapshot.token)
@@ -89,7 +91,7 @@ internal object WidgetRenderer {
         setContentDescription(R.id.widgetGraph, ctx.getString(R.string.widget_graph_description,
             bins.count { it == TargetStatus.OK }, bins.count { it == TargetStatus.UNKNOWN }))
         setContentDescription(R.id.widgetRoot, announcement(ctx, value) + " · " + age + " · " + coverageLabel + " · " +
-            LastSuccessPolicy.label(value.lastSuccessAt, System.currentTimeMillis()) + " · " +
+            AndroidText.resolve(ctx, LastSuccessPolicy.label(value.lastSuccessAt, System.currentTimeMillis())) + " · " +
             latency(ctx, value))
     }
     private fun age(value: WidgetSnapshot) = value.state.checkedAtMs.takeIf { it > 0 }

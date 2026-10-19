@@ -310,7 +310,8 @@ object History {
         statsCache.clear()
         version++
     }
-    fun exportSummary(ctx: Context, days: Int = 1): String = describeStats(stats(ctx, days), days)
+    fun exportSummary(ctx: Context, days: Int = 1): String =
+        AndroidText.resolve(ctx, describeStats(stats(ctx, days), days))
     @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
         check(ready(ctx)) { Lang.t("История временно недоступна", "History is temporarily unavailable") }
         ensureClock(ctx,now)
@@ -326,22 +327,29 @@ object History {
     @Synchronized internal fun replace(ctx: Context, replacement: List<Observation>) {
         replaceSnapshot(ctx, replacement)
     }
-    fun describeStats(s: TimeStats, days: Int): String = buildString {
-        append(Lang.t("TG Монитор — ", "TG Monitor — ")).append(if (days == 1) Lang.t("за сутки", "last 24 hours") else Lang.t("за неделю", "last week")).append('\n')
-        if (s.uptimePercent >= 0) append(Lang.t("Оценка доступности по времени: ${formatPercent(s.uptimePercent)}\n", "Time-based availability estimate: ${formatPercent(s.uptimePercent)}\n"))
-        append(Lang.t("Доступен: ${durationStr(s.okMs)}; частично: ${durationStr(s.partialMs)}\n", "Reachable: ${durationStr(s.okMs)}; partially: ${durationStr(s.partialMs)}\n"))
-        append(Lang.t("Сбой Telegram: ${durationStr(s.downMs)}; нет сети: ${durationStr(s.offlineMs)}\n", "Telegram outage: ${durationStr(s.downMs)}; no internet: ${durationStr(s.offlineMs)}\n"))
-        append(Lang.t("Нет данных: ${durationStr(s.unknownMs)}\n", "No data: ${durationStr(s.unknownMs)}\n"))
-        append(Lang.t("Подтверждённых эпизодов сбоя Telegram: ${s.outageCount}; потерь сети: ${s.offlineCount}\n", "Confirmed Telegram outages: ${s.outageCount}; internet losses: ${s.offlineCount}\n"))
-        if (s.outageCount > 0) append(if (s.lastOutageOngoing) Lang.t("Текущий сбой: ", "Current outage: ") else Lang.t("Последний наблюдаемый сбой: ", "Last observed outage: "))
-            .append(recoveryDurationStr(s.lastOutageMs)).append('\n')
-        append(Lang.t("Самый долгий подтверждённый сбой: ${durationStr(s.longestOutageMs)}\n", "Longest confirmed outage: ${durationStr(s.longestOutageMs)}\n"))
-        append(Lang.t("Завершённых полностью наблюдённых сбоев: ${s.completedOutageCount}\n", "Completed fully observed outages: ${s.completedOutageCount}\n"))
-        if (s.mttrMs >= 0) append(Lang.t("Среднее время восстановления (MTTR): ${recoveryDurationStr(s.mttrMs)}\n", "Mean time to recovery (MTTR): ${recoveryDurationStr(s.mttrMs)}\n"))
-        append(Lang.t("Проверки: OK ${s.okChecks}; сбой ${s.downChecks}; частично ${s.partialChecks}; нет сети ${s.offlineChecks}; нет данных ${s.unknownChecks}\n", "Checks: OK ${s.okChecks}; outage ${s.downChecks}; partial ${s.partialChecks}; no internet ${s.offlineChecks}; no data ${s.unknownChecks}\n"))
-        append(Lang.t("В MTTR входят полностью наблюдённые сбои Telegram между OK; PARTIAL может продолжать сбой, а пробелы и отсутствие сети исключаются.\n", "MTTR covers fully observed Telegram outages between OK checks; PARTIAL can extend an outage, while gaps and lost internet are excluded.\n"))
-        append(Lang.t("Проверок: ${s.checks}. Промежутки между проверками оцениваются; пробелы исключены из процента.", "Checks: ${s.checks}. Time between checks is estimated; gaps are excluded from the percentage."))
-    }
+    fun describeStats(s: TimeStats, days: Int, targetId: TargetId = TargetId.TELEGRAM): TextValue =
+        textLines(buildList {
+        val name = TextArgument.Value(TargetNames.text(targetId))
+        fun duration(millis: Long, precise: Boolean = false) =
+            TextArgument.Duration(DurationParts.from(millis), precise)
+        add(TextValue(if (days == 1) TextKey.HISTORY_DAY else TextKey.HISTORY_WEEK))
+        if (s.uptimePercent >= 0) add(textOf(TextKey.HISTORY_UPTIME, TextArgument.Decimal(s.uptimePercent)))
+        add(textOf(TextKey.HISTORY_REACHABLE, duration(s.okMs), duration(s.partialMs)))
+        add(textOf(TextKey.HISTORY_OUTAGE, name, duration(s.downMs), duration(s.offlineMs)))
+        add(textOf(TextKey.HISTORY_NO_DATA, duration(s.unknownMs)))
+        add(textOf(TextKey.HISTORY_EPISODES, name, TextArgument.Number(s.outageCount.toLong()),
+            TextArgument.Number(s.offlineCount.toLong())))
+        if (s.outageCount > 0) add(textOf(if (s.lastOutageOngoing) TextKey.HISTORY_CURRENT_OUTAGE
+            else TextKey.HISTORY_LAST_OUTAGE, duration(s.lastOutageMs, precise = true)))
+        add(textOf(TextKey.HISTORY_LONGEST, duration(s.longestOutageMs)))
+        add(textOf(TextKey.HISTORY_COMPLETED, TextArgument.Number(s.completedOutageCount.toLong())))
+        if (s.mttrMs >= 0) add(textOf(TextKey.HISTORY_MTTR, duration(s.mttrMs, precise = true)))
+        add(textOf(TextKey.HISTORY_CHECKS, TextArgument.Number(s.okChecks.toLong()),
+            TextArgument.Number(s.downChecks.toLong()), TextArgument.Number(s.partialChecks.toLong()),
+            TextArgument.Number(s.offlineChecks.toLong()), TextArgument.Number(s.unknownChecks.toLong())))
+        add(textOf(TextKey.HISTORY_MTTR_SCOPE, name))
+        add(textOf(TextKey.HISTORY_CHECKS_TOTAL, TextArgument.Number(s.checks.toLong())))
+    })
     @Synchronized fun flush(ctx: Context, now: Long = System.currentTimeMillis()) {
         if (!loaded) return
         dirty = true

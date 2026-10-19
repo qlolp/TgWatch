@@ -6,11 +6,11 @@ enum class PowerProfile(val awake: Int, val asleep: Int, val failure: Int) {
     FREQUENT(15, 60, 10);
 
     /** Follows the current UI language, so it is computed rather than stored. */
-    val title: String get() = when (this) {
-        ECONOMY -> Lang.t("Экономичный", "Economy")
-        BALANCED -> Lang.t("Обычный", "Balanced")
-        FREQUENT -> Lang.t("Частый", "Frequent")
-    }
+    val title: TextValue get() = TextValue(when (this) {
+        ECONOMY -> TextKey.PROFILE_ECONOMY
+        BALANCED -> TextKey.PROFILE_BALANCED
+        FREQUENT -> TextKey.PROFILE_FREQUENT
+    })
 
     fun interval(bad: Boolean, screenOff: Boolean): Int =
         if (bad) failure else if (screenOff) asleep else awake

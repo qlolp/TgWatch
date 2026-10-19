@@ -69,7 +69,8 @@ class DailySummaryReceiver : BroadcastReceiver() {
             isCurrent: () -> Boolean): Boolean {
             val notifications = EventNotifications(ctx, ctx.getSystemService(NotificationManager::class.java))
             var postingAt = 0L
-            val posted = notifications.summary(text.title, text.body) {
+            val posted = notifications.summary(AndroidText.resolve(ctx, text.title),
+                AndroidText.resolve(ctx, text.body)) {
                 postingAt = System.currentTimeMillis()
                 // Both history and Android notification preparation may have waited.
                 eligible(ctx, force, settings, postingAt, isCurrent)

@@ -133,7 +133,8 @@ class EventSettingsTest {
                     assertTrue(activity.findViewById<Switch>(R.id.swSoundRecovery).isChecked)
                     assertTrue(activity.findViewById<Switch>(R.id.swNotifyPartial).isChecked)
                     val patternId = activity.resources.getIdentifier("btnAlarmPattern", "id", ctx.packageName)
-                    assertTrue(activity.findViewById<Button>(patternId).text.contains(AlarmPattern.SHORT.title))
+                    assertTrue(activity.findViewById<Button>(patternId).text.contains(
+                        AndroidText.resolve(activity, AlarmPattern.SHORT.title)))
                     // Capture real UI after assertions; documentation images come from the emulator.
                     activity.findViewById<Switch>(soundId).performClick()
                     activity.findViewById<Switch>(recoveryId).performClick()

@@ -8,44 +8,51 @@ import java.util.TimeZone
 object DailySummary {
     const val DEFAULT_MINUTE = 21 * 60
 
-    data class Text(val title: String, val body: String)
+    data class Text(val title: TextValue, val body: TextValue)
 
-    /** null when the day has no checks: an empty summary is only noise. */
-    fun text(s: TimeStats): Text? {
+    /** null when the day has no checks; language is resolved only by the caller's Context. */
+    fun text(s: TimeStats, id: TargetId = TargetId.TELEGRAM): Text? {
         if (s.checks == 0) return null
-        val title = if (s.uptimePercent >= 0) Lang.t("Telegram за сутки: ${formatPercent(s.uptimePercent)}", "Telegram in the last 24 h: ${formatPercent(s.uptimePercent)}")
-            else Lang.t("Telegram за сутки", "Telegram in the last 24 h")
+        val name = TextArgument.Value(TargetNames.text(id))
+        val title = if (s.uptimePercent >= 0) textOf(TextKey.DAILY_TITLE_PERCENT,
+            name, TextArgument.Decimal(s.uptimePercent)) else textOf(TextKey.DAILY_TITLE, name)
         val body = buildList {
             add(when {
-                s.outageCount == 0 -> Lang.t("Сбоев Telegram не было", "No Telegram outages")
-                s.lastOutageOngoing -> Lang.t("Сбоев Telegram: ${s.outageCount}, сбой продолжается ", "Telegram outages: ${s.outageCount}, ongoing for ") +
-                    recoveryDurationStr(s.lastOutageMs)
-                else -> Lang.t("Сбоев Telegram: ${s.outageCount}, самый долгий ${durationStr(s.longestOutageMs)}", "Telegram outages: ${s.outageCount}, longest ${durationStr(s.longestOutageMs)}")
+                s.outageCount == 0 -> textOf(TextKey.DAILY_NO_OUTAGES, name)
+                s.lastOutageOngoing -> textOf(TextKey.DAILY_ONGOING, name, TextArgument.Number(s.outageCount.toLong()),
+                    TextArgument.Duration(DurationParts.from(s.lastOutageMs), precise = true))
+                else -> textOf(TextKey.DAILY_LONGEST, name, TextArgument.Number(s.outageCount.toLong()),
+                    TextArgument.Duration(DurationParts.from(s.longestOutageMs)))
             })
-            if (s.partialMs >= 60_000L) add(Lang.t("Частично доступен: ${durationStr(s.partialMs)}", "Partially reachable: ${durationStr(s.partialMs)}"))
-            if (s.offlineCount > 0) add(Lang.t("Без интернета: ${durationStr(s.offlineMs)}", "No internet: ${durationStr(s.offlineMs)}"))
-            if (s.avgLatencyMs >= 0) add(Lang.t("Средний отклик: ${s.avgLatencyMs} мс", "Average response: ${s.avgLatencyMs} ms"))
-            if (s.unknownMs >= 60_000L) add(Lang.t("Без наблюдения: ${durationStr(s.unknownMs)}", "Not monitored: ${durationStr(s.unknownMs)}"))
-            add(Lang.t("Проверок: ${s.checks}", "Checks: ${s.checks}"))
-        }.joinToString("\n")
-        return Text(title, body)
+            if (s.partialMs >= MINUTE_MS) add(textOf(TextKey.DAILY_PARTIAL,
+                TextArgument.Duration(DurationParts.from(s.partialMs))))
+            if (s.offlineCount > 0) add(textOf(TextKey.DAILY_OFFLINE,
+                TextArgument.Duration(DurationParts.from(s.offlineMs))))
+            if (s.avgLatencyMs >= 0) add(textOf(TextKey.DAILY_LATENCY, TextArgument.Number(s.avgLatencyMs)))
+            if (s.unknownMs >= MINUTE_MS) add(textOf(TextKey.DAILY_UNOBSERVED,
+                TextArgument.Duration(DurationParts.from(s.unknownMs))))
+            add(textOf(TextKey.DAILY_CHECKS, TextArgument.Number(s.checks.toLong())))
+        }
+        return Text(title, textLines(body))
     }
 
     fun targets(values: Map<TargetId, TimeStats?>): Text? {
         if (values.isEmpty() || values.values.all { it != null && it.checks == 0 }) return null
-        val body = values.entries.joinToString("\n\n") { (id, stats) ->
-            val name = TargetNames.label(id)
-            val value = stats?.let(::text)
+        val blocks = values.map { (id, stats) ->
+            val name = TextArgument.Value(TargetNames.text(id))
+            val value = stats?.let { text(it, id) }
             when {
-                stats == null -> "$name: " + Lang.t("история недоступна", "history unavailable")
-                value == null -> "$name: " + Lang.t("нет проверок", "no checks")
-                else -> (value.title + "\n" + value.body).replace("Telegram", name)
+                stats == null -> textOf(TextKey.DAILY_UNAVAILABLE, name)
+                value == null -> textOf(TextKey.DAILY_NO_CHECKS, name)
+                else -> textLines(listOf(value.title, value.body))
             }
         }
         return if (values.keys == setOf(TargetId.TELEGRAM) && values[TargetId.TELEGRAM] != null)
             text(checkNotNull(values[TargetId.TELEGRAM]))
-            else Text(Lang.t("Доступность за сутки", "Reachability in the last 24 h"), body)
+            else Text(TextValue(TextKey.DAILY_ALL_TARGETS), TextValue(TextKey.BLOCKS, blocks.map(TextArgument::Value)))
     }
+
+    private const val MINUTE_MS = 60_000L
 
     /** Next wall-clock moment at [minuteOfDay] strictly after [now]; DST-safe via Calendar. */
     fun nextAt(now: Long, minuteOfDay: Int, zone: TimeZone = TimeZone.getDefault()): Long {

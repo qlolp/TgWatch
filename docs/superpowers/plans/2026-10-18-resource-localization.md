@@ -30,11 +30,11 @@
 **Files:** Create `app/src/main/java/ru/tgwatch/TextValue.kt`, `AndroidText.kt`, `DurationParts.kt`; modify `MonitorService.kt` formatting helpers, `DailySummary.kt`, `History.kt`, `LastSuccessPolicy.kt`, `PowerProfile.kt`, `AlarmPattern.kt`; modify their callers and existing JVM tests; create `TextValueTest.kt`, `TextResourcesIntegrationTest.kt`.
 **Interfaces:** `TextKey` enumerates semantic presentation keys only, with no language strings. `TextValue(key: TextKey,args: List<TextArgument>)`; sealed TextArgument variants `Number(Long)`, `Decimal(Double)`, `Text(String)`, `Duration(DurationParts)`. `DurationParts` holds nonnegative day/hour/minute/second values; no language. `AndroidText.resolve(ctx: Context,value: TextValue): String` maps keys to resource IDs and resolves arguments using ctx configuration; `AndroidText.quantity(ctx,key,count,args): String` resolves quantity resources. No Context stored between calls.
 
-- [ ] Write typed policy assertions for duration0/5000/135minutes and daily-summary no-outage/ongoing/missing-history cases. Add native resource assertions for exact existing RU/EN output, numbered placeholders and plural counts0/1/2/5/21. Existing LangTest expectations move to native resource tests, while JVM tests verify keys/values and stats.
-- [ ] Run focused JVM/native tests and observe RED for missing presentation model, then implement model/resolver and resource mappings. Keep computation worker-side; resolving resource text does not trigger storage/network.
-- [ ] Replace pure-policy translated return values with TextValue/typed duration results; move percent/date locale selection to Android presentation. Update every caller in the same commit so no half-migrated API is exposed.
-- [ ] Run all phone JVM tests and native RU/EN resource tests plus lint. Confirm zero duplicate resource names and matching placeholders. Verify boundary values use the same underlying measurements.
-- [ ] Commit `refactor: resolve common presentation through Android resources`.
+- [x] Write typed policy assertions for duration0/5000/135minutes and daily-summary no-outage/ongoing/missing-history cases. Add native resource assertions for exact existing RU/EN output, numbered placeholders and plural counts0/1/2/5/21. Existing LangTest expectations move to native resource tests, while JVM tests verify keys/values and stats.
+- [x] Run focused JVM/native tests and observe RED for missing presentation model, then implement model/resolver and resource mappings. Keep computation worker-side; resolving resource text does not trigger storage/network.
+- [x] Replace pure-policy translated return values with TextValue/typed duration results; move percent/date locale selection to Android presentation. Update every caller in the same commit so no half-migrated API is exposed.
+- [x] Run all phone JVM tests and native RU/EN resource tests plus lint. Confirm zero duplicate resource names and matching placeholders. Verify boundary values use the same underlying measurements.
+- [x] Commit `refactor: resolve common presentation through Android resources`.
 
 ### Task 2: Settings, notifications, widgets and diagnostics
 

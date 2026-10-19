@@ -24,7 +24,7 @@ internal data class HistoryDisplay(
             val stats = TargetHistories.stats(ctx, id, selectedDays, now).valueOrThrow()
             val uptime = stats.uptimePercent
             val coverage = CoverageStats.from(stats, selectedDays * CoverageStats.DAY_MS)
-            val summary = TargetHistoryPresentation.summary(id, stats, selectedDays)
+            val summary = TargetHistoryPresentation.summary(ctx, id, stats, selectedDays)
             val window = if (days == 1) HOUR_MINUTES else WEEK_MINUTES
             val minutes = if (id == TargetId.TELEGRAM) History.lastMinutes(ctx, window, now)
                 else TargetHistoryPresentation.minutes(TargetHistories.rows(ctx, id, now), window, now)

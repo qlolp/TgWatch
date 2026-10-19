@@ -148,7 +148,7 @@ class MainActivity : Activity() {
         updateProfileLabel()
         btnProfile.setOnClickListener {
             AlertDialog.Builder(this).setTitle(R.string.battery_title)
-                .setItems(PowerProfile.entries.map { Lang.t("${it.title}: ${it.awake} с / сон ${it.asleep} с / сбой ${it.failure} с", "${it.title}: ${it.awake} s / sleep ${it.asleep} s / outage ${it.failure} s") }.toTypedArray()) { _, index ->
+                .setItems(PowerProfile.entries.map { Lang.t("${AndroidText.resolve(this, it.title)}: ${it.awake} с / сон ${it.asleep} с / сбой ${it.failure} с", "${AndroidText.resolve(this, it.title)}: ${it.awake} s / sleep ${it.asleep} s / outage ${it.failure} s") }.toTypedArray()) { _, index ->
                     val profile = PowerProfile.entries[index]
                     Prefs.setProfile(this, profile)
                     changingProfile = true
@@ -268,7 +268,7 @@ class MainActivity : Activity() {
         updateAlarmPatternLabel()
         btnAlarmPattern.setOnClickListener {
             AlertDialog.Builder(this).setTitle(Lang.t("Сигнал вибрации при сбое", "Outage vibration pattern"))
-                .setSingleChoiceItems(AlarmPattern.entries.map { it.title }.toTypedArray(),
+                .setSingleChoiceItems(AlarmPattern.entries.map { AndroidText.resolve(this, it.title) }.toTypedArray(),
                     Prefs.alarmPattern(this).ordinal) { dialog, index ->
                     Prefs.setAlarmPattern(this, AlarmPattern.entries[index])
                     updateAlarmPatternLabel()
@@ -336,7 +336,7 @@ class MainActivity : Activity() {
         advancedSettings.visibility = if (advancedExpanded) View.VISIBLE else View.GONE
         btnAdvanced.text = getString(if (advancedExpanded) R.string.advanced_hide else R.string.advanced_show)
     }
-    private fun updateAlarmPatternLabel() { btnAlarmPattern.text = Lang.t("Сигнал вибрации: ${Prefs.alarmPattern(this).title}", "Vibration pattern: ${Prefs.alarmPattern(this).title}") }
+    private fun updateAlarmPatternLabel() { btnAlarmPattern.text = Lang.t("Сигнал вибрации: ${AndroidText.resolve(this, Prefs.alarmPattern(this).title)}", "Vibration pattern: ${AndroidText.resolve(this, Prefs.alarmPattern(this).title)}") }
 
     override fun onResume() {
         super.onResume()

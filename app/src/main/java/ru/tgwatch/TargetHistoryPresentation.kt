@@ -6,10 +6,10 @@ internal object TargetHistoryPresentation {
     fun version(id: TargetId): Long = if (id == TargetId.TELEGRAM) History.version
         else TargetPersistence.active?.revisions?.get(id) ?: 0L
 
-    fun summary(id: TargetId, stats: TimeStats, days: Int): String {
-        val legacy = History.describeStats(stats, days)
-        return if (id == TargetId.TELEGRAM) legacy
-            else TargetNames.label(id) + "\n" + legacy.replace("Telegram", TargetNames.label(id))
+    fun summary(ctx: android.content.Context, id: TargetId, stats: TimeStats, days: Int): String {
+        val value = History.describeStats(stats, days, id)
+        return AndroidText.resolve(ctx, if (id == TargetId.TELEGRAM) value
+            else textLines(listOf(TargetNames.text(id), value)))
     }
 
     fun minutes(rows: List<Observation>, count: Int, now: Long): List<History.Minute> {

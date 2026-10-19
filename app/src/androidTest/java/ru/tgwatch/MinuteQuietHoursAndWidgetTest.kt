@@ -151,11 +151,11 @@ class MinuteQuietHoursAndWidgetTest {
             }
             return text
         }
-        assertEquals(LastSuccessPolicy.label(now - 60_000, now), lastSuccessText())
+        assertEquals(AndroidText.resolve(ctx, LastSuccessPolicy.label(now - 60_000, now)), lastSuccessText())
         LastSuccessStore.record(ctx, "OK", now + 86_400_000)
         assertTrue(lastSuccessText().contains(Lang.t("Часы изменились · OK", "Clock changed · OK")))
         LastSuccessStore.clear(ctx)
-        assertEquals(LastSuccessPolicy.label(0, now), lastSuccessText())
+        assertEquals(AndroidText.resolve(ctx, LastSuccessPolicy.label(0, now)), lastSuccessText())
     }
 
     @Test fun narrowWidgetShowsCompleteDateTimeAndClockMarkerWithoutClipping() = withSavedSettings {
