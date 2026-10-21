@@ -841,6 +841,7 @@ class MonitorService : Service() {
 
         targetMonitoring?.onTelegram(newState, p.outcomes)
         NetworkStats.record(this, now, probeNetwork, newState.status.name)
+        refreshEgressCountry()
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
@@ -856,6 +857,14 @@ class MonitorService : Service() {
             sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
         } catch (e: Exception) {
             Log.w(TAG, "broadcastState", e)
+        }
+    }
+
+    /** Informational only: never blocks the check and never stores the egress address. */
+    private fun refreshEgressCountry() {
+        val network = cm.activeNetwork ?: return
+        EgressCountryUi.refresh(this, network.networkHandle) { url ->
+            network.openConnection(url) as java.net.HttpURLConnection
         }
     }
 

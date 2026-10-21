@@ -35,12 +35,14 @@ class MainActivity : Activity() {
     private lateinit var ivStatus: ImageView
     private lateinit var tvTitle: TextView
     private lateinit var tvSince: TextView
+    private lateinit var tvEgress: TextView
     private lateinit var tvReason: TextView
     private lateinit var tvLatency: TextView
     private lateinit var tvChecked: TextView
     private lateinit var btnToggle: Button
     private lateinit var btnCheck: Button
     private lateinit var btnResumeAlerts: Button
+    private lateinit var statusCardUi: TelegramStatusCard
     private lateinit var rgInterval: RadioGroup
     private lateinit var swKeepAwake: Switch
     private lateinit var swVibrate: Switch
@@ -172,12 +174,16 @@ class MainActivity : Activity() {
         ivStatus = findViewById(R.id.ivStatus)
         tvTitle = findViewById(R.id.tvTitle)
         tvSince = findViewById(R.id.tvSince)
+        tvEgress = findViewById(R.id.tvEgress)
         tvReason = findViewById(R.id.tvReason)
         tvLatency = findViewById(R.id.tvLatency)
         tvChecked = findViewById(R.id.tvChecked)
         btnToggle = findViewById(R.id.btnToggle)
         btnCheck = findViewById(R.id.btnCheck)
         btnResumeAlerts = findViewById(R.id.btnResumeAlerts)
+        statusCardUi = TelegramStatusCard(
+            TelegramStatusCard.Views(ivStatus, tvTitle, tvSince, tvReason, tvLatency, tvChecked, btnResumeAlerts),
+            ::animateCardColor)
         rgInterval = findViewById(R.id.rgInterval)
         swKeepAwake = findViewById(R.id.swKeepAwake)
         swVibrate = findViewById(R.id.swVibrate)
@@ -351,6 +357,7 @@ class MainActivity : Activity() {
         historyUi.resume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
+        EgressCountryUi.refreshActive(this)
         ui.removeCallbacks(ticker)
         ui.post(ticker)
     }
@@ -478,110 +485,6 @@ class MainActivity : Activity() {
 
     private val recoveryUi = RecoveryUi(this)
 
-    private fun renderTelegramStatus(s: MonitorService.State, now: Long, running: Boolean, stale: Boolean) {
-        var color = getColor(R.color.status_idle)
-        if (!running) {
-            ivStatus.setImageResource(R.drawable.ic_stat_pause)
-            tvTitle.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_off)
-            tvSince.text = this@MainActivity.renderString(R.string.copy_main_checks_are_stopped)
-            tvReason.text = this@MainActivity.renderString(R.string.copy_main_tap_start_and_the)
-        } else if (stale) {
-            color = getColor(R.color.status_idle)
-            renderTelegramStale(s, now)
-        } else {
-            color = renderTelegramCurrent(s, now)
-        }
-        val mutedUntil = Prefs.alertsMutedUntil(this, now)
-        btnResumeAlerts.visibility = if (mutedUntil > 0L) View.VISIBLE else View.GONE
-        if (running && mutedUntil > 0L) tvReason.append(this@MainActivity.renderString(
-            R.string.copy_main_alerts_muted_until,
-            timeStr(this@MainActivity, mutedUntil)))
-        ivStatus.contentDescription = tvTitle.text
-        animateCardColor(color)
-
-        tvLatency.text = if (running && !stale && s.status == MonitorService.Status.OK) this@MainActivity.renderString(
-            R.string.copy_main_ms,
-            s.latencyMs) else "—"
-        tvChecked.text = if (running) agoStr(this@MainActivity, s.checkedAt, now) else "—"
-    }
-
-    private fun renderTelegramStale(s: MonitorService.State, now: Long) {
-        ivStatus.setImageResource(R.drawable.ic_stat_wait)
-        tvTitle.text = when (s.status) {
-            MonitorService.Status.OK -> this@MainActivity.renderString(R.string.copy_main_last_known_reachable)
-            MonitorService.Status.PARTIAL -> this@MainActivity.renderString(
-                R.string.copy_main_last_known_partially_reachable)
-            MonitorService.Status.TG_DOWN -> this@MainActivity.renderString(
-                R.string.copy_main_last_known_unreachable)
-            MonitorService.Status.NO_NETWORK -> this@MainActivity.renderString(
-                R.string.copy_main_last_known_no_internet)
-            MonitorService.Status.UNKNOWN -> this@MainActivity.renderString(R.string.copy_main_checking)
-        }
-        tvSince.text = this@MainActivity.renderString(
-            R.string.copy_main_checked_waiting_for_a,
-            agoStr(this@MainActivity, s.checkedAt, now))
-        tvReason.text = this@MainActivity.renderString(R.string.copy_main_monitoring_is_delayed_android)
-    }
-
-    private fun renderTelegramCurrent(s: MonitorService.State, now: Long): Int {
-        var color = getColor(R.color.status_idle)
-        when (s.status) {
-            MonitorService.Status.OK -> {
-                color = getColor(R.color.status_ok)
-                ivStatus.setImageResource(R.drawable.ic_stat_ok)
-                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_responding)
-            }
-            MonitorService.Status.PARTIAL -> {
-                color = getColor(R.color.status_offline)
-                ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_partially_reachable)
-            }
-            MonitorService.Status.TG_DOWN -> {
-                color = getColor(R.color.status_fail)
-                ivStatus.setImageResource(R.drawable.ic_stat_fail)
-                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_telegram_is_unreachable)
-            }
-            MonitorService.Status.NO_NETWORK -> {
-                color = getColor(R.color.status_offline)
-                ivStatus.setImageResource(R.drawable.ic_stat_offline)
-                tvTitle.text = this@MainActivity.renderString(R.string.copy_main_no_internet)
-            }
-            MonitorService.Status.UNKNOWN -> {
-                ivStatus.setImageResource(R.drawable.ic_stat_wait)
-                tvTitle.text = if (s.checkedAt > 0) this@MainActivity.renderString(
-                    R.string.copy_main_reachability_unknown) else this@MainActivity.renderString(
-                        R.string.copy_main_checking)
-            }
-        }
-        tvSince.text = if (s.status == MonitorService.Status.UNKNOWN) {
-            if (s.checkedAt > 0) this@MainActivity.renderString(
-                R.string.copy_main_checked,
-                agoStr(this@MainActivity, s.checkedAt, now)) else this@MainActivity.renderString(
-                    R.string.copy_main_first_check_in_progress)
-        } else {
-            this@MainActivity.renderString(
-                R.string.copy_main_for_since,
-                durationStr(this@MainActivity, now - s.since),
-                timeStr(this@MainActivity, s.since))
-        }
-        tvReason.text = telegramReason(s)
-        return color
-    }
-
-    private fun telegramReason(s: MonitorService.State): String {
-        return when (s.status) {
-            MonitorService.Status.OK -> this@MainActivity.renderString(
-                R.string.copy_main_mtproto_and_web_resources)
-            MonitorService.Status.PARTIAL -> s.reason
-            MonitorService.Status.TG_DOWN -> this@MainActivity.renderString(R.string.copy_main_reason, s.reason)
-            MonitorService.Status.NO_NETWORK -> this@MainActivity.renderString(R.string.copy_main_reason, s.reason)
-            MonitorService.Status.UNKNOWN -> s.reason.ifEmpty { this@MainActivity.renderString(
-                R.string.copy_main_checking_web_resources_and) }
-        } + if (s.lastVibrationAt > 0L) this@MainActivity.renderString(
-            R.string.copy_main_last_vibration,
-            timeStr(this@MainActivity, s.lastVibrationAt)) else ""
-    }
-
     private fun render() {
         if (recoveryUi.preparing()) return
         if (BackupManager.hasPending()) {
@@ -605,7 +508,10 @@ class MainActivity : Activity() {
         MainSetupUi.render(this, notifOk, batteryOk, alarmOk)
         TargetLegacySettingsUi.refresh(this, intervalButtons) { changingProfile = it }
 
-        if (targetUi.selected == TargetId.TELEGRAM) renderTelegramStatus(s, now, running, stale)
+        if (targetUi.selected == TargetId.TELEGRAM) {
+            statusCardUi.render(this, s, now, running, stale)
+        }
+        EgressCountryUi.render(tvEgress, this)
         historyUi.refresh(historyDays, now)
         if (tvDiagnostics.visibility == View.VISIBLE && targetUi.selected == TargetId.TELEGRAM) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { this@MainActivity.renderString(

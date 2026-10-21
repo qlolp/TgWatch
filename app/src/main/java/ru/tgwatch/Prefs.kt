@@ -35,6 +35,9 @@ object Prefs {
     private const val KEY_EXTRA_WHATSAPP = "extra_probe_whatsapp"
     private const val KEY_EXTRA_CUSTOM = "extra_probe_custom"
     private const val KEY_LAST_STATUS = "last_status"
+    private const val KEY_EGRESS_ISO = "egress_iso"
+    private const val KEY_EGRESS_AT = "egress_at"
+    private const val KEY_EGRESS_NET = "egress_net"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
     private const val KEY_LAST_LATENCY = "last_latency"
@@ -388,6 +391,29 @@ object Prefs {
             .remove(KEY_LAST_VIBE)
             .remove("last_diagnostics")
             .remove("last_expected_sec")
+            .apply()
+    }
+
+    /** Device-local egress country; the address itself is never persisted. */
+    fun egressCountry(ctx: Context): EgressCountry.Snapshot? {
+        val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) } ?: return null
+        return EgressCountry.Snapshot(iso, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+    }
+
+    fun setEgressCountry(ctx: Context, snapshot: EgressCountry.Snapshot) {
+        require(EgressCountry.isValid(snapshot.iso))
+        sp(ctx).edit()
+            .putString(KEY_EGRESS_ISO, snapshot.iso)
+            .putLong(KEY_EGRESS_AT, snapshot.checkedAt)
+            .putLong(KEY_EGRESS_NET, snapshot.networkHandle)
+            .apply()
+    }
+
+    fun clearEgressCountry(ctx: Context) {
+        sp(ctx).edit()
+            .remove(KEY_EGRESS_ISO)
+            .remove(KEY_EGRESS_AT)
+            .remove(KEY_EGRESS_NET)
             .apply()
     }
 }
