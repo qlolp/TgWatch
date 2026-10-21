@@ -3,26 +3,27 @@ package ru.tgwatch
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
-import android.app.ProgressDialog
 import android.content.Intent
-import android.net.Uri
 import android.text.InputType
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.Toast
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 
 /** SAF documents and password entry; expensive crypto/storage work never runs on the UI thread. */
 class BackupUi(private val activity: Activity) {
-    private data class CsvDocument(val rows: Map<TargetId, List<TargetObservation>>, val legacy: Boolean)
-    private var busy = false
     private val dialogs = mutableListOf<Dialog>()
+    private val jobs = BackupJobUi(activity, ::dismissDialogs, ::previewTargets, ::previewCsv)
 
-    fun close() { dialogs.forEach { it.dismiss() }; dialogs.clear() }
+    fun close() { jobs.close(); dismissDialogs() }
+    fun resume() = jobs.onBackupChanged()
+    private fun dismissDialogs() {
+        val old = dialogs.toList()
+        dialogs.clear()
+        old.forEach { it.dismiss() }
+    }
 
     fun export() {
+        if (!jobs.available()) return
         AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_backup_format))
             .setItems(arrayOf(activity.renderString(R.string.copy_backup_ui_all_targets_v),
                 activity.renderString(R.string.copy_backup_ui_telegram_only_compatible_v))) { _, index ->
@@ -31,15 +32,13 @@ class BackupUi(private val activity: Activity) {
             }.show().also { dialogs.add(it) }
     }
     fun restore() {
+        if (!jobs.available()) return
         if (BackupManager.hasPending()) {
             AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_finish_restoring))
                 .setMessage(activity.renderString(R.string.copy_backup_ui_the_previous_restore_was))
-                .setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue)) { _, _ -> work(
-                    activity.renderString(
-                    R.string.copy_backup_ui_restoring), {
-                    BackupManager.recoverPending(activity.applicationContext)
-                }, { activity.recreate() }, activity.renderString(
-                    R.string.copy_backup_ui_couldn_t_finish_restoring)) }
+                .setPositiveButton(activity.renderString(R.string.copy_backup_ui_continue)) { _, _ ->
+                    if (!BackupJobs.recover(activity.applicationContext)) jobs.busyMessage()
+                }
                 .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
                     ).also { dialogs.add(it) }
             return
@@ -50,14 +49,14 @@ class BackupUi(private val activity: Activity) {
 
     @Suppress("DEPRECATION")
     private fun document(action: String, code: Int, type: String, name: String? = null) {
-        if (busy) return
+        if (!jobs.available()) return
         try {
             activity.startActivityForResult(Intent(action).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 this.type = type
                 if (name != null) putExtra(Intent.EXTRA_TITLE, name)
             }, code)
-        } catch (_: Exception) { message(activity.renderString(R.string.copy_backup_ui_couldn_t_open_the)) }
+        } catch (_: Exception) { jobs.message(activity.renderString(R.string.copy_backup_ui_couldn_t_open_the)) }
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {
@@ -65,36 +64,20 @@ class BackupUi(private val activity: Activity) {
         if (result != Activity.RESULT_OK) return true
         val uri = data?.data ?: return true
         when (code) {
-            EXPORT, EXPORT_LEGACY -> password(true) { pass -> work(activity.renderString(
-                R.string.copy_backup_ui_creating_backup), {
-                try {
-                    val archive = if (code == EXPORT) BackupManager.export(activity.applicationContext, pass)
-                        else BackupManager.exportTelegram(activity.applicationContext, pass)
-                    activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(archive) }
-                        ?: error("No output")
-                } finally { pass.fill('\u0000') }
-            }, { message(activity.renderString(R.string.copy_backup_ui_encrypted_backup_saved_you)) },
-                activity.renderString(R.string.copy_backup_ui_couldn_t_save_the)) }
-            RESTORE -> password(false) { pass -> work(activity.renderString(
-                R.string.copy_backup_ui_checking_backup), {
-                try { PortableBackupCodec.decryptTargetImport(read(uri, PortableBackupCodec.MAX_ENVELOPE_BYTES), pass) }
-                finally { pass.fill('\u0000') }
-            }, { previewTargets(it) }, activity.renderString(R.string.copy_backup_ui_wrong_password_or_damaged)) }
-            CSV -> work(activity.renderString(R.string.copy_backup_ui_checking_csv), {
-                val bytes = read(uri, TargetBackupCodec.MAX_PLAINTEXT_BYTES)
-                val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
-                CsvDocument(TargetCsv.parse(text), TargetCsv.isLegacy(text))
-            }, { previewCsv(it) }, activity.renderString(R.string.copy_backup_ui_the_csv_is_damaged))
+            EXPORT, EXPORT_LEGACY -> password(true) { pass ->
+                if (!BackupJobs.export(activity.applicationContext, uri, pass, code == EXPORT_LEGACY))
+                    jobs.busyMessage()
+            }
+            RESTORE -> password(false) { pass ->
+                if (!BackupJobs.readBackup(activity.applicationContext, uri, pass)) jobs.busyMessage()
+            }
+            CSV -> if (!BackupJobs.readCsv(activity.applicationContext, uri)) jobs.busyMessage()
         }
         return true
     }
 
-    private fun read(uri: Uri, maxBytes: Int): ByteArray = activity.contentResolver.openInputStream(uri)
-        ?.use { BoundedInput.read(it, maxBytes) } ?: error("No input")
-
     private fun password(confirm: Boolean, action: (CharArray) -> Unit) {
-        if (busy) return
+        if (!jobs.available()) return
         val layout = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             val pad = (20 * resources.displayMetrics.density).toInt()
@@ -139,7 +122,7 @@ class BackupUi(private val activity: Activity) {
         dialogs.add(dialog)
     }
 
-    private fun previewTargets(imported: TargetBackupImport) {
+    private fun previewTargets(id: Long, imported: TargetBackupImport) {
         val snapshot = imported.snapshot
         val count = snapshot.observations.values.sumOf { it.size }
         AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_restore_this_backup))
@@ -147,56 +130,22 @@ class BackupUi(private val activity: Activity) {
                 R.string.copy_backup_ui_targets_history_records_data,
                 snapshot.targets.size,
                 count))
-            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ ->
-                work(activity.renderString(R.string.copy_backup_ui_restoring), {
-                    TargetRestore.stage(activity.applicationContext, imported)
-                    BackupManager.recoverPending(activity.applicationContext)
-                }, { message(activity.renderString(
-                    R.string.copy_backup_ui_data_restored_all_targets)); activity.recreate() },
-                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
-            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
-                ).also { dialogs.add(it) }
+            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ -> jobs.apply(id) }
+            .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel)) { _, _ -> jobs.discard(id) }
+            .setOnCancelListener { jobs.discard(id) }.show().also { dialogs.add(it) }
     }
 
-    private fun previewCsv(document: CsvDocument) {
+    private fun previewCsv(id: Long, document: BackupJobResult.Csv) {
         val rows = document.rows
         val names = rows.keys.joinToString(", ") { TargetNames.label(activity, it) }
         val count = rows.values.sumOf { it.size }
         AlertDialog.Builder(activity).setTitle(activity.renderString(R.string.copy_backup_ui_import_csv))
             .setMessage(activity.renderString(R.string.copy_backup_ui_targets_records_history_for, names, count))
-            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ ->
-                work(activity.renderString(R.string.copy_backup_ui_restoring), {
-                    if (document.legacy) BackupManager.importHistory(activity.applicationContext,
-                        rows.getValue(TargetId.TELEGRAM).map { value ->
-                            value.row.copy(kind = Timeline.canonicalKind(value.row.kind)) })
-                    else BackupManager.importHistories(activity.applicationContext, rows)
-                }, { message(activity.renderString(
-                    R.string.copy_backup_ui_history_restored_all_targets)); activity.recreate() },
-                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
-            }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
-                ).also { dialogs.add(it) }
+            .setPositiveButton(activity.renderString(R.string.copy_backup_ui_replace_data)) { _, _ -> jobs.apply(id) }
+            .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel)) { _, _ -> jobs.discard(id) }
+            .setOnCancelListener { jobs.discard(id) }.show().also { dialogs.add(it) }
     }
 
-    @Suppress("DEPRECATION")
-    private fun <T> work(title: String, block: () -> T, success: (T) -> Unit, failure: String) {
-        if (busy) return
-        busy = true
-        val progress = ProgressDialog(activity).apply { setMessage(title); setCancelable(false); show() }
-        dialogs.add(progress)
-        Thread({
-            val result = runCatching(block)
-            activity.runOnUiThread {
-                busy = false
-                progress.dismiss()
-                dialogs.remove(progress)
-                if (!activity.isFinishing && !activity.isDestroyed) {
-                    result.fold(success) { message(failure) }
-                }
-            }
-        }, "tg-backup").start()
-    }
-
-    private fun message(text: String) = Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
     companion object {
         private const val EXPORT = 30
         private const val RESTORE = 31

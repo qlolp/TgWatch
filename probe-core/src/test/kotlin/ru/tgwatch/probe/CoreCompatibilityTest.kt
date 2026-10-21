@@ -10,6 +10,36 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoreCompatibilityTest {
+    @Test fun busyDuplicateDoesNotReplaceTheFirstMeasuredResult() {
+        val pool = Executors.newSingleThreadExecutor()
+        val released = CountDownLatch(1)
+        val endpoint = ProbeEndpoint("same", ProbeGroup.WEB, "https://fixture.invalid/")
+        try {
+            val result = ProbeBatch(pool, 1000, ProbeAdmission(1, 0)).runMapped(listOf(endpoint, endpoint),
+                { _, detail, _ ->
+                    assertEquals(ProbeDetailCode.BUSY, detail.code)
+                    released.countDown()
+                    "busy"
+                }) { _, _ ->
+                    assertTrue(released.await(1, TimeUnit.SECONDS))
+                    "measured"
+                }
+            assertEquals(listOf("measured", "busy"), result)
+        } finally { released.countDown(); pool.shutdownNow() }
+    }
+
+    @Test fun sameDisplayNameDoesNotMixDifferentEndpointResults() {
+        val pool = Executors.newSingleThreadExecutor()
+        try {
+            val endpoints = listOf("https://a.invalid/", "https://b.invalid/").map {
+                ProbeEndpoint("same", ProbeGroup.WEB, it)
+            }
+            val result = ProbeBatch(pool, 1000, ProbeAdmission(2, 0)).runMapped(endpoints,
+                { _, _, _ -> "fallback" }) { endpoint, _ -> endpoint.address }
+            assertEquals(endpoints.map { it.address }, result)
+        } finally { pool.shutdownNow() }
+    }
+
     @Test fun coreClassLoaderHasNoAndroidOrPhoneDependencies() {
         val loader = ProbeReport::class.java.classLoader
         for (name in listOf("android.content.Context", "ru.tgwatch.Lang", "ru.tgwatch.BuildConfig"))

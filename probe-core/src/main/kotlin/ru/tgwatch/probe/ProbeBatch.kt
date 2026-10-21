@@ -17,36 +17,36 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
         operation: (ProbeEndpoint, ProbeCancellation) -> R): List<R> {
         checkCoordinator()
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
-        val queue = ExecutorCompletionService<Pair<String, R>>(pool)
-        val handles = mutableListOf<Triple<Future<Pair<String, R>>, ProbeCancellation, ProbePermit>>()
-        val results = mutableListOf<Pair<String, R>>()
-        val started = ConcurrentHashMap.newKeySet<String>()
+        val queue = ExecutorCompletionService<Pair<Int, R>>(pool)
+        val handles = mutableListOf<Triple<Future<Pair<Int, R>>, ProbeCancellation, ProbePermit>>()
+        val results = mutableListOf<Pair<Int, R>>()
+        val started = ConcurrentHashMap.newKeySet<Int>()
         fun unavailable(endpoint: ProbeEndpoint, code: ProbeDetailCode) =
             fallback(endpoint, ProbeDetail(code), ProbeMeasurement.NOT_MEASURED)
         try {
-            endpoints.forEach { endpoint ->
+            endpoints.forEachIndexed { index, endpoint ->
                 val key = "${endpoint.group}:${endpoint.name}:${endpoint.address}"
                 val lease = admission.tryAcquire(key, lane)
                 if (lease == null) {
-                    results += endpoint.name to unavailable(endpoint, ProbeDetailCode.BUSY)
-                    return@forEach
+                    results += index to unavailable(endpoint, ProbeDetailCode.BUSY)
+                    return@forEachIndexed
                 }
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable endpoint.name to unavailable(endpoint, ProbeDetailCode.CANCELLED)
+                        if (!lease.start()) return@Callable index to unavailable(endpoint, ProbeDetailCode.CANCELLED)
                         try {
                             cancellation.check()
-                            started.add(endpoint.name)
-                            endpoint.name to operation(endpoint, cancellation)
+                            started.add(index)
+                            index to operation(endpoint, cancellation)
                         } catch (error: Exception) {
-                            endpoint.name to fallback(endpoint, ProbeDetail.failure(error), ProbeMeasurement.FAILURE)
+                            index to fallback(endpoint, ProbeDetail.failure(error), ProbeMeasurement.FAILURE)
                         } finally { cancellation.close(); lease.finished() }
                     })
                     handles += Triple(future, cancellation, lease)
                 } catch (_: RejectedExecutionException) {
                     lease.cancelBeforeStart()
-                    results += endpoint.name to unavailable(endpoint, ProbeDetailCode.BUSY)
+                    results += index to unavailable(endpoint, ProbeDetailCode.BUSY)
                 }
             }
             repeat(handles.size) {
@@ -64,9 +64,9 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             }
         }
         checkCoordinator()
-        return endpoints.map { endpoint -> results.firstOrNull { it.first == endpoint.name }?.second ?: fallback(endpoint,
+        return endpoints.mapIndexed { index, endpoint -> results.firstOrNull { it.first == index }?.second ?: fallback(endpoint,
             ProbeDetail(ProbeDetailCode.TIME_LIMIT),
-            if (endpoint.name in started) ProbeMeasurement.FAILURE else ProbeMeasurement.NOT_MEASURED) }
+            if (index in started) ProbeMeasurement.FAILURE else ProbeMeasurement.NOT_MEASURED) }
     }
     private fun checkCoordinator() {
         if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")

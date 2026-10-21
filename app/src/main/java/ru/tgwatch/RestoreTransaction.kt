@@ -70,15 +70,18 @@ class RestoreTransaction(private val pending: File, private val maxBytes: Int = 
 
 /** Read an untrusted document without allocating beyond its declared byte budget. */
 object BoundedInput {
-    fun read(input: InputStream, maxBytes: Int): ByteArray {
+    fun read(input: InputStream, maxBytes: Int, check: () -> Unit = {}): ByteArray {
         require(maxBytes > 0)
         val output = ByteArrayOutputStream(minOf(maxBytes, 8192))
         val buffer = ByteArray(8192)
         while (true) {
+            check()
             val count = input.read(buffer, 0, minOf(buffer.size, maxBytes - output.size() + 1))
+            check()
             if (count < 0) return output.toByteArray()
             if (count == 0) {
                 val one = input.read()
+                check()
                 if (one < 0) return output.toByteArray()
                 require(output.size() < maxBytes) { "Document exceeds size limit" }
                 output.write(one)
