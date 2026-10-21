@@ -136,6 +136,7 @@ class MainActivity : Activity() {
             historyUi.selectPeriod(historyDays)
             render()
         }
+        bindRetentionPicker()
         findViewById<Button>(R.id.btnExportCsv).setOnClickListener {
             csvExport.export(targetUi.selected, historyDays)
         }
@@ -375,6 +376,8 @@ class MainActivity : Activity() {
             UiErrors.show(this, R.string.copy_main_couldn_t_start_monitoring, e)
         }
     }
+
+    private fun bindRetentionPicker() = RetentionPicker.bind(this)
 
     private fun notifyServiceSettingsChanged() {
         if (MonitorService.running) MonitorService.send(this, MonitorService.ACTION_SETTINGS)

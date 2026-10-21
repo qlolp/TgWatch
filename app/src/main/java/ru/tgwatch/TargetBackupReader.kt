@@ -29,7 +29,8 @@ internal class TargetBackupReader(source: Reader) {
             else -> throw IllegalArgumentException("Unknown backup field")
         } }
         reader.finish()
-        require(version == TargetBackupCodec.FORMAT_VERSION.toLong())
+        require(version != null && version in TargetBackupCodec.READABLE_FORMAT_MIN.toLong()..
+            TargetBackupCodec.FORMAT_VERSION.toLong())
         val definitions = checkNotNull(targets)
         val ids = definitions.map { it.id }.toSet()
         val supplied = checkNotNull(observations)

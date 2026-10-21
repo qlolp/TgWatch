@@ -20,6 +20,10 @@
     <string name="check_now">Check now</string>
     <string name="history_title">Availability history</string>
     <string name="period_day">Period: 24 hours</string>
+    <string name="history_retention_label">Keep history</string>
+    <string name="history_retention_week">7 days</string>
+    <string name="history_retention_month">30 days</string>
+    <string name="history_retention_quarter">90 days</string>
     <string name="period_week">Period: week</string>
     <string name="history_empty">No data yet — wait for a few checks.</string>
     <string name="share_summary">Share summary</string>

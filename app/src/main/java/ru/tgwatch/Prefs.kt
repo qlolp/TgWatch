@@ -23,6 +23,7 @@ object Prefs {
     private const val KEY_NOTIFY_RECOVERY = "notify_recovery"
     private const val KEY_EVENT_SOUND = "event_sound"
     private const val KEY_ALARM_PATTERN = "vibration_pattern"
+    private const val KEY_HISTORY_RETENTION = "history_retention"
     private const val KEY_QUIET_HOURS = "quiet_hours"
     private const val KEY_QUIET_START = "quiet_start_hour"
     private const val KEY_QUIET_END = "quiet_end_hour"
@@ -189,6 +190,14 @@ object Prefs {
     } ?: AlarmPattern.STANDARD
     fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN,
         pattern.name).apply() }
+
+    /** Portable history window; week is the established default and migration never lengthens it. */
+    fun historyRetention(ctx: Context): Retention = Retention.entries.firstOrNull {
+        it.name == sp(ctx).getString(KEY_HISTORY_RETENTION, Retention.WEEK.name)
+    } ?: Retention.WEEK
+    fun setHistoryRetention(ctx: Context, value: Retention) {
+        sp(ctx).edit().putString(KEY_HISTORY_RETENTION, value.name).apply()
+    }
 
     /** Opt-in: an upgrade must not start posting a new daily notification. */
     fun dailySummary(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_DAILY_SUMMARY, false)

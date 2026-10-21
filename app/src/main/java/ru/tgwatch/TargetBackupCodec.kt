@@ -6,7 +6,9 @@ data class TargetBackupSnapshot(val createdAtMs: Long, val globalSettings: Map<S
     val log: List<String>)
 
 object TargetBackupCodec {
-    const val FORMAT_VERSION = 3
+    /** v3 omitted history_retention; v4 writes it. Older readers reject v4 by schema version. */
+    const val FORMAT_VERSION = 4
+    const val READABLE_FORMAT_MIN = 3
     const val MAX_PLAINTEXT_BYTES = 16 * 1024 * 1024
     const val MAX_OBSERVATIONS = 98_000
     const val TELEGRAM_ROWS = 65_000
