@@ -5,6 +5,16 @@ import unittest
 
 
 class UpgradeOnboardingTests(unittest.TestCase):
+    def test_ui_deadline_reports_only_fixed_control_state_for_diagnosis(self):
+        module = self.load()
+        command, pause, now, taps = self.run_fixture(module, valid_button=False)
+        with self.assertRaises(ValueError) as failure:
+            module.prepare(command, 2, lambda: now[0], pause)
+        self.assertIn('controls=', str(failure.exception))
+        self.assertIn('btnOnboardingSkip', str(failure.exception))
+        self.assertNotIn('http', str(failure.exception))
+        self.assertEqual([], taps)
+
     def test_continuously_updating_predecessor_still_starts_through_visible_controls(self):
         module = self.load()
         base, pause, now, taps = self.run_fixture(module)

@@ -15,6 +15,10 @@ UI_RUNTIME = ':'.join('/system/framework/' + name + '.jar' for name in
              ':/data/local/tmp/tgwatch-upgrade-ui.jar'
 
 
+class UiPreparationError(ValueError):
+    """Contains fixed control metadata only, never screen text or arbitrary IDs."""
+
+
 def center(bounds):
     match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds or '')
     if not match:
@@ -29,6 +33,10 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
     deadline = clock() + timeout
     skipped = False
     started = False
+    captures = swipes = 0
+    disabled = None
+    control_state = 'unread'
+    last_failure = 'none'
     while clock() < deadline:
         if 'isForeground=true' in command(['shell', 'dumpsys', 'activity', 'services',
                                            'ru.tgwatch/.MonitorService']):
@@ -42,6 +50,12 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                      '-c', 'ru.tgwatch.tools.UpgradeUiSnapshot'])
             root = ET.fromstring(command(['shell', '-T', 'cat', UI]))
             nodes = {n.get('resource-id'): n for n in root.iter('node') if n.get('package') == 'ru.tgwatch'}
+            captures += 1
+            fixed = ('btnOnboardingSkip', 'btnToggle', 'mainScroll')
+            control_state = ','.join(name + ':' + str((node.get('enabled') == 'true',
+                node.get('clickable') == 'true', center(node.get('bounds'))))
+                for name in fixed if (node := nodes.get('ru.tgwatch:id/' + name)) is not None)
+            control_state += ';scrollable=' + str(any(n.get('scrollable') == 'true' for n in nodes.values()))
             def tap(name):
                 node = nodes.get('ru.tgwatch:id/' + name)
                 point = center(node.get('bounds')) if node is not None else None
@@ -65,10 +79,13 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                             x = str((left + right) // 2)
                             command(['shell', 'input', 'swipe', x, str(top + (bottom - top) * 3 // 4),
                                      x, str(top + (bottom - top) // 4), '300'])
-        except (subprocess.SubprocessError, ET.ParseError):
-            pass
+                            swipes += 1
+        except (subprocess.SubprocessError, ET.ParseError, ValueError) as error:
+            last_failure = type(error).__name__
         pause(.5)
-    raise ValueError('Predecessor did not enter foreground monitoring through its UI')
+    raise UiPreparationError('Predecessor did not enter foreground monitoring through its UI; '
+        f'captures={captures}, skipped={skipped}, started={started}, disabled={disabled}, swipes={swipes}, '
+        f'last_failure={last_failure}, controls={control_state}')
 
 
 def main():
@@ -87,7 +104,8 @@ def main():
         print('Published predecessor started through its own UI; observation verification follows')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-        print('Predecessor UI preparation failed: ' + type(error).__name__, file=sys.stderr)
+        detail = str(error) if isinstance(error, UiPreparationError) else type(error).__name__
+        print('Predecessor UI preparation failed: ' + detail, file=sys.stderr)
         return 1
 
 
