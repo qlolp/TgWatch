@@ -47,9 +47,9 @@
 
 **Interfaces:** Consumes task1 context and public snapshots. Produces `RegionalComparisonCollector(startElapsed, context, services)` with `offer`, `finish` and invalidation; immutable `RegionalComparisonSnapshot`/`RegionalComparisonPair`; `RegionalComparisonStorage.read/write` and bounded repository comparison operations.
 
-- [ ] Write tests rejecting pre-start/wrong-scope observations, changed config, disabled profiles, reversed time and invalid labels; deadline returns missing observations explicitly; same context is identified; ten-pair storage roundtrip/rejection.
-- [ ] Run RED; implement fresh request/collector and A→switch-yourself→B screen, save/read comparisons off main thread.
-- [ ] Test that stale cached status cannot satisfy capture, switching during capture cancels it, process recreation cannot complete pending work and partial sides remain unmeasured. Run task suite; expected PASS. Commit task2 and ledger evidence.
+- [x] Write tests rejecting pre-start/wrong-scope observations, changed config, disabled profiles, reversed time and invalid labels; deadline returns missing observations explicitly; same context is identified; ten-pair storage roundtrip/rejection.
+- [x] Run RED; implement fresh request/collector and A→switch-yourself→B screen, save/read comparisons off main thread.
+- [x] Test that stale cached status cannot satisfy capture, switching during capture cancels it, process recreation cannot complete pending work and partial sides remain unmeasured. Run task suite; expected PASS. Commit task2 and ledger evidence.
 
 ### Task 3: Typed “Why?” explanations
 
