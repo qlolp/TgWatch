@@ -211,7 +211,15 @@ if [[ "$api_level" -eq 35 ]]; then
   adb uninstall ru.tgwatch
   adb install -g app/build/outputs/apk/debug/app-debug.apk
   adb shell am start -W -n ru.tgwatch/.MainActivity
-  python3 scripts/prepare-upgrade-predecessor.py
+  if python3 scripts/prepare-upgrade-predecessor.py; then
+    echo 'Fresh-install UI preflight passed'
+  else
+    # This is a fresh disposable fixture with no account or imported private settings.
+    adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/fresh-start-failure.png || true
+    adb shell cat /data/local/tmp/tgwatch-upgrade-ui.xml \
+      > app/build/reports/androidTests/fresh-start-failure.xml || true
+    false
+  fi
   await_observation 0
   check_crashes
 fi
