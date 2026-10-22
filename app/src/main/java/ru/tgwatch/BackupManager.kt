@@ -17,7 +17,7 @@ object BackupManager {
         "notify_slow", "history_retention")
     private val transientKeys = setOf("last_status", "last_checked", "last_since", "last_latency",
         "last_reason", "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at",
-        "egress_iso", "egress_at", "egress_net")
+        "egress_iso", "egress_at", "egress_net", "egress_boot")
 
     fun hasPending(): Boolean = replacingHistory || BackupJournals.pending ||
         RecoveryCoordinator.state != RecoveryState.READY

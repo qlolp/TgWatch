@@ -60,9 +60,14 @@ class TargetRestoreIntegrationTest {
 
     @Test fun restoresAllHistoriesTogetherButEveryTargetRemainsStopped() {
         val source = data()
+        for (service in RegionalService.entries) assertTrue(RegionalPreferences.setEnabled(ctx, service, true))
+        Prefs.sp(ctx).edit().putLong("regional.youtube.delivered_at", 1234).commit()
         BackupManager.restoreTargets(ctx, source)
         assertFalse(Prefs.isEnabled(ctx))
         assertTrue(TargetPreferences.definitions(ctx).none { it.enabled })
+        assertFalse(RegionalPreferences.anyEnabled(ctx))
+        assertEquals(setOf(RegionalPreferences.REVISION), Prefs.sp(ctx).all.keys
+            .filter { it.startsWith(RegionalPreferences.PREFIX) }.toSet())
         assertEquals(source.targets.map { it.copy(enabled = false) }, TargetPreferences.definitions(ctx))
         assertEquals(source.targets.first { it.id == TargetId.TELEGRAM }.intervalSec, Prefs.intervalSec(ctx))
         val restored = TargetPersistence.storage().snapshot()
@@ -82,6 +87,15 @@ class TargetRestoreIntegrationTest {
         catch (_: IllegalArgumentException) { }
         assertEquals(original, TargetPersistence.storage().snapshot())
         assertFalse(BackupManager.hasPending())
+    }
+
+    @Test fun anEnableCapturedBeforeRestoreCannotRestartRestoredMonitoring() {
+        val captured = RegionalPreferences.revision(ctx)
+        BackupManager.restoreTargets(ctx, data())
+        assertTrue("Restore must advance the regional fence", RegionalPreferences.revision(ctx) > captured)
+        assertFalse(RegionalPreferences.setEnabled(ctx, RegionalService.GEMINI, true, captured))
+        assertFalse(Prefs.isEnabled(ctx))
+        assertFalse(RegionalPreferences.anyEnabled(ctx))
     }
 
     @Test fun csvImportPreservesOtherTargetHistoriesAndDefinitions() {

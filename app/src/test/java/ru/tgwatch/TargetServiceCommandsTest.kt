@@ -4,6 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TargetServiceCommandsTest {
+    @Test fun stoppingLastHistoricalTargetPreservesRegionalOnlyMonitoring() {
+        val command = TargetServiceCommands.route(MonitorService.ACTION_STOP, null,
+            setOf(TargetId.TELEGRAM), regionalEnabled = true)
+        assertTrue(command.stopTarget)
+        assertFalse(command.stopAll)
+        assertEquals(MonitorService.ACTION_SETTINGS, command.action)
+    }
     @Test fun serviceHealthUsesActualSecondaryIntervalWithoutChangingTelegram() {
         val matrix = TargetDefinition.default(TargetId.MATRIX).copy(enabled = true)
         assertEquals(600, TargetServiceCommands.expectedIntervalSec(30, listOf(matrix), mapOf(TargetId.MATRIX to 600)))

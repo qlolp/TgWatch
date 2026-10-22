@@ -8,6 +8,7 @@ package ru.tgwatch
  * parses a single `loc=` field; every other line is discarded immediately.
  */
 object EgressCountry {
+    private val countries = java.util.Locale.getISOCountries().toSet()
     const val ENDPOINT = "https://www.cloudflare.com/cdn-cgi/trace"
     private const val FIELD = "loc="
     private const val ISO_LENGTH = 2
@@ -18,14 +19,14 @@ object EgressCountry {
     data class Snapshot(val iso: String, val checkedAt: Long, val networkHandle: Long)
 
     fun isValid(iso: String): Boolean =
-        iso.length == ISO_LENGTH && iso.all { it in 'A'..'Z' }
+        iso.length == ISO_LENGTH && iso in countries
 
     /** Accepts `loc=US` from the Cloudflare trace format; anything else is ignored. */
     fun parseTrace(body: String): String? {
         body.lineSequence().forEach { raw ->
             val line = raw.trim()
             if (!line.startsWith(FIELD, ignoreCase = true)) return@forEach
-            val iso = line.substring(FIELD.length).trim().uppercase()
+            val iso = line.substring(FIELD.length).trim().uppercase(java.util.Locale.ROOT)
             return iso.takeIf { isValid(it) }
         }
         return null
@@ -46,6 +47,6 @@ object EgressCountry {
 
     fun needsRefresh(stored: Snapshot?, now: Long, networkHandle: Long): Boolean {
         if (stored == null || stored.networkHandle != networkHandle) return true
-        return now - stored.checkedAt >= MIN_INTERVAL_MS
+        return now < stored.checkedAt || now - stored.checkedAt >= MIN_INTERVAL_MS
     }
 }

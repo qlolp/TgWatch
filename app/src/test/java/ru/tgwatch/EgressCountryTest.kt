@@ -30,7 +30,7 @@ class EgressCountryTest {
 
     @Test fun labelCombinesFlagAndIso() {
         assertEquals("🇺🇸 US", EgressCountry.label("US"))
-        assertEquals("🇽🇽 XX", EgressCountry.label("XX"))
+        assertEquals("", EgressCountry.label("XX"))
         assertEquals("", EgressCountry.label("nope"))
     }
 
@@ -41,6 +41,14 @@ class EgressCountryTest {
         assertTrue(EgressCountry.needsRefresh(stored, at + EgressCountry.MIN_INTERVAL_MS, networkHandle = 7L))
         assertTrue(EgressCountry.needsRefresh(stored, at + 1_000L, networkHandle = 8L))
         assertTrue(EgressCountry.needsRefresh(null, at, networkHandle = 1L))
+        assertTrue("Clock rollback invalidates the lookup", EgressCountry.needsRefresh(stored, at - 1, 7L))
+    }
+
+    @Test fun unknownAndReservedCountryCodesAreNotCountryFlags() {
+        for (code in listOf("XX", "ZZ", "AA", "T1")) {
+            assertFalse(code, EgressCountry.isValid(code))
+            assertNull(EgressCountry.parseTrace("loc=$code"))
+        }
     }
 
     @Test fun neverImpliesAddressStorage() {

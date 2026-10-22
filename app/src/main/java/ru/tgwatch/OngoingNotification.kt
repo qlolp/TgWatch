@@ -14,7 +14,8 @@ import ru.tgwatch.MonitorService.Status
 internal data class OngoingContent(val title: TextValue, val text: TextValue, val channel: String,
     val icon: Int, val color: Int, val colorized: Boolean)
 internal data class OngoingView(val notif: OngoingContent, val whenMs: Long,
-    val chronometer: Boolean, val progress: Int?, val targetId: TargetId = TargetId.TELEGRAM)
+    val chronometer: Boolean, val progress: Int?, val targetId: TargetId = TargetId.TELEGRAM,
+    val regionalOnly: Boolean = false)
 
 /** Builds from immutable cached inputs; never reads history or owns service lifecycle. */
 internal object OngoingNotification {
@@ -60,6 +61,12 @@ internal object OngoingNotification {
             chronometer = state.bad && !stale,
             progress = NotificationProgress.percent(stats))
     }
+
+    fun regional(ctx: Context, now: Long): OngoingView = OngoingView(OngoingContent(
+        textLiteral(ctx.getString(R.string.regional_ongoing,
+            RegionalService.entries.count { RegionalPreferences.enabled(ctx, it) })),
+        textLiteral(ctx.getString(R.string.regional_title)), CHANNEL_OK, R.drawable.ic_stat_wait,
+        COLOR_OK, false), now, false, null, regionalOnly = true)
 
     /** Each row names its own goal; no combined uptime or invented outage start is displayed. */
     fun targets(states: List<TargetSnapshot>, now: Long, elapsed: Long): OngoingView {
@@ -118,7 +125,7 @@ internal object OngoingNotification {
 
     fun build(ctx: Context, view: OngoingView, servicePending: (Int, String) -> PendingIntent): Notification {
         val openApp = PendingIntent.getActivity(ctx, 0,
-            Intent(ctx, MainActivity::class.java)
+            Intent(ctx, if (view.regionalOnly) RegionalServicesActivity::class.java else MainActivity::class.java)
                 .setData(android.net.Uri.parse("tgwatch://ongoing/${view.targetId.wire}"))
                 .putExtra(TargetAutomation.EXTRA_TARGET_ID, view.targetId.wire)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -149,8 +156,8 @@ internal object OngoingNotification {
             .setCategory(Notification.CATEGORY_SERVICE)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(openApp)
-            .setDeleteIntent(check)
-            .addAction(action(ctx, R.drawable.ic_stat_ok, AndroidText.resolve(ctx,
+        if (!view.regionalOnly) builder.setDeleteIntent(check).addAction(action(ctx,
+                R.drawable.ic_stat_ok, AndroidText.resolve(ctx,
                 textOf(TextKey.COPY_ONGOING_NOTIFICATION_CHECK)), check))
             .addAction(action(ctx, R.drawable.ic_stat_pause, AndroidText.resolve(ctx,
                 textOf(TextKey.COPY_ONGOING_NOTIFICATION_STOP)), stop))

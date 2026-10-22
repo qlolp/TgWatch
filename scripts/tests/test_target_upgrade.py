@@ -71,6 +71,20 @@ class TargetUpgradeTests(unittest.TestCase):
         self.assertEqual({'telegram'}, {row['target_id'] for row in before['observations']})
         self.assertTrue(module.has_observation(after, 'telegram', 3000))
 
+    def test_current_v4_registry_is_accepted_without_weakening_unknown_version_rejection(self):
+        module = self.load()
+        files = self.generation({'telegram': '3000,4000,OK,20,1,0\n'})
+        path = f'targets-v1/{GEN}/registry.json'
+        value = json.loads(files[path])
+        value['formatVersion'] = 4
+        value['settings']['history_retention'] = 'WEEK'
+        files[path] = json.dumps(value).encode()
+        self.assertTrue(module.has_observation(module.capture(self.reader(files)), 'telegram', 3000))
+        for version in (True, 2, 5):
+            value['formatVersion'] = version
+            files[path] = json.dumps(value).encode()
+            with self.assertRaises(ValueError): module.capture(self.reader(files))
+
     def test_manifest_selects_whole_generation_and_ignores_uncommitted_stage(self):
         module = self.load()
         files = self.generation({'telegram': '1000,2000,OK,20,1,0\n'})

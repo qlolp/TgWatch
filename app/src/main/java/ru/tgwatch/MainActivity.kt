@@ -175,6 +175,13 @@ class MainActivity : Activity() {
         tvTitle = findViewById(R.id.tvTitle)
         tvSince = findViewById(R.id.tvSince)
         tvEgress = findViewById(R.id.tvEgress)
+        findViewById<Button>(R.id.btnRegionalServices).setOnClickListener {
+            startActivity(Intent(this, RegionalServicesActivity::class.java))
+        }
+        findViewById<Button>(R.id.btnRefreshCountry).setOnClickListener {
+            EgressCountryUi.refreshActive(this, force = true)
+            EgressCountryUi.render(tvEgress, this)
+        }
         tvReason = findViewById(R.id.tvReason)
         tvLatency = findViewById(R.id.tvLatency)
         tvChecked = findViewById(R.id.tvChecked)

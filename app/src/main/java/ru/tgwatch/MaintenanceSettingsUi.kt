@@ -14,26 +14,32 @@ internal object MaintenanceSettingsUi {
     private const val LAST_DAY_BIT = 6
 
     fun add(activity: Activity, content: LinearLayout, id: TargetId) {
+        add(activity, content, { MaintenanceWindows.load(activity, id) },
+            { MaintenanceWindows.save(activity, id, it) })
+    }
+
+    fun add(activity: Activity, content: LinearLayout, load: () -> List<MaintenanceWindow>,
+        save: (List<MaintenanceWindow>) -> Unit) {
         val label = TextView(activity)
         content.addView(label)
         content.addView(Button(activity).apply {
             setText(R.string.maintenance_add)
             isSaveEnabled = false
-            setOnClickListener { pickWindow(activity, id) { refresh(label, activity, id) } }
+            setOnClickListener { pickWindow(activity, load, save) { refresh(label, activity, load) } }
         })
         content.addView(Button(activity).apply {
             setText(R.string.maintenance_clear)
             isSaveEnabled = false
             setOnClickListener {
-                MaintenanceWindows.save(activity, id, emptyList())
-                refresh(label, activity, id)
+                save(emptyList())
+                refresh(label, activity, load)
             }
         })
-        refresh(label, activity, id)
+        refresh(label, activity, load)
     }
 
-    private fun refresh(label: TextView, activity: Activity, id: TargetId) {
-        val windows = MaintenanceWindows.load(activity, id)
+    private fun refresh(label: TextView, activity: Activity, load: () -> List<MaintenanceWindow>) {
+        val windows = load()
         label.text = if (windows.isEmpty()) activity.getString(R.string.maintenance_empty)
         else windows.joinToString("\n") { describe(activity, it) }
     }
@@ -54,26 +60,28 @@ internal object MaintenanceSettingsUi {
     private fun daysLabel(mask: Int): String = (0..LAST_DAY_BIT).filter { (mask shr it) and 1 == 1 }
         .joinToString(",") { (it + 1).toString() }
 
-    private fun pickWindow(activity: Activity, id: TargetId, done: () -> Unit) {
+    private fun pickWindow(activity: Activity, load: () -> List<MaintenanceWindow>,
+        save: (List<MaintenanceWindow>) -> Unit, done: () -> Unit) {
         val startDefault = DEFAULT_START_MINUTE
         TimePickerDialog(activity, { _, hour, minute ->
             val start = hour * MINUTES_PER_HOUR + minute
             TimePickerDialog(activity, { _, endHour, endMinute ->
                 val end = endHour * MINUTES_PER_HOUR + endMinute
-                appendWindow(activity, id, start, end)
+                appendWindow(load, save, start, end)
                 done()
             }, startDefault / MINUTES_PER_HOUR, startDefault % MINUTES_PER_HOUR, true).show()
         }, startDefault / MINUTES_PER_HOUR, startDefault % MINUTES_PER_HOUR, true).show()
     }
 
-    private fun appendWindow(activity: Activity, id: TargetId, start: Int, end: Int) {
-        val windows = MaintenanceWindows.load(activity, id).toMutableList()
+    private fun appendWindow(load: () -> List<MaintenanceWindow>, save: (List<MaintenanceWindow>) -> Unit,
+        start: Int, end: Int) {
+        val windows = load().toMutableList()
         if (windows.size >= MaintenanceWindow.MAX_WINDOWS) windows.removeAt(0)
         windows += MaintenanceWindow(
             id = "w" + System.currentTimeMillis().toString(ID_RADIX),
             startMinuteOfDay = start.coerceIn(0, MaintenanceWindow.MAX_MINUTE),
             endMinuteOfDay = end.coerceIn(0, MaintenanceWindow.MAX_END_MINUTE),
         )
-        MaintenanceWindows.save(activity, id, windows)
+        save(windows)
     }
 }
