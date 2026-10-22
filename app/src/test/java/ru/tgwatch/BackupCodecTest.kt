@@ -118,15 +118,18 @@ class BackupCodecTest {
         rejected { decode(base.replace("\"log\":[]", "\"log\":[\"\\ud800\"]")) }
         rejected { BackupCodec.encode(snapshot.copy(log = listOf("\ud800"))) }
     }
-    @Test fun allTwentySevenSettingsIncludingEventsDailySummaryExtraProbesAndSlowRoundTripWithStrictTypes() {
+    @Test fun allThirtyTwoSettingsIncludingEventsDailySummaryExtraProbesRegionalAndSlowRoundTripWithStrictTypes() {
         val snapshot = sample().copy(settings = sample().settings + mapOf("notify_outage" to true,
             "notify_partial" to false, "sound_outage" to false, "sound_partial" to true, "sound_recovery" to false,
             "extra_probe_matrix" to true, "extra_probe_whatsapp" to false, "extra_probe_custom" to true,
-            "extra_probe_custom_url" to "https://status.example.org/health", "notify_slow" to false))
-        assertEquals(27, snapshot.settings.size)
+            "extra_probe_custom_url" to "https://status.example.org/health", "notify_slow" to false,
+            "egress_enabled" to true, "regional_youtube" to true, "regional_gemini" to false,
+            "regional_notebook_lm" to true, "regional_chatgpt" to false))
+        assertEquals(32, snapshot.settings.size)
         assertEquals(snapshot, BackupCodec.decode(BackupCodec.encode(snapshot)))
         for (key in listOf("notify_outage", "notify_partial", "sound_outage", "sound_partial", "sound_recovery",
-            "daily_summary", "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "notify_slow")) {
+            "daily_summary", "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "notify_slow",
+            "egress_enabled", "regional_youtube", "regional_gemini", "regional_notebook_lm", "regional_chatgpt")) {
             rejected { BackupCodec.encode(snapshot.copy(settings = snapshot.settings + (key to "true"))) }
             rejected { decode(base.replace("\"settings\":{}", "\"settings\":{\"$key\":1}")) }
         }

@@ -305,6 +305,8 @@ class MainActivity : Activity() {
         }
 
         ExtraProbesUi(this, ::notifyServiceSettingsChanged)
+        EgressCountryUi.bindToggle(this, ::notifyServiceSettingsChanged)
+        RegionalServicesUi(this, ::notifyServiceSettingsChanged)
 
         swQuietHours.isChecked = Prefs.quietHoursEnabled(this)
         swQuietHours.setOnCheckedChangeListener { _, checked -> Prefs.setQuietHoursEnabled(this, checked) }
@@ -358,6 +360,7 @@ class MainActivity : Activity() {
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
         EgressCountryUi.refreshActive(this)
+        RegionalServicesProbe.refreshActive(this)
         ui.removeCallbacks(ticker)
         ui.post(ticker)
     }
@@ -512,6 +515,7 @@ class MainActivity : Activity() {
             statusCardUi.render(this, s, now, running, stale)
         }
         EgressCountryUi.render(tvEgress, this)
+        RegionalServicesUi.render(findViewById(R.id.tvRegional), this)
         historyUi.refresh(historyDays, now)
         if (tvDiagnostics.visibility == View.VISIBLE && targetUi.selected == TargetId.TELEGRAM) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { this@MainActivity.renderString(

@@ -15,7 +15,9 @@ object BackupCodec {
     private val booleanKeys = setOf("keep_awake", "vibrate", "vibrate_partial", "vibrate_offline",
         "vibrate_recovery", "notify_recovery", "event_sound", "quiet_hours", "notify_outage",
         "notify_partial", "sound_outage", "sound_partial", "sound_recovery", "daily_summary",
-        "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "notify_slow")
+        "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "notify_slow",
+        "egress_enabled", "regional_youtube", "regional_gemini", "regional_notebook_lm",
+        "regional_chatgpt")
     private val integerRanges = mapOf("interval_sec" to 10..120, "quiet_start_hour" to 0..23,
         "quiet_end_hour" to 0..23, "quiet_start_minute" to 0..1439, "quiet_end_minute" to 0..1439,
         "daily_summary_minute" to 0..1439)

@@ -1,0 +1,1 @@
+Optional HTTPS exit-country line on the status card (flag and name; ISO only, never the address). Opt-in regional checks for YouTube, Gemini, NotebookLM and ChatGPT flag possible geo-blocks without changing Telegram status, the widget or the webhook.

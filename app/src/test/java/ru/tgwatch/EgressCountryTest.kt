@@ -34,6 +34,14 @@ class EgressCountryTest {
         assertEquals("", EgressCountry.label("nope"))
     }
 
+    @Test fun displayLabelPrefersLocalizedCountryName() {
+        val english = java.util.Locale.ENGLISH
+        assertEquals("🇺🇸 United States (US)", EgressCountry.displayLabel("US", english))
+        assertEquals("🇩🇪 Germany (DE)", EgressCountry.displayLabel("DE", english))
+        assertEquals("", EgressCountry.displayLabel("nope", english))
+        assertEquals("🇽🇽 XX", EgressCountry.displayLabel("XX", english))
+    }
+
     @Test fun refreshIsRateLimitedPerNetworkIdentity() {
         val at = 1_000_000L
         val stored = EgressCountry.Snapshot("US", at, networkHandle = 7L)

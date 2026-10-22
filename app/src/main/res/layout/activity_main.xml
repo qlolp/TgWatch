@@ -156,6 +156,15 @@
                         android:textColor="@color/on_status"
                         android:textSize="14sp"
                         android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tvRegional"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/on_status"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -266,16 +275,19 @@
                     android:id="@+id/rbRetentionWeek"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="@string/history_retention_week" />
                 <RadioButton
                     android:id="@+id/rbRetentionMonth"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="@string/history_retention_month" />
                 <RadioButton
                     android:id="@+id/rbRetentionQuarter"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:text="@string/history_retention_quarter" />
             </RadioGroup>
             <Button android:id="@+id/btnLatency" style="@style/ButtonText" android:text="@string/latency_title" />
@@ -574,6 +586,47 @@
                 style="@style/ButtonText"
                 android:layout_marginStart="-12dp"
                 android:text="@string/extra_probe_custom_url_unset" />
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_marginTop="16dp"
+                android:text="@string/egress_title" />
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="2dp"
+                android:text="@string/egress_hint"
+                android:textSize="12sp" />
+            <Switch
+                android:id="@+id/swEgressCountry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/egress_show_country"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_marginTop="16dp"
+                android:text="@string/regional_title" />
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="2dp"
+                android:text="@string/regional_hint"
+                android:textSize="12sp" />
+            <Switch android:id="@+id/swRegionalYoutube" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="8dp"
+                android:text="@string/regional_youtube" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swRegionalGemini" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/regional_gemini" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swRegionalNotebook" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/regional_notebook_lm" android:textColor="@color/text_primary" android:textSize="15sp" />
+            <Switch android:id="@+id/swRegionalChatgpt" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="48dp"
+                android:text="@string/regional_chatgpt" android:textColor="@color/text_primary" android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
