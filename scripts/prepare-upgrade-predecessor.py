@@ -25,7 +25,6 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
     deadline = clock() + timeout
     skipped = False
     started = False
-    scrolls = 0
     while clock() < deadline:
         if 'isForeground=true' in command(['shell', 'dumpsys', 'activity', 'services',
                                            'ru.tgwatch/.MonitorService']):
@@ -50,14 +49,13 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                 if disabled:
                     started = tap('btnToggle')
                     scroll = nodes.get('ru.tgwatch:id/mainScroll')
-                    if not started and scroll is not None and scrolls < 3:
+                    if not started and scroll is not None:
                         match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', scroll.get('bounds', ''))
                         if match and center(scroll.get('bounds')):
                             left, top, right, bottom = map(int, match.groups())
                             x = str((left + right) // 2)
                             command(['shell', 'input', 'swipe', x, str(top + (bottom - top) * 3 // 4),
                                      x, str(top + (bottom - top) // 4), '300'])
-                            scrolls += 1
         except (subprocess.SubprocessError, ET.ParseError):
             pass
         pause(.5)

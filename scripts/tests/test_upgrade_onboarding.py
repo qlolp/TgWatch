@@ -59,6 +59,26 @@ class UpgradeOnboardingTests(unittest.TestCase):
         with self.assertRaises(ValueError): module.prepare(command, 8, lambda: now[0], pause)
         self.assertEqual([], taps)
 
+    def test_small_viewport_scrolls_until_start_is_visible_within_the_shared_deadline(self):
+        module = self.load()
+        now, swipes, taps = [0.0], [], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                start = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                         'enabled="true" clickable="true" bounds="[10,400][110,450]" />') if len(swipes) >= 4 else ''
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" />' + start + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']: swipes.append(args)
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 8, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(4, len(swipes))
+        self.assertEqual(1, len(taps))
+
     def test_bounds_reject_missing_negative_or_empty_coordinates(self):
         module = self.load()
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:

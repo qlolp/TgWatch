@@ -202,6 +202,16 @@ adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 assert_legacy_observation
 check_crashes
+# Exercise the same real onboarding/start UI used by the signed predecessor gate.
+# All data-preservation assertions above have finished on this disposable emulator.
+if [[ "$api_level" -eq 35 ]]; then
+  adb uninstall ru.tgwatch
+  adb install -g app/build/outputs/apk/debug/app-debug.apk
+  adb shell am start -W -n ru.tgwatch/.MainActivity
+  python3 scripts/prepare-upgrade-predecessor.py
+  await_observation 0
+  check_crashes
+fi
 # After all assertions, capture the real main screen for documentation.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
 adb shell input keyevent KEYCODE_WAKEUP

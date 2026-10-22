@@ -88,8 +88,8 @@
 
 **Interfaces:** Consumes current public observations and opaque context; `RegionalChangeWatch.observe/ready/delivered` requires two WEB_REACHABLE observations≥15s after arming in one scope. Armed intent persists, positive evidence does not. Existing alert policy remains independent.
 
-- [ ] Write RED tests for positive confirmation, network/config reset, unknown/auth/CAPTCHA/DNS rejection, 24h expiry, time reversal, restore/disable/reboot and process-death reset. Native/Android permission/quiet/maintenance tests must not consume blocked delivery.
-- [ ] Implement opt-in arm/cancel/state, shared confirmation scheduling, dedicated truthful positive notification and durable consumption after successful posting. Mirror the goal in native Mac model/notification menu; requests remain independent per service.
-- [ ] Run all relevant pure, Python/Node, Swift and Android integration tests; expected PASS. Prepare1.23.0/code1023000 matching metadata/docs, preserve signing/upgrade gates. Commit task6 and ledger evidence.
+- [x] Write RED tests for positive confirmation, network/config reset, unknown/auth/CAPTCHA/DNS rejection, 24h expiry, time reversal, restore/disable/reboot and process-death reset. Native/Android permission/quiet/maintenance tests must not consume blocked delivery.
+- [x] Implement opt-in arm/cancel/state, shared confirmation scheduling, dedicated truthful positive notification and durable consumption after successful posting. Mirror the goal in native Mac model/notification menu; requests remain independent per service.
+- [x] Run all relevant pure, Python/Node, Swift and Android integration tests; expected PASS. Prepare1.23.0/code1023000 matching metadata/docs, preserve signing/upgrade gates. Commit task6 and ledger evidence.
 - [ ] Complete one fresh whole-branch review using spec/plan/ledger. Reproduce important findings RED→GREEN and run green suite; record any minor limitations.
 - [ ] Complete full CI, merge reviewed tree under existing user authorization, publish matching immutable tag through existing signing pipeline. Download phone/Wear APKs to verify hashes/certificate/version; independently verify both signed-upgrade reports. Report actual Mac build/interactive/notarization limits accurately.
