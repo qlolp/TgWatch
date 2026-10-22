@@ -9,6 +9,10 @@ import xml.etree.ElementTree as ET
 
 PREFS = '/data/user_de/0/ru.tgwatch/shared_prefs/tgwatch.xml'
 UI = '/data/local/tmp/tgwatch-upgrade-ui.xml'
+# API35's legacy launcher omits its optional android.test dependency from CLASSPATH.
+UI_RUNTIME = ':'.join('/system/framework/' + name + '.jar' for name in
+                      ('uiautomator', 'android.test.runner', 'android.test.base', 'android.test.mock')) + \
+             ':/data/local/tmp/tgwatch-upgrade-ui.jar'
 
 
 def center(bounds):
@@ -31,7 +35,12 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                                            'ru.tgwatch/.MonitorService']):
             return
         try:
-            command(['shell', 'uiautomator', 'dump', '--compressed', UI])
+            # dump waits for an idle second, which a one-second status ticker need not provide.
+            # A failed/null-root capture must not reuse old coordinates.
+            command(['shell', 'rm', '-f', UI])
+            command(['shell', 'env', 'CLASSPATH=' + UI_RUNTIME, 'app_process', '/system/bin',
+                     'com.android.commands.uiautomator.Launcher', 'runtest',
+                     '-c', 'ru.tgwatch.tools.UpgradeUiSnapshot'])
             root = ET.fromstring(command(['shell', '-T', 'cat', UI]))
             nodes = {n.get('resource-id'): n for n in root.iter('node') if n.get('package') == 'ru.tgwatch'}
             def tap(name):
