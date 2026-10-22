@@ -608,16 +608,17 @@ class SignedUpgradeWorkflowTests(unittest.TestCase):
             (scripts / name).write_text((SCRIPTS / name).read_text())
         self.log, self.state = self.work / "calls.jsonl", self.work / "state.json"
         self.state.write_text(json.dumps({"installed": None, "checked": 0, "prefs": "", "history": ""}))
-        (self.work / "gradlew").write_text('''#!/bin/bash
-python3 - "$@" <<'PY'
-import json, os, sys
-with open(os.environ['UPGRADE_LOG'], 'a') as stream:
-    stream.write(json.dumps(['gradle'] + sys.argv[1:]) + '\\n')
-PY
-''')
         (scripts / "adb-readiness.py").write_text("import json, os, sys\n"
             "with open(os.environ['UPGRADE_LOG'], 'a') as stream: "
             "stream.write(json.dumps(['readiness'] + sys.argv[1:]) + '\\n')\n")
+        # This suite tests orchestration, with compilation as an external boundary.
+        # The actual SDK/D8 fixture is compiled and executed by the native upgrade gate.
+        (scripts / "build-upgrade-ui.py").write_text(
+            "import argparse, json, os\nfrom pathlib import Path\n"
+            "parser = argparse.ArgumentParser()\nparser.add_argument('--out', required=True)\n"
+            "args = parser.parse_args()\nPath(args.out).write_bytes(b'fixture dex jar')\n"
+            "with open(os.environ['UPGRADE_LOG'], 'a') as stream: "
+            "stream.write(json.dumps(['build-ui']) + '\\n')\n")
         adb = tools / "adb"
         adb.write_text('''#!/usr/bin/env python3
 import json, os, sys, xml.etree.ElementTree as ET
@@ -632,7 +633,6 @@ elif args[:3] == ['shell', 'id', '-u']: print('0')
 elif args == ['shell', 'getprop', 'ro.kernel.qemu']: print('1')
 elif args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
     print('isForeground=true' if state['checked'] > 0 and state['enabled'] else '')
-elif args[0] == 'install' and args[-1] == 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk': pass
 elif args[0] == 'install':
     if '-r' not in args:
         if state['installed'] is not None: sys.exit(17)
@@ -652,12 +652,20 @@ elif args[:3] == ['shell', 'am', 'start']:
         tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
         state['prefs'] = ET.tostring(tree, encoding='unicode')
         state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
-elif args[:3] == ['shell', 'am', 'instrument']:
-    assert args[-1] == 'ru.tgwatch.testui/.SnapshotInstrumentation'
+elif args[:3] == ['shell', 'rm', '-f']:
+    assert args[3] == '/data/local/tmp/tgwatch-upgrade-ui.xml'
+    state.pop('ui', None)
+elif args[:3] == ['shell', 'chmod', '444']:
+    assert state.get('ui_fixture') and args[3] == '/data/local/tmp/tgwatch-upgrade-ui.jar'
+elif args[:2] == ['shell', 'env']:
+    assert state.get('ui_fixture')
+    assert args[2].startswith('CLASSPATH=') and '/system/framework/android.test.runner.jar' in args[2]
+    assert args[2].endswith(':/data/local/tmp/tgwatch-upgrade-ui.jar')
+    assert args[3:] == ['app_process', '/system/bin', 'com.android.commands.uiautomator.Launcher',
+                        'runtest', '-c', 'ru.tgwatch.tools.UpgradeUiSnapshot']
     button = 'btnOnboardingSkip' if state['onboarding'] else 'btnToggle'
-    print('INSTRUMENTATION_RESULT: controls=<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/' +
-          button + '" enabled="true" clickable="true" bounds="[0,0][100,60]"/></hierarchy>')
-    print('INSTRUMENTATION_CODE: -1')
+    state['ui'] = ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/' + button +
+                   '" enabled="true" clickable="true" bounds="[0,0][100,60]"/></hierarchy>')
 elif args[:3] == ['shell', 'input', 'tap']:
     if state['onboarding']: state['onboarding'] = False
     else:
@@ -673,15 +681,18 @@ elif args[:3] == ['shell', '-T', 'cat']:
     if args[-1].endswith('targets-v1/active-generation'):
         print('cat: No such file or directory', file=sys.stderr); sys.exit(1)
     if args[-1].endswith('tgwatch-upgrade-ui.xml'):
-        button = 'btnOnboardingSkip' if state['onboarding'] else 'btnToggle'
-        print('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/' + button +
-              '" enabled="true" clickable="true" bounds="[0,0][100,60]"/></hierarchy>')
+        if not state.get('ui'): sys.exit(1)
+        print(state['ui'])
     else: print(state['prefs'] if 'shared_prefs' in args[-1] else state['history'])
 elif args[:2] == ['shell', 'cat']:
     print(state['prefs'] if 'shared_prefs' in args[2] else state['history'])
 elif args[0] == 'pull':
     Path(args[2]).write_text(state['prefs'] if 'shared_prefs' in args[1] else state['history'])
-elif args[0] == 'push': state['seeded'] = Path(args[1]).read_text()
+elif args[0] == 'push':
+    if args[-1] == '/data/local/tmp/tgwatch-upgrade-ui.jar':
+        assert Path(args[1]).read_bytes() == b'fixture dex jar'
+        state['ui_fixture'] = True
+    else: state['seeded'] = Path(args[1]).read_text()
 elif args[0] == 'shell' and args[1].startswith('cat /data/local/tmp/'):
     state['prefs'] = state['seeded']
 elif args[:2] == ['exec-out', 'screencap']: sys.stdout.buffer.write(b'fixture screenshot')
@@ -704,18 +715,17 @@ path.write_text(json.dumps(state))
 
     def test_both_upgrade_pairs_preserve_data_and_reset_only_between_pairs(self):
         calls = self.run_paths()
-        helper = 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk'
-        installations = [(index, call[-1]) for index, call in enumerate(calls)
-                         if call[:2] == ["adb", "install"] and call[-1] != helper]
-        helper_installs = [i for i, call in enumerate(calls) if call[:2] == ['adb', 'install'] and call[-1] == helper]
-        self.assertEqual(2, len(helper_installs))
-        self.assertTrue(all(calls[i] == ['adb', 'install', '-r', '-t', helper] for i in helper_installs))
-        self.assertLess(helper_installs[0], installations[0][0])
-        self.assertLess(installations[1][0], helper_installs[1])
-        self.assertLess(helper_installs[1], installations[2][0])
-        self.assertEqual(2, sum(call[:2] == ['gradle', ':ui-probe:assembleDebug'] for call in calls))
+        installations = [(index, call[-1]) for index, call in enumerate(calls) if call[:2] == ["adb", "install"]]
         self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk", "previous-latest/TgWatch.apk", "TgWatch.apk"],
                          [apk for _, apk in installations])
+        builds = [i for i, call in enumerate(calls) if call == ['build-ui']]
+        fixture_uploads = [i for i, call in enumerate(calls) if call[:2] == ['adb', 'push'] and
+                           call[-1] == '/data/local/tmp/tgwatch-upgrade-ui.jar']
+        self.assertEqual(2, len(builds))
+        self.assertEqual(2, len(fixture_uploads))
+        for index, predecessor in enumerate((installations[0][0], installations[2][0])):
+            self.assertLess(builds[index], fixture_uploads[index])
+            self.assertLess(fixture_uploads[index], predecessor)
         resets = [index for index, call in enumerate(calls) if call[:2] == ["adb", "uninstall"]]
         self.assertEqual(1, len(resets))
         self.assertLess(installations[1][0], resets[0])
@@ -735,8 +745,7 @@ path.write_text(json.dumps(state))
     def test_first_release_still_runs_legacy_gate(self):
         calls = self.run_paths(latest=False)
         self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk"],
-                         [call[-1] for call in calls if call[:2] == ["adb", "install"] and
-                          call[-1] != 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk'])
+                         [call[-1] for call in calls if call[:2] == ["adb", "install"]])
         self.assertFalse(any(call[:2] == ["adb", "uninstall"] for call in calls))
         self.assertTrue((self.work / "signed-upgrade/legacy/upgrade-after-prefs.xml").is_file())
 

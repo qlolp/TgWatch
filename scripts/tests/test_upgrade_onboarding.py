@@ -1,9 +1,47 @@
 import importlib.util
 from pathlib import Path
+import subprocess
 import unittest
 
 
 class UpgradeOnboardingTests(unittest.TestCase):
+    def test_continuously_updating_predecessor_still_starts_through_visible_controls(self):
+        module = self.load()
+        base, pause, now, taps = self.run_fixture(module)
+        def command(args):
+            if taps and args[:3] == ['shell', 'uiautomator', 'dump']:
+                # Android's dump waits for one idle second; the status screen ticks every second.
+                raise subprocess.CalledProcessError(1, args, stderr='could not get idle state')
+            return base(args)
+        try:
+            module.prepare(command, 8, lambda: now[0], pause)
+        except ValueError:
+            self.fail('A ticking status screen must not prevent starting through real controls')
+        self.assertEqual(2, len(taps))
+
+    def test_failed_snapshot_cannot_click_coordinates_from_an_old_xml_file(self):
+        module = self.load()
+        now = [0.0]
+        stale_file = [True]
+        taps = []
+        def command(args):
+            if args[:3] == ['shell', 'rm', '-f']:
+                stale_file[0] = False
+            elif args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                if not stale_file[0]:
+                    raise subprocess.CalledProcessError(1, args)
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                        'enabled="true" clickable="true" bounds="[10,20][110,80]" /></hierarchy>')
+            elif args[:3] == ['shell', 'input', 'tap']:
+                taps.append(args)
+            # A capture process can exit without producing a hierarchy (null root or idle timeout).
+            return ''
+        with self.assertRaises(ValueError):
+            module.prepare(command, 2, lambda: now[0], lambda delay: now.__setitem__(0, now[0] + delay))
+        self.assertEqual([], taps, 'A missing fresh snapshot must never reuse stale coordinates')
+
     def load(self):
         path = Path(__file__).resolve().parents[1] / 'prepare-upgrade-predecessor.py'
         self.assertTrue(path.exists(), 'Missing real predecessor onboarding preparation')
@@ -12,28 +50,11 @@ class UpgradeOnboardingTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def test_live_controls_require_one_successful_self_targeted_snapshot_without_idle_or_stale_files(self):
-        module = self.load()
-        calls = []
-        def command(args):
-            calls.append(args)
-            return ('INSTRUMENTATION_RESULT: controls=<hierarchy />\n'
-                    'INSTRUMENTATION_CODE: -1\n')
-        self.assertEqual('hierarchy', module.controls(command).tag)
-        self.assertEqual([['shell', 'am', 'instrument', '-w', '-r',
-                           'ru.tgwatch.testui/.SnapshotInstrumentation']], calls)
-        for transcript in ['', 'INSTRUMENTATION_CODE: -1\n',
-                           'INSTRUMENTATION_RESULT: controls=<hierarchy />\nINSTRUMENTATION_CODE: 0\n']:
-            with self.assertRaises(ValueError): module.controls(lambda _: transcript)
-
     def run_fixture(self, module, guide=True, start_works=True, valid_button=True):
         now = [0.0]
         taps = []
         state = {'guide': guide, 'started': not guide}
         def command(args):
-            if args[:3] == ['shell', 'am', 'instrument']:
-                return ('INSTRUMENTATION_RESULT: controls=' + command(['shell', '-T', 'cat', 'live-controls']) +
-                        '\nINSTRUMENTATION_CODE: -1\n')
             if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
                 return 'isForeground=true' if state['started'] else ''
             if args[:3] == ['shell', '-T', 'cat']:
@@ -80,9 +101,6 @@ class UpgradeOnboardingTests(unittest.TestCase):
         module = self.load()
         now, swipes, taps = [0.0], [], []
         def command(args):
-            if args[:3] == ['shell', 'am', 'instrument']:
-                return ('INSTRUMENTATION_RESULT: controls=' + command(['shell', '-T', 'cat', 'live-controls']) +
-                        '\nINSTRUMENTATION_CODE: -1\n')
             if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
                 return 'isForeground=true' if taps else ''
             if args[:3] == ['shell', '-T', 'cat']:

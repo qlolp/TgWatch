@@ -1,4 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:allowBackup="false" android:testOnly="true" android:label="TgWatch UI test helper" />
-    <instrumentation android:name=".SnapshotInstrumentation" android:targetPackage="ru.tgwatch.testui" />
-</manifest>
