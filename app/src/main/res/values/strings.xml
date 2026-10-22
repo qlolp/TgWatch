@@ -197,4 +197,54 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="share_status_refresh">Refresh preview / retry</string>
     <string name="share_status_busy">Another card is being prepared. Retry when it finishes.</string>
     <string name="share_status_expired">This PNG preview expired. Refresh the preview before sharing.</string>
+    <string name="regional_why">Why?</string>
+    <string name="regional_why_body">%1$s · %2$s
+%3$s%4$s
+
+%5$s</string>
+    <string name="regional_why_response">A public HTTPS response was received. Video playback, account access and AI features have not been tested. Verify the feature in your browser.</string>
+    <string name="regional_why_region_pending">The response contains an explicit regional refusal. A second observation on this connection is needed for confirmation. You can compare two connections.</string>
+    <string name="regional_why_region_confirmed">Explicit regional refusal was observed repeatedly on this connection. This concerns the public site; account and feature availability can differ. Compare connections without changing them automatically.</string>
+    <string name="regional_why_auth">The public request requires sign-in. This does not establish a regional block. Open the service in your browser to check your account.</string>
+    <string name="regional_why_challenge">An anti-bot challenge or CAPTCHA was detected. This does not establish a regional block. Complete the check in your browser; the monitor cannot do it for you.</string>
+    <string name="regional_why_rate">The server is limiting requests. Wait before trying again. Rate limiting does not establish a regional block.</string>
+    <string name="regional_why_dns">DNS lookup failed. A later connection, TLS handshake and HTTP response were not confirmed. Check DNS or compare connections; this alone does not establish a regional block.</string>
+    <string name="regional_why_tls">TLS connection failed. A trustworthy HTTP response was not obtained. Check device time and network interception or compare connections. This alone does not establish a regional block.</string>
+    <string name="regional_why_timeout">The request timed out. No usable public response was measured; the exact failing stage is unknown. A timeout does not establish a regional block. Compare connections.</string>
+    <string name="regional_why_connection">The network connection failed before a usable HTTP response. The cause is not established. Check internet access or compare connections.</string>
+    <string name="regional_why_network">No usable public response was received. The failing network stage was not identified. Check internet access or compare connections.</string>
+    <string name="regional_why_http">An HTTP response was received without a recognized availability signal. A generic denial, including HTTP 403 or 451, does not establish a regional block. Inspect the service in your browser.</string>
+    <string name="regional_why_unmeasured">No fresh public observation is available on this connection. Enable monitoring and the profile, then check again. Older history is not a current diagnosis.</string>
+    <string name="regional_why_browser">Open in browser</string>
+    <string name="regional_why_feature">How to verify the feature</string>
+    <string name="regional_feature_youtube">Open YouTube and play a video. A loaded home page alone does not confirm playback. No result is recorded by opening the browser.</string>
+    <string name="regional_feature_gemini">Open Gemini, sign in if needed and send a test question. A public page response does not confirm a working conversation. No result is recorded by opening the browser.</string>
+    <string name="regional_feature_notebook">Open Notebook, sign in if needed and try the notebook feature you need. The public landing page does not confirm feature access. No result is recorded by opening the browser.</string>
+    <string name="regional_feature_antigravity">Open Antigravity and test the feature you need with your account. The public website response does not confirm product access. No result is recorded by opening the browser.</string>
+    <string name="regional_feature_dots">Open ChatGPT / dots and test the feature you need with your account. A response or redirect does not confirm access to dots. No result is recorded by opening the browser.</string>
+    <string name="regional_source_browser_reported">Browser helper · reported by you</string>
+    <string name="regional_source_feature_reported">Feature test · reported by you</string>
+    <string name="regional_report_browser">Report browser-helper result</string>
+    <string name="regional_report_feature">Report feature-test result</string>
+    <string name="regional_verification_row">%1$s
+%2$s</string>
+    <string name="regional_verification_value">%1$s · %2$s
+Current on this connection for up to 15 minutes.</string>
+    <string name="regional_verification_absent">No current user report. Historical notes do not confirm the current state.</string>
+    <string name="regional_report_browser_help">Run the local browser helper on this device and connection, then report what it showed. Instructions are available below. The result is entered by you; TgWatch does not read your browser, account or cookies. A page with no explicit error does not confirm that features work. Opening a page records nothing.</string>
+    <string name="regional_report_feature_help">Test the feature you need in the service, then report the outcome. This is your observation, separate from the public-site monitor. No account data or error text is collected. Opening the service alone is not a successful test.</string>
+    <string name="regional_report_choose">Enter observed result</string>
+    <string name="regional_report_saved">User-reported observation recorded. History and current state are shown separately.</string>
+    <string name="regional_report_failed">Could not finish recording. Check history or retry.</string>
+    <string name="regional_report_region">Explicit regional error</string>
+    <string name="regional_report_auth">Sign-in required</string>
+    <string name="regional_report_challenge">CAPTCHA / anti-bot check</string>
+    <string name="regional_report_no_error">No explicit error (features unverified)</string>
+    <string name="regional_report_works">The tested feature works</string>
+    <string name="regional_report_not_working">The tested feature failed</string>
+    <string name="regional_report_clear">Clear current note</string>
+    <string name="regional_history_report">%1$s · %2$s · %3$s</string>
+    <string name="regional_history_sources">Sources are labelled per event: automatic public-site check or an observation reported by you. These layers do not replace each other.</string>
+    <string name="regional_report_cleared">Current note cleared</string>
+    <string name="regional_report_help">Browser-helper instructions</string>
 </resources>

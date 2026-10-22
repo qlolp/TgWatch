@@ -1,0 +1,49 @@
+name: Mac app
+on:
+  push:
+    branches: [main, 'codex/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mac:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            python: '3.10'
+            arch: intel
+          - os: macos-26
+            python: '3.15'
+            arch: apple-silicon
+    concurrency:
+      group: tgwatch-mac-${{ matrix.os }}-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Public classification, browser and private IPC contracts
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_*regional*.py' -v
+          python3 -m unittest discover -s scripts/tests -p test_mac_app_ipc.py -v
+      - name: Foundation model, owned processes, actual native menu and signed bundle
+        run: bash scripts/test-mac-app.sh
+      - name: Build local universal app archive
+        run: bash scripts/build-mac-app.sh --output "$RUNNER_TEMP/TgWatch.app"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: TgWatch-mac-local-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/TgWatch-mac-local-build.zip
+            docs/macos.md
+            LICENSE
+          if-no-files-found: error

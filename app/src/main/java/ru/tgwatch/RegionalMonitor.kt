@@ -49,6 +49,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
     private val power = ctx.getSystemService(PowerManager::class.java)
     private val main = Handler(Looper.getMainLooper())
     private val notifications = RegionalNotifications(ctx)
+    private val watches = RegionalWatchController(ctx, active)
     private val due = mutableMapOf<RegionalService, Long>()
     private val consensus = mutableMapOf<RegionalService, RegionalConsensus>()
     private var revision = 0L
@@ -66,7 +67,9 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         cancellation = null
         due.clear()
         consensus.clear()
+        watches.resetEvidence()
         RegionalStateStore.clear()
+        RegionalContext.invalidate()
         notifications.clearAll()
     }
 
@@ -101,6 +104,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
             return
         }
         val cancel = ProbeCancellation()
+        val journalGeneration = RegionalRepository.generation(ctx)
         cancellation = cancel
         val captured = ++ticket
         val networkRevision = revision
@@ -110,7 +114,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
                 try {
                     if (permit.start()) {
                         val result = probe(service, network, cancel, networkRevision, config)
-                        main.post { complete(captured, result) }
+                        main.post { complete(captured, result, journalGeneration) }
                     }
                 } finally { permit.finished(); cancel.close() }
             }
@@ -122,18 +126,24 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         }
     }
 
-    @Synchronized private fun complete(captured: Long, result: RegionalResult) {
+    @Synchronized private fun complete(captured: Long, result: RegionalResult, journalGeneration: Long) {
         if (captured != ticket || closed) return
         cancellation = null
         if (!active() || !current(result)) return
         val evidence = consensus.getOrPut(result.service) { RegionalConsensus() }
         evidence.update(result.status, "${result.networkHandle}:$revision:$configuration", result.checkedElapsed)
-        RegionalStateStore.put(result.copy(regionConfirmed = evidence.confirmed()))
+        val published = result.copy(regionConfirmed = evidence.confirmed())
+        RegionalStateStore.put(published)
+        RegionalJournalObserver.record(ctx, published, journalGeneration)
         if (result.status == RegionalStatus.WEB_REACHABLE) RegionalPreferences.reachable(ctx, result.service)
         if (result.status != RegionalStatus.REGION_RESTRICTED) notifications.clear(result.service)
         if (result.status == RegionalStatus.REGION_RESTRICTED && !evidence.confirmed())
             due[result.service] = result.checkedElapsed + RegionalConsensus.CONFIRM_MS
-        reconcile(SystemClock.elapsedRealtime())
+        val now = SystemClock.elapsedRealtime()
+        watches.observe(published, now, intervalMs * 2)?.let { next ->
+            due[result.service] = minOf(due[result.service] ?: next, next)
+        }
+        reconcile(now)
         progress()
     }
 
@@ -147,11 +157,13 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
     private fun reconcile(now: Long) {
         RegionalService.entries.forEach { service ->
             val result = RegionalStateStore.get(service) ?: return@forEach
-            val evidence = consensus[service] ?: return@forEach
-            if (now - result.checkedElapsed > intervalMs * 2 || !RegionalPreferences.enabled(ctx, service)) {
+            if (now < result.checkedElapsed || now - result.checkedElapsed > intervalMs * 2 || !current(result)) {
                 notifications.clear(service)
+                watches.resetEvidence(service)
                 return@forEach
             }
+            watches.reconcile(result, now, intervalMs * 2)
+            val evidence = consensus[service] ?: return@forEach
             if (evidence.shouldNotify(now) && RegionalPreferences.notificationAllowed(ctx, service,
                     result.networkHandle) && notifications.post(result)) {
                 evidence.recordNotification(now)

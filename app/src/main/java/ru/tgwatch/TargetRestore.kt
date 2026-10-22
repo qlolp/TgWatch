@@ -56,6 +56,7 @@ internal object TargetRestore {
                 imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
                 EventLog.replace(ctx, imported.snapshot.log)
                 LastSuccessStore.clear(ctx)
+                RegionalRepository.clearForRestore(ctx)
                 EgressCountryUi.invalidate(ctx)
                 MonitorService.clearRestoredState()
                 syncPreferences(File(ctx.applicationContext.createDeviceProtectedStorageContext()

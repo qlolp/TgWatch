@@ -5,6 +5,16 @@ import unittest
 
 
 class UpgradeOnboardingTests(unittest.TestCase):
+    def test_ui_deadline_reports_only_fixed_control_state_for_diagnosis(self):
+        module = self.load()
+        command, pause, now, taps = self.run_fixture(module, valid_button=False)
+        with self.assertRaises(ValueError) as failure:
+            module.prepare(command, 2, lambda: now[0], pause)
+        self.assertIn('controls=', str(failure.exception))
+        self.assertIn('btnOnboardingSkip', str(failure.exception))
+        self.assertNotIn('http', str(failure.exception))
+        self.assertEqual([], taps)
+
     def test_continuously_updating_predecessor_still_starts_through_visible_controls(self):
         module = self.load()
         base, pause, now, taps = self.run_fixture(module)
@@ -97,10 +107,109 @@ class UpgradeOnboardingTests(unittest.TestCase):
         with self.assertRaises(ValueError): module.prepare(command, 8, lambda: now[0], pause)
         self.assertEqual([], taps)
 
+    def test_small_viewport_scrolls_until_start_is_visible_within_the_shared_deadline(self):
+        module = self.load()
+        now, swipes, taps = [0.0], [], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                start = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                         'enabled="true" clickable="true" bounds="[10,400][110,450]" />') if len(swipes) >= 4 else ''
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" />' + start + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']: swipes.append(args)
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 8, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(4, len(swipes))
+        self.assertEqual(1, len(taps))
+
+    def test_overlapping_scroll_steps_do_not_fling_past_the_start_button(self):
+        module = self.load()
+        now, offset, taps = [0.0], [0], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                button = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                          'enabled="true" clickable="true" bounds="[10,500][110,560]" />') \
+                         if 450 <= offset[0] <= 900 else ''
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + button + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                distance = abs(int(args[4]) - int(args[6]))
+                duration = int(args[-1])
+                # A fast fling can jump beyond the target; a slow overlapping drag cannot.
+                offset[0] += 1_200 if duration < 1_000 else distance
+                now[0] += duration / 1_000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 12, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+
+    def test_a_restored_bottom_viewport_rewinds_to_the_real_start_button(self):
+        module = self.load()
+        now, offset, taps, swipes = [0.0], [900], [], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                marker = 'tvVersion' if offset[0] >= 800 else 'targetSelector' if offset[0] <= 0 else ''
+                extra = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/' + marker +
+                         '" bounds="[10,20][110,60]" />') if marker else ''
+                if 100 <= offset[0] <= 400:
+                    extra += ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                              'enabled="true" clickable="true" bounds="[10,300][110,360]" />')
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + extra + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                swipes.append(args)
+                offset[0] += int(args[4]) - int(args[6])
+                now[0] += int(args[-1]) / 1_000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 12, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+        self.assertTrue(any(int(call[4]) < int(call[6]) for call in swipes))
+
     def test_bounds_reject_missing_negative_or_empty_coordinates(self):
         module = self.load()
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:
             self.assertIsNone(module.center(bounds))
+
+    def test_long_main_screen_is_searched_within_real_capture_and_drag_costs(self):
+        module = self.load()
+        now, offset, taps = [0.0], [3600], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', 'env', 'CLASSPATH=' + module.UI_RUNTIME]:
+                now[0] += 1  # Real API35 snapshots require a new app_process connection.
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                extra = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/tvVersion" '
+                         'bounds="[10,500][110,560]" />') if offset[0] >= 3300 else ''
+                if 600 <= offset[0] <= 1200:
+                    extra += ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                              'enabled="true" clickable="true" bounds="[10,300][110,360]" />')
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + extra + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                offset[0] += int(args[4]) - int(args[6])
+                now[0] += int(args[-1]) / 1000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 30, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+        self.assertLess(now[0], 30)
 
 
 if __name__ == '__main__':

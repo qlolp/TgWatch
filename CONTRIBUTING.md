@@ -25,7 +25,7 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.22.2`; код `1022002` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.23.0`; код `1023000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
@@ -88,6 +88,13 @@ Upgrade baseline для CI — настоящий `v1.10.47` APK с фиксир
 Дополнительный сценарий использует последний стабильный опубликованный предшественник;
 его APK сверяется с checksum, production-сертификатом и версией тега. Данные очищаются
 только между двумя независимыми сценариями, без удаления между old → new внутри каждого.
+
+Для запуска предшественника через реальные кнопки smoke собирает собственный тестовый JAR
+`scripts/build-upgrade-ui.py` из закреплённого SDK35 и Build Tools36.0.0. Стандартный
+UIAutomator читает свежую иерархию без ожидания неподвижного экрана; перед чтением старый
+снимок удаляется. В пределах общего срока 30 секунд host нажимает только найденные
+доступные реальные кнопки, затем отдельно проверяет foreground service и новую
+сохранённую строку истории. Это fixture одноразового эмулятора, вне APK и файлов публикации.
 `scripts/signed-upgrade-smoke.sh <previous.apk> <current.apk>` проверяет сохранение истории,
 legacy hour settings и independent event options без clearing data. Локальный upgrade с общей
 development-подписью проверяет миграцию, но не production certificate continuity. Батарея,

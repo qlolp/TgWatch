@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Button
 import android.widget.LinearLayout
@@ -20,6 +19,8 @@ class RegionalServicesActivity : Activity() {
     private val labels = mutableMapOf<RegionalService, TextView>()
     private val switches = mutableMapOf<RegionalService, Switch>()
     private lateinit var country: TextView
+    private lateinit var verification: RegionalVerificationUi
+    private lateinit var watches: RegionalWatchUi
     private var writing = false
     private var binding = false
     private val ticker = object : Runnable {
@@ -41,6 +42,15 @@ class RegionalServicesActivity : Activity() {
         country = TextView(this)
         content.addView(country)
         button(content, R.string.country_refresh) { EgressCountryUi.refreshActive(this, force = true) }
+        button(content, R.string.regional_history_title) {
+            startActivity(Intent(this, RegionalHistoryActivity::class.java))
+        }
+        button(content, R.string.regional_compare_title) {
+            startActivity(Intent(this, RegionalComparisonActivity::class.java))
+        }
+        verification = RegionalVerificationUi(this)
+        watches = RegionalWatchUi(this)
+        content.addView(TextView(this).apply { setText(R.string.regional_watch_help) })
         RegionalService.entries.forEach { service -> addProfile(content, service) }
         button(content, R.string.regional_check) {
             if (!MonitorService.requestRegionalCheck())
@@ -51,6 +61,12 @@ class RegionalServicesActivity : Activity() {
             startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                 .putExtra(Settings.EXTRA_CHANNEL_ID, RegionalNotifications.CHANNEL))
+        }
+        button(content, R.string.regional_watch_channel_settings) {
+            RegionalPublicNotifications(this)
+            startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, RegionalPublicNotifications.CHANNEL))
         }
         content.addView(TextView(this).apply { setText(R.string.regional_maintenance) })
         MaintenanceSettingsUi.add(this, content,
@@ -76,7 +92,7 @@ class RegionalServicesActivity : Activity() {
         }
         switches[service] = toggle
         content.addView(toggle)
-        val label = TextView(this)
+        val label = TextView(this).apply { setText(R.string.regional_source_public) }
         labels[service] = label
         content.addView(label)
         content.addView(Button(this).apply {
@@ -88,6 +104,9 @@ class RegionalServicesActivity : Activity() {
                         Toast.LENGTH_SHORT).show() }
             }
         })
+        button(content, R.string.regional_why) { RegionalExplanationUi.show(this, service) }
+        verification.add(content, service)
+        watches.add(content, service)
         toggle.setOnCheckedChangeListener { _, checked -> configure(service, checked) }
     }
 
@@ -117,20 +136,19 @@ class RegionalServicesActivity : Activity() {
         }
         binding = false
         EgressCountryUi.render(country, this)
-        val network = getSystemService(android.net.ConnectivityManager::class.java).activeNetwork?.networkHandle
-        val now = SystemClock.elapsedRealtime()
         labels.forEach { (service, label) ->
-            val result = RegionalStateStore.get(service)?.takeIf {
-                it.networkHandle == network && it.configurationRevision == RegionalPreferences.revision(this) &&
-                    now >= it.checkedElapsed && now - it.checkedElapsed <= RegionalMonitor.SLEEP_MS * 2
-            }
-            label.text = when {
+            val result = RegionalCurrent.result(this, service)
+            val detail = when {
                 !RegionalPreferences.enabled(this, service) -> getString(R.string.regional_off)
                 result == null -> getString(R.string.regional_unverified)
                 else -> getString(R.string.regional_result, resultText(result),
                     agoStr(this, result.checkedAt, System.currentTimeMillis()))
             }
+            label.text = getString(R.string.regional_verification_row,
+                getString(R.string.regional_source_public), detail)
         }
+        verification.render()
+        watches.render()
     }
 
     private fun resultText(result: RegionalResult): String {

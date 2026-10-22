@@ -75,6 +75,7 @@ if codes.count(0) != 2 or any(code not in (0, 1) for code in codes):
     raise SystemExit("Permission tests failed or were skipped")
 print("Notification permission cycle: 2 passed, 0 failed/skipped")
 PY_PERMISSION
+  bash scripts/regional-watch-permission-smoke.sh
 fi
 report_storage_mode before-legacy-upgrade
 # A genuine 1.6 -> 1.7 data-format upgrade using one test signing identity.
@@ -201,6 +202,27 @@ adb shell am start -W -n ru.tgwatch/.MainActivity
 adb shell run-as ru.tgwatch cat files/upgrade-sentinel | tr -d '\r' | grep -qx preserved
 assert_legacy_observation
 check_crashes
+# Exercise the same real onboarding/start UI used by the signed predecessor gate.
+# All data-preservation assertions above have finished on this disposable emulator.
+if [[ "$api_level" -eq 35 ]]; then
+  python3 scripts/build-upgrade-ui.py --out "$legacy_dir/ui.jar"
+  adb push "$legacy_dir/ui.jar" /data/local/tmp/tgwatch-upgrade-ui.jar
+  adb shell chmod 444 /data/local/tmp/tgwatch-upgrade-ui.jar
+  adb uninstall ru.tgwatch
+  adb install -g app/build/outputs/apk/debug/app-debug.apk
+  adb shell am start -W -n ru.tgwatch/.MainActivity
+  if python3 scripts/prepare-upgrade-predecessor.py; then
+    echo 'Fresh-install UI preflight passed'
+  else
+    # This is a fresh disposable fixture with no account or imported private settings.
+    adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/fresh-start-failure.png || true
+    adb shell cat /data/local/tmp/tgwatch-upgrade-ui.xml \
+      > app/build/reports/androidTests/fresh-start-failure.xml || true
+    false
+  fi
+  await_observation 0
+  check_crashes
+fi
 # After all assertions, capture the real main screen for documentation.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
 adb shell input keyevent KEYCODE_WAKEUP
