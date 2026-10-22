@@ -6,6 +6,7 @@ from html.parser import HTMLParser
 import json
 import multiprocessing
 import re
+import signal
 import ssl
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 PROFILES = {
     'youtube': ('YouTube', 'https://www.youtube.com/', {'www.youtube.com', 'youtube.com'}),
@@ -304,6 +306,32 @@ def safe_report(service, status, code, country, checked_at):
                 status=status, http_code=code, country=country, checked_at=checked_at)
 
 
+class AppEvidence:
+    """Private IPC identity is random, not a route/IP fingerprint. Every context change resets all profiles."""
+    def __init__(self, services):
+        self.services = tuple(services)
+        self.scope = None
+        self.context_id = None
+        self.states = {service: Consensus() for service in services}
+
+    def update(self, service, status, scope, now):
+        if scope is None or scope != self.scope:
+            self.scope = scope
+            self.context_id = uuid.uuid4().hex if scope is not None else None
+            self.states = {item: Consensus() for item in self.services}
+        state = self.states[service]
+        if scope is not None:
+            state.update(status, self.context_id, now)
+        return self.context_id, state
+
+
+def app_report(service, status, code, country, checked_at, context_id, confirmed):
+    report = safe_report(service, status if context_id is not None else 'UNKNOWN', code,
+                         country if context_id is not None else None, checked_at)
+    report.update(schema=1, region_confirmed=bool(confirmed and context_id is not None), context_id=context_id)
+    return report
+
+
 def measure(service):
     before = route_scope()
     country, egress = bounded_probe('country')
@@ -331,6 +359,11 @@ def notify(service):
         return False
 
 
+def stop_requested(_signal, _frame):
+    # Unwind bounded_probe's finally block so an app stop owns the child all the way through join.
+    raise KeyboardInterrupt
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--service', action='append', choices=PROFILES,
@@ -338,13 +371,19 @@ def main(argv=None):
     parser.add_argument('--watch', action='store_true', help='Run in foreground; Ctrl-C stops')
     parser.add_argument('--interval', type=int, default=300, help='300..3600 seconds in watch mode')
     parser.add_argument('--notify', action='store_true', help='Local macOS notifications after independent confirmation')
-    parser.add_argument('--json', action='store_true', help='Safe JSON lines, no response contents or IP addresses')
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument('--json', action='store_true', help='Safe JSON lines, no response contents or IP addresses')
+    output.add_argument('--app-json', action='store_true', help='Private versioned IPC for the native Mac app')
     args = parser.parse_args(argv)
     if not 300 <= args.interval <= 3600:
         parser.error('--interval must be between 300 and 3600 seconds')
+    if args.app_json and args.notify:
+        parser.error('--app-json notifications are managed by the native application')
     services = list(dict.fromkeys(args.service or PROFILES))
     states = {service: Consensus() for service in services}
+    app = AppEvidence(services) if args.app_json else None
     due = {service: 0.0 for service in services}
+    previous_term = signal.signal(signal.SIGTERM, stop_requested)
     try:
         while True:
             for service in services:
@@ -352,17 +391,22 @@ def main(argv=None):
                 if args.watch and now < due[service]:
                     continue
                 status, code, country, scope = measure(service)
-                if scope is None:
-                    states[service] = Consensus()
+                if app is not None:
+                    context_id, state = app.update(service, status, scope, time.monotonic())
                 else:
-                    states[service].update(status, scope, time.monotonic())
-                report = safe_report(service, status, code, country, int(time.time() * 1000))
-                if args.json:
+                    if scope is None:
+                        states[service] = Consensus()
+                    else:
+                        states[service].update(status, scope, time.monotonic())
+                    state = states[service]
+                checked_at = int(time.time() * 1000)
+                report = app_report(service, status, code, country, checked_at, context_id, state.confirmed) if (
+                    app is not None) else safe_report(service, status, code, country, checked_at)
+                if args.json or args.app_json:
                     print(json.dumps(report, ensure_ascii=False), flush=True)
                 else:
                     print(f"{PROFILES[service][0]}: {status} · country={report['country'] or 'unverified'} · "
                           'public website only; account features unverified', flush=True)
-                state = states[service]
                 if args.notify and state.should_notify(time.monotonic()) and notify(service):
                     state.delivered(time.monotonic())
                 due[service] = time.monotonic() + (15 if status == 'REGION_RESTRICTED' and not state.confirmed
@@ -375,6 +419,8 @@ def main(argv=None):
     except (OSError, ValueError, subprocess.SubprocessError):
         print('Regional check could not complete; no account or regional conclusion was made.', file=sys.stderr)
         return 1
+    finally:
+        signal.signal(signal.SIGTERM, previous_term)
 
 
 if __name__ == '__main__':
