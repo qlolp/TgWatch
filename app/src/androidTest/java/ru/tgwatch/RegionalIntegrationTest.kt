@@ -193,6 +193,41 @@ class RegionalIntegrationTest {
         }
     }
 
+    @Test fun aNotificationFromAReplacedNetworkIsClearedBeforeItsCallbackArrives() {
+        assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.GEMINI, true))
+        Prefs.setEnabled(ctx, true)
+        val manager = ctx.getSystemService(android.app.NotificationManager::class.java)
+        assertTrue(manager.areNotificationsEnabled())
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val worker = java.util.concurrent.ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+            java.util.concurrent.ArrayBlockingQueue(1))
+        val monitor = RegionalMonitor(ctx, { true }, {}, { service, network, _, revision, configuration ->
+            val offset = if (calls.getAndIncrement() == 0) 20_000L else 0L
+            RegionalResult(service, RegionalStatus.REGION_RESTRICTED, System.currentTimeMillis() - offset,
+                SystemClock.elapsedRealtime() - offset, network.networkHandle, revision, configuration, 403)
+        }, execution = RegionalExecution(ProbeAdmission(), worker))
+        fun awaitCondition(message: String, predicate: () -> Boolean) {
+            val deadline = SystemClock.elapsedRealtime() + 5_000
+            while (!predicate() && SystemClock.elapsedRealtime() < deadline) Thread.sleep(20)
+            assertTrue(message, predicate())
+        }
+        try {
+            monitor.tick()
+            awaitCondition("First real result is published") { RegionalStateStore.get(RegionalService.GEMINI) != null }
+            monitor.request()
+            awaitCondition("Two explicit observations post an alert") {
+                manager.activeNotifications.any { it.notification.channelId == RegionalNotifications.CHANNEL }
+            }
+            val current = RegionalStateStore.get(RegionalService.GEMINI)!!
+            RegionalStateStore.put(current.copy(networkHandle = current.networkHandle + 1))
+            // The public store can already be stale while Android's network callback is still queued.
+            monitor.tick()
+            awaitCondition("A stale-network notification must be cleared without waiting for changed()") {
+                manager.activeNotifications.none { it.notification.channelId == RegionalNotifications.CHANNEL }
+            }
+        } finally { monitor.close(); worker.shutdownNow() }
+    }
+
     private fun awaitRunning() {
         val deadline = SystemClock.elapsedRealtime() + 10_000
         while (!MonitorService.running && SystemClock.elapsedRealtime() < deadline) Thread.sleep(50)
