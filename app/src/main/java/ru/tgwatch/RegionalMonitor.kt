@@ -10,6 +10,7 @@ import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.Executor
 
 internal object RegionalStateStore {
     private val results = mutableMapOf<RegionalService, RegionalResult>()
@@ -30,10 +31,18 @@ private object RegionalWorkers {
         { task -> Thread(task, "regional-check").apply { isDaemon = true } })
 }
 
+/** Production always shares one process registry/pool; deterministic fixtures can own their execution boundary. */
+internal class RegionalExecution(val admission: ProbeAdmission, val executor: Executor) {
+    companion object {
+        val process = RegionalExecution(ProbeAdmission.process, RegionalWorkers.executor)
+    }
+}
+
 internal class RegionalMonitor(private val ctx: Context, private val active: () -> Boolean,
     private val progress: () -> Unit,
     private val probe: (RegionalService, android.net.Network, ProbeCancellation, Long, Long) -> RegionalResult =
-        RegionalHttpProbe::check, private val wake: () -> Unit = {}) {
+        RegionalHttpProbe::check, private val wake: () -> Unit = {},
+    private val execution: RegionalExecution = RegionalExecution.process) {
     constructor(host: TargetMonitorHost) : this(host.context, host::isCurrent,
         { host.worker.post { if (host.isCurrent()) host.onProgress() } }, wake = host::acquireWakeLock)
     private val connectivity = ctx.getSystemService(ConnectivityManager::class.java)
@@ -87,7 +96,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
     }
 
     private fun startProbe(service: RegionalService, network: android.net.Network, now: Long, config: Long) {
-        val permit = ProbeAdmission.process.tryAcquire("regional_services", ProbeLane.SECONDARY) ?: run {
+        val permit = execution.admission.tryAcquire("regional_services", ProbeLane.SECONDARY) ?: run {
             due[service] = now + RETRY_MS
             return
         }
@@ -97,7 +106,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         val networkRevision = revision
         wake()
         try {
-            RegionalWorkers.executor.execute {
+            execution.executor.execute {
                 try {
                     if (permit.start()) {
                         val result = probe(service, network, cancel, networkRevision, config)

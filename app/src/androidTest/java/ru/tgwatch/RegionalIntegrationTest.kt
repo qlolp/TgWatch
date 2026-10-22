@@ -136,6 +136,8 @@ class RegionalIntegrationTest {
         assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.YOUTUBE, true))
         Prefs.setEnabled(ctx, true)
         for (networkChange in listOf(false, true)) {
+            val worker = java.util.concurrent.ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+                java.util.concurrent.ArrayBlockingQueue(1))
             val entered = CountDownLatch(1)
             val release = CountDownLatch(1)
             val finished = CountDownLatch(1)
@@ -147,7 +149,7 @@ class RegionalIntegrationTest {
                     finished.countDown()
                     RegionalResult(service, RegionalStatus.REGION_RESTRICTED, System.currentTimeMillis(),
                         SystemClock.elapsedRealtime(), network.networkHandle, revision, configuration)
-                })
+                }, execution = RegionalExecution(ProbeAdmission(), worker))
             try {
                 monitor.tick()
                 assertTrue(entered.await(5, TimeUnit.SECONDS))
@@ -159,7 +161,7 @@ class RegionalIntegrationTest {
                 assertTrue(finished.await(5, TimeUnit.SECONDS))
                 assertFalse(published.await(1, TimeUnit.SECONDS))
                 assertNull(RegionalStateStore.get(RegionalService.YOUTUBE))
-            } finally { release.countDown(); monitor.close() }
+            } finally { release.countDown(); monitor.close(); worker.shutdownNow() }
         }
     }
 
