@@ -40,6 +40,7 @@ class BackupRestoreIntegrationTest {
         "daily_summary" to true, "daily_summary_minute" to 1290,
         "extra_probe_matrix" to true, "extra_probe_whatsapp" to false, "extra_probe_custom" to true,
         "extra_probe_custom_url" to "https://status.example.org/health", "notify_slow" to false,
+        "history_retention" to "WEEK",
         "egress_enabled" to true, "regional_youtube" to true, "regional_gemini" to false,
         "regional_notebook_lm" to false, "regional_chatgpt" to true,
     )
