@@ -40,14 +40,12 @@ class RegionalExperienceIntegrationTest {
         val now = System.currentTimeMillis()
         val row = RegionalJournalEntry(RegionalEventKind.PUBLIC, now, scope, RegionalRoute.VPN,
             "DE", now, RegionalService.GEMINI, RegionalStatus.REGION_RESTRICTED, true, 403)
-        RegionalRepository.recordEntry(ctx, row)
-        RegionalRepository.awaitIdle(ctx)
+        RegionalRepository.recordEntries(ctx, listOf(row)).get(10, java.util.concurrent.TimeUnit.SECONDS)
         assertEquals(listOf(row), RegionalRepository.snapshot(ctx).rows)
         val disk = RegionalJournalStorage(RegionalRepository.fileFor(ctx)).read()
         assertEquals(listOf(row), disk)
         assertFalse(RegionalRepository.fileFor(ctx).readText().contains("https://"))
         BackupManager.restoreTargets(ctx, backup)
-        RegionalRepository.awaitIdle(ctx)
         assertTrue(RegionalRepository.snapshot(ctx).rows.isEmpty())
         assertTrue(RegionalJournalStorage(RegionalRepository.fileFor(ctx)).read().isEmpty())
     }
@@ -59,10 +57,9 @@ class RegionalExperienceIntegrationTest {
         val changed = RegionalContext.current(ctx, 43, 2)
         assertNotEquals(next.token, changed.token)
         val now = System.currentTimeMillis()
-        RegionalRepository.recordEntry(ctx, RegionalJournalEntry(RegionalEventKind.PUBLIC, now,
+        RegionalRepository.recordEntries(ctx, listOf(RegionalJournalEntry(RegionalEventKind.PUBLIC, now,
             scope, RegionalRoute.WIFI, service = RegionalService.YOUTUBE,
-            status = RegionalStatus.AUTH_REQUIRED, httpCode = 401))
-        RegionalRepository.awaitIdle(ctx)
+            status = RegionalStatus.AUTH_REQUIRED, httpCode = 401))).get(10, java.util.concurrent.TimeUnit.SECONDS)
         ActivityScenario.launch<RegionalHistoryActivity>(Intent(ctx, RegionalHistoryActivity::class.java)).use { scenario ->
             val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
             var ready = false
@@ -84,6 +81,66 @@ class RegionalExperienceIntegrationTest {
                 buttons.forEach { assertTrue(it.minimumHeight >= (48 * activity.resources.displayMetrics.density).toInt()) }
             }
         }
+    }
+
+    @Test fun savedComparisonsStayHistoricalAndCannotReturnAfterRestore() {
+        val now = System.currentTimeMillis()
+        val connection = RegionalConnection(scope, RegionalRoute.VPN)
+        val row = RegionalJournalEntry(RegionalEventKind.PUBLIC, now - 2_000, scope, RegionalRoute.VPN,
+            service = RegionalService.GEMINI, status = RegionalStatus.WEB_REACHABLE, httpCode = 200)
+        val a = RegionalComparisonSnapshot("Connection A", now - 1_500, connection,
+            mapOf(RegionalService.GEMINI to row))
+        val pair = RegionalComparisonPair(a, a.copy(label = "Connection B", at = now - 1_000))
+        val generation = RegionalRepository.generation(ctx)
+        assertTrue(RegionalComparisonRepository.save(ctx, pair, generation)
+            .get(10, java.util.concurrent.TimeUnit.SECONDS))
+        assertEquals(listOf(pair), RegionalComparisonRepository.snapshot(ctx).pairs)
+        val previous = android.content.res.Configuration(ctx.resources.configuration)
+        val enlarged = android.content.res.Configuration(previous).apply { fontScale = 2f }
+        @Suppress("DEPRECATION")
+        ctx.resources.updateConfiguration(enlarged, ctx.resources.displayMetrics)
+        try {
+            ActivityScenario.launch<RegionalComparisonActivity>(Intent(ctx, RegionalComparisonActivity::class.java))
+                .use { scenario ->
+                    awaitText(scenario, "Connection A")
+                    scenario.onActivity { activity ->
+                        val all = views(activity.findViewById(android.R.id.content))
+                        val buttons = all.filterIsInstance<Button>()
+                        assertFalse(buttons.single { it.text == activity.getString(R.string.regional_compare_b) }.isEnabled)
+                        buttons.filter { it.visibility == View.VISIBLE }.forEach {
+                            assertTrue(it.height >= (48 * activity.resources.displayMetrics.density).toInt())
+                        }
+                        val text = all.filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }
+                        assertTrue(text.contains(activity.getString(R.string.regional_source_public)))
+                    }
+                    scenario.recreate()
+                    scenario.onActivity { activity ->
+                        assertFalse(views(activity.findViewById(android.R.id.content)).filterIsInstance<Button>()
+                            .single { it.text == activity.getString(R.string.regional_compare_b) }.isEnabled)
+                    }
+                }
+        } finally {
+            @Suppress("DEPRECATION")
+            ctx.resources.updateConfiguration(previous, ctx.resources.displayMetrics)
+        }
+        BackupManager.restoreTargets(ctx, backup)
+        assertTrue(RegionalComparisonRepository.snapshot(ctx).pairs.isEmpty())
+        assertFalse(RegionalComparisonRepository.save(ctx, pair, generation)
+            .get(10, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(RegionalComparisonStorage(RegionalComparisonRepository.fileFor(ctx)).read().isEmpty())
+    }
+
+    private fun <T : android.app.Activity> awaitText(scenario: ActivityScenario<T>, text: String) {
+        val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+        var ready = false
+        while (!ready && android.os.SystemClock.elapsedRealtime() < deadline) {
+            scenario.onActivity { activity ->
+                ready = views(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+                    .any { it.text.contains(text) }
+            }
+            if (!ready) Thread.sleep(25)
+        }
+        assertTrue("Prepared comparison must arrive", ready)
     }
 
     private fun views(view: View): List<View> = listOf(view) + if (view is ViewGroup)

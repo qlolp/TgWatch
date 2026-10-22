@@ -36,10 +36,10 @@
 
 **Interfaces:** Produces validated `RegionalJournalEntry`, `RegionalJournalCodec.encode/decode`, `RegionalJournalStorage.read/write/append`, `RegionalRepository.record/snapshot/clear` and `RegionalContext.current/invalidate`. Context contains a random token, route enum and fresh optional country/time. Historical public events carry fixed status/failure/code/confirmation only.
 
-- [ ] Write codec/storage tests: roundtrip and consecutive dedup; retention/cap; invalid enums/country/scope/oversize/truncation; failed replacement preserves old file; no raw input fields. Android tests cover reopen, network token change, clear/restore fence and source rendering.
-- [ ] Run tests; observe missing-feature RED before implementing the bounded codec/storage/repository and history UI.
-- [ ] Implement observer/context hooks without main-thread file access; restore clears/fences device-local files.
-- [ ] Run pure tests plus Android integration via CI; expected PASS and unchanged old histories/backup behavior. Commit task1 and ledger evidence.
+- [x] Write codec/storage tests: roundtrip and consecutive dedup; retention/cap; invalid enums/country/scope/oversize/truncation; failed replacement preserves old file; no raw input fields. Android tests cover reopen, network token change, clear/restore fence and source rendering.
+- [x] Run tests; observe missing-feature RED before implementing the bounded codec/storage/repository and history UI.
+- [x] Implement observer/context hooks without main-thread file access; restore clears/fences device-local files.
+- [x] Run pure tests plus Android integration via CI; expected PASS and unchanged old histories/backup behavior. Commit task1 and ledger evidence.
 
 ### Task 2: Fresh manual A/B comparison
 

@@ -44,6 +44,9 @@ class RegionalServicesActivity : Activity() {
         button(content, R.string.regional_history_title) {
             startActivity(Intent(this, RegionalHistoryActivity::class.java))
         }
+        button(content, R.string.regional_compare_title) {
+            startActivity(Intent(this, RegionalComparisonActivity::class.java))
+        }
         RegionalService.entries.forEach { service -> addProfile(content, service) }
         button(content, R.string.regional_check) {
             if (!MonitorService.requestRegionalCheck())

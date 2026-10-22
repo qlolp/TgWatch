@@ -6,6 +6,55 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RegionalJournalSessionTest {
+    @Test fun aMultiFileClearFinishesBeforeANewGenerationReaderCanObserveComparisons() {
+        val directory = Files.createTempDirectory("regional-multiple-files").toFile()
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val readDone = java.util.concurrent.CountDownLatch(1)
+        val readStarted = java.util.concurrent.CountDownLatch(1)
+        try {
+            val journal = RegionalJournalSession(RegionalJournalStorage(File(directory, "events")))
+            val comparisons = File(directory, "pairs").apply { writeText("old pairs") }
+            val clearer = Thread {
+                journal.clear {
+                    entered.countDown()
+                    check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    comparisons.writeText("")
+                }
+            }.apply { start() }
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            val observed = java.util.concurrent.atomic.AtomicReference<String>()
+            val reader = Thread {
+                val ticket = journal.generation
+                readStarted.countDown()
+                journal.withGeneration(ticket) { observed.set(comparisons.readText()); true }
+                readDone.countDown()
+            }.apply { start() }
+            assertTrue(readStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertFalse(readDone.await(100, java.util.concurrent.TimeUnit.MILLISECONDS))
+            release.countDown()
+            clearer.join(5_000)
+            reader.join(5_000)
+            assertFalse(clearer.isAlive)
+            assertFalse(reader.isAlive)
+            assertEquals("", observed.get())
+        } finally { release.countDown(); directory.deleteRecursively() }
+    }
+
+    @Test fun aComparisonWriteCapturedBeforeRestoreCannotCreateAFileAfterTheFenceMoves() {
+        val directory = Files.createTempDirectory("regional-other-file-fence").toFile()
+        try {
+            val journal = RegionalJournalSession(RegionalJournalStorage(File(directory, "events")))
+            val ticket = journal.generation
+            val comparison = File(directory, "comparison")
+            journal.clear()
+            assertFalse(journal.withGeneration(ticket) { comparison.writeText("stale"); true })
+            assertFalse(comparison.exists())
+            assertTrue(journal.withGeneration(journal.generation) { comparison.writeText("fresh"); true })
+            assertEquals("fresh", comparison.readText())
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun aReadErrorCanRecoverOnBackgroundRefreshWithoutDeletingHealthyRows() {
         val directory = Files.createTempDirectory("regional-read-retry").toFile()
         try {

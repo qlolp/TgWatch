@@ -61,12 +61,13 @@ class RegionalJournalSession(private val storage: RegionalJournalStorage) {
         }
     }
 
-    @Synchronized fun clear() {
+    @Synchronized fun clear(after: () -> Unit = {}) {
         generation = Math.addExact(generation, 1L)
         // A failed clear must not let a later append merge deleted rows back into the file.
         pending = emptyList()
         try {
             storage.write(emptyList())
+            after()
             pending = null
             snapshot = RegionalJournalSnapshot(loading = false)
         } catch (failure: Exception) {
@@ -80,4 +81,7 @@ class RegionalJournalSession(private val storage: RegionalJournalStorage) {
         clear()
         return true
     }
+
+    @Synchronized fun withGeneration(ticket: Long, action: () -> Boolean): Boolean =
+        ticket == generation && action()
 }

@@ -6,12 +6,15 @@ import android.content.Context
 internal object RegionalJournalObserver {
     fun record(ctx: Context, result: RegionalResult) {
         val connection = RegionalContext.current(ctx, result.networkHandle, result.configurationRevision)
+        RegionalRepository.recordEntries(ctx, listOf(entry(result, connection)), includeContext = true)
+    }
+
+    fun entry(result: RegionalResult, connection: RegionalConnection): RegionalJournalEntry {
         val countryAt = connection.countryAt?.takeIf { it <= result.checkedAt }
-        val row = RegionalJournalEntry(RegionalEventKind.PUBLIC, result.checkedAt.coerceAtLeast(0),
+        return RegionalJournalEntry(RegionalEventKind.PUBLIC, result.checkedAt.coerceAtLeast(0),
             connection.token, connection.route, connection.country.takeIf { countryAt != null }, countryAt,
             result.service, result.status, result.regionConfirmed,
             result.httpCode?.takeIf(RegionalJournalCodec::validHttpCode), result.failure)
-        RegionalRepository.recordEntries(ctx, listOf(row), includeContext = true)
     }
 
     fun country(ctx: Context, country: EgressCountry.Snapshot) {

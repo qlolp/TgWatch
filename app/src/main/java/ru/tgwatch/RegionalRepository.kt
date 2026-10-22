@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicLong
 /** One bounded disk worker; UI only sees immutable cached snapshots. Restore fences queued writes. */
 internal object RegionalRepository {
     private const val QUEUE_SIZE = 64
-    private const val WAIT_SECONDS = 10L
     private const val PRUNE_MS = 60_000L
     private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, ArrayBlockingQueue(QUEUE_SIZE),
         { task -> Thread(task, "regional-history").apply { isDaemon = true } })
@@ -35,9 +34,6 @@ internal object RegionalRepository {
         val state = current.journal.snapshot
         return if (current.busy) state.copy(error = RegionalJournalError.BUSY) else state
     }
-
-    fun recordEntry(ctx: Context, row: RegionalJournalEntry): CompletableFuture<Boolean> =
-        recordEntries(ctx, listOf(row))
 
     fun recordEntries(ctx: Context, rows: List<RegionalJournalEntry>,
         includeContext: Boolean = false): CompletableFuture<Boolean> {
@@ -76,9 +72,11 @@ internal object RegionalRepository {
     /** Called from the already-background restore transaction, never from a UI click. */
     fun clearForRestore(ctx: Context) {
         val current = owner(ctx)
-        current.journal.clear()
-        current.loadRequested.set(true)
-        RegionalContext.invalidate()
+        current.journal.clear {
+            RegionalComparisonRepository.clearForRestore(ctx)
+            current.loadRequested.set(true)
+            RegionalContext.invalidate()
+        }
     }
 
     fun clear(ctx: Context): CompletableFuture<Boolean> {
@@ -90,7 +88,13 @@ internal object RegionalRepository {
             }
         }
     }
-    fun awaitIdle(ctx: Context) { queue(owner(ctx)) { true }.get(WAIT_SECONDS, TimeUnit.SECONDS) }
+
+    fun generation(ctx: Context): Long = owner(ctx).journal.generation
+
+    fun transaction(ctx: Context, expectedGeneration: Long, action: () -> Boolean): CompletableFuture<Boolean> {
+        val current = owner(ctx)
+        return queue(current) { current.journal.withGeneration(expectedGeneration, action) }
+    }
 
     private fun queue(current: Owner, action: () -> Boolean): CompletableFuture<Boolean> {
         val future = CompletableFuture<Boolean>()
