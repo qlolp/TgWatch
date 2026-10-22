@@ -20,6 +20,10 @@ internal object RegionalStateStore {
 
 internal fun MonitorService.Companion.requestRegionalCheck(): Boolean = regionalRequest?.invoke() == true
 
+internal fun nextMonitoringDelay(primary: Long?, targets: TargetMonitoring, regional: RegionalMonitor?): Long? =
+    CheckAlarm.nextDelay(SystemClock.elapsedRealtime(), primary,
+        listOfNotNull(targets.nextWakeElapsed(), regional?.nextWakeElapsed).minOrNull())
+
 /** One physical worker per process, including service restart and transports that ignore cancellation. */
 private object RegionalWorkers {
     val executor = ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, SynchronousQueue(),
@@ -27,7 +31,9 @@ private object RegionalWorkers {
 }
 
 internal class RegionalMonitor(private val ctx: Context, private val active: () -> Boolean,
-    private val progress: () -> Unit) {
+    private val progress: () -> Unit,
+    private val probe: (RegionalService, android.net.Network, ProbeCancellation, Long, Long) -> RegionalResult =
+        RegionalHttpProbe::check) {
     private val connectivity = ctx.getSystemService(ConnectivityManager::class.java)
     private val power = ctx.getSystemService(PowerManager::class.java)
     private val main = Handler(Looper.getMainLooper())
@@ -90,7 +96,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
             RegionalWorkers.executor.execute {
                 try {
                     if (permit.start()) {
-                        val result = RegionalHttpProbe.check(service, network, cancel, networkRevision, config)
+                        val result = probe(service, network, cancel, networkRevision, config)
                         main.post { complete(captured, result) }
                     }
                 } finally { permit.finished(); cancel.close() }
@@ -140,8 +146,10 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         }
     }
 
-    @Synchronized fun nextWakeElapsed(): Long? = if (closed || cancellation != null) null else
-        RegionalService.entries.filter { RegionalPreferences.enabled(ctx, it) }.minOfOrNull { due[it] ?: 0L }
+    val nextWakeElapsed: Long? get() = synchronized(this) {
+        if (closed || cancellation != null) null else RegionalService.entries
+            .filter { RegionalPreferences.enabled(ctx, it) }.minOfOrNull { due[it] ?: 0L }
+    }
 
     @Synchronized fun close() { closed = true; changed() }
     companion object {

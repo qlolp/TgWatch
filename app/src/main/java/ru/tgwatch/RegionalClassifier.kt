@@ -39,13 +39,14 @@ object RegionalClassifier {
     }
 
     private fun visible(code: Int, body: String, complete: Boolean): RegionalStatus {
-        val clean = body.replace(comments, " ").replace(ignored, " ").replace(tags, " ")
+        val markup = RegionalMarkup.removeHidden(body.replace(comments, " ").replace(ignored, " "))
+        val clean = markup.replace(tags, " ")
             .replace("&nbsp;", " ").replace("&#39;", "'")
             .lowercase(Locale.ROOT).replace(spaces, " ").trim()
         return when {
             complete && challengePhrases.any(clean::contains) -> RegionalStatus.CHALLENGE
             complete && clean.length <= MAX_VISIBLE_REGION_TEXT && regionPhrases.any(clean::contains) &&
-                (code in RegionalHttpStatus.denial || regionHeading(body)) ->
+                (code in RegionalHttpStatus.denial || regionHeading(markup)) ->
                 RegionalStatus.REGION_RESTRICTED
             code in RegionalHttpStatus.success -> RegionalStatus.WEB_REACHABLE
             else -> RegionalStatus.UNKNOWN

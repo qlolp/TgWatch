@@ -26,6 +26,13 @@ internal object EgressCountryUi {
     private val executor = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(1),
         { task -> Thread(task, "tg-egress").apply { isDaemon = true } })
 
+    @Synchronized fun invalidate(ctx: Context) {
+        lookup.invalidate()
+        lastAttemptElapsed = 0L
+        lastAttemptNetwork = -1L
+        Prefs.clearEgressCountry(ctx)
+    }
+
     fun render(view: TextView, ctx: Context) {
         val snapshot = Prefs.egressCountry(ctx)
         view.visibility = View.VISIBLE

@@ -15,6 +15,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class RegionalIntegrationTest {
@@ -32,6 +34,7 @@ class RegionalIntegrationTest {
         TargetId.entries.forEach { edit.putBoolean(TargetPreferences.key(it, "enabled"), false) }
         check(edit.commit())
         RegionalStateStore.clear()
+        EgressCountryUi.invalidate(ctx)
     }
 
     @After fun restore() {
@@ -80,6 +83,59 @@ class RegionalIntegrationTest {
         assertFalse(notifications.post(result))
         assertFalse(Prefs.sp(ctx).contains("regional.gemini.delivered_at"))
         notifications.clearAll()
+    }
+
+    @Test fun countryCannotBecomeCurrentAfterBootIdentityChanges() {
+        val snapshot = EgressCountry.Snapshot("DE", System.currentTimeMillis(), 42)
+        Prefs.setEgressCountry(ctx, snapshot)
+        assertEquals(snapshot, Prefs.egressCountry(ctx))
+        val boot = android.provider.Settings.Global.getInt(ctx.contentResolver,
+            android.provider.Settings.Global.BOOT_COUNT, -1)
+        Prefs.sp(ctx).edit().putInt("egress_boot", boot + 1).commit()
+        assertNull(Prefs.egressCountry(ctx))
+    }
+
+    @Test fun changingAnotherProfileCannotReopenAnAlreadyWarnedIncident() {
+        assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.GEMINI, true))
+        RegionalPreferences.delivered(ctx, RegionalService.GEMINI, 42)
+        Prefs.sp(ctx).edit().putLong("regional.gemini.delivered_at",
+            SystemClock.elapsedRealtime() - RegionalConsensus.COOLDOWN_MS).commit()
+        assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.YOUTUBE, true))
+        assertFalse(RegionalPreferences.notificationAllowed(ctx, RegionalService.GEMINI, 42))
+        RegionalPreferences.reachable(ctx, RegionalService.GEMINI)
+        assertTrue(RegionalPreferences.notificationAllowed(ctx, RegionalService.GEMINI, 42))
+    }
+
+    @Test fun aLateResponseCannotPublishAfterDisableEnableOrNetworkInvalidation() {
+        assertNotNull(ctx.getSystemService(android.net.ConnectivityManager::class.java).activeNetwork)
+        assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.YOUTUBE, true))
+        Prefs.setEnabled(ctx, true)
+        for (networkChange in listOf(false, true)) {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val finished = CountDownLatch(1)
+            val published = CountDownLatch(1)
+            val monitor = RegionalMonitor(ctx, { true }, { published.countDown() },
+                { service, network, _, revision, configuration ->
+                    entered.countDown()
+                    assertTrue(release.await(5, TimeUnit.SECONDS))
+                    finished.countDown()
+                    RegionalResult(service, RegionalStatus.REGION_RESTRICTED, System.currentTimeMillis(),
+                        SystemClock.elapsedRealtime(), network.networkHandle, revision, configuration)
+                })
+            try {
+                monitor.tick()
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                if (networkChange) monitor.changed() else {
+                    assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.YOUTUBE, false))
+                    assertTrue(RegionalPreferences.setEnabled(ctx, RegionalService.YOUTUBE, true))
+                }
+                release.countDown()
+                assertTrue(finished.await(5, TimeUnit.SECONDS))
+                assertFalse(published.await(1, TimeUnit.SECONDS))
+                assertNull(RegionalStateStore.get(RegionalService.YOUTUBE))
+            } finally { release.countDown(); monitor.close() }
+        }
     }
 
     @Test fun regionalControlsRemainReadableAtDoubleFontScale() {

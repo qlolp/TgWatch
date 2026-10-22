@@ -11,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RegionalServicesTests(unittest.TestCase):
+    def test_shared_android_and_mac_fixtures(self):
+        module = self.load()
+        for line in (ROOT / 'tools/fixtures/regional-classification.jsonl').read_text().splitlines():
+            case = json.loads(line)
+            with self.subTest(case=case['id']):
+                self.assertEqual(case['status'], module.classify(case['code'], case['contentType'], case['body'],
+                    case['locationHost'], case['complete']))
+
     def load(self):
         path = ROOT / 'scripts/regional-services.py'
         self.assertTrue(path.exists(), 'Missing independent Mac public checks')
@@ -95,6 +103,23 @@ class RegionalServicesTests(unittest.TestCase):
             args = run.call_args.args[0]
             self.assertEqual('/usr/bin/osascript', args[0])
             self.assertNotIn('http', ' '.join(args))
+
+    def test_network_change_during_a_probe_discards_the_old_verdict_and_country(self):
+        module = self.load()
+        self.assertTrue(hasattr(module, 'measure'), 'A check must validate its network at completion')
+        with patch.object(module, 'route_scope', side_effect=['wifi', 'vpn']), \
+             patch.object(module, 'bounded_probe', side_effect=[('DE', 'old-egress'),
+                 ('REGION_RESTRICTED', 403), ('US', 'new-egress')]):
+            status, code, country, scope = module.measure('gemini')
+        self.assertEqual(('UNKNOWN', None, None, None), (status, code, country, scope))
+
+    def test_rotating_vpn_exit_on_the_same_interface_breaks_confirmation(self):
+        module = self.load()
+        self.assertTrue(hasattr(module, 'measure'), 'Route alone cannot identify a rotating VPN exit')
+        with patch.object(module, 'route_scope', return_value='same-interface'), \
+             patch.object(module, 'bounded_probe', side_effect=[('DE', 'old-egress'),
+                 ('REGION_RESTRICTED', 403), ('DE', 'new-egress')]):
+            self.assertEqual(('UNKNOWN', None, None, None), module.measure('gemini'))
 
 
 if __name__ == '__main__':

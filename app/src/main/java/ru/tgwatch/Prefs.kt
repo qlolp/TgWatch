@@ -402,7 +402,8 @@ object Prefs {
 
     /** Device-local egress country; the address itself is never persisted. */
     fun egressCountry(ctx: Context): EgressCountry.Snapshot? {
-        val sameBoot = bootCount(ctx) >= 0 && sp(ctx).getInt(KEY_EGRESS_BOOT, -1) == bootCount(ctx)
+        val boot = bootCount(ctx)
+        val sameBoot = boot != null && sp(ctx).getInt(KEY_EGRESS_BOOT, -1) == boot
         val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) && sameBoot }
         return iso?.let {
             EgressCountry.Snapshot(it, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
@@ -415,7 +416,7 @@ object Prefs {
             .putString(KEY_EGRESS_ISO, snapshot.iso)
             .putLong(KEY_EGRESS_AT, snapshot.checkedAt)
             .putLong(KEY_EGRESS_NET, snapshot.networkHandle)
-            .putInt(KEY_EGRESS_BOOT, bootCount(ctx))
+            .putInt(KEY_EGRESS_BOOT, bootCount(ctx) ?: -1)
             .apply()
     }
 

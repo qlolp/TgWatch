@@ -4,6 +4,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RegionalClassifierTest {
+    @Test fun sharedAndroidAndMacFixtures() {
+        val fixture = listOf(java.io.File("tools/fixtures/regional-classification.jsonl"),
+            java.io.File("../tools/fixtures/regional-classification.jsonl")).first { it.isFile }
+        fixture.forEachLine { line ->
+            val values = mutableMapOf<String, String>()
+            val reader = ru.tgwatch.probe.StrictJsonReader(java.io.StringReader(line))
+            reader.objectFields { name -> values[name] = when (reader.nextType) {
+                '"' -> reader.string()
+                't', 'f' -> reader.booleanValue().toString()
+                else -> reader.longValue().toString()
+            } }
+            reader.finish()
+            assertEquals(values.getValue("id"), values.getValue("status"), classify(values.getValue("code").toInt(),
+                values.getValue("body"), values.getValue("contentType"), values.getValue("locationHost"),
+                values.getValue("complete").toBooleanStrict()))
+        }
+    }
     private fun classify(code: Int, body: String, contentType: String = "text/html",
         locationHost: String = "", complete: Boolean = true): String {
         val type = runCatching { Class.forName("ru.tgwatch.RegionalClassifier") }.getOrNull()

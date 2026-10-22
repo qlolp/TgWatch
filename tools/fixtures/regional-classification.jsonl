@@ -1,0 +1,15 @@
+{"id": "generic403", "code": 403, "contentType": "text/html", "body": "Access denied", "locationHost": "", "complete": true, "status": "UNKNOWN"}
+{"id": "legal451", "code": 451, "contentType": "text/html", "body": "Unavailable for legal reasons", "locationHost": "", "complete": true, "status": "UNKNOWN"}
+{"id": "rate", "code": 429, "contentType": "text/html", "body": "", "locationHost": "", "complete": true, "status": "RATE_LIMITED"}
+{"id": "auth", "code": 401, "contentType": "text/html", "body": "", "locationHost": "", "complete": true, "status": "AUTH_REQUIRED"}
+{"id": "explicit200", "code": 200, "contentType": "text/html", "body": "<h1>This service is not available in your country.</h1>", "locationHost": "", "complete": true, "status": "REGION_RESTRICTED"}
+{"id": "explicit403ru", "code": 403, "contentType": "text/html", "body": "<p>Gemini недоступен в вашей стране</p>", "locationHost": "", "complete": true, "status": "REGION_RESTRICTED"}
+{"id": "staticBundle", "code": 200, "contentType": "text/html", "body": "<script>const message=\"not available in your country\"</script><h1>Welcome</h1>", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
+{"id": "comment", "code": 200, "contentType": "text/html", "body": "<!-- not available in your country --><h1>Welcome</h1>", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
+{"id": "faq", "code": 200, "contentType": "text/html", "body": "<h1>FAQ</h1><p>Why is this service not available in your country?</p>", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
+{"id": "captcha", "code": 403, "contentType": "text/html", "body": "<h1>Verify you are human</h1><p>Not available in your country</p>", "locationHost": "", "complete": true, "status": "CHALLENGE"}
+{"id": "hidden", "code": 200, "contentType": "text/html", "body": "<h1 hidden>Not available in your country</h1><h1>Welcome</h1>", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
+{"id": "nestedHidden", "code": 403, "contentType": "text/html", "body": "<div aria-hidden=\"true\"><div><h1>Not available in your country</h1></div></div>Access denied", "locationHost": "", "complete": true, "status": "UNKNOWN"}
+{"id": "inlineHidden", "code": 200, "contentType": "text/html", "body": "<h1 style=\"display: none\">Not available in your country</h1>Welcome", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
+{"id": "json", "code": 403, "contentType": "application/json", "body": "{\"error\":{\"code\":\"unsupported_country\"}}", "locationHost": "", "complete": true, "status": "REGION_RESTRICTED"}
+{"id": "incompleteJson", "code": 403, "contentType": "application/json", "body": "{\"error\":{\"code\":\"unsupported_country\"}}", "locationHost": "", "complete": false, "status": "UNKNOWN"}

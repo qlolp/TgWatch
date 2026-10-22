@@ -22,18 +22,20 @@ internal object RegionalPreferences {
         val allowed = !BackupManager.hasPending() && RecoveryCoordinator.state == RecoveryState.READY &&
             expectedRevision == revision(ctx)
         return allowed && Prefs.sp(ctx).edit().putBoolean("$PREFIX${service.wire}.enabled", enabled)
+            .putLong(key(service, "enabled_revision"), profileRevision(ctx, service) + 1)
             .putLong(REVISION, expectedRevision + 1).commit()
     }
 
-    private fun boot(ctx: Context): Int = Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)
     private fun key(service: RegionalService, suffix: String) = "$PREFIX${service.wire}.$suffix"
+    private fun profileRevision(ctx: Context, service: RegionalService): Long =
+        Prefs.sp(ctx).getLong(key(service, "enabled_revision"), 0)
     fun notificationAllowed(ctx: Context, service: RegionalService, network: Long): Boolean {
         val prefs = Prefs.sp(ctx)
         val sameBoot = boot(ctx) >= 0 && prefs.getInt(key(service, "boot"), UNSEEN_BOOT) == boot(ctx)
         if (!sameBoot) return true
         val since = SystemClock.elapsedRealtime() - prefs.getLong(key(service, "delivered_at"), 0)
         val sameIncident = prefs.getLong(key(service, "delivered_network"), -1) == network &&
-            prefs.getLong(key(service, "delivered_revision"), -1) == revision(ctx)
+            prefs.getLong(key(service, "delivered_revision"), -1) == profileRevision(ctx, service)
         return !sameIncident && since >= RegionalConsensus.COOLDOWN_MS
     }
 
@@ -41,10 +43,12 @@ internal object RegionalPreferences {
         Prefs.sp(ctx).edit().putInt(key(service, "boot"), boot(ctx))
             .putLong(key(service, "delivered_at"), SystemClock.elapsedRealtime())
             .putLong(key(service, "delivered_network"), network)
-            .putLong(key(service, "delivered_revision"), revision(ctx)).apply()
+            .putLong(key(service, "delivered_revision"), profileRevision(ctx, service)).apply()
     }
 
     fun reachable(ctx: Context, service: RegionalService) {
         Prefs.sp(ctx).edit().remove(key(service, "delivered_network")).apply()
     }
 }
+
+private fun boot(ctx: Context): Int = Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)

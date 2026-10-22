@@ -2,12 +2,10 @@
 """Unauthenticated regional evidence from this computer; no account or feature readiness claim."""
 import argparse
 import hashlib
-import io
+from html.parser import HTMLParser
 import json
-import locale
 import multiprocessing
 import re
-import socket
 import ssl
 import subprocess
 import sys
@@ -55,6 +53,47 @@ def unique_object(pairs):
     return result
 
 
+class VisibleMarkup(HTMLParser):
+    """Hidden subtrees never contribute regional evidence, including nested hidden containers."""
+    VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.stack = []
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        hidden = (bool(self.stack and self.stack[-1][1]) or 'hidden' in attrs or
+                  attrs.get('aria-hidden', '').lower() == 'true' or bool(re.search(
+                      r'display\s*:\s*none|visibility\s*:\s*hidden', attrs.get('style', ''), re.I)))
+        if len(self.stack) > 64:
+            hidden = True
+        if not hidden:
+            self.parts.append(self.get_starttag_text())
+        if tag not in self.VOID:
+            self.stack.append((tag, hidden))
+
+    def handle_endtag(self, tag):
+        hidden = bool(self.stack and self.stack[-1][1])
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index][0] == tag:
+                del self.stack[index:]
+                break
+        if not hidden:
+            self.parts.append(f'</{tag}>')
+
+    def handle_data(self, data):
+        if not self.stack or not self.stack[-1][1]:
+            self.parts.append(data)
+
+    def handle_entityref(self, name):
+        self.handle_data('&' + name + ';')
+
+    def handle_charref(self, name):
+        self.handle_data('&#' + name + ';')
+
+
 def classify(code, content_type, body, location_host='', complete=True):
     if code == 401 or 300 <= code <= 399 and location_host.lower() in LOGIN_HOSTS:
         return 'AUTH_REQUIRED'
@@ -76,7 +115,9 @@ def classify(code, content_type, body, location_host='', complete=True):
                 return 'REGION_RESTRICTED' if isinstance(error_code, str) and error_code.lower() in REGION_CODES else 'UNKNOWN'
         except (ValueError, RecursionError):
             return 'UNKNOWN'
-    filtered = IGNORED.sub(' ', COMMENTS.sub(' ', body))
+    markup = VisibleMarkup()
+    markup.feed(IGNORED.sub(' ', COMMENTS.sub(' ', body)))
+    filtered = ''.join(markup.parts)
     visible = ' '.join(TAGS.sub(' ', filtered).replace('&nbsp;', ' ').replace('&#39;', "'").lower().split())
     heading = any(any(phrase in TAGS.sub(' ', match[1]).lower() for phrase in REGION_PHRASES)
                   and not TAGS.sub(' ', match[1]).strip().endswith('?') for match in HEADINGS.findall(filtered))
@@ -237,6 +278,19 @@ def safe_report(service, status, code, country, checked_at):
                 status=status, http_code=code, country=country, checked_at=checked_at)
 
 
+def measure(service):
+    before = route_scope()
+    country, egress = bounded_probe('country')
+    status, code = bounded_probe('service', service)
+    current_country, current_egress = bounded_probe('country')
+    after = route_scope()
+    changed = before != after or (egress is not None and current_egress is not None and egress != current_egress)
+    if changed:
+        return 'UNKNOWN', None, None, None
+    scope = (before, egress) if before is not None and egress is not None and egress == current_egress else None
+    return status, code, current_country if scope is not None else None, scope
+
+
 def notify(service):
     if sys.platform != 'darwin':
         return False
@@ -267,21 +321,16 @@ def main(argv=None):
     due = {service: 0.0 for service in services}
     try:
         while True:
-            before = route_scope()
-            country, egress = bounded_probe('country')
             for service in services:
                 now = time.monotonic()
                 if args.watch and now < due[service]:
                     continue
-                status, code = bounded_probe('service', service)
-                after = route_scope()
-                # Missing/change evidence cannot be combined into a regional warning.
-                scope = (before, egress) if before is not None and egress is not None and before == after else None
+                status, code, country, scope = measure(service)
                 if scope is None:
                     states[service] = Consensus()
                 else:
                     states[service].update(status, scope, time.monotonic())
-                report = safe_report(service, status, code, country if before == after else None, int(time.time() * 1000))
+                report = safe_report(service, status, code, country, int(time.time() * 1000))
                 if args.json:
                     print(json.dumps(report, ensure_ascii=False), flush=True)
                 else:
@@ -292,7 +341,6 @@ def main(argv=None):
                     state.delivered(time.monotonic())
                 due[service] = time.monotonic() + (15 if status == 'REGION_RESTRICTED' and not state.confirmed
                                                 else args.interval)
-                before = after
             if not args.watch:
                 return 0
             time.sleep(max(0.1, min(due.values()) - time.monotonic()))

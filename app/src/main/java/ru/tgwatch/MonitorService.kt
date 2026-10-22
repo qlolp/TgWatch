@@ -610,8 +610,7 @@ class MonitorService : Service() {
         if (destroyed || stopping) return
         val targets = targetMonitoring ?: return
         val primary = telegramDueElapsed.takeIf { targets.telegramEnabled }
-        val secondary = listOfNotNull(targets.nextWakeElapsed(), regionalMonitor?.nextWakeElapsed()).minOrNull()
-        val delay = CheckAlarm.nextDelay(SystemClock.elapsedRealtime(), primary, secondary)
+        val delay = nextMonitoringDelay(primary, targets, regionalMonitor)
         worker.removeCallbacks(checkRunnable)
         if (delay == null) cancelAlarm() else {
             worker.postDelayed(checkRunnable, delay)
