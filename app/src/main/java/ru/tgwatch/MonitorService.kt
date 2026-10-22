@@ -865,6 +865,9 @@ class MonitorService : Service() {
         EgressCountryUi.refresh(this, network.networkHandle) { url ->
             network.openConnection(url) as java.net.HttpURLConnection
         }
+        RegionalServicesProbe.refresh(this, network.networkHandle) { url ->
+            network.openConnection(url) as java.net.HttpURLConnection
+        }
     }
 
     private fun publishEventAlerts(p: Probe, changed: Boolean, sound: Boolean, alertsAllowed: Boolean) {

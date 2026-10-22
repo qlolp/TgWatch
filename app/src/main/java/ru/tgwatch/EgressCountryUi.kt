@@ -3,9 +3,11 @@ package ru.tgwatch
 import android.content.Context
 import android.util.Log
 import android.view.View
+import android.widget.Switch
 import android.widget.TextView
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 /** UI binder and bounded HTTPS GET for the egress ISO code. Never stores the address. */
 internal object EgressCountryUi {
@@ -17,31 +19,57 @@ internal object EgressCountryUi {
 
     @Volatile private var lastAttemptElapsed = 0L
 
+    fun bindToggle(activity: android.app.Activity, settingsChanged: () -> Unit) {
+        val toggle = activity.findViewById<Switch>(R.id.swEgressCountry)
+        toggle.isChecked = Prefs.egressCountryEnabled(activity)
+        toggle.setOnCheckedChangeListener { _, checked ->
+            Prefs.setEgressCountryEnabled(activity, checked)
+            if (!checked) Prefs.clearEgressCountry(activity)
+            settingsChanged()
+            render(activity.findViewById(R.id.tvEgress), activity)
+        }
+    }
+
     fun render(view: TextView, ctx: Context) {
+        if (!Prefs.egressCountryEnabled(ctx)) {
+            view.visibility = View.GONE
+            return
+        }
         val snapshot = Prefs.egressCountry(ctx)
         if (snapshot == null) {
             view.visibility = View.GONE
             return
         }
         view.visibility = View.VISIBLE
-        view.text = EgressCountry.label(snapshot.iso)
+        val locale = Locale.forLanguageTag(ctx.getString(R.string.lang))
+        view.text = ctx.getString(R.string.egress_status_line,
+            EgressCountry.displayLabel(snapshot.iso, locale))
         view.contentDescription = view.text
     }
 
     fun refresh(ctx: Context, networkHandle: Long, open: (URL) -> HttpURLConnection) {
         val now = System.currentTimeMillis()
         val stored = Prefs.egressCountry(ctx)
-        if (!EgressCountry.needsRefresh(stored, now, networkHandle)) return
         val elapsed = android.os.SystemClock.elapsedRealtime()
-        if (elapsed - lastAttemptElapsed < COALESCE_MS) return
+        val due = Prefs.egressCountryEnabled(ctx) &&
+            EgressCountry.needsRefresh(stored, now, networkHandle) &&
+            elapsed - lastAttemptElapsed >= COALESCE_MS
+        if (!due) return
         lastAttemptElapsed = elapsed
         Thread({
             val iso = fetch(open)
-            if (iso != null) Prefs.setEgressCountry(ctx, EgressCountry.Snapshot(iso, now, networkHandle))
+            if (iso != null) {
+                val previous = Prefs.egressCountry(ctx)?.iso
+                Prefs.setEgressCountry(ctx, EgressCountry.Snapshot(iso, now, networkHandle))
+                if (previous != null && previous != iso) {
+                    EventLog.add(ctx, ctx.getString(R.string.egress_event_changed, previous, iso))
+                }
+            }
         }, "tg-egress").apply { isDaemon = true }.start()
     }
 
     fun refreshActive(ctx: Context) {
+        if (!Prefs.egressCountryEnabled(ctx)) return
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
         val network = cm?.activeNetwork ?: return
         refresh(ctx, network.networkHandle) { url ->

@@ -34,10 +34,12 @@ object Prefs {
     private const val KEY_EXTRA_MATRIX = "extra_probe_matrix"
     private const val KEY_EXTRA_WHATSAPP = "extra_probe_whatsapp"
     private const val KEY_EXTRA_CUSTOM = "extra_probe_custom"
+    private const val KEY_EGRESS_ENABLED = "egress_enabled"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_EGRESS_ISO = "egress_iso"
     private const val KEY_EGRESS_AT = "egress_at"
     private const val KEY_EGRESS_NET = "egress_net"
+    private const val KEY_REGIONAL_AT = "regional_checked_at"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
     private const val KEY_LAST_LATENCY = "last_latency"
@@ -237,6 +239,48 @@ object Prefs {
         ExtraProbes.endpoints(extraMatrix(ctx), extraWhatsapp(ctx), extraCustom(ctx), extraCustomUrl(ctx),
             ctx.getString(R.string.extra_custom_label))
 
+    /**
+     * Opt-in egress country line. Default on so upgrades keep the 1.21 status-card behaviour;
+     * Advanced settings can turn the lookup off.
+     */
+    fun egressCountryEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_EGRESS_ENABLED, true)
+    fun setEgressCountryEnabled(ctx: Context, value: Boolean) {
+        sp(ctx).edit().putBoolean(KEY_EGRESS_ENABLED, value).apply()
+    }
+
+    fun regionalEnabled(ctx: Context, id: RegionalServices.Id): Boolean =
+        sp(ctx).getBoolean(RegionalServices.service(id).prefKey, false)
+
+    fun setRegionalEnabled(ctx: Context, id: RegionalServices.Id, value: Boolean) {
+        sp(ctx).edit().putBoolean(RegionalServices.service(id).prefKey, value).apply()
+    }
+
+    fun regionalOutcome(ctx: Context, id: RegionalServices.Id): GeoBlockPolicy.Outcome? {
+        val raw = sp(ctx).getString(RegionalServices.outcomeKey(id), null) ?: return null
+        return GeoBlockPolicy.Outcome.entries.firstOrNull { it.name == raw }
+    }
+
+    fun setRegionalOutcomes(ctx: Context, outcomes: Map<RegionalServices.Id, GeoBlockPolicy.Outcome>,
+        checkedAt: Long) {
+        val edit = sp(ctx).edit().putLong(KEY_REGIONAL_AT, checkedAt)
+        for (service in RegionalServices.all) {
+            val outcome = outcomes[service.id]
+            if (outcome == null) edit.remove(RegionalServices.outcomeKey(service.id))
+            else edit.putString(RegionalServices.outcomeKey(service.id), outcome.name)
+        }
+        edit.apply()
+    }
+
+    fun clearRegionalOutcome(ctx: Context, id: RegionalServices.Id) {
+        sp(ctx).edit().remove(RegionalServices.outcomeKey(id)).apply()
+    }
+
+    fun clearRegionalOutcomes(ctx: Context) {
+        val edit = sp(ctx).edit().remove(KEY_REGIONAL_AT)
+        for (service in RegionalServices.all) edit.remove(RegionalServices.outcomeKey(service.id))
+        edit.apply()
+    }
+
     /** Не вибрировать ночью. */
     fun quietHoursEnabled(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_QUIET_HOURS, false)
 
@@ -401,8 +445,12 @@ object Prefs {
 
     /** Device-local egress country; the address itself is never persisted. */
     fun egressCountry(ctx: Context): EgressCountry.Snapshot? {
-        val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) } ?: return null
-        return EgressCountry.Snapshot(iso, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+        val iso = if (egressCountryEnabled(ctx)) {
+            sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) }
+        } else null
+        return iso?.let {
+            EgressCountry.Snapshot(it, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+        }
     }
 
     fun setEgressCountry(ctx: Context, snapshot: EgressCountry.Snapshot) {

@@ -44,6 +44,17 @@ object EgressCountry {
         return "${flag(iso)} $iso"
     }
 
+    /** Flag plus localized country name when the platform knows it; ISO remains the authority. */
+    fun displayLabel(iso: String, locale: java.util.Locale): String {
+        if (!isValid(iso)) return ""
+        val name = java.util.Locale.Builder().setRegion(iso).build().getDisplayCountry(locale).trim()
+        val flag = flag(iso)
+        return when {
+            name.isEmpty() || name.equals(iso, ignoreCase = true) -> "$flag $iso"
+            else -> "$flag $name ($iso)"
+        }
+    }
+
     fun needsRefresh(stored: Snapshot?, now: Long, networkHandle: Long): Boolean {
         if (stored == null || stored.networkHandle != networkHandle) return true
         return now - stored.checkedAt >= MIN_INTERVAL_MS

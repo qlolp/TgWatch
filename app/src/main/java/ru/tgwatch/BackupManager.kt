@@ -14,10 +14,13 @@ object BackupManager {
         "quiet_start_minute", "quiet_end_minute", "notify_outage", "notify_partial",
         "sound_outage", "sound_partial", "sound_recovery", "daily_summary", "daily_summary_minute",
         "extra_probe_matrix", "extra_probe_whatsapp", "extra_probe_custom", "extra_probe_custom_url",
-        "notify_slow", "history_retention")
+        "notify_slow", "history_retention", "egress_enabled",
+        "regional_youtube", "regional_gemini", "regional_notebook_lm", "regional_chatgpt")
     private val transientKeys = setOf("last_status", "last_checked", "last_since", "last_latency",
         "last_reason", "last_vibe", "last_diagnostics", "last_expected_sec", "last_success_at",
-        "egress_iso", "egress_at", "egress_net")
+        "egress_iso", "egress_at", "egress_net", "regional_checked_at",
+        "regional_outcome_youtube", "regional_outcome_gemini", "regional_outcome_notebook_lm",
+        "regional_outcome_chatgpt")
 
     fun hasPending(): Boolean = replacingHistory || BackupJournals.pending ||
         RecoveryCoordinator.state != RecoveryState.READY
@@ -40,7 +43,12 @@ object BackupManager {
         "extra_probe_matrix" to Prefs.extraMatrix(ctx), "extra_probe_whatsapp" to Prefs.extraWhatsapp(ctx),
         "extra_probe_custom" to Prefs.extraCustom(ctx), "extra_probe_custom_url" to Prefs.extraCustomUrl(ctx),
         "notify_slow" to Prefs.notifyFor(ctx, "SLOW"),
-        "history_retention" to Prefs.historyRetention(ctx).name),
+        "history_retention" to Prefs.historyRetention(ctx).name,
+        "egress_enabled" to Prefs.egressCountryEnabled(ctx),
+        "regional_youtube" to Prefs.regionalEnabled(ctx, RegionalServices.Id.YOUTUBE),
+        "regional_gemini" to Prefs.regionalEnabled(ctx, RegionalServices.Id.GEMINI),
+        "regional_notebook_lm" to Prefs.regionalEnabled(ctx, RegionalServices.Id.NOTEBOOK_LM),
+        "regional_chatgpt" to Prefs.regionalEnabled(ctx, RegionalServices.Id.CHATGPT)),
         History.snapshot(ctx, now), EventLog.all(ctx).toList())
 
     @Synchronized fun export(ctx: Context, password: CharArray): ByteArray {
