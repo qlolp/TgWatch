@@ -127,6 +127,31 @@ class UpgradeOnboardingTests(unittest.TestCase):
         self.assertEqual(4, len(swipes))
         self.assertEqual(1, len(taps))
 
+    def test_overlapping_scroll_steps_do_not_fling_past_the_start_button(self):
+        module = self.load()
+        now, offset, taps = [0.0], [0], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                button = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                          'enabled="true" clickable="true" bounds="[10,500][110,560]" />') \
+                         if 450 <= offset[0] <= 900 else ''
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + button + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                distance = abs(int(args[4]) - int(args[6]))
+                duration = int(args[-1])
+                # A fast fling can jump beyond the target; a slow overlapping drag cannot.
+                offset[0] += 1_200 if duration < 1_000 else distance
+                now[0] += duration / 1_000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 12, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+
     def test_bounds_reject_missing_negative_or_empty_coordinates(self):
         module = self.load()
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:

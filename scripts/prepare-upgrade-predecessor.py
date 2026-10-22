@@ -77,8 +77,9 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                         if match and center(scroll.get('bounds')):
                             left, top, right, bottom = map(int, match.groups())
                             x = str((left + right) // 2)
+                            # Overlapping, slow steps keep every row observable instead of flinging past it.
                             command(['shell', 'input', 'swipe', x, str(top + (bottom - top) * 3 // 4),
-                                     x, str(top + (bottom - top) // 4), '300'])
+                                     x, str(top + (bottom - top) // 2), '1000'])
                             swipes += 1
         except (subprocess.SubprocessError, ET.ParseError, ValueError) as error:
             last_failure = type(error).__name__
