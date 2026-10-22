@@ -88,6 +88,15 @@ class TargetRestoreIntegrationTest {
         assertFalse(BackupManager.hasPending())
     }
 
+    @Test fun anEnableCapturedBeforeRestoreCannotRestartRestoredMonitoring() {
+        val captured = RegionalPreferences.revision(ctx)
+        BackupManager.restoreTargets(ctx, data())
+        assertTrue("Restore must advance the regional fence", RegionalPreferences.revision(ctx) > captured)
+        assertFalse(RegionalPreferences.setEnabled(ctx, RegionalService.GEMINI, true, captured))
+        assertFalse(Prefs.isEnabled(ctx))
+        assertFalse(RegionalPreferences.anyEnabled(ctx))
+    }
+
     @Test fun csvImportPreservesOtherTargetHistoriesAndDefinitions() {
         BackupManager.restoreTargets(ctx, data())
         check(Prefs.sp(ctx).edit().putBoolean(TargetPreferences.key(TargetId.CUSTOM, "endpoint_review"), false).commit())

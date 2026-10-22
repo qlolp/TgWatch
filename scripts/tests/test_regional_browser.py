@@ -26,6 +26,12 @@ class RegionalBrowserTests(unittest.TestCase):
                  dict(text='Welcome. Sign in', headings=['Welcome'], expected='UNKNOWN'),
                  dict(text='Sign in to continue', headings=['Sign in to continue'], expected='AUTH_REQUIRED'),
                  dict(text='Working chat conversation', headings=[], expected='UNKNOWN')]
+        cases.extend([
+            dict(text='How to fix “not available in your country”',
+                 headings=['How to fix “not available in your country”'], expected='UNKNOWN'),
+            dict(text='Gemini isn’t available in your country yet',
+                 headings=['Gemini isn’t available in your country yet'], expected='REGION_RESTRICTED'),
+        ])
         script = """
 const helper = require(process.argv[1]);
 const cases = JSON.parse(process.argv[2]);
@@ -53,6 +59,21 @@ process.stdout.write(JSON.stringify([normal,helper.run(doc,win)]));
         self.assertEqual(['UNKNOWN', 'UNKNOWN'], [report['status'] for report in reports])
         self.assertEqual({'source', 'service', 'status'}, set(reports[0]))
         self.assertNotIn('Welcome', result.stdout)
+
+    def test_conversation_and_quotation_headings_are_not_service_errors(self):
+        script = """
+const helper = require(process.argv[1]);
+const doc = {body:{innerText:'Not available in your country'},querySelectorAll(){return [
+ {tagName:'H1',innerText:'Not available in your country',getClientRects(){return [1]},
+  closest(){return {tagName:'BLOCKQUOTE'}}}
+]}};
+const win = {location:{hostname:'chatgpt.com',protocol:'https:'},
+ getComputedStyle(){return {display:'block',visibility:'visible',opacity:'1'}}};
+process.stdout.write(JSON.stringify(helper.run(doc,win)));
+"""
+        result = subprocess.run(['node', '-e', script, str(ROOT / 'tools/regional-browser-check.js')],
+                                text=True, capture_output=True, check=True, timeout=10)
+        self.assertEqual('UNKNOWN', json.loads(result.stdout)['status'])
 
 
 if __name__ == '__main__':
