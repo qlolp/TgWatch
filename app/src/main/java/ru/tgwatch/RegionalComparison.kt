@@ -9,6 +9,17 @@ data class RegionalComparisonPair(val a: RegionalComparisonSnapshot, val b: Regi
     val sameConnection: Boolean get() = a.connection.token == b.connection.token
 }
 
+enum class RegionalComparisonSaveOutcome { SAVED, FAILED, REPLACED }
+
+object RegionalComparisonCompletion {
+    fun outcome(requestedGeneration: Long, currentGeneration: Long, saved: Boolean): RegionalComparisonSaveOutcome =
+        when {
+            requestedGeneration != currentGeneration -> RegionalComparisonSaveOutcome.REPLACED
+            saved -> RegionalComparisonSaveOutcome.SAVED
+            else -> RegionalComparisonSaveOutcome.FAILED
+        }
+}
+
 /** Only post-request observations on the captured connection can fill a side. Missing stays missing. */
 class RegionalComparisonCollector(private val startElapsed: Long, val context: RegionalConnection,
     services: Set<RegionalService>, private val label: String, private val startedAt: Long) {

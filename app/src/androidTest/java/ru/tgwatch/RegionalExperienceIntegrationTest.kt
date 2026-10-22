@@ -130,6 +130,35 @@ class RegionalExperienceIntegrationTest {
         assertTrue(RegionalComparisonStorage(RegionalComparisonRepository.fileFor(ctx)).read().isEmpty())
     }
 
+    @Test fun aQueuedSuccessfulSaveCallbackCannotClaimSuccessAfterTheRestoreFenceMoves() {
+        val now = System.currentTimeMillis()
+        val row = RegionalJournalEntry(RegionalEventKind.PUBLIC, now - 2_000, scope, RegionalRoute.WIFI,
+            service = RegionalService.GEMINI, status = RegionalStatus.WEB_REACHABLE, httpCode = 200)
+        val side = RegionalComparisonSnapshot("A", now - 1_500, RegionalConnection(scope, RegionalRoute.WIFI),
+            mapOf(RegionalService.GEMINI to row))
+        val pair = RegionalComparisonPair(side, side.copy(label = "B", at = now - 1_000))
+        val state = RegionalComparisonUiState().apply { generation = RegionalRepository.generation(ctx) }
+        lateinit var controller: RegionalComparisonController
+        instrumentation.runOnMainSync {
+            controller = RegionalComparisonController(ctx.applicationContext, state) {}
+            controller.save(pair)
+            // Keep delivery queued on main while real background I/O saves, then replaces the data.
+            java.util.concurrent.CompletableFuture.runAsync {
+                check(RegionalRepository.transaction(ctx, state.generation) { true }
+                    .get(10, java.util.concurrent.TimeUnit.SECONDS))
+                RegionalRepository.clearForRestore(ctx)
+            }.get(10, java.util.concurrent.TimeUnit.SECONDS)
+        }
+        instrumentation.waitForIdleSync()
+        instrumentation.runOnMainSync {
+            assertFalse(state.saving)
+            assertEquals(R.string.regional_compare_changed, state.message)
+            assertNull(state.latest)
+            controller.close()
+        }
+        assertTrue(RegionalComparisonRepository.snapshot(ctx).pairs.isEmpty())
+    }
+
     private fun <T : android.app.Activity> awaitText(scenario: ActivityScenario<T>, text: String) {
         val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
         var ready = false

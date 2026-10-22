@@ -6,6 +6,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RegionalComparisonTest {
+    @Test fun aSuccessfulOldSaveCannotBeAcknowledgedAfterDataReplacement() {
+        assertEquals(RegionalComparisonSaveOutcome.REPLACED, RegionalComparisonCompletion.outcome(5, 6, true))
+        assertEquals(RegionalComparisonSaveOutcome.REPLACED, RegionalComparisonCompletion.outcome(5, 6, false))
+        assertEquals(RegionalComparisonSaveOutcome.SAVED, RegionalComparisonCompletion.outcome(5, 5, true))
+        assertEquals(RegionalComparisonSaveOutcome.FAILED, RegionalComparisonCompletion.outcome(5, 5, false))
+    }
+
     private val connection = RegionalConnection("0123456789abcdef0123456789abcdef", RegionalRoute.VPN, "DE", 900)
     private val services = setOf(RegionalService.GEMINI, RegionalService.YOUTUBE)
     private fun collector(label: String = "Home") = RegionalComparisonCollector(100, connection, services, label, 1_000)

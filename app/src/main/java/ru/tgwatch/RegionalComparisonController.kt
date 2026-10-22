@@ -92,16 +92,22 @@ internal class RegionalComparisonController(private val ctx: Context, val state:
         }
     }
 
-    private fun save(pair: RegionalComparisonPair) {
+    internal fun save(pair: RegionalComparisonPair) {
         state.latest = pair
         state.saving = true
         val serial = ++state.serial
-        RegionalComparisonRepository.save(ctx, pair, state.generation).whenComplete { saved, failure -> ui.post {
+        val generation = state.generation
+        RegionalComparisonRepository.save(ctx, pair, generation).whenComplete { saved, failure -> ui.post {
             if (serial == state.serial) {
+                val outcome = RegionalComparisonCompletion.outcome(generation, RegionalRepository.generation(ctx),
+                    saved == true && failure == null)
                 state.saving = false
-                state.message = if (saved == true && failure == null) R.string.regional_compare_saved
-                    else R.string.regional_compare_save_error
-                if (saved == true && failure == null) { state.a = null; state.latest = null }
+                state.message = when (outcome) {
+                    RegionalComparisonSaveOutcome.SAVED -> R.string.regional_compare_saved
+                    RegionalComparisonSaveOutcome.FAILED -> R.string.regional_compare_save_error
+                    RegionalComparisonSaveOutcome.REPLACED -> R.string.regional_compare_changed
+                }
+                if (outcome != RegionalComparisonSaveOutcome.FAILED) { state.a = null; state.latest = null }
                 changed?.invoke()
             }
         } }
