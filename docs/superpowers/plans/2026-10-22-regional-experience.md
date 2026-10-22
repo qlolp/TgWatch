@@ -67,9 +67,9 @@
 
 **Interfaces:** Consumes current opaque context, produces validated layer/outcome records and a `current(context, now)` predicate. Public/browser-reported/user-feature remain separate; journal is historical persistence only.
 
-- [ ] Write tests for supported layer/outcome pairs, 15min boundary, context replacement, restart, clock rollback, clear and absence of public-consensus mutation.
-- [ ] Run RED; implement explicit report dialogs and separate source rows, storing fixed outcomes only.
-- [ ] Verify opening the browser creates no success record, historical notes cannot become current and RU/EN/large-font UI remains usable. Run task suite; expected PASS. Commit task4 and ledger evidence.
+- [x] Write tests for supported layer/outcome pairs, 15min boundary, context replacement, restart, clock rollback, clear and absence of public-consensus mutation.
+- [x] Run RED; implement explicit report dialogs and separate source rows, storing fixed outcomes only.
+- [x] Verify opening the browser creates no success record, historical notes cannot become current and RU/EN/large-font UI remains usable. Run task suite; expected PASS. Commit task4 and ledger evidence.
 
 ### Task 5: Native Mac menu-bar companion
 
