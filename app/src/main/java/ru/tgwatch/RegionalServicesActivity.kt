@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Button
 import android.widget.LinearLayout
@@ -94,6 +93,7 @@ class RegionalServicesActivity : Activity() {
                         Toast.LENGTH_SHORT).show() }
             }
         })
+        button(content, R.string.regional_why) { RegionalExplanationUi.show(this, service) }
         toggle.setOnCheckedChangeListener { _, checked -> configure(service, checked) }
     }
 
@@ -123,13 +123,8 @@ class RegionalServicesActivity : Activity() {
         }
         binding = false
         EgressCountryUi.render(country, this)
-        val network = getSystemService(android.net.ConnectivityManager::class.java).activeNetwork?.networkHandle
-        val now = SystemClock.elapsedRealtime()
         labels.forEach { (service, label) ->
-            val result = RegionalStateStore.get(service)?.takeIf {
-                it.networkHandle == network && it.configurationRevision == RegionalPreferences.revision(this) &&
-                    now >= it.checkedElapsed && now - it.checkedElapsed <= RegionalMonitor.SLEEP_MS * 2
-            }
+            val result = RegionalCurrent.result(this, service)
             label.text = when {
                 !RegionalPreferences.enabled(this, service) -> getString(R.string.regional_off)
                 result == null -> getString(R.string.regional_unverified)
