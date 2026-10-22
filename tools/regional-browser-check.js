@@ -5,6 +5,7 @@
         "youtube.com": "YouTube", "www.youtube.com": "YouTube",
         "gemini.google.com": "Gemini", "notebook.google.com": "Notebook",
         "notebooklm.google.com": "Notebook", "antigravity.google": "Antigravity",
+        "www.antigravity.google": "Antigravity",
         "antigravity.google.com": "Antigravity", "chatgpt.com": "ChatGPT / dots"
     };
     const region = ["not available in your country", "not supported in your country",

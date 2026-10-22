@@ -384,10 +384,7 @@ class MonitorService : Service() {
         workerThread.start()
         worker = Handler(workerThread.looper)
         targetMonitoring = createTargetMonitoring()
-        regionalMonitor = RegionalMonitor(this, { acceptsRunningCheck(this) }, {
-            lastProgressMono = SystemClock.elapsedRealtime()
-            worker.post { releaseWakeLock(); rearmChecks() }
-        }).also { regionalRequest = it::request }
+        regionalMonitor = RegionalMonitor(checkNotNull(targetMonitoring).host).also { regionalRequest = it::request }
 
         running = true
         lastProgressMono = SystemClock.elapsedRealtime()
@@ -970,7 +967,8 @@ class MonitorService : Service() {
     }
 
     private fun releaseWakeLock() {
-        val checksActive = checkStartedMono > 0L || targetMonitoring?.hasInFlight == true
+        val checksActive = checkStartedMono > 0L || targetMonitoring?.hasInFlight == true ||
+            regionalMonitor?.hasInFlight == true
         if (!destroyed && checksActive) return
         try {
             wakeLock?.let { if (it.isHeld) it.release() }

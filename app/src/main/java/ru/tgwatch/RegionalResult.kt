@@ -25,4 +25,4 @@ enum class RegionalFailure { DNS, TLS, TIMEOUT, CONNECTION, UNMEASURED }
 data class RegionalResult(val service: RegionalService, val status: RegionalStatus,
     val checkedAt: Long, val checkedElapsed: Long, val networkHandle: Long,
     val networkRevision: Long, val configurationRevision: Long, val httpCode: Int? = null,
-    val failure: RegionalFailure? = null)
+    val failure: RegionalFailure? = null, val regionConfirmed: Boolean = false)

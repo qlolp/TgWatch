@@ -8,7 +8,7 @@ enum class RegionalService(val wire: String, val title: String, val address: Str
     NOTEBOOK("notebook", "Notebook", "https://notebook.google.com/",
         setOf("notebook.google.com", "notebooklm.google.com")),
     ANTIGRAVITY("antigravity", "Antigravity", "https://antigravity.google/",
-        setOf("antigravity.google", "antigravity.google.com")),
+        setOf("antigravity.google", "www.antigravity.google", "antigravity.google.com")),
     DOTS("dots", "ChatGPT / dots", "https://chatgpt.com/dots/home", setOf("chatgpt.com"));
 
     companion object {

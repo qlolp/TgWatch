@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import shutil
+import importlib.util
 import subprocess
 import unittest
 
@@ -9,6 +10,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RegionalBrowserTests(unittest.TestCase):
+    def test_bookmarklet_installer_contains_exact_current_source(self):
+        path = ROOT / 'scripts/build-regional-bookmarklet.py'
+        spec = importlib.util.spec_from_file_location('build_bookmarklet', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.render(), (ROOT / 'tools/regional-browser-bookmarklet.html').read_text())
+
     def test_visible_error_categories_and_no_feature_success_inference(self):
         self.assertIsNotNone(shutil.which('node'), 'Browser-helper tests require Node (available in CI)')
         cases = [dict(text='Not available in your country', headings=['Not available in your country'],

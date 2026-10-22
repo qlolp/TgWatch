@@ -1,5 +1,7 @@
 <resources>
     <string name="regional_title">Региональная доступность сервисов</string>
+    <string name="regional_open">Открыть %1$s в браузере</string>
+    <string name="regional_open_failed">Не удалось открыть браузер</string>
     <string name="regional_explanation">Проверяем публичные сайты с этого телефона. Воспроизведение видео, доступ аккаунта и функции ИИ требуют проверки в самом сервисе. Флаг страны и обычный отказ HTTP не доказывают блокировку по IP. Тревога — после двух явных региональных ответов в одном подключении. Обычно раз в 5 минут; при выключенном экране или экономии заряда — раз в 10 минут.</string>
     <string name="regional_check">Проверить включённые сервисы</string>
     <string name="regional_enable_first">Сначала включите сервис и мониторинг</string>
@@ -12,6 +14,8 @@
     <string name="regional_off">Мониторинг выключен</string>
     <string name="regional_unverified">Не подтверждено</string>
     <string name="regional_result">%1$s · %2$s</string>
+    <string name="regional_http">%1$s · HTTP %2$d</string>
+    <string name="regional_confirmed">Региональное ограничение подтверждено двумя ответами в этом подключении</string>
     <string name="regional_web_reachable">Публичный сайт отвечает; функции не проверены</string>
     <string name="regional_restricted">Сервис сообщает о региональном ограничении; для тревоги нужно подтверждение</string>
     <string name="regional_auth">Требуется вход или согласие</string>

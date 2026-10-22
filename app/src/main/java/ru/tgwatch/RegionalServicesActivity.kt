@@ -77,6 +77,15 @@ class RegionalServicesActivity : Activity() {
         val label = TextView(this)
         labels[service] = label
         content.addView(label)
+        content.addView(Button(this).apply {
+            text = getString(R.string.regional_open, service.title)
+            minimumHeight = (TOUCH_DP * resources.displayMetrics.density).toInt()
+            setOnClickListener {
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(service.address))) }
+                    .onFailure { Toast.makeText(this@RegionalServicesActivity, R.string.regional_open_failed,
+                        Toast.LENGTH_SHORT).show() }
+            }
+        })
         toggle.setOnCheckedChangeListener { _, checked -> configure(service, checked) }
     }
 
@@ -116,10 +125,16 @@ class RegionalServicesActivity : Activity() {
             label.text = when {
                 !RegionalPreferences.enabled(this, service) -> getString(R.string.regional_off)
                 result == null -> getString(R.string.regional_unverified)
-                else -> getString(R.string.regional_result, getString(statusString(result.status)),
+                else -> getString(R.string.regional_result, resultText(result),
                     agoStr(this, result.checkedAt, System.currentTimeMillis()))
             }
         }
+    }
+
+    private fun resultText(result: RegionalResult): String {
+        val status = if (result.regionConfirmed) R.string.regional_confirmed else statusString(result.status)
+        val text = getString(status)
+        return result.httpCode?.let { getString(R.string.regional_http, text, it) } ?: text
     }
 
     override fun onResume() { super.onResume(); ui.post(ticker); EgressCountryUi.refreshActive(this) }

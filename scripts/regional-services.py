@@ -18,7 +18,8 @@ PROFILES = {
     'youtube': ('YouTube', 'https://www.youtube.com/', {'www.youtube.com', 'youtube.com'}),
     'gemini': ('Gemini', 'https://gemini.google.com/', {'gemini.google.com'}),
     'notebook': ('Notebook', 'https://notebook.google.com/', {'notebook.google.com', 'notebooklm.google.com'}),
-    'antigravity': ('Antigravity', 'https://antigravity.google/', {'antigravity.google', 'antigravity.google.com'}),
+    'antigravity': ('Antigravity', 'https://antigravity.google/',
+                    {'antigravity.google', 'www.antigravity.google', 'antigravity.google.com'}),
     'dots': ('ChatGPT / dots', 'https://chatgpt.com/dots/home', {'chatgpt.com'}),
 }
 LOGIN_HOSTS = {'accounts.google.com', 'auth.openai.com', 'auth0.openai.com',

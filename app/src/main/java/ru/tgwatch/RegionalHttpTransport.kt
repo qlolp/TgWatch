@@ -14,15 +14,15 @@ import ru.tgwatch.probe.ProbeCancellation
 /** Fixed unauthenticated HTTPS endpoints. Default platform certificate/hostname validation stays enabled. */
 internal class RegionalHttpTransport(private val openConnection: (URI) -> HttpsURLConnection) {
     private companion object {
-    private const val TIMEOUT_MS = 3_000
-    private const val BUDGET_MS = 9_000L
-    private const val MAX_BYTES = 32 * 1024
-    private const val HOPS = 3
-    private const val BUFFER_BYTES = 2_048
-    private const val MAX_LOCATION = 2_048
-    private val deadlines = Executors.newSingleThreadScheduledExecutor { task ->
-        Thread(task, "regional-deadline").apply { isDaemon = true }
-    }
+        private const val TIMEOUT_MS = 3_000
+        private const val BUDGET_MS = 9_000L
+        private const val MAX_BYTES = 32 * 1024
+        private const val HOPS = 3
+        private const val BUFFER_BYTES = 2_048
+        private const val MAX_LOCATION = 2_048
+        private val deadlines = Executors.newSingleThreadScheduledExecutor { task ->
+            Thread(task, "regional-deadline").apply { isDaemon = true }
+        }
 
     }
 

@@ -23,6 +23,7 @@ class RegionalIntegrationTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val ctx get() = instrumentation.targetContext
     private lateinit var preferences: Map<String, *>
+    private lateinit var snapshot: TargetBackupSnapshot
 
     @Before fun isolate() {
         HistoryTestStorage.awaitReady()
@@ -30,6 +31,7 @@ class RegionalIntegrationTest {
         preferences = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
+        snapshot = BackupManager.snapshotTargets(ctx)
         val edit = Prefs.sp(ctx).edit().clear().putBoolean("enabled", false)
         TargetId.entries.forEach { edit.putBoolean(TargetPreferences.key(it, "enabled"), false) }
         check(edit.commit())
@@ -41,6 +43,7 @@ class RegionalIntegrationTest {
         if (!::preferences.isInitialized) return
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
+        BackupManager.restoreTargets(ctx, snapshot)
         val edit = Prefs.sp(ctx).edit().clear()
         preferences.forEach { (key, value) -> when (value) {
             is String -> edit.putString(key, value)
@@ -52,6 +55,7 @@ class RegionalIntegrationTest {
         } }
         check(edit.commit())
         RegionalStateStore.clear()
+        EventLog.invalidate()
     }
 
     @Test fun regionalOnlyServiceSurvivesTelegramStopWithoutEnablingHistoricalTargets() {

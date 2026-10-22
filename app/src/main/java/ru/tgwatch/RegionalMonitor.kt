@@ -33,7 +33,9 @@ private object RegionalWorkers {
 internal class RegionalMonitor(private val ctx: Context, private val active: () -> Boolean,
     private val progress: () -> Unit,
     private val probe: (RegionalService, android.net.Network, ProbeCancellation, Long, Long) -> RegionalResult =
-        RegionalHttpProbe::check) {
+        RegionalHttpProbe::check, private val wake: () -> Unit = {}) {
+    constructor(host: TargetMonitorHost) : this(host.context, host::isCurrent,
+        { host.worker.post { if (host.isCurrent()) host.onProgress() } }, wake = host::acquireWakeLock)
     private val connectivity = ctx.getSystemService(ConnectivityManager::class.java)
     private val power = ctx.getSystemService(PowerManager::class.java)
     private val main = Handler(Looper.getMainLooper())
@@ -46,6 +48,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
     private var cancellation: ProbeCancellation? = null
     private var closed = false
     val intervalMs: Long get() = if (!power.isInteractive || power.isPowerSaveMode) SLEEP_MS else INTERVAL_MS
+    val hasInFlight: Boolean get() = synchronized(this) { cancellation != null }
 
     @Synchronized fun changed() {
         revision++
@@ -92,6 +95,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         cancellation = cancel
         val captured = ++ticket
         val networkRevision = revision
+        wake()
         try {
             RegionalWorkers.executor.execute {
                 try {
@@ -112,9 +116,9 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         if (captured != ticket || closed) return
         cancellation = null
         if (!active() || !current(result)) return
-        RegionalStateStore.put(result)
         val evidence = consensus.getOrPut(result.service) { RegionalConsensus() }
         evidence.update(result.status, "${result.networkHandle}:$revision:$configuration", result.checkedElapsed)
+        RegionalStateStore.put(result.copy(regionConfirmed = evidence.confirmed()))
         if (result.status == RegionalStatus.WEB_REACHABLE) RegionalPreferences.reachable(ctx, result.service)
         if (result.status != RegionalStatus.REGION_RESTRICTED) notifications.clear(result.service)
         if (result.status == RegionalStatus.REGION_RESTRICTED && !evidence.confirmed())
