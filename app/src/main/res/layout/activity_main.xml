@@ -261,21 +261,27 @@
                 android:id="@+id/rgRetention"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="vertical">
                 <RadioButton
                     android:id="@+id/rbRetentionWeek"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
                     android:text="@string/history_retention_week" />
                 <RadioButton
                     android:id="@+id/rbRetentionMonth"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
                     android:text="@string/history_retention_month" />
                 <RadioButton
                     android:id="@+id/rbRetentionQuarter"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
                     android:text="@string/history_retention_quarter" />
             </RadioGroup>
             <Button android:id="@+id/btnLatency" style="@style/ButtonText" android:text="@string/latency_title" />
