@@ -57,4 +57,8 @@ internal object RegionalWatchPreferences {
 
     @Synchronized fun consume(ctx: Context, service: RegionalService, expected: RegionalWatchMetadata): Boolean =
         cancel(ctx, service, expected)
+
+    /** Keep an old callback from canceling or replacing a card belonging to an explicit newer request. */
+    @Synchronized fun ifCurrent(ctx: Context, service: RegionalService, expected: RegionalWatchMetadata,
+        action: () -> Boolean): Boolean = current(ctx, service) == expected && action()
 }

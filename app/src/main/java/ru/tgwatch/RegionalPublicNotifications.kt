@@ -24,8 +24,6 @@ internal class RegionalPublicNotifications(private val ctx: Context, private val
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val message = ctx.getString(R.string.regional_watch_message)
         val previous = manager.activeNotifications.firstOrNull { it.id == id(result.service) }
-        if (previous != null && previous.notification.extras.getLong(REQUEST_ARMED, -1) != request.request.armedElapsed)
-            manager.cancel(id(result.service))
         val notification = Notification.Builder(ctx, channel)
             .setSmallIcon(Icon.createWithResource(ctx, R.drawable.ic_stat_ok))
             .setContentTitle(ctx.getString(R.string.regional_watch_title, result.service.title))
@@ -33,7 +31,14 @@ internal class RegionalPublicNotifications(private val ctx: Context, private val
             .addExtras(Bundle().apply { putLong(REQUEST_ARMED, request.request.armedElapsed) })
             .setContentIntent(open).setOnlyAlertOnce(true).setAutoCancel(true).build()
         return runCatching {
-            if (!current(result, request)) false else { manager.notify(id(result.service), notification); true }
+            RegionalWatchPreferences.ifCurrent(ctx, result.service, request) {
+                if (!current(result, request)) false else {
+                    if (previous != null && previous.notification.extras.getLong(REQUEST_ARMED, -1) !=
+                        request.request.armedElapsed) manager.cancel(id(result.service))
+                    manager.notify(id(result.service), notification)
+                    true
+                }
+            }
         }.getOrDefault(false)
     }
     private fun current(result: RegionalResult, request: RegionalWatchMetadata): Boolean {
