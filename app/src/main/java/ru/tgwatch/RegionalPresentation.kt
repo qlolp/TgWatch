@@ -36,6 +36,10 @@ internal object RegionalPresentation {
             RegionalEventKind.COUNTRY -> ctx.getString(R.string.regional_history_country)
             RegionalEventKind.PUBLIC -> ctx.getString(R.string.regional_history_public, row.service!!.title,
                 status(ctx, row.status!!, row.confirmed))
+            RegionalEventKind.BROWSER, RegionalEventKind.FEATURE -> ctx.getString(R.string.regional_history_report,
+                row.service!!.title, RegionalVerificationUi.source(ctx, if (row.kind == RegionalEventKind.BROWSER)
+                    RegionalVerificationLayer.BROWSER else RegionalVerificationLayer.FEATURE),
+                RegionalVerificationUi.outcome(ctx, row.verification!!))
         }
         val country = row.country?.let { ctx.getString(R.string.regional_history_country_value,
             EgressCountry.flag(it), it, time(ctx, row.countryAt!!)) } ?: ctx.getString(R.string.country_unverified)

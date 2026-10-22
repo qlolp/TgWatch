@@ -36,9 +36,9 @@ internal object RegionalRepository {
     }
 
     fun recordEntries(ctx: Context, rows: List<RegionalJournalEntry>,
-        includeContext: Boolean = false): CompletableFuture<Boolean> {
+        includeContext: Boolean = false, expectedGeneration: Long? = null): CompletableFuture<Boolean> {
         val current = owner(ctx)
-        val ticket = current.journal.generation
+        val ticket = expectedGeneration ?: current.journal.generation
         val captured = rows.toList()
         return queue(current) {
             val now = System.currentTimeMillis().coerceAtLeast(0)
@@ -46,7 +46,7 @@ internal object RegionalRepository {
             val first = captured.firstOrNull()
             if (includeContext && first != null && current.journal.snapshot.rows.lastOrNull()?.scope != first.scope) {
                 current.journal.append(ticket, first.copy(kind = RegionalEventKind.NETWORK, service = null,
-                    status = null, confirmed = false, httpCode = null, failure = null), now)
+                    status = null, confirmed = false, httpCode = null, failure = null, verification = null), now)
             }
             captured.map { current.journal.append(ticket, it, now) }.all { it }
         }
@@ -74,6 +74,7 @@ internal object RegionalRepository {
         val current = owner(ctx)
         current.journal.clear {
             RegionalComparisonRepository.clearForRestore(ctx)
+            RegionalVerificationRepository.reset()
             current.loadRequested.set(true)
             RegionalContext.invalidate()
         }
@@ -84,7 +85,11 @@ internal object RegionalRepository {
         val ticket = current.journal.generation
         return queue(current) {
             current.journal.clearIfCurrent(ticket).also { cleared ->
-                if (cleared) { current.loadRequested.set(true); RegionalContext.invalidate() }
+                if (cleared) {
+                    current.loadRequested.set(true)
+                    RegionalContext.invalidate()
+                    RegionalVerificationRepository.reset()
+                }
             }
         }
     }

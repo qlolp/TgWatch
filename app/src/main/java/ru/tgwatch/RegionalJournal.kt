@@ -1,7 +1,7 @@
 package ru.tgwatch
 
 enum class RegionalRoute { WIFI, CELLULAR, VPN, ETHERNET, OTHER, UNKNOWN, NONE }
-enum class RegionalEventKind { NETWORK, COUNTRY, PUBLIC }
+enum class RegionalEventKind { NETWORK, COUNTRY, PUBLIC, BROWSER, FEATURE }
 data class RegionalConnection(val token: String, val route: RegionalRoute,
     val country: String? = null, val countryAt: Long? = null)
 
@@ -9,7 +9,8 @@ data class RegionalConnection(val token: String, val route: RegionalRoute,
 data class RegionalJournalEntry(val kind: RegionalEventKind, val at: Long, val scope: String,
     val route: RegionalRoute, val country: String? = null, val countryAt: Long? = null,
     val service: RegionalService? = null, val status: RegionalStatus? = null,
-    val confirmed: Boolean = false, val httpCode: Int? = null, val failure: RegionalFailure? = null)
+    val confirmed: Boolean = false, val httpCode: Int? = null, val failure: RegionalFailure? = null,
+    val verification: RegionalVerificationOutcome? = null)
 
 object RegionalJournal {
     const val MAX_ROWS = 1_000
@@ -24,7 +25,9 @@ object RegionalJournal {
         val previous = entry?.let { next -> kept.lastOrNull {
             it.kind == next.kind && it.scope == next.scope && it.service == next.service
         } }
-        val append = entry != null && entry.copy(at = previous?.at ?: entry.at) != previous
+        val explicit = entry?.kind in setOf(RegionalEventKind.BROWSER, RegionalEventKind.FEATURE)
+        val compared = if (explicit) entry else entry?.copy(at = previous?.at ?: entry.at)
+        val append = entry != null && compared != previous
         return (if (append) kept + entry!! else kept).takeLast(MAX_ROWS)
     }
 }
@@ -32,10 +35,13 @@ object RegionalJournal {
 /** Versioned, strict fixed-column format; unknown/truncated fields invalidate the whole file. */
 object RegionalJournalCodec {
     const val MAX_BYTES = 512 * 1024
-    private const val HEADER = "TGRJ1\n"
+    private const val HEADER = "TGRJ2\n"
+    private const val LEGACY_HEADER = "TGRJ1\n"
     private const val HTTP_FIRST = 100
     private const val HTTP_LAST = 599
-    private enum class Column { KIND, AT, SCOPE, ROUTE, COUNTRY, COUNTRY_AT, SERVICE, STATUS, CONFIRMED, HTTP, FAILURE }
+    private enum class Column {
+        KIND, AT, SCOPE, ROUTE, COUNTRY, COUNTRY_AT, SERVICE, STATUS, CONFIRMED, HTTP, FAILURE, VERIFICATION
+    }
     private val scopePattern = Regex("[0-9a-f]{32}")
     private val numberPattern = Regex("0|[1-9][0-9]*")
 
@@ -49,6 +55,12 @@ object RegionalJournalCodec {
             RegionalEventKind.PUBLIC -> require(row.service != null && row.status != null)
             RegionalEventKind.COUNTRY -> require(row.country != null && row.service == null && row.status == null)
             RegionalEventKind.NETWORK -> require(row.service == null && row.status == null)
+            RegionalEventKind.BROWSER, RegionalEventKind.FEATURE -> {
+                val layer = if (row.kind == RegionalEventKind.BROWSER) RegionalVerificationLayer.BROWSER
+                    else RegionalVerificationLayer.FEATURE
+                require(row.service != null && row.status == null && row.verification != null)
+                require(RegionalVerificationRules.allowed(layer, row.verification))
+            }
         }
     }
 
@@ -64,6 +76,7 @@ object RegionalJournalCodec {
         require(row.failure == null || row.status in setOf(RegionalStatus.NETWORK_ERROR, RegionalStatus.UNKNOWN))
         require(row.kind == RegionalEventKind.PUBLIC ||
             (!row.confirmed && row.httpCode == null && row.failure == null))
+        require(row.kind in setOf(RegionalEventKind.BROWSER, RegionalEventKind.FEATURE) || row.verification == null)
     }
 
     fun encode(rows: List<RegionalJournalEntry>): String {
@@ -72,18 +85,19 @@ object RegionalJournalCodec {
         val text = HEADER + rows.joinToString("") { row -> listOf(row.kind.name, row.at, row.scope,
             row.route.name, row.country ?: "-", row.countryAt ?: "-", row.service?.wire ?: "-",
             row.status?.name ?: "-", if (row.confirmed) "1" else "0", row.httpCode ?: "-",
-            row.failure?.name ?: "-").joinToString("\t") + "\n" }
+            row.failure?.name ?: "-", row.verification?.name ?: "-").joinToString("\t") + "\n" }
         require(text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "Regional journal too large" }
         return text
     }
 
     fun decode(text: String): List<RegionalJournalEntry> {
         require(text.length <= MAX_BYTES && text.toByteArray(Charsets.UTF_8).size <= MAX_BYTES)
-        require(text.startsWith(HEADER) && text.endsWith('\n')) { "Unsupported regional journal" }
-        if (text == HEADER) return emptyList()
+        val legacy = text.startsWith(LEGACY_HEADER)
+        require((text.startsWith(HEADER) || legacy) && text.endsWith('\n')) { "Unsupported regional journal" }
+        if (text.length == HEADER.length) return emptyList()
         val lines = text.substring(HEADER.length, text.length - 1).split('\n')
         require(lines.size <= RegionalJournal.MAX_ROWS)
-        return lines.map(::decodeRow)
+        return lines.map { decodeRow(it, legacy) }
     }
 
     private fun number(value: String): Long {
@@ -91,9 +105,10 @@ object RegionalJournalCodec {
         return value.toLongOrNull() ?: throw IllegalArgumentException("Regional number overflow")
     }
 
-    private fun decodeRow(line: String): RegionalJournalEntry {
+    private fun decodeRow(line: String, legacy: Boolean): RegionalJournalEntry {
         val fields = line.split('\t')
-        require(fields.size == Column.entries.size && fields.field(Column.CONFIRMED) in setOf("0", "1")) {
+        val count = if (legacy) Column.VERIFICATION.ordinal else Column.entries.size
+        require(fields.size == count && fields.field(Column.CONFIRMED) in setOf("0", "1")) {
             "Invalid regional row"
         }
         val service = fields.optional(Column.SERVICE)?.let {
@@ -105,7 +120,8 @@ object RegionalJournalCodec {
             fields.optional(Column.COUNTRY_AT)?.let(::number), service,
             fields.optional(Column.STATUS)?.let(RegionalStatus::valueOf), fields.field(Column.CONFIRMED) == "1",
             fields.optional(Column.HTTP)?.let { require(number(it) <= HTTP_LAST); number(it).toInt() },
-            fields.optional(Column.FAILURE)?.let(RegionalFailure::valueOf))
+            fields.optional(Column.FAILURE)?.let(RegionalFailure::valueOf),
+            if (legacy) null else fields.optional(Column.VERIFICATION)?.let(RegionalVerificationOutcome::valueOf))
         validate(row)
         return row
     }

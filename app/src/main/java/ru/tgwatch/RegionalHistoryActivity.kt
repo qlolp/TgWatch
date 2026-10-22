@@ -40,6 +40,7 @@ class RegionalHistoryActivity : Activity() {
         setContentView(scroll)
         ScreenInsets.apply(this, scroll)
         content.addView(TextView(this).apply { setText(R.string.regional_history_help) })
+        content.addView(TextView(this).apply { setText(R.string.regional_history_sources) })
         count = TextView(this).also(content::addView)
         body = TextView(this).apply { setTextIsSelectable(true) }.also(content::addView)
         more = button(content, R.string.regional_history_more) {

@@ -19,6 +19,7 @@ class RegionalServicesActivity : Activity() {
     private val labels = mutableMapOf<RegionalService, TextView>()
     private val switches = mutableMapOf<RegionalService, Switch>()
     private lateinit var country: TextView
+    private lateinit var verification: RegionalVerificationUi
     private var writing = false
     private var binding = false
     private val ticker = object : Runnable {
@@ -46,6 +47,7 @@ class RegionalServicesActivity : Activity() {
         button(content, R.string.regional_compare_title) {
             startActivity(Intent(this, RegionalComparisonActivity::class.java))
         }
+        verification = RegionalVerificationUi(this)
         RegionalService.entries.forEach { service -> addProfile(content, service) }
         button(content, R.string.regional_check) {
             if (!MonitorService.requestRegionalCheck())
@@ -81,7 +83,7 @@ class RegionalServicesActivity : Activity() {
         }
         switches[service] = toggle
         content.addView(toggle)
-        val label = TextView(this)
+        val label = TextView(this).apply { setText(R.string.regional_source_public) }
         labels[service] = label
         content.addView(label)
         content.addView(Button(this).apply {
@@ -94,6 +96,7 @@ class RegionalServicesActivity : Activity() {
             }
         })
         button(content, R.string.regional_why) { RegionalExplanationUi.show(this, service) }
+        verification.add(content, service)
         toggle.setOnCheckedChangeListener { _, checked -> configure(service, checked) }
     }
 
@@ -125,13 +128,16 @@ class RegionalServicesActivity : Activity() {
         EgressCountryUi.render(country, this)
         labels.forEach { (service, label) ->
             val result = RegionalCurrent.result(this, service)
-            label.text = when {
+            val detail = when {
                 !RegionalPreferences.enabled(this, service) -> getString(R.string.regional_off)
                 result == null -> getString(R.string.regional_unverified)
                 else -> getString(R.string.regional_result, resultText(result),
                     agoStr(this, result.checkedAt, System.currentTimeMillis()))
             }
+            label.text = getString(R.string.regional_verification_row,
+                getString(R.string.regional_source_public), detail)
         }
+        verification.render()
     }
 
     private fun resultText(result: RegionalResult): String {

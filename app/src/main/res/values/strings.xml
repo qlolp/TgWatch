@@ -222,4 +222,29 @@ Physical slots: %2$d/16 primary · %3$d/3 secondary</string>
     <string name="regional_feature_notebook">Open Notebook, sign in if needed and try the notebook feature you need. The public landing page does not confirm feature access. No result is recorded by opening the browser.</string>
     <string name="regional_feature_antigravity">Open Antigravity and test the feature you need with your account. The public website response does not confirm product access. No result is recorded by opening the browser.</string>
     <string name="regional_feature_dots">Open ChatGPT / dots and test the feature you need with your account. A response or redirect does not confirm access to dots. No result is recorded by opening the browser.</string>
+    <string name="regional_source_browser_reported">Browser helper · reported by you</string>
+    <string name="regional_source_feature_reported">Feature test · reported by you</string>
+    <string name="regional_report_browser">Report browser-helper result</string>
+    <string name="regional_report_feature">Report feature-test result</string>
+    <string name="regional_verification_row">%1$s
+%2$s</string>
+    <string name="regional_verification_value">%1$s · %2$s
+Current on this connection for up to 15 minutes.</string>
+    <string name="regional_verification_absent">No current user report. Historical notes do not confirm the current state.</string>
+    <string name="regional_report_browser_help">Run the local browser helper on this device and connection, then report what it showed. Instructions are available below. The result is entered by you; TgWatch does not read your browser, account or cookies. A page with no explicit error does not confirm that features work. Opening a page records nothing.</string>
+    <string name="regional_report_feature_help">Test the feature you need in the service, then report the outcome. This is your observation, separate from the public-site monitor. No account data or error text is collected. Opening the service alone is not a successful test.</string>
+    <string name="regional_report_choose">Enter observed result</string>
+    <string name="regional_report_saved">User-reported observation recorded. History and current state are shown separately.</string>
+    <string name="regional_report_failed">Could not finish recording. Check history or retry.</string>
+    <string name="regional_report_region">Explicit regional error</string>
+    <string name="regional_report_auth">Sign-in required</string>
+    <string name="regional_report_challenge">CAPTCHA / anti-bot check</string>
+    <string name="regional_report_no_error">No explicit error (features unverified)</string>
+    <string name="regional_report_works">The tested feature works</string>
+    <string name="regional_report_not_working">The tested feature failed</string>
+    <string name="regional_report_clear">Clear current note</string>
+    <string name="regional_history_report">%1$s · %2$s · %3$s</string>
+    <string name="regional_history_sources">Sources are labelled per event: automatic public-site check or an observation reported by you. These layers do not replace each other.</string>
+    <string name="regional_report_cleared">Current note cleared</string>
+    <string name="regional_report_help">Browser-helper instructions</string>
 </resources>

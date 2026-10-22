@@ -222,4 +222,29 @@
     <string name="regional_feature_notebook">Откройте Notebook, при необходимости войдите и проверьте нужную функцию блокнота. Публичная страница не подтверждает доступ к функциям. Открытие браузера не записывает результат.</string>
     <string name="regional_feature_antigravity">Откройте Antigravity и проверьте нужную функцию со своим аккаунтом. Ответ публичного сайта не подтверждает доступ к продукту. Открытие браузера не записывает результат.</string>
     <string name="regional_feature_dots">Откройте ChatGPT / dots и проверьте нужную функцию со своим аккаунтом. Ответ или перенаправление не подтверждает доступ к dots. Открытие браузера не записывает результат.</string>
+    <string name="regional_source_browser_reported">Браузерная проверка · сообщено вами</string>
+    <string name="regional_source_feature_reported">Проверка функции · сообщено вами</string>
+    <string name="regional_report_browser">Отметить результат браузерной проверки</string>
+    <string name="regional_report_feature">Отметить результат проверки функции</string>
+    <string name="regional_verification_row">%1$s
+%2$s</string>
+    <string name="regional_verification_value">%1$s · %2$s
+Актуально на этом соединении не более 15 минут.</string>
+    <string name="regional_verification_absent">Актуальной ручной отметки нет. История не подтверждает текущее состояние.</string>
+    <string name="regional_report_browser_help">Запустите локальную браузерную проверку на этом устройстве и соединении и сообщите её результат. Инструкция доступна ниже. Это ваша отметка: TgWatch не читает браузер, аккаунт или cookies. Страница без явной ошибки не подтверждает работу функций. Открытие страницы ничего не записывает.</string>
+    <string name="regional_report_feature_help">Проверьте нужную функцию в сервисе, затем отметьте результат. Это ваше наблюдение, отдельное от публичной проверки. Данные аккаунта и текст ошибки не собираются. Одного открытия сервиса недостаточно для отметки об успехе.</string>
+    <string name="regional_report_choose">Выбрать наблюдавшийся результат</string>
+    <string name="regional_report_saved">Ваше наблюдение записано. История и актуальное состояние показаны отдельно.</string>
+    <string name="regional_report_failed">Не удалось завершить запись. Проверьте историю или повторите.</string>
+    <string name="regional_report_region">Явная региональная ошибка</string>
+    <string name="regional_report_auth">Требуется вход</string>
+    <string name="regional_report_challenge">CAPTCHA / проверка от ботов</string>
+    <string name="regional_report_no_error">Нет явной ошибки (функции не проверены)</string>
+    <string name="regional_report_works">Проверенная функция работает</string>
+    <string name="regional_report_not_working">Проверенная функция не сработала</string>
+    <string name="regional_report_clear">Сбросить актуальную отметку</string>
+    <string name="regional_history_report">%1$s · %2$s · %3$s</string>
+    <string name="regional_history_sources">Источник указан у каждого события: автоматическая публичная проверка или сообщённое вами наблюдение. Эти уровни не заменяют друг друга.</string>
+    <string name="regional_report_cleared">Актуальная отметка сброшена</string>
+    <string name="regional_report_help">Инструкция браузерной проверки</string>
 </resources>

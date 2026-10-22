@@ -23,7 +23,7 @@ class RegionalJournalTest {
 
     @Test fun malformedFieldsAndUnsupportedVersionsAreRejectedAsAWhole() {
         val good = RegionalJournalCodec.encode(listOf(row()))
-        for (bad in listOf(good.replace("TGRJ1", "TGRJ9"), good.replace("VPN", "tunnel://secret"),
+        for (bad in listOf(good.replace("TGRJ2", "TGRJ9"), good.replace("VPN", "tunnel://secret"),
             good.replace("DE", "ZZ"), good.replace(scope, "1.2.3.4"),
             good.replace("REGION_RESTRICTED", "some page text"), good + "truncated",
             "x".repeat(RegionalJournalCodec.MAX_BYTES + 1))) {
