@@ -13,6 +13,7 @@ additional targets and integrations start disabled. See [targets](multiservice.m
 Optional regional profiles cover YouTube, Gemini, Notebook, Antigravity and ChatGPT/dots.
 Version 1.23.0 adds a seven-day local journal, fresh A/B connection comparisons,
 factual explanations and separately labelled user-reported browser/feature checks.
+Backup lifecycle, bounded statistics and probe matching fixes from 1.22.2 are retained.
 An opt-in, one-shot watch can notify after two fresh public responses at least
 15 seconds apart, with a 24-hour deadline. Blocked delivery does not consume it.
 Public-site access and country information do not certify account features or an

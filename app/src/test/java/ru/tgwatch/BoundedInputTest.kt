@@ -6,6 +6,22 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 class BoundedInputTest {
+    @Test fun cancellationCheckStopsBeforeReadingAnotherChunk() {
+        var reads = 0
+        val input = object : InputStream() {
+            override fun read(): Int = 1
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                reads++
+                buffer[offset] = 1
+                return 1
+            }
+        }
+        try {
+            BoundedInput.read(input, 100) { if (reads >= 2) throw java.io.InterruptedIOException() }
+            fail("A cancelled reader must not continue")
+        } catch (_: java.io.InterruptedIOException) { assertEquals(2, reads) }
+    }
+
     @Test fun exactBoundAndShortReadsPreserveBytes() {
         val bytes = ByteArray(1024) { it.toByte() }
         val input = object : ByteArrayInputStream(bytes) {
