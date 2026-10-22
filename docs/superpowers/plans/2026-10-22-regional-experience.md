@@ -57,9 +57,9 @@
 
 **Interfaces:** Consumes `RegionalResult`; produces fixed semantic explanation/action IDs with no raw strings. Actions open fixed browser, comparison or feature instructions.
 
-- [ ] Write assertions for all statuses and DNS/TLS/timeout failures; auth/403/451/unknown cannot become regional proof; an unreached network stage remains unmeasured.
-- [ ] Run RED; implement pure mapping and localized dialogs with observed age/source and next action.
-- [ ] Run pure mapping and exact RU/EN native output tests; expected PASS. Commit task3 and ledger evidence.
+- [x] Write assertions for all statuses and DNS/TLS/timeout failures; auth/403/451/unknown cannot become regional proof; an unreached network stage remains unmeasured.
+- [x] Run RED; implement pure mapping and localized dialogs with observed age/source and next action.
+- [x] Run pure mapping and exact RU/EN native output tests; expected PASS. Commit task3 and ledger evidence.
 
 ### Task 4: Distinct browser and feature verification
 
