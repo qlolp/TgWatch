@@ -14,12 +14,19 @@ internal object MaintenanceWindows {
     private const val ENABLED_INDEX = 4
 
     fun load(ctx: Context, id: TargetId): List<MaintenanceWindow> =
-        Prefs.sp(ctx).getString(key(id), "").orEmpty().split(SEP_ROWS).mapNotNull(::decode)
+        load(ctx, key(id))
+
+    fun load(ctx: Context, key: String): List<MaintenanceWindow> =
+        Prefs.sp(ctx).getString(key, "").orEmpty().split(SEP_ROWS).mapNotNull(::decode)
 
     fun save(ctx: Context, id: TargetId, windows: List<MaintenanceWindow>) {
+        save(ctx, key(id), windows)
+    }
+
+    fun save(ctx: Context, key: String, windows: List<MaintenanceWindow>) {
         require(windows.size <= MaintenanceWindow.MAX_WINDOWS)
         val encoded = windows.joinToString(SEP_ROWS) { encode(it) }
-        Prefs.sp(ctx).edit().putString(key(id), encoded).apply()
+        Prefs.sp(ctx).edit().putString(key, encoded).apply()
     }
 
     fun isActive(ctx: Context, id: TargetId, now: Long = System.currentTimeMillis()): Boolean =

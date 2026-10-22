@@ -7,4 +7,8 @@ internal object TargetServiceHealth {
     fun expectedIntervalSec(ctx: Context): Int = TargetServiceCommands.expectedIntervalSec(
         MonitorService.state.expectedIntervalSec,
         TargetId.entries.map { TargetPreferences.storedDefinition(ctx, it) }, MonitorService.secondaryIntervals)
+        .let { interval ->
+            if (RegionalPreferences.anyEnabled(ctx) &&
+                TargetId.entries.none { TargetPreferences.storedDefinition(ctx, it).enabled }) 600 else interval
+        }
 }

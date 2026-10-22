@@ -1,4 +1,24 @@
 <resources>
+    <string name="regional_title">Региональная доступность сервисов</string>
+    <string name="regional_explanation">Проверяем публичные сайты с этого телефона. Воспроизведение видео, доступ аккаунта и функции ИИ требуют проверки в самом сервисе. Флаг страны и обычный отказ HTTP не доказывают блокировку по IP. Тревога — после двух явных региональных ответов в одном подключении. Обычно раз в 5 минут; при выключенном экране или экономии заряда — раз в 10 минут.</string>
+    <string name="regional_check">Проверить включённые сервисы</string>
+    <string name="regional_enable_first">Сначала включите сервис и мониторинг</string>
+    <string name="regional_channel_settings">Настройки региональных уведомлений</string>
+    <string name="regional_maintenance">Плановые паузы региональных предупреждений</string>
+    <string name="regional_mute">Заглушить все тревоги на час</string>
+    <string name="regional_alert_channel">Региональные ограничения сервисов</string>
+    <string name="regional_alert_title">%1$s: сообщение о региональном ограничении</string>
+    <string name="regional_alert_message">%1$s дважды сообщил о региональном ограничении в подключении этого телефона. Причина может также зависеть от аккаунта или политики сервиса. Откройте сервис для проверки.</string>
+    <string name="regional_off">Мониторинг выключен</string>
+    <string name="regional_unverified">Не подтверждено</string>
+    <string name="regional_result">%1$s · %2$s</string>
+    <string name="regional_web_reachable">Публичный сайт отвечает; функции не проверены</string>
+    <string name="regional_restricted">Сервис сообщает о региональном ограничении; для тревоги нужно подтверждение</string>
+    <string name="regional_auth">Требуется вход или согласие</string>
+    <string name="regional_challenge">CAPTCHA или проверка браузера</string>
+    <string name="regional_rate">Ограничение частоты запросов</string>
+    <string name="regional_network">Ошибка сети</string>
+    <string name="regional_ongoing">Региональный мониторинг: сервисов %1$d</string>
     <string name="country_refresh">Обновить страну выхода</string>
     <string name="country_no_network">Страна выхода: нет активной сети</string>
     <string name="country_checking">Определяем страну выхода…</string>

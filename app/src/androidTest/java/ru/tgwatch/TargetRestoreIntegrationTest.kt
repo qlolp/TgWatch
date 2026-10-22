@@ -60,9 +60,13 @@ class TargetRestoreIntegrationTest {
 
     @Test fun restoresAllHistoriesTogetherButEveryTargetRemainsStopped() {
         val source = data()
+        for (service in RegionalService.entries) assertTrue(RegionalPreferences.setEnabled(ctx, service, true))
+        Prefs.sp(ctx).edit().putLong("regional.youtube.delivered_at", 1234).commit()
         BackupManager.restoreTargets(ctx, source)
         assertFalse(Prefs.isEnabled(ctx))
         assertTrue(TargetPreferences.definitions(ctx).none { it.enabled })
+        assertFalse(RegionalPreferences.anyEnabled(ctx))
+        assertTrue(Prefs.sp(ctx).all.keys.none { it.startsWith(RegionalPreferences.PREFIX) })
         assertEquals(source.targets.map { it.copy(enabled = false) }, TargetPreferences.definitions(ctx))
         assertEquals(source.targets.first { it.id == TargetId.TELEGRAM }.intervalSec, Prefs.intervalSec(ctx))
         val restored = TargetPersistence.storage().snapshot()

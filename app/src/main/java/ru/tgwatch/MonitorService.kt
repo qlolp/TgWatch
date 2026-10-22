@@ -104,6 +104,13 @@ class MonitorService : Service() {
         @Volatile private var lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
 
         fun endpointOutcomes(): List<ProbeOutcome> = lastEndpoints
+        internal fun requestRegionalCheck(): Boolean {
+            val service = activeService ?: return false
+            if (!service.acceptsRunningCheck(service) || !RegionalPreferences.anyEnabled(service)) return false
+            service.regionalMonitor?.request()
+            service.worker.post { service.rearmChecks() }
+            return true
+        }
         fun schedulingDiagnostics(): ScheduleDiagnostics.Snapshot =
             activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
 
@@ -197,6 +204,7 @@ class MonitorService : Service() {
         }
 
         fun clearRestoredState() {
+            RegionalStateStore.clear()
             activeService?.let { synchronized(it) { it.extraCoordinator.invalidate() } }
             state = State()
             lastEndpoints = emptyList()
@@ -211,6 +219,7 @@ class MonitorService : Service() {
 
     private var historySession = 0L
     private var targetMonitoring: TargetMonitoring? = null
+    private var regionalMonitor: RegionalMonitor? = null
     @Volatile private var telegramDueElapsed: Long? = null
     @Volatile private var primarySettingsRevision: Long? = null
     private var deferredExtra: Probe? = null
@@ -277,6 +286,7 @@ class MonitorService : Service() {
             if (RecoveryCoordinator.state == RecoveryState.FAILED) { stopSelf(); return }
             slowController?.reconcile()
             targetAlertController?.reconcile()
+            regionalMonitor?.tick()
             postNotification(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
@@ -308,6 +318,7 @@ class MonitorService : Service() {
             runCheck()
         }
         targets?.startDue()
+        regionalMonitor?.tick()
         if (targets != null) { releaseWakeLock(); rearmChecks() }
     }
 
@@ -336,6 +347,8 @@ class MonitorService : Service() {
         deferredExtra = null
         checkSchedule.networkChanged(delayMs)
         targetMonitoring?.networkChanged(checkSchedule.revision)
+        regionalMonitor?.changed()
+        EgressCountryUi.refreshActive(this, force = true)
     }
 
     /** Unlocking after sleep should not show a result from the long screen-off interval. */
@@ -377,6 +390,10 @@ class MonitorService : Service() {
         workerThread.start()
         worker = Handler(workerThread.looper)
         targetMonitoring = createTargetMonitoring()
+        regionalMonitor = RegionalMonitor(this, { acceptsRunningCheck(this) }, {
+            lastProgressMono = SystemClock.elapsedRealtime()
+            worker.post { releaseWakeLock(); rearmChecks() }
+        })
 
         running = true
         lastProgressMono = SystemClock.elapsedRealtime()
@@ -436,7 +453,8 @@ class MonitorService : Service() {
             Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled
         }
         val command = TargetServiceCommands.route(intent?.action,
-            intent?.getStringExtra(TargetAutomation.EXTRA_TARGET_ID), intended)
+            intent?.getStringExtra(TargetAutomation.EXTRA_TARGET_ID), intended,
+            Prefs.isEnabled(this) && RegionalPreferences.anyEnabled(this))
         if (command.ignored) return START_STICKY
         val action = command.action
         if (command.stopTarget) TargetPreferences.stop(this, command.targetId)
@@ -450,6 +468,7 @@ class MonitorService : Service() {
         }
 
         targetMonitoring?.let { targets -> worker.post { targets.refresh() } }
+        regionalMonitor?.tick()
         if (action == ACTION_HEALTH) ensureProgress()
         val first = beginLoop()
         slowController?.reconcile()
@@ -518,6 +537,7 @@ class MonitorService : Service() {
         slowController?.close()
         targetAlertController?.close()
         targetMonitoring?.close()
+        regionalMonitor?.close()
         deferredExtra = null
         extraCoordinator.close()
         scheduleDiagnostics.canceled()
@@ -596,7 +616,8 @@ class MonitorService : Service() {
         if (destroyed || stopping) return
         val targets = targetMonitoring ?: return
         val primary = telegramDueElapsed.takeIf { targets.telegramEnabled }
-        val delay = CheckAlarm.nextDelay(SystemClock.elapsedRealtime(), primary, targets.nextWakeElapsed())
+        val secondary = listOfNotNull(targets.nextWakeElapsed(), regionalMonitor?.nextWakeElapsed()).minOrNull()
+        val delay = CheckAlarm.nextDelay(SystemClock.elapsedRealtime(), primary, secondary)
         worker.removeCallbacks(checkRunnable)
         if (delay == null) cancelAlarm() else {
             worker.postDelayed(checkRunnable, delay)
@@ -937,6 +958,9 @@ class MonitorService : Service() {
     private fun notificationView(s: State, now: Long = System.currentTimeMillis()): OngoingView =
         if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled)
             OngoingNotification.view(s, currentNotificationStats(), now)
+        else if (RegionalPreferences.anyEnabled(this) &&
+            TargetId.entries.none { TargetPreferences.definition(this, it).enabled })
+            OngoingNotification.regional(this, now)
         else OngoingNotification.targets(TargetId.entries.filter { it != TargetId.TELEGRAM &&
             Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled }
             .map { TargetStateStore.current(this, it) }, now, SystemClock.elapsedRealtime())

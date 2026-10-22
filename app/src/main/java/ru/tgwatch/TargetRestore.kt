@@ -38,7 +38,8 @@ internal object TargetRestore {
             TargetPersistence.replaceGeneration(ctx, complete) {
                 val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false).putBoolean(TargetPowerSettings.KEY, false)
                 cleared.forEach(edit::remove)
-                preferences.keys.filter { it.startsWith("target.") }.forEach(edit::remove)
+                preferences.keys.filter { it.startsWith("target.") || it.startsWith(RegionalPreferences.PREFIX) }
+                    .forEach(edit::remove)
                 imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
                 for (id in TargetId.entries) {
                     val definition = imported.snapshot.targets.firstOrNull { it.id == id }
