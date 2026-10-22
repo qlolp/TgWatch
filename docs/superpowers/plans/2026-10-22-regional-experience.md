@@ -77,10 +77,10 @@
 
 **Interfaces:** Existing public `safe_report`/`--json` remains unchanged. New `--app-json` emits schema1 fixed fields including `region_confirmed` and random context ID, never internal route/IP hashes. `RegionalMenuModel` validates bounded lines with process-generation and age checks; AppKit owns menu state, native notifications and opt-in login registration.
 
-- [ ] Write Python IPC/termination tests and Foundation model tests: valid five-profile data, malformed/oversize/unknown fields, stale/future timestamps, replaced process, scope change and no credentials/hash fields. Run RED.
-- [ ] Implement app-only IPC and graceful child cleanup; implement native menu and interpreter discovery without shell commands; explicit notifications/login controls and missing-runtime help.
-- [ ] Build real `.app` with local Swift compiler, validate plist/bundled engine/ad-hoc signature and run model/process tests. Add pinned Mac CI compilation/test job without weakening Android release gates; CI artifact contains local-build distribution and signing/runtime documentation.
-- [ ] Run full Python/browser suite and Mac build/tests; expected PASS. Commit task5 and ledger evidence.
+- [x] Write Python IPC/termination tests and Foundation model tests: valid five-profile data, malformed/oversize/unknown fields, stale/future timestamps, replaced process, scope change and no credentials/hash fields. Run RED.
+- [x] Implement app-only IPC and graceful child cleanup; implement native menu and interpreter discovery without shell commands; explicit notifications/login controls and missing-runtime help.
+- [x] Build real `.app` with local Swift compiler, validate plist/bundled engine/ad-hoc signature and run model/process tests. Add pinned Mac CI compilation/test job without weakening Android release gates; CI artifact contains local-build distribution and signing/runtime documentation.
+- [x] Run full Python/browser suite and Mac build/tests; expected PASS. Commit task5 and ledger evidence.
 
 ### Task 6: One-shot public-response change watches and release
 
