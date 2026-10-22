@@ -111,6 +111,10 @@ def main():
         policy = _release_policy()
         version = policy.read_version(args.version_file)
         baseline = select_baseline(policy.published_releases(args.repo), version)
+        # This project already has the immutable production 1.10.47 baseline.
+        # An empty/incomplete API inventory cannot authorize skipping its upgrade gate.
+        if baseline is None and args.repo == "qlolp/TgWatch":
+            raise ValueError("Known production predecessor missing from release inventory")
         if baseline is None:
             message = f"No published predecessor of {version}; additional upgrade path skipped"
         else:

@@ -164,9 +164,9 @@ print(state['badging'])
         path.write_text("#!/usr/bin/env python3\n" + body)
         path.chmod(0o755)
 
-    def run_cli(self):
+    def run_cli(self, repo="owner/repo"):
         self.state.write_text(json.dumps(self.fixture))
-        return subprocess.run([sys.executable, str(SCRIPT), "--repo", "owner/repo",
+        return subprocess.run([sys.executable, str(SCRIPT), "--repo", repo,
                                "--version-file", str(self.version), "--out", str(self.work / "previous-latest"),
                                "--aapt2", str(self.bin / "aapt2"), "--github-output", str(self.output)],
                               env=self.env, text=True, capture_output=True)
@@ -191,6 +191,14 @@ print(state['badging'])
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("available=false\n", self.output.read_text())
         self.assertFalse((self.work / "previous-latest/tag.txt").exists())
+        self.assertFalse(any(c[1:3] == ["release", "download"] for c in self.calls()))
+
+    def test_published_project_cannot_skip_a_missing_release_inventory(self):
+        self.fixture["releases"] = []
+        result = self.run_cli(repo="qlolp/TgWatch")
+        self.assertNotEqual(0, result.returncode, result.stdout)
+        self.assertIn("production predecessor", result.stderr)
+        self.assertFalse(self.output.exists(), "A failed lookup must not authorize a skipped upgrade")
         self.assertFalse(any(c[1:3] == ["release", "download"] for c in self.calls()))
 
     def assert_rejected(self, reason):
