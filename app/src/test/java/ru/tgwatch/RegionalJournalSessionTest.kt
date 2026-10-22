@@ -6,6 +6,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RegionalJournalSessionTest {
+    @Test fun aReadErrorCanRecoverOnBackgroundRefreshWithoutDeletingHealthyRows() {
+        val directory = Files.createTempDirectory("regional-read-retry").toFile()
+        try {
+            val file = File(directory, "journal").apply { writeText("temporarily unreadable") }
+            val storage = RegionalJournalStorage(file)
+            val journal = RegionalJournalSession(storage)
+            journal.load(1_000)
+            assertEquals(RegionalJournalError.READ, journal.snapshot.error)
+            val row = RegionalJournalEntry(RegionalEventKind.NETWORK, 1_000,
+                "0123456789abcdef0123456789abcdef", RegionalRoute.WIFI)
+            storage.write(listOf(row))
+            assertTrue(journal.prune(journal.generation, 1_001))
+            assertNull(journal.snapshot.error)
+            assertEquals(listOf(row), journal.snapshot.rows)
+        } finally { directory.deleteRecursively() }
+    }
+
     @Test fun openingExpiredHistoryRemovesExpiredRowsFromDiskAsWellAsTheView() {
         val directory = Files.createTempDirectory("regional-expiry").toFile()
         try {

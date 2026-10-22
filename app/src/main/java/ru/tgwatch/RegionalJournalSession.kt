@@ -15,7 +15,7 @@ class RegionalJournalSession(private val storage: RegionalJournalStorage) {
     private var pending: List<RegionalJournalEntry>? = null
 
     @Synchronized fun load(now: Long) {
-        if (!snapshot.loading) return
+        if (!snapshot.loading && snapshot.error != RegionalJournalError.READ) return
         val rows = try {
             storage.read()
         } catch (_: Exception) {
