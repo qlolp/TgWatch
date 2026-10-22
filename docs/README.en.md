@@ -10,10 +10,16 @@ Optional independent targets cover Matrix, WhatsApp Web and a custom HTTPS servi
 each with its own history, intervals and alerts. Telegram remains the default;
 additional targets and integrations start disabled. See [targets](multiservice.md).
 
-Version 1.22 adds optional regional profiles for YouTube, Gemini, Notebook, Antigravity
-and ChatGPT/dots, current exit-country information, and separate Mac/browser helpers.
-Public-site access does not certify account features or an IP-only restriction.
-See the [regional-services guide](regional-services.md) and [release notes](releases/1.22.1.md).
+Optional regional profiles cover YouTube, Gemini, Notebook, Antigravity and ChatGPT/dots.
+Version 1.23.0 adds a seven-day local journal, fresh A/B connection comparisons,
+factual explanations and separately labelled user-reported browser/feature checks.
+An opt-in, one-shot watch can notify after two fresh public responses at least
+15 seconds apart, with a 24-hour deadline. Blocked delivery does not consume it.
+Public-site access and country information do not certify account features or an
+IP-only restriction. Regional records remain outside portable backups and diagnostics.
+See the [regional-services guide](regional-services.md), [native Mac app](macos.md)
+and [release notes](releases/1.23.0.md). Mac builds require macOS13+ and Python3.10+;
+local universal builds are ad-hoc signed, without Developer ID or notarization.
 
 ## Reading the status
 
@@ -130,7 +136,7 @@ separate `TgWatch-wear` prefix; every unified release includes both apps' six fi
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.21.0` (Android code `1021000`), phone target API36, Wear target API35.
+The source version is `1.23.0` (Android code `1023000`), phone target API36, Wear target API35.
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed
