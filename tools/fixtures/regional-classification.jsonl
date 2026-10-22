@@ -13,3 +13,5 @@
 {"id": "inlineHidden", "code": 200, "contentType": "text/html", "body": "<h1 style=\"display: none\">Not available in your country</h1>Welcome", "locationHost": "", "complete": true, "status": "WEB_REACHABLE"}
 {"id": "json", "code": 403, "contentType": "application/json", "body": "{\"error\":{\"code\":\"unsupported_country\"}}", "locationHost": "", "complete": true, "status": "REGION_RESTRICTED"}
 {"id": "incompleteJson", "code": 403, "contentType": "application/json", "body": "{\"error\":{\"code\":\"unsupported_country\"}}", "locationHost": "", "complete": false, "status": "UNKNOWN"}
+{"id": "excessJsonDepth", "code": 403, "contentType": "application/json", "body": "{\"error\": {\"code\": \"unsupported_country\"}, \"other\": [[[[[[[[[[[0]]]]]]]]]]]}", "locationHost": "", "complete": true, "status": "UNKNOWN"}
+{"id": "invalidUnicode", "code": 403, "contentType": "application/json", "body": "{\"error\":{\"code\":\"unsupported_country\"},\"other\":\"\\ud800\"}", "locationHost": "", "complete": true, "status": "UNKNOWN"}

@@ -9,20 +9,20 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 
 /** One configurable channel; only confirmed explicit service evidence may enter it. */
-internal class RegionalNotifications(private val ctx: Context) {
+internal class RegionalNotifications(private val ctx: Context, private val channel: String = CHANNEL) {
     private val manager = ctx.getSystemService(NotificationManager::class.java)
     init {
-        manager.createNotificationChannel(NotificationChannel(CHANNEL, ctx.getString(R.string.regional_alert_channel),
+        manager.createNotificationChannel(NotificationChannel(channel, ctx.getString(R.string.regional_alert_channel),
             NotificationManager.IMPORTANCE_DEFAULT))
     }
 
     fun post(result: RegionalResult): Boolean {
         val now = System.currentTimeMillis()
-        if (!systemAllowed() || !timeAllowed(now)) return false
+        if (result.status != RegionalStatus.REGION_RESTRICTED || !systemAllowed() || !timeAllowed(now)) return false
         val open = PendingIntent.getActivity(ctx, BASE_ID, Intent(ctx, RegionalServicesActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val message = ctx.getString(R.string.regional_alert_message, result.service.title)
-        val notification = Notification.Builder(ctx, CHANNEL)
+        val notification = Notification.Builder(ctx, channel)
             .setSmallIcon(Icon.createWithResource(ctx, R.drawable.ic_stat_wait))
             .setContentTitle(ctx.getString(R.string.regional_alert_title, result.service.title))
             .setContentText(message).setStyle(Notification.BigTextStyle().bigText(message))
@@ -31,7 +31,7 @@ internal class RegionalNotifications(private val ctx: Context) {
     }
 
     private fun systemAllowed(): Boolean = manager.areNotificationsEnabled() &&
-        manager.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE &&
+        manager.getNotificationChannel(channel)?.importance != NotificationManager.IMPORTANCE_NONE &&
         manager.currentInterruptionFilter in setOf(NotificationManager.INTERRUPTION_FILTER_ALL,
             NotificationManager.INTERRUPTION_FILTER_UNKNOWN)
 

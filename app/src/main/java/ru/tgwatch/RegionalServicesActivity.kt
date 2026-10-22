@@ -34,7 +34,9 @@ class RegionalServicesActivity : Activity() {
             val padding = (PADDING_DP * resources.displayMetrics.density).toInt()
             setPadding(padding, padding, padding, padding)
         }
-        setContentView(ScrollView(this).apply { addView(content) })
+        val scroll = ScrollView(this).apply { addView(content) }
+        setContentView(scroll)
+        ScreenInsets.apply(this, scroll)
         content.addView(TextView(this).apply { setText(R.string.regional_explanation) })
         country = TextView(this)
         content.addView(country)
@@ -137,7 +139,15 @@ class RegionalServicesActivity : Activity() {
         return result.httpCode?.let { getString(R.string.regional_http, text, it) } ?: text
     }
 
-    override fun onResume() { super.onResume(); ui.post(ticker); EgressCountryUi.refreshActive(this) }
+    override fun onResume() {
+        super.onResume()
+        if (Prefs.isEnabled(this) && RegionalPreferences.anyEnabled(this) && !MonitorService.running)
+            runCatching { MonitorService.start(this) }.onFailure {
+                UiErrors.show(this, R.string.copy_main_couldn_t_start_monitoring, it)
+            }
+        ui.post(ticker)
+        EgressCountryUi.refreshActive(this)
+    }
     override fun onPause() { ui.removeCallbacks(ticker); super.onPause() }
 
     private fun statusString(status: RegionalStatus): Int = when (status) {

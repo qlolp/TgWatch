@@ -26,6 +26,7 @@ internal class RegionalHttpTransport(private val openConnection: (URI) -> HttpsU
 
     }
 
+    @Suppress("TooGenericExceptionCaught") // A platform failure invalidates only this optional observation.
     fun check(service: RegionalService, cancellation: ProbeCancellation): RegionalHttpResponse {
         val deadline = deadlines.schedule({ cancellation.close() }, BUDGET_MS, TimeUnit.MILLISECONDS)
         val measured = try { request(service, cancellation) }
@@ -35,12 +36,14 @@ internal class RegionalHttpTransport(private val openConnection: (URI) -> HttpsU
         catch (_: InterruptedException) { failure(RegionalFailure.TIMEOUT) }
         catch (_: IOException) { failure(RegionalFailure.CONNECTION) }
         catch (_: IllegalArgumentException) { failure(RegionalFailure.UNMEASURED) }
+        catch (_: RuntimeException) { failure(RegionalFailure.UNMEASURED) }
         finally { deadline.cancel(false) }
         return measured
     }
 
     private fun failure(failure: RegionalFailure) =
-        RegionalHttpResponse(RegionalStatus.NETWORK_ERROR, failure = failure)
+        RegionalHttpResponse(if (failure == RegionalFailure.UNMEASURED) RegionalStatus.UNKNOWN
+            else RegionalStatus.NETWORK_ERROR, failure = failure)
 
     private fun request(service: RegionalService,
         cancellation: ProbeCancellation): RegionalHttpResponse {

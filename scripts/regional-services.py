@@ -54,6 +54,17 @@ def unique_object(pairs):
     return result
 
 
+def validate_json(value, depth=0):
+    if isinstance(value, (dict, list)):
+        if depth >= 10:
+            raise ValueError('JSON nesting limit')
+        children = list(value.keys()) + list(value.values()) if isinstance(value, dict) else value
+        for child in children:
+            validate_json(child, depth + 1)
+    elif isinstance(value, str):
+        value.encode('utf-8', errors='strict')
+
+
 class VisibleMarkup(HTMLParser):
     """Hidden subtrees never contribute regional evidence, including nested hidden containers."""
     VOID = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'}
@@ -62,6 +73,7 @@ class VisibleMarkup(HTMLParser):
         super().__init__(convert_charrefs=False)
         self.stack = []
         self.parts = []
+        self.invalid = False
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -70,6 +82,7 @@ class VisibleMarkup(HTMLParser):
                       r'display\s*:\s*none|visibility\s*:\s*hidden', attrs.get('style', ''), re.I)))
         if len(self.stack) > 64:
             hidden = True
+            self.invalid = True
         if not hidden:
             self.parts.append(self.get_starttag_text())
         if tag not in self.VOID:
@@ -108,6 +121,7 @@ def classify(code, content_type, body, location_host='', complete=True):
         try:
             value = json.loads(body, object_pairs_hook=unique_object,
                                parse_constant=lambda _: (_ for _ in ()).throw(ValueError('Invalid constant')))
+            validate_json(value)
             if not isinstance(value, dict):
                 return 'UNKNOWN'
             error = value.get('error')
@@ -118,7 +132,7 @@ def classify(code, content_type, body, location_host='', complete=True):
             return 'UNKNOWN'
     markup = VisibleMarkup()
     markup.feed(IGNORED.sub(' ', COMMENTS.sub(' ', body)))
-    filtered = ''.join(markup.parts)
+    filtered = '' if markup.invalid else ''.join(markup.parts)
     visible = ' '.join(TAGS.sub(' ', filtered).replace('&nbsp;', ' ').replace('&#39;', "'").lower().split())
     heading = any(any(phrase in TAGS.sub(' ', match[1]).lower() for phrase in REGION_PHRASES)
                   and not TAGS.sub(' ', match[1]).strip().endswith('?') for match in HEADINGS.findall(filtered))
@@ -198,8 +212,9 @@ def http_get(url, limit=32768):
         response = error
     with response:
         body, complete = read_bounded(response, limit)
+        location = response.headers.get('Location', '')
         return response.code, response.headers.get('Content-Type', ''), body.decode('utf-8', errors='replace'), (
-            response.headers.get('Location', '')[:2048]), complete
+            location if len(location) <= 2048 else ''), complete
 
 
 def public_probe(service):

@@ -109,6 +109,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
             permit.cancelBeforeStart()
             cancellation = null
             due[service] = now + RETRY_MS
+            progress()
         }
     }
 

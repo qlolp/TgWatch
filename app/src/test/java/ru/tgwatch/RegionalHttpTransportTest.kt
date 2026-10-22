@@ -98,6 +98,14 @@ class RegionalHttpTransportTest {
         assertFalse(result.toString().contains("secret"))
     }
 
+    @Test fun anUnexpectedPlatformFailureCannotStrandMonitoringOrPublishRawDetails() {
+        val result = RegionalHttpTransport { throw SecurityException("private platform detail") }
+            .check(RegionalService.GEMINI, ProbeCancellation())
+        assertEquals(RegionalStatus.UNKNOWN, result.status)
+        assertEquals(RegionalFailure.UNMEASURED, result.failure)
+        assertFalse(result.toString().contains("private"))
+    }
+
     @Test fun cancellationDisconnectsAnInFlightRequestAndRejectsItsResponse() {
         val entered = CountDownLatch(1)
         val released = CountDownLatch(1)

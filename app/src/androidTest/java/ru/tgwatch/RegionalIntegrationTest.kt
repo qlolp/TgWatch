@@ -27,6 +27,11 @@ class RegionalIntegrationTest {
 
     @Before fun isolate() {
         HistoryTestStorage.awaitReady()
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val descriptor = instrumentation.uiAutomation.executeShellCommand(
+                "pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
         check(!BackupManager.hasPending())
         preferences = Prefs.sp(ctx).all.toMap()
         Prefs.setEnabled(ctx, false)
@@ -97,6 +102,22 @@ class RegionalIntegrationTest {
             android.provider.Settings.Global.BOOT_COUNT, -1)
         Prefs.sp(ctx).edit().putInt("egress_boot", boot + 1).commit()
         assertNull(Prefs.egressCountry(ctx))
+    }
+
+    @Test fun blockedRegionalChannelCannotConsumeOrDeliverAnAlert() {
+        val manager = ctx.getSystemService(android.app.NotificationManager::class.java)
+        assertTrue(manager.areNotificationsEnabled())
+        val channel = "regional_test_blocked"
+        manager.createNotificationChannel(android.app.NotificationChannel(channel, "Test blocked",
+            android.app.NotificationManager.IMPORTANCE_NONE))
+        try {
+            assertEquals(android.app.NotificationManager.IMPORTANCE_NONE,
+                manager.getNotificationChannel(channel).importance)
+            val result = RegionalResult(RegionalService.GEMINI, RegionalStatus.REGION_RESTRICTED,
+                System.currentTimeMillis(), SystemClock.elapsedRealtime(), 1, 1, 1)
+            assertFalse(RegionalNotifications(ctx, channel).post(result))
+            assertFalse(Prefs.sp(ctx).contains("regional.gemini.delivered_at"))
+        } finally { manager.deleteNotificationChannel(channel) }
     }
 
     @Test fun changingAnotherProfileCannotReopenAnAlreadyWarnedIncident() {

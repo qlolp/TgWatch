@@ -10,6 +10,11 @@ Optional independent targets cover Matrix, WhatsApp Web and a custom HTTPS servi
 each with its own history, intervals and alerts. Telegram remains the default;
 additional targets and integrations start disabled. See [targets](multiservice.md).
 
+Version 1.22 adds optional regional profiles for YouTube, Gemini, Notebook, Antigravity
+and ChatGPT/dots, current exit-country information, and separate Mac/browser helpers.
+Public-site access does not certify account features or an IP-only restriction.
+See the [regional-services guide](regional-services.md) and [release notes](releases/1.22.0.md).
+
 ## Reading the status
 
 | Status | Meaning |
@@ -108,7 +113,7 @@ remain available in the full TalkBack description and the goal screen.
 Status sharing freezes a preview before sending either text or a PNG through the
 system share sheet. Both use the same capture, excluding addresses and secrets.
 
-The standalone `ru.tgwatch.wear` APK for Wear OS3+/API30 measures this watch's network,
+The standalone `ru.tgwatch.wear` APK for Wear OS 3+/API30 measures this watch's network,
 without a phone or Google Data Layer. Manual checks use one web endpoint and three
 rotating DCs, at most four physical requests and eight seconds. A failed subset does
 not claim a global outage. Tile and complication read only the local cache, expire
