@@ -1,4 +1,28 @@
 <resources>
+    <string name="regional_history_title">Regional event history</string>
+    <string name="regional_history_help">Device-local events for 7 days, up to 1,000 entries. Times are from this device. A connection or country change near an error does not establish its cause. Regional history is excluded from portable backups.</string>
+    <string name="regional_history_more">Show earlier events</string>
+    <string name="regional_history_clear">Clear regional history</string>
+    <string name="regional_history_clear_confirm">Delete regional event history from this device?</string>
+    <string name="regional_history_loading">Loading regional history…</string>
+    <string name="regional_history_error">Regional history could not be loaded or saved. Displayed entries may be incomplete. Clear history to reset damaged storage.</string>
+    <string name="regional_history_clock">Device time moved backwards; displayed order follows recording order rather than a claimed sequence of causes.</string>
+    <string name="regional_history_connection">Connection context changed</string>
+    <string name="regional_history_country">Exit country observed</string>
+    <string name="regional_source_public">Public website check</string>
+    <string name="regional_history_public">%1$s · Public website check\n%2$s</string>
+    <string name="regional_history_country_value">%1$s %2$s · Cloudflare observation: %3$s</string>
+    <string name="regional_history_code"> · HTTP %1$d</string>
+    <string name="regional_history_row">%1$s\n%2$s\n%3$s · %4$s%5$s</string>
+    <plurals name="regional_history_count">
+        <item quantity="one">%1$d recorded event</item>
+        <item quantity="other">%1$d recorded events</item>
+    </plurals>
+    <string name="regional_route_wifi">Wi-Fi</string>
+    <string name="regional_route_cellular">Mobile network</string>
+    <string name="regional_route_vpn">VPN</string>
+    <string name="regional_route_ethernet">Ethernet</string>
+    <string name="regional_route_other">Other network</string>
     <string name="regional_title">Regional service checks</string>
     <string name="regional_open">Open %1$s in browser</string>
     <string name="regional_open_failed">Could not open the browser</string>

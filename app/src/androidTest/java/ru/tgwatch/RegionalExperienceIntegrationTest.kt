@@ -64,6 +64,16 @@ class RegionalExperienceIntegrationTest {
             status = RegionalStatus.AUTH_REQUIRED, httpCode = 401))
         RegionalRepository.awaitIdle(ctx)
         ActivityScenario.launch<RegionalHistoryActivity>(Intent(ctx, RegionalHistoryActivity::class.java)).use { scenario ->
+            val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+            var ready = false
+            while (!ready && android.os.SystemClock.elapsedRealtime() < deadline) {
+                scenario.onActivity { activity ->
+                    ready = views(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+                        .any { it.text.contains("YouTube") }
+                }
+                if (!ready) Thread.sleep(25)
+            }
+            assertTrue("Prepared history must arrive", ready)
             scenario.onActivity { activity ->
                 val all = views(activity.findViewById(android.R.id.content))
                 val text = all.filterIsInstance<TextView>().joinToString("\n") { it.text.toString() }

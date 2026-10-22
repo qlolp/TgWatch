@@ -67,6 +67,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         due.clear()
         consensus.clear()
         RegionalStateStore.clear()
+        RegionalContext.invalidate()
         notifications.clearAll()
     }
 
@@ -128,7 +129,9 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         if (!active() || !current(result)) return
         val evidence = consensus.getOrPut(result.service) { RegionalConsensus() }
         evidence.update(result.status, "${result.networkHandle}:$revision:$configuration", result.checkedElapsed)
-        RegionalStateStore.put(result.copy(regionConfirmed = evidence.confirmed()))
+        val published = result.copy(regionConfirmed = evidence.confirmed())
+        RegionalStateStore.put(published)
+        RegionalJournalObserver.record(ctx, published)
         if (result.status == RegionalStatus.WEB_REACHABLE) RegionalPreferences.reachable(ctx, result.service)
         if (result.status != RegionalStatus.REGION_RESTRICTED) notifications.clear(result.service)
         if (result.status == RegionalStatus.REGION_RESTRICTED && !evidence.confirmed())

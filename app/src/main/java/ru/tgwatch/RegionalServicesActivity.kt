@@ -41,6 +41,9 @@ class RegionalServicesActivity : Activity() {
         country = TextView(this)
         content.addView(country)
         button(content, R.string.country_refresh) { EgressCountryUi.refreshActive(this, force = true) }
+        button(content, R.string.regional_history_title) {
+            startActivity(Intent(this, RegionalHistoryActivity::class.java))
+        }
         RegionalService.entries.forEach { service -> addProfile(content, service) }
         button(content, R.string.regional_check) {
             if (!MonitorService.requestRegionalCheck())

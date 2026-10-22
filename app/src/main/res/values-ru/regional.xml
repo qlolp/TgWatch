@@ -1,4 +1,30 @@
 <resources>
+    <string name="regional_history_title">История региональных событий</string>
+    <string name="regional_history_help">Локальные события за 7 дней, до 1 000 записей. Время — по часам устройства. Близость смены сети или страны к ошибке не доказывает её причину. Региональная история не входит в переносимые резервные копии.</string>
+    <string name="regional_history_more">Показать более ранние события</string>
+    <string name="regional_history_clear">Очистить региональную историю</string>
+    <string name="regional_history_clear_confirm">Удалить историю региональных событий с этого устройства?</string>
+    <string name="regional_history_loading">Загрузка региональной истории…</string>
+    <string name="regional_history_error">Не удалось прочитать или сохранить региональную историю. Показанные записи могут быть неполными. Очистка истории сбросит повреждённое хранилище.</string>
+    <string name="regional_history_clock">Часы устройства переведены назад; записи показаны в порядке записи, без вывода о последовательности причин.</string>
+    <string name="regional_history_connection">Изменился контекст подключения</string>
+    <string name="regional_history_country">Получено наблюдение страны выхода</string>
+    <string name="regional_source_public">Проверка публичного сайта</string>
+    <string name="regional_history_public">%1$s · Проверка публичного сайта\n%2$s</string>
+    <string name="regional_history_country_value">%1$s %2$s · наблюдение Cloudflare: %3$s</string>
+    <string name="regional_history_code"> · HTTP %1$d</string>
+    <string name="regional_history_row">%1$s\n%2$s\n%3$s · %4$s%5$s</string>
+    <plurals name="regional_history_count">
+        <item quantity="one">%1$d записанное событие</item>
+        <item quantity="few">%1$d записанных события</item>
+        <item quantity="many">%1$d записанных событий</item>
+        <item quantity="other">%1$d записанного события</item>
+    </plurals>
+    <string name="regional_route_wifi">Wi-Fi</string>
+    <string name="regional_route_cellular">Мобильная сеть</string>
+    <string name="regional_route_vpn">VPN</string>
+    <string name="regional_route_ethernet">Ethernet</string>
+    <string name="regional_route_other">Другая сеть</string>
     <string name="regional_title">Региональная доступность сервисов</string>
     <string name="regional_open">Открыть %1$s в браузере</string>
     <string name="regional_open_failed">Не удалось открыть браузер</string>

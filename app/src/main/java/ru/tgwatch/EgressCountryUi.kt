@@ -68,7 +68,10 @@ internal object EgressCountryUi {
             executor.execute {
                 val permit = ProbeAdmission.process.tryAcquire("country_lookup", ProbeLane.SECONDARY)
                 val iso = if (permit?.start() == true) try { fetch(open) } finally { permit.finished() } else null
-                lookup.finish(ticket, activeHandle(ctx), iso) { Prefs.setEgressCountry(ctx, it) }
+                lookup.finish(ticket, activeHandle(ctx), iso) {
+                    Prefs.setEgressCountry(ctx, it)
+                    RegionalJournalObserver.country(ctx, it)
+                }
             }
         } catch (_: RejectedExecutionException) {
             lookup.finish(ticket, activeHandle(ctx), null) { Prefs.setEgressCountry(ctx, it) }
