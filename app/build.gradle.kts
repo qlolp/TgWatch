@@ -76,7 +76,7 @@ kotlin {
 }
 dependencies {
     implementation(project(":probe-core"))
-    implementation("androidx.core:core:1.16.0")
+    implementation("androidx.core:core:1.19.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:runner:1.7.0")
