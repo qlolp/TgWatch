@@ -83,7 +83,7 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                             left, top, right, bottom = map(int, match.groups())
                             x = str((left + right) // 2)
                             # Overlapping, slow steps keep every row observable instead of flinging past it.
-                            start, end = top + (bottom - top) * 3 // 4, top + (bottom - top) // 2
+                            start, end = top + (bottom - top) * 3 // 4, top + (bottom - top) // 4
                             if rewinding: start, end = end, start
                             command(['shell', 'input', 'swipe', x, str(start), x, str(end), '1000'])
                             swipes += 1

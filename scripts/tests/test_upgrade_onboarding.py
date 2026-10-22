@@ -184,6 +184,33 @@ class UpgradeOnboardingTests(unittest.TestCase):
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:
             self.assertIsNone(module.center(bounds))
 
+    def test_long_main_screen_is_searched_within_real_capture_and_drag_costs(self):
+        module = self.load()
+        now, offset, taps = [0.0], [3600], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', 'env', 'CLASSPATH=' + module.UI_RUNTIME]:
+                now[0] += 1  # Real API35 snapshots require a new app_process connection.
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                extra = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/tvVersion" '
+                         'bounds="[10,500][110,560]" />') if offset[0] >= 3300 else ''
+                if 600 <= offset[0] <= 1200:
+                    extra += ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                              'enabled="true" clickable="true" bounds="[10,300][110,360]" />')
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + extra + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                offset[0] += int(args[4]) - int(args[6])
+                now[0] += int(args[-1]) / 1000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 30, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+        self.assertLess(now[0], 30)
+
 
 if __name__ == '__main__':
     unittest.main()
