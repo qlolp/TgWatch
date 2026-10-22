@@ -1,11 +1,15 @@
 import AppKit
 import ServiceManagement
+import Network
 
 @MainActor final class RegionalMenuApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var model = RegionalMenuModel()
     private var engine: RegionalEngineProcess?
     private var notifications: RegionalNativeNotifications?
+    private var responseWatches: MacResponseWatchController?
+    private let networkFence = MacConnectionFence()
+    private var pathMonitor: NWPathMonitor?
     private var services = Set(RegionalMenuService.allCases)
     private var monitoring = false
     private var generation: UInt64 = 0
@@ -43,28 +47,41 @@ import ServiceManagement
                 let latest = self.current(reading.service) else { return false }
             return latest.contextID == reading.contextID && latest.status == .regionRestricted && latest.regionConfirmed
         })
-        notifications?.onChange = { [weak self] in self?.rebuildMenu() }
+        responseWatches = MacResponseWatchController(defaults: defaults, services: services,
+            notifications: notifications!, live: { [weak self] service in
+                guard let self, self.monitoring, let reading = self.current(service) else { return nil }
+                return (reading, self.generation)
+            })
+        responseWatches?.onChange = { [weak self] in self?.rebuildMenu() }
+        notifications?.onChange = { [weak self] in
+            self?.rebuildMenu()
+            self?.responseWatches?.considerReady()
+        }
         notifications?.onDenied = { [weak self] in
             self?.message(tr("Notifications blocked"), tr("Allow TgWatch notifications in macOS System Settings, then enable them here."))
         }
         notifications?.refresh()
         loginStatus = SMAppService.mainApp.status
+        observeNetwork()
         monitoring = defaults.bool(forKey: "monitoring.enabled") && !services.isEmpty
         if monitoring { restart() } else { rebuildMenu() }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async { self?.rebuildMenu() }
+            DispatchQueue.main.async { self?.responseWatches?.prune(); self?.rebuildMenu() }
         }
     }
     private func current(_ service: RegionalMenuService) -> RegionalMenuReading? {
-        model.current(service, now: Date().timeIntervalSince1970 * 1_000, uptime: ProcessInfo.processInfo.systemUptime)
+        guard networkFence.capture() > 0 else { return nil }
+        return model.current(service, now: Date().timeIntervalSince1970 * 1_000,
+            uptime: ProcessInfo.processInfo.systemUptime, networkEpoch: networkFence.capture())
     }
     private func receive(_ data: Data, generation: UInt64) {
         guard monitoring, generation == self.generation,
             model.ingest(data, generation: generation, now: Date().timeIntervalSince1970 * 1_000,
-                         uptime: ProcessInfo.processInfo.systemUptime) else { return }
+                         uptime: ProcessInfo.processInfo.systemUptime, networkEpoch: networkFence.capture()) else { return }
         for service in services {
             if let reading = current(service) { notifications?.consider(reading, generation: generation) }
         }
+        responseWatches?.observe()
         rebuildMenu()
     }
     private func engineState(_ state: RegionalEngineState, generation: UInt64) {
@@ -75,12 +92,13 @@ import ServiceManagement
         }
         switch state {
         case .starting: statusText = tr("Finding Python / starting checks…")
-        case .running: statusText = tr("Monitoring public websites")
+        case .running: statusText = networkFence.capture() > 0 ? tr("Monitoring public websites") : tr("Waiting for network information…")
         case .stopped: statusText = tr("Monitoring stopped")
         case .missingRuntime, .failed:
             monitoring = false
             defaults.set(false, forKey: "monitoring.enabled")
-            model.replace(generation: generation, services: [])
+            model.replace(generation: generation, services: [], networkEpoch: networkFence.capture())
+            responseWatches?.resetEvidence()
             statusText = state == .missingRuntime ? tr("Python 3.10+ is required") : tr("Checks stopped; retry or open Help")
             if case .missingRuntime = state {
                 message(tr("Python 3.10+ is required"),
@@ -92,10 +110,25 @@ import ServiceManagement
     }
     private func restart() {
         generation &+= 1
-        model.replace(generation: generation, services: monitoring ? services : [])
+        responseWatches?.resetEvidence()
+        model.replace(generation: generation, services: monitoring ? services : [], networkEpoch: networkFence.capture())
         engine?.replace(services: monitoring ? services : [], generation: generation)
         statusText = monitoring ? tr("Starting fresh checks…") : tr("Monitoring stopped")
         rebuildMenu()
+    }
+    private func observeNetwork() {
+        let monitor = NWPathMonitor()
+        let fence = networkFence
+        monitor.pathUpdateHandler = { [weak self] _ in
+            // Fence buffered callbacks immediately, before the UI's queued restart executes.
+            fence.changed()
+            DispatchQueue.main.async {
+                guard let self, !self.terminating else { return }
+                if self.monitoring { self.restart() } else { self.rebuildMenu() }
+            }
+        }
+        monitor.start(queue: DispatchQueue(label: "ru.tgwatch.mac.path"))
+        pathMonitor = monitor
     }
     private func item(_ menu: NSMenu, _ title: String, action: Selector? = nil,
                       represented: String? = nil, checked: Bool = false, enabled: Bool = true) {
@@ -145,6 +178,17 @@ import ServiceManagement
                 item(detail, flag + " " + country + " · " + tr("Cloudflare context only"), enabled: false)
             } else { item(detail, tr("Country unverified"), enabled: false) }
         }
+        let intent = responseWatches?.intent(service)
+        let canArm = monitoring && reading?.status == .regionRestricted && reading?.regionConfirmed == true
+        item(detail, intent == nil ? tr("Tell me when the public site responds") : tr("Cancel public-response watch"),
+             action: #selector(toggleResponseWatch), represented: service.rawValue, enabled: intent != nil || canArm)
+        if let intent {
+            item(detail, tr("Waiting until: ") + dateFormatter.string(from: Date(timeIntervalSince1970: intent.deadline / 1_000)),
+                 enabled: false)
+            if notifications?.optedIn != true || notifications?.authorized != true {
+                item(detail, tr("Enable notifications to receive the alert"), enabled: false)
+            }
+        }
         item(detail, tr("Open in browser"), action: #selector(openService), represented: service.rawValue)
         parent.submenu = detail
         menu.addItem(parent)
@@ -164,12 +208,19 @@ import ServiceManagement
         guard let raw = sender.representedObject as? String, let service = RegionalMenuService(rawValue: raw) else { return }
         if services.contains(service) { services.remove(service) } else { services.insert(service) }
         defaults.set(services.map(\.rawValue).sorted(), forKey: "profiles")
+        responseWatches?.profilesChanged(services)
         if services.isEmpty { monitoring = false; defaults.set(false, forKey: "monitoring.enabled") }
         restart()
     }
     @objc private func openService(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let service = RegionalMenuService(rawValue: raw) else { return }
         NSWorkspace.shared.open(service.address)
+    }
+    @objc private func toggleResponseWatch(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let service = RegionalMenuService(rawValue: raw) else { return }
+        if responseWatches?.intent(service) != nil { responseWatches?.cancel(service) }
+        else { responseWatches?.arm(service) }
+        rebuildMenu()
     }
     @objc private func toggleNotifications() { notifications?.toggle() }
     @objc private func toggleLogin() {
@@ -199,8 +250,9 @@ import ServiceManagement
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard engine != nil else { return .terminateNow }
-        terminating = true; monitoring = false; timer?.invalidate(); generation &+= 1
-        model.replace(generation: generation, services: [])
+        terminating = true; monitoring = false; timer?.invalidate(); pathMonitor?.cancel(); generation &+= 1
+        model.replace(generation: generation, services: [], networkEpoch: networkFence.capture())
+        responseWatches?.resetEvidence()
         engine?.replace(services: [], generation: generation)
         return .terminateLater
     }

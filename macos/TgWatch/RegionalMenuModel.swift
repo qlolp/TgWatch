@@ -123,16 +123,18 @@ struct RegionalMenuModel {
     private(set) var services: Set<RegionalMenuService> = []
     private(set) var contextID: String?
     private var readings: [RegionalMenuService: RegionalMenuReading] = [:]
+    private var networkEpoch: UInt64 = 0
 
-    mutating func replace(generation: UInt64, services: Set<RegionalMenuService>) {
+    mutating func replace(generation: UInt64, services: Set<RegionalMenuService>, networkEpoch: UInt64 = 0) {
+        self.networkEpoch = networkEpoch
         self.generation = generation
         self.services = services
         contextID = nil
         readings.removeAll()
     }
     @discardableResult mutating func ingest(_ data: Data, generation: UInt64, now: Double,
-                                            uptime: TimeInterval) -> Bool {
-        guard generation == self.generation,
+                                            uptime: TimeInterval, networkEpoch: UInt64 = 0) -> Bool {
+        guard generation == self.generation, networkEpoch == self.networkEpoch,
               let reading = RegionalMenuDecoder.decode(data, now: now, uptime: uptime),
               services.contains(reading.service) else { return false }
         if let previous = readings[reading.service], reading.checkedAt < previous.checkedAt { return false }
@@ -141,8 +143,9 @@ struct RegionalMenuModel {
         readings[reading.service] = reading
         return true
     }
-    func current(_ service: RegionalMenuService, now: Double, uptime: TimeInterval) -> RegionalMenuReading? {
-        guard let reading = readings[service], reading.contextID != nil, reading.contextID == contextID,
+    func current(_ service: RegionalMenuService, now: Double, uptime: TimeInterval,
+                 networkEpoch: UInt64 = 0) -> RegionalMenuReading? {
+        guard networkEpoch == self.networkEpoch, let reading = readings[service], reading.contextID != nil, reading.contextID == contextID,
               now >= reading.checkedAt, now - reading.checkedAt <= RegionalMenuDecoder.maximumAgeMS,
               uptime >= reading.receivedUptime, uptime - reading.receivedUptime <= RegionalMenuDecoder.maximumAgeMS / 1_000
         else { return nil }

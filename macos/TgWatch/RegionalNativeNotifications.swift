@@ -12,6 +12,7 @@ func tr(_ key: String) -> String { NSLocalizedString(key, comment: "") }
     var onDenied: () -> Void = {}
     private(set) var authorized = false
     private var pending = Set<RegionalMenuService>()
+    private var responsePending: [RegionalMenuService: String] = [:]
     private var delivered: [RegionalMenuService: String] = [:]
     private var lastAlert: [RegionalMenuService: Double] = [:]
     var optedIn: Bool { defaults.bool(forKey: "notifications.enabled") }
@@ -33,7 +34,7 @@ func tr(_ key: String) -> String { NSLocalizedString(key, comment: "") }
             defaults.set(false, forKey: "notifications.enabled")
             center.removePendingNotificationRequests(withIdentifiers: RegionalMenuService.allCases.map {
                 "regional-restriction-" + $0.rawValue
-            })
+            } + RegionalMenuService.allCases.map { "regional-public-response-" + $0.rawValue })
             onChange()
         } else {
             center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
@@ -76,6 +77,44 @@ func tr(_ key: String) -> String { NSLocalizedString(key, comment: "") }
                         if succeeded {
                             self.delivered[service] = context
                             self.lastAlert[service] = Date().timeIntervalSince1970 * 1_000
+                        }
+                    }
+                }
+            }
+        }
+    }
+    func postPublicResponse(service: RegionalMenuService, requestID: String,
+        isCurrent: @escaping () -> Bool, completion: @escaping (Bool) -> Void) {
+        guard optedIn, responsePending[service] == nil else { return }
+        responsePending[service] = requestID
+        let finish: (Bool) -> Void = { [weak self] accepted in
+            if self?.responsePending[service] == requestID { self?.responsePending.removeValue(forKey: service) }
+            completion(accepted)
+        }
+        center.getNotificationSettings { [weak self] settings in
+            let allowed = Self.allowed(settings)
+            DispatchQueue.main.async {
+                guard let self, allowed, self.optedIn, isCurrent() else { finish(false); return }
+                self.center.getDeliveredNotifications { [weak self] delivered in
+                    let alreadyPosted = delivered.contains {
+                        $0.request.identifier == "regional-public-response-" + service.rawValue &&
+                            $0.request.content.userInfo["goal_id"] as? String == requestID
+                    }
+                    DispatchQueue.main.async {
+                        guard let self, self.optedIn, isCurrent() else { finish(false); return }
+                        if alreadyPosted { finish(true); return }
+                        let identifier = "regional-public-response-" + service.rawValue
+                        let content = UNMutableNotificationContent()
+                        content.title = service.title + ": " + tr("Public website responds")
+                        content.body = tr("Two fresh public responses were observed. Account and feature access remain unverified.")
+                        content.sound = .default
+                        content.userInfo = ["service": service.rawValue, "goal_id": requestID]
+                        // All card changes occur after the main-actor request/context check.
+                        self.center.removeDeliveredNotifications(withIdentifiers: [identifier])
+                        self.center.removePendingNotificationRequests(withIdentifiers: [identifier])
+                        self.center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil)) { error in
+                            let accepted = error == nil
+                            DispatchQueue.main.async { finish(accepted) }
                         }
                     }
                 }

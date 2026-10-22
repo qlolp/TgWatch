@@ -1,11 +1,13 @@
 "Allow TgWatch notifications in macOS System Settings, then enable them here." = "Allow TgWatch notifications in macOS System Settings, then enable them here.";
 "Bundled engine missing. Rebuild the app." = "Bundled engine missing. Rebuild the app.";
 "CAPTCHA / browser verification" = "CAPTCHA / browser verification";
+"Cancel public-response watch" = "Cancel public-response watch";
 "Check now" = "Check now";
 "Checked: " = "Checked: ";
 "Checks stopped; retry or open Help" = "Checks stopped; retry or open Help";
 "Cloudflare context only" = "Cloudflare context only";
 "Country unverified" = "Country unverified";
+"Enable notifications to receive the alert" = "Enable notifications to receive the alert";
 "Explicit regional refusal" = "Explicit regional refusal";
 "Finding Python / starting checks…" = "Finding Python / starting checks…";
 "Help" = "Help";
@@ -34,7 +36,11 @@
 "Starting fresh checks…" = "Starting fresh checks…";
 "Stop monitoring" = "Stop monitoring";
 "System Settings" = "System Settings";
+"Tell me when the public site responds" = "Tell me when the public site responds";
 "The public service reported a regional refusal twice. Verify access in the service; account features remain unverified." = "The public service reported a regional refusal twice. Verify access in the service; account features remain unverified.";
+"Two fresh public responses were observed. Account and feature access remain unverified." = "Two fresh public responses were observed. Account and feature access remain unverified.";
 "Unverified" = "Unverified";
+"Waiting for network information…" = "Waiting for network information…";
+"Waiting until: " = "Waiting until: ";
 "confirmed" = "confirmed";
 "off" = "off";

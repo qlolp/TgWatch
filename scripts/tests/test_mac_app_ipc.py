@@ -72,6 +72,35 @@ class MacAppIpcTests(unittest.TestCase):
             self.assertNotEqual(0, run.returncode)
             self.assertNotIn('Traceback', run.stderr)
 
+    def test_app_confirmation_delay_is_bounded_and_requires_known_current_context(self):
+        module = self.load()
+        app = module.AppEvidence(['gemini'])
+        scope = ('route', 'egress')
+        app.update('gemini', 'WEB_REACHABLE', scope, 0)
+        self.assertEqual(15, app.next_delay('gemini', 0, 300))
+        app.update('gemini', 'WEB_REACHABLE', scope, 14)
+        self.assertEqual(1, app.next_delay('gemini', 14, 300))
+        app.update('gemini', 'WEB_REACHABLE', scope, 15)
+        self.assertEqual(300, app.next_delay('gemini', 15, 300))
+        app.update('gemini', 'CHALLENGE', scope, 16)
+        self.assertEqual(300, app.next_delay('gemini', 16, 300))
+        app.update('gemini', 'REGION_RESTRICTED', scope, 17)
+        self.assertEqual(15, app.next_delay('gemini', 17, 300))
+        app.update('gemini', 'REGION_RESTRICTED', scope, 32)
+        self.assertEqual(300, app.next_delay('gemini', 32, 300))
+        app.update('gemini', 'WEB_REACHABLE', None, 33)
+        self.assertEqual(300, app.next_delay('gemini', 33, 300))
+
+    def test_only_private_app_loop_schedules_a_public_response_confirmation(self):
+        module = self.load()
+        for option, expected in [('--json', 300), ('--app-json', 15)]:
+            with patch.object(module, 'measure', return_value=('WEB_REACHABLE', 200, 'DE', ('route', 'egress'))), \
+                 patch.object(module.time, 'monotonic', return_value=123), \
+                 patch.object(module.time, 'sleep', side_effect=KeyboardInterrupt) as sleep, \
+                 patch('sys.stdout', io.StringIO()):
+                self.assertEqual(0, module.main(['--service', 'gemini', '--watch', option]))
+                self.assertEqual(expected, sleep.call_args.args[0])
+
     @unittest.skipUnless(os.name == 'posix', 'SIGTERM process ownership is a POSIX contract')
     def test_sigterm_stops_actual_owned_hanging_probe_child(self):
         with tempfile.TemporaryDirectory(prefix='tgwatch-app-ipc-') as directory:

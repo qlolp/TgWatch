@@ -313,16 +313,40 @@ class AppEvidence:
         self.scope = None
         self.context_id = None
         self.states = {service: Consensus() for service in services}
+        self.statuses = {}
+        self.web_first = {}
+        self.last = -1
 
     def update(self, service, status, scope, now):
-        if scope is None or scope != self.scope:
+        if scope is None or scope != self.scope or now < self.last:
             self.scope = scope
             self.context_id = uuid.uuid4().hex if scope is not None else None
             self.states = {item: Consensus() for item in self.services}
+            self.statuses = {}
+            self.web_first = {}
+        self.last = now
         state = self.states[service]
         if scope is not None:
             state.update(status, self.context_id, now)
+            if status == 'WEB_REACHABLE':
+                if self.statuses.get(service) != status:
+                    self.web_first[service] = now
+                elif service in self.web_first and now - self.web_first[service] >= 15:
+                    self.web_first.pop(service)
+            else:
+                self.web_first.pop(service, None)
+            self.statuses[service] = status
         return self.context_id, state
+
+    def next_delay(self, service, now, interval):
+        if self.context_id is None:
+            return interval
+        state = self.states[service]
+        if self.statuses.get(service) == 'REGION_RESTRICTED' and not state.confirmed and state.first is not None:
+            return max(0.1, 15 - (now - state.first))
+        if service in self.web_first:
+            return max(0.1, 15 - (now - self.web_first[service]))
+        return interval
 
 
 def app_report(service, status, code, country, checked_at, context_id, confirmed):
@@ -409,8 +433,10 @@ def main(argv=None):
                           'public website only; account features unverified', flush=True)
                 if args.notify and state.should_notify(time.monotonic()) and notify(service):
                     state.delivered(time.monotonic())
-                due[service] = time.monotonic() + (15 if status == 'REGION_RESTRICTED' and not state.confirmed
-                                                else args.interval)
+                completed = time.monotonic()
+                delay = app.next_delay(service, completed, args.interval) if app is not None else (
+                    15 if status == 'REGION_RESTRICTED' and not state.confirmed else args.interval)
+                due[service] = completed + delay
             if not args.watch:
                 return 0
             time.sleep(max(0.1, min(due.values()) - time.monotonic()))

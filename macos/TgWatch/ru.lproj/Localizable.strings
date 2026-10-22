@@ -1,11 +1,13 @@
 "Allow TgWatch notifications in macOS System Settings, then enable them here." = "Разрешите уведомления TgWatch в системных настройках macOS, затем включите их здесь.";
 "Bundled engine missing. Rebuild the app." = "Встроенный модуль проверки не найден. Соберите приложение заново.";
 "CAPTCHA / browser verification" = "CAPTCHA / проверка в браузере";
+"Cancel public-response watch" = "Отменить ожидание публичного ответа";
 "Check now" = "Проверить сейчас";
 "Checked: " = "Проверено: ";
 "Checks stopped; retry or open Help" = "Проверки остановлены; повторите или откройте справку";
 "Cloudflare context only" = "Контекст Cloudflare";
 "Country unverified" = "Страна не подтверждена";
+"Enable notifications to receive the alert" = "Включите уведомления для получения сигнала";
 "Explicit regional refusal" = "Явный региональный отказ";
 "Finding Python / starting checks…" = "Поиск Python / запуск проверок…";
 "Help" = "Справка";
@@ -34,7 +36,11 @@
 "Starting fresh checks…" = "Запуск свежих проверок…";
 "Stop monitoring" = "Остановить мониторинг";
 "System Settings" = "Системные настройки";
+"Tell me when the public site responds" = "Сообщить, когда публичный сайт ответит";
 "The public service reported a regional refusal twice. Verify access in the service; account features remain unverified." = "Публичный сервис дважды сообщил о региональном отказе. Проверьте доступ в сервисе; функции аккаунта не проверены.";
+"Two fresh public responses were observed. Account and feature access remain unverified." = "Получены два свежих публичных ответа. Доступ к аккаунту и функциям не проверен.";
 "Unverified" = "Не проверено";
+"Waiting for network information…" = "Ожидание сведений о сети…";
+"Waiting until: " = "Ожидание до: ";
 "confirmed" = "подтверждено";
 "off" = "выкл.";

@@ -52,6 +52,10 @@ import Foundation
         model.replace(generation: 3, services: [])
         expect(!model.ingest(line(), generation: 2, now: 1_100, uptime: 15), "Stopped process cannot revive results")
         expect(model.current(.gemini, now: 1_100, uptime: 15) == nil, "Stopped has no current evidence")
+        model.replace(generation: 4, services: [.gemini], networkEpoch: 7)
+        expect(model.ingest(line(), generation: 4, now: 1_100, uptime: 16, networkEpoch: 7), "Current network epoch")
+        expect(model.current(.gemini, now: 1_100, uptime: 16, networkEpoch: 8) == nil, "Queued path change fences UI")
+        expect(!model.ingest(line(), generation: 4, now: 1_100, uptime: 16, networkEpoch: 8), "Old child cannot publish after path change")
         print("RegionalMenuModel: \(assertions) assertions passed")
     }
 }
