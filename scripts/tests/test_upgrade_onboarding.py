@@ -12,11 +12,28 @@ class UpgradeOnboardingTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_live_controls_require_one_successful_self_targeted_snapshot_without_idle_or_stale_files(self):
+        module = self.load()
+        calls = []
+        def command(args):
+            calls.append(args)
+            return ('INSTRUMENTATION_RESULT: controls=<hierarchy />\n'
+                    'INSTRUMENTATION_CODE: -1\n')
+        self.assertEqual('hierarchy', module.controls(command).tag)
+        self.assertEqual([['shell', 'am', 'instrument', '-w', '-r',
+                           'ru.tgwatch.testui/.SnapshotInstrumentation']], calls)
+        for transcript in ['', 'INSTRUMENTATION_CODE: -1\n',
+                           'INSTRUMENTATION_RESULT: controls=<hierarchy />\nINSTRUMENTATION_CODE: 0\n']:
+            with self.assertRaises(ValueError): module.controls(lambda _: transcript)
+
     def run_fixture(self, module, guide=True, start_works=True, valid_button=True):
         now = [0.0]
         taps = []
         state = {'guide': guide, 'started': not guide}
         def command(args):
+            if args[:3] == ['shell', 'am', 'instrument']:
+                return ('INSTRUMENTATION_RESULT: controls=' + command(['shell', '-T', 'cat', 'live-controls']) +
+                        '\nINSTRUMENTATION_CODE: -1\n')
             if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
                 return 'isForeground=true' if state['started'] else ''
             if args[:3] == ['shell', '-T', 'cat']:
@@ -63,6 +80,9 @@ class UpgradeOnboardingTests(unittest.TestCase):
         module = self.load()
         now, swipes, taps = [0.0], [], []
         def command(args):
+            if args[:3] == ['shell', 'am', 'instrument']:
+                return ('INSTRUMENTATION_RESULT: controls=' + command(['shell', '-T', 'cat', 'live-controls']) +
+                        '\nINSTRUMENTATION_CODE: -1\n')
             if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
                 return 'isForeground=true' if taps else ''
             if args[:3] == ['shell', '-T', 'cat']:

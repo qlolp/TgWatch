@@ -104,6 +104,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
             return
         }
         val cancel = ProbeCancellation()
+        val journalGeneration = RegionalRepository.generation(ctx)
         cancellation = cancel
         val captured = ++ticket
         val networkRevision = revision
@@ -113,7 +114,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
                 try {
                     if (permit.start()) {
                         val result = probe(service, network, cancel, networkRevision, config)
-                        main.post { complete(captured, result) }
+                        main.post { complete(captured, result, journalGeneration) }
                     }
                 } finally { permit.finished(); cancel.close() }
             }
@@ -125,7 +126,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         }
     }
 
-    @Synchronized private fun complete(captured: Long, result: RegionalResult) {
+    @Synchronized private fun complete(captured: Long, result: RegionalResult, journalGeneration: Long) {
         if (captured != ticket || closed) return
         cancellation = null
         if (!active() || !current(result)) return
@@ -133,7 +134,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         evidence.update(result.status, "${result.networkHandle}:$revision:$configuration", result.checkedElapsed)
         val published = result.copy(regionConfirmed = evidence.confirmed())
         RegionalStateStore.put(published)
-        RegionalJournalObserver.record(ctx, published)
+        RegionalJournalObserver.record(ctx, published, journalGeneration)
         if (result.status == RegionalStatus.WEB_REACHABLE) RegionalPreferences.reachable(ctx, result.service)
         if (result.status != RegionalStatus.REGION_RESTRICTED) notifications.clear(result.service)
         if (result.status == RegionalStatus.REGION_RESTRICTED && !evidence.confirmed())

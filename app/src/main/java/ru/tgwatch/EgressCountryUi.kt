@@ -61,6 +61,7 @@ internal object EgressCountryUi {
         if (!force && coalesced(networkHandle, elapsed)) return
         lastAttemptElapsed = elapsed
         lastAttemptNetwork = networkHandle
+        val journalGeneration = RegionalRepository.generation(ctx)
         val ticket = lookup.begin(networkHandle, now)
         // A failed or interrupted forced refresh must not resurrect a confident cached country.
         Prefs.clearEgressCountry(ctx)
@@ -70,7 +71,7 @@ internal object EgressCountryUi {
                 val iso = if (permit?.start() == true) try { fetch(open) } finally { permit.finished() } else null
                 lookup.finish(ticket, activeHandle(ctx), iso) {
                     Prefs.setEgressCountry(ctx, it)
-                    RegionalJournalObserver.country(ctx, it)
+                    RegionalJournalObserver.country(ctx, it, journalGeneration)
                 }
             }
         } catch (_: RejectedExecutionException) {

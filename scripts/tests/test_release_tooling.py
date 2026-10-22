@@ -608,6 +608,13 @@ class SignedUpgradeWorkflowTests(unittest.TestCase):
             (scripts / name).write_text((SCRIPTS / name).read_text())
         self.log, self.state = self.work / "calls.jsonl", self.work / "state.json"
         self.state.write_text(json.dumps({"installed": None, "checked": 0, "prefs": "", "history": ""}))
+        (self.work / "gradlew").write_text('''#!/bin/bash
+python3 - "$@" <<'PY'
+import json, os, sys
+with open(os.environ['UPGRADE_LOG'], 'a') as stream:
+    stream.write(json.dumps(['gradle'] + sys.argv[1:]) + '\\n')
+PY
+''')
         (scripts / "adb-readiness.py").write_text("import json, os, sys\n"
             "with open(os.environ['UPGRADE_LOG'], 'a') as stream: "
             "stream.write(json.dumps(['readiness'] + sys.argv[1:]) + '\\n')\n")
@@ -625,6 +632,7 @@ elif args[:3] == ['shell', 'id', '-u']: print('0')
 elif args == ['shell', 'getprop', 'ro.kernel.qemu']: print('1')
 elif args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
     print('isForeground=true' if state['checked'] > 0 and state['enabled'] else '')
+elif args[0] == 'install' and args[-1] == 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk': pass
 elif args[0] == 'install':
     if '-r' not in args:
         if state['installed'] is not None: sys.exit(17)
@@ -644,7 +652,12 @@ elif args[:3] == ['shell', 'am', 'start']:
         tree.find(".//*[@name='last_checked']").set('value', str(state['checked']))
         state['prefs'] = ET.tostring(tree, encoding='unicode')
         state['history'] += str(state['checked']) + ',400,OK,10,1\\n'
-elif args[:3] == ['shell', 'uiautomator', 'dump']: pass
+elif args[:3] == ['shell', 'am', 'instrument']:
+    assert args[-1] == 'ru.tgwatch.testui/.SnapshotInstrumentation'
+    button = 'btnOnboardingSkip' if state['onboarding'] else 'btnToggle'
+    print('INSTRUMENTATION_RESULT: controls=<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/' +
+          button + '" enabled="true" clickable="true" bounds="[0,0][100,60]"/></hierarchy>')
+    print('INSTRUMENTATION_CODE: -1')
 elif args[:3] == ['shell', 'input', 'tap']:
     if state['onboarding']: state['onboarding'] = False
     else:
@@ -691,7 +704,16 @@ path.write_text(json.dumps(state))
 
     def test_both_upgrade_pairs_preserve_data_and_reset_only_between_pairs(self):
         calls = self.run_paths()
-        installations = [(index, call[-1]) for index, call in enumerate(calls) if call[:2] == ["adb", "install"]]
+        helper = 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk'
+        installations = [(index, call[-1]) for index, call in enumerate(calls)
+                         if call[:2] == ["adb", "install"] and call[-1] != helper]
+        helper_installs = [i for i, call in enumerate(calls) if call[:2] == ['adb', 'install'] and call[-1] == helper]
+        self.assertEqual(2, len(helper_installs))
+        self.assertTrue(all(calls[i] == ['adb', 'install', '-r', '-t', helper] for i in helper_installs))
+        self.assertLess(helper_installs[0], installations[0][0])
+        self.assertLess(installations[1][0], helper_installs[1])
+        self.assertLess(helper_installs[1], installations[2][0])
+        self.assertEqual(2, sum(call[:2] == ['gradle', ':ui-probe:assembleDebug'] for call in calls))
         self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk", "previous-latest/TgWatch.apk", "TgWatch.apk"],
                          [apk for _, apk in installations])
         resets = [index for index, call in enumerate(calls) if call[:2] == ["adb", "uninstall"]]
@@ -713,7 +735,8 @@ path.write_text(json.dumps(state))
     def test_first_release_still_runs_legacy_gate(self):
         calls = self.run_paths(latest=False)
         self.assertEqual(["previous/TgWatch.apk", "TgWatch.apk"],
-                         [call[-1] for call in calls if call[:2] == ["adb", "install"]])
+                         [call[-1] for call in calls if call[:2] == ["adb", "install"] and
+                          call[-1] != 'ui-probe/build/outputs/apk/debug/ui-probe-debug.apk'])
         self.assertFalse(any(call[:2] == ["adb", "uninstall"] for call in calls))
         self.assertTrue((self.work / "signed-upgrade/legacy/upgrade-after-prefs.xml").is_file())
 

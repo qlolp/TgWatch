@@ -12,11 +12,11 @@
     <string name="regional_compare_progress">Результаты: %1$d / %2$d. Окно замера: 75 секунд.</string>
     <string name="regional_compare_saving">Сохранение сравнения…</string>
     <string name="regional_compare_saved">Сравнение сохранено</string>
-    <string name="regional_compare_save_error">Не удалось прочитать или сохранить сравнения. Показанные данные могут быть неполными. Для повтора сделайте свежий замер.</string>
+    <string name="regional_compare_save_error">Не удалось прочитать или сохранить сравнения. Повторите попытку или очистите сохранённые сравнения для сброса хранилища.</string>
     <string name="regional_compare_cancel">Отменить текущий замер</string>
     <string name="regional_compare_cancelled">Замер отменён</string>
     <string name="regional_compare_clear">Удалить сохранённые сравнения</string>
-    <string name="regional_compare_clear_confirm">Удалить все сохранённые сравнения подключений с этого устройства?</string>
+    <string name="regional_compare_clear_confirm">Удалить сохранённые сравнения? Это также сбросит повреждённый файл сравнений.</string>
     <string name="regional_compare_cleared">Сохранённые сравнения удалены</string>
     <string name="regional_compare_history">Сохранённые сравнения (до 10)</string>
     <string name="regional_compare_same">В замерах A и B сохранён один контекст подключения.</string>

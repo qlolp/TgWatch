@@ -8,7 +8,23 @@ import time
 import xml.etree.ElementTree as ET
 
 PREFS = '/data/user_de/0/ru.tgwatch/shared_prefs/tgwatch.xml'
-UI = '/data/local/tmp/tgwatch-upgrade-ui.xml'
+
+
+def controls(command):
+    # A ticking status screen need not become accessibility-idle. Read a fresh,
+    # bounded allowlist through separate self-targeted instrumentation instead.
+    output = command(['shell', 'am', 'instrument', '-w', '-r',
+                      'ru.tgwatch.testui/.SnapshotInstrumentation'])
+    lines = output.splitlines()
+    prefix = 'INSTRUMENTATION_RESULT: controls='
+    rows = [line[len(prefix):] for line in lines if line.startswith(prefix)]
+    codes = [line.strip() for line in lines if line.startswith('INSTRUMENTATION_CODE:')]
+    if len(rows) != 1 or codes != ['INSTRUMENTATION_CODE: -1'] or len(rows[0]) > 4096:
+        raise ValueError('No successful fresh control snapshot')
+    root = ET.fromstring(rows[0])
+    if root.tag != 'hierarchy':
+        raise ValueError('Invalid control snapshot')
+    return root
 
 
 def center(bounds):
@@ -30,8 +46,7 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                                            'ru.tgwatch/.MonitorService']):
             return
         try:
-            command(['shell', 'uiautomator', 'dump', '--compressed', UI])
-            root = ET.fromstring(command(['shell', '-T', 'cat', UI]))
+            root = controls(command)
             nodes = {n.get('resource-id'): n for n in root.iter('node') if n.get('package') == 'ru.tgwatch'}
             def tap(name):
                 node = nodes.get('ru.tgwatch:id/' + name)
@@ -56,7 +71,7 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                             x = str((left + right) // 2)
                             command(['shell', 'input', 'swipe', x, str(top + (bottom - top) * 3 // 4),
                                      x, str(top + (bottom - top) // 4), '300'])
-        except (subprocess.SubprocessError, ET.ParseError):
+        except (subprocess.SubprocessError, ET.ParseError, ValueError):
             pass
         pause(.5)
     raise ValueError('Predecessor did not enter foreground monitoring through its UI')

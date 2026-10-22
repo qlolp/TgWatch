@@ -95,7 +95,7 @@ internal class RegionalComparisonUi(private val activity: Activity, private val 
         b.isEnabled = pending == null && !state.saving && state.a != null
         cancel.isEnabled = pending != null
         val history = RegionalComparisonRepository.snapshot(activity)
-        clear.isEnabled = history.pairs.isNotEmpty() && !state.saving
+        clear.isEnabled = (history.error || history.pairs.isNotEmpty()) && !state.saving
         loader.request(RegionalComparisonViewKey(history, state.a, state.latest))
     }
 

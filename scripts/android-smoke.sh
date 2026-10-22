@@ -43,7 +43,7 @@ report_storage_mode() {
 }
 # The always-run reporter must never mistake a previous run for fresh results.
 rm -rf -- app/build/outputs/androidTest-results/connected
-bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace
+bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug :ui-probe:assembleDebug --no-daemon --stacktrace
 python3 scripts/adb-readiness.py
 report_storage_mode after-instrumentation
 mkdir -p app/build/reports/androidTests/ui-screenshots
@@ -205,6 +205,7 @@ check_crashes
 # Exercise the same real onboarding/start UI used by the signed predecessor gate.
 # All data-preservation assertions above have finished on this disposable emulator.
 if [[ "$api_level" -eq 35 ]]; then
+  adb install -r -t ui-probe/build/outputs/apk/debug/ui-probe-debug.apk
   adb uninstall ru.tgwatch
   adb install -g app/build/outputs/apk/debug/app-debug.apk
   adb shell am start -W -n ru.tgwatch/.MainActivity

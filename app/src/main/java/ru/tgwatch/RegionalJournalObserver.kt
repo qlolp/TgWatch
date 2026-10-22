@@ -4,9 +4,11 @@ import android.content.Context
 
 /** Builds allowlisted historical metadata only after the monitor/country lookup accepted its generation. */
 internal object RegionalJournalObserver {
-    fun record(ctx: Context, result: RegionalResult) {
+    fun record(ctx: Context, result: RegionalResult, journalGeneration: Long) {
+        if (journalGeneration != RegionalRepository.generation(ctx)) return
         val connection = RegionalContext.current(ctx, result.networkHandle, result.configurationRevision)
-        RegionalRepository.recordEntries(ctx, listOf(entry(result, connection)), includeContext = true)
+        RegionalRepository.recordEntries(ctx, listOf(entry(result, connection)), includeContext = true,
+            expectedGeneration = journalGeneration)
     }
 
     fun entry(result: RegionalResult, connection: RegionalConnection): RegionalJournalEntry {
@@ -17,12 +19,12 @@ internal object RegionalJournalObserver {
             result.httpCode?.takeIf(RegionalJournalCodec::validHttpCode), result.failure)
     }
 
-    fun country(ctx: Context, country: EgressCountry.Snapshot) {
-        if (!RegionalPreferences.anyEnabled(ctx)) return
+    fun country(ctx: Context, country: EgressCountry.Snapshot, journalGeneration: Long) {
+        if (!RegionalPreferences.anyEnabled(ctx) || journalGeneration != RegionalRepository.generation(ctx)) return
         val connection = RegionalContext.current(ctx, country.networkHandle, RegionalPreferences.revision(ctx))
         if (connection.country != country.iso) return
         RegionalRepository.recordEntries(ctx, listOf(RegionalJournalEntry(RegionalEventKind.COUNTRY,
             country.checkedAt, connection.token, connection.route, country.iso, country.checkedAt)),
-            includeContext = true)
+            includeContext = true, expectedGeneration = journalGeneration)
     }
 }

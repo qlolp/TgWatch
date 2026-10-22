@@ -14,6 +14,8 @@ await_observation() {
 }
 # The same bounded reconnect/root/boot gate used by the Android smoke suite.
 python3 scripts/adb-readiness.py --timeout 180
+bash ./gradlew :ui-probe:assembleDebug --no-daemon --stacktrace
+adb install -r -t ui-probe/build/outputs/apk/debug/ui-probe-debug.apk
 adb install -g "$old_apk"
 adb shell am start -W -n ru.tgwatch/.MainActivity
 python3 scripts/prepare-upgrade-predecessor.py

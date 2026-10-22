@@ -7,6 +7,7 @@ local.properties
 /app/build/
 /probe-core/build/
 /wear/build/
+/ui-probe/build/
 /captures/
 .externalNativeBuild/
 .cxx/

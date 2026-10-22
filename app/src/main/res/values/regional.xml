@@ -12,11 +12,11 @@
     <string name="regional_compare_progress">Results: %1$d / %2$d. Capture window: 75 seconds.</string>
     <string name="regional_compare_saving">Saving comparison…</string>
     <string name="regional_compare_saved">Comparison saved</string>
-    <string name="regional_compare_save_error">Comparisons could not be read or saved. Displayed data may be incomplete. Take a fresh measurement to retry.</string>
+    <string name="regional_compare_save_error">Could not read or save comparisons. Retry, or clear saved comparisons to reset storage.</string>
     <string name="regional_compare_cancel">Cancel current measurement</string>
     <string name="regional_compare_cancelled">Measurement cancelled</string>
     <string name="regional_compare_clear">Delete saved comparisons</string>
-    <string name="regional_compare_clear_confirm">Delete all saved connection comparisons from this device?</string>
+    <string name="regional_compare_clear_confirm">Clear saved comparisons? This also resets a damaged comparison file.</string>
     <string name="regional_compare_cleared">Saved comparisons deleted</string>
     <string name="regional_compare_history">Saved comparisons (up to 10)</string>
     <string name="regional_compare_same">A and B have the same recorded connection context.</string>
