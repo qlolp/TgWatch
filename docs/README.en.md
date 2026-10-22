@@ -13,7 +13,7 @@ additional targets and integrations start disabled. See [targets](multiservice.m
 Version 1.22 adds optional regional profiles for YouTube, Gemini, Notebook, Antigravity
 and ChatGPT/dots, current exit-country information, and separate Mac/browser helpers.
 Public-site access does not certify account features or an IP-only restriction.
-See the [regional-services guide](regional-services.md) and [release notes](releases/1.22.0.md).
+See the [regional-services guide](regional-services.md) and [release notes](releases/1.22.1.md).
 
 ## Reading the status
 
