@@ -360,7 +360,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-
+        backupUi.resume()
         historyUi.resume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)

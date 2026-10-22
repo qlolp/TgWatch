@@ -7,6 +7,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NetworkTallyTest {
+    @Test fun decoderRejectsCounterOverflowAndLimitsEvenShortRows() {
+        assertTrue(NetworkTally.decode("10,WIFI,9223372036854775807,0,0").snapshot.isEmpty())
+        val tooManyRows = (1..36).joinToString("\n") { "$it,WIFI,1,0,0" }
+        assertTrue(NetworkTally.decode(tooManyRows).snapshot.isEmpty())
+    }
+
+    @Test fun loadingClipsOldAndFutureRowsToTheCurrentCalendarWindow() {
+        val rows = "1,WIFI,1,0,0\n9,WIFI,2,0,0\n10,WIFI,3,0,0\n11,WIFI,4,0,0"
+        val loaded = NetworkTally.decode(rows, today = 10)
+        assertEquals(setOf(9L, 10L), loaded.snapshot.keys.map { it.first }.toSet())
+        assertEquals(NetCounts(ok = 5), loaded.totals(10, 7).getValue(NetworkKind.WIFI))
+    }
+
+    @Test fun decodedCountersSumWithoutIntegerOverflow() {
+        val tally = NetworkTally.decode("10,WIFI,2147483647,1,0")
+        val counts = tally.totals(10, 1).getValue(NetworkKind.WIFI)
+        assertEquals(2_147_483_648L, counts.total)
+        assertTrue(counts.okPercent in 0.0..100.0)
+    }
+
+    @Test fun incrementingAnOldMaximumCounterKeepsItNonNegative() {
+        val tally = NetworkTally.decode("10,WIFI,2147483647,0,0")
+        tally.record(10, NetworkKind.WIFI, "OK")
+        assertEquals(2_147_483_648L, tally.totals(10, 1).getValue(NetworkKind.WIFI).ok)
+        assertEquals(tally.snapshot, NetworkTally.decode(tally.encode()).snapshot)
+    }
+
+    @Test fun clockRollbackDiscardsFutureStatistics() {
+        val tally = NetworkTally()
+        tally.record(10, NetworkKind.WIFI, "OK")
+        tally.record(9, NetworkKind.WIFI, "OK")
+        assertEquals(setOf(9L), tally.snapshot.keys.map { it.first }.toSet())
+    }
+
+    @Test fun oversizedAuxiliaryStatisticsAreDiscarded() {
+        val text = (1..10_000).joinToString("\n") { "$it,WIFI,1,0,0" }
+        assertTrue(NetworkTally.decode(text).snapshot.isEmpty())
+    }
+
     private fun NetworkTally.add(day: Long, kind: NetworkKind, ok: Int = 0, partial: Int = 0, down: Int = 0) {
         repeat(ok) { record(day, kind, "OK") }
         repeat(partial) { record(day, kind, "PARTIAL") }
