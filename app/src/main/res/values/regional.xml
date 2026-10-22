@@ -80,4 +80,13 @@
     <string name="country_unverified">Exit country is unverified</string>
     <string name="country_current">%1$s %2$s · %3$s\nExit country according to Cloudflare</string>
     <string name="country_stale">%1$s %2$s · old result (%3$s)\nCurrent connection’s country is unverified</string>
+    <string name="regional_watch_channel">Public website response watches</string>
+    <string name="regional_watch_title">%1$s: public website responds</string>
+    <string name="regional_watch_message">Two fresh public responses were observed. Account and feature access remain unverified.</string>
+    <string name="regional_watch_arm">Tell me when the public site responds</string>
+    <string name="regional_watch_cancel">Waiting until %1$s · cancel</string>
+    <string name="regional_watch_help">After a confirmed regional refusal, you can request one alert after two fresh public responses at least 15 seconds apart. The request lasts up to 24 hours while monitoring is enabled. This does not confirm account features. Quiet hours, mute, maintenance and notification settings still apply.</string>
+    <string name="regional_watch_channel_settings">Public-response notification channel</string>
+    <string name="regional_watch_saved">Public-response watch updated</string>
+    <string name="regional_watch_changed">State changed or the request could not be saved. Check the screen and retry.</string>
 </resources>

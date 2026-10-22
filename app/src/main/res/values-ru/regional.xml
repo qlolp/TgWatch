@@ -82,4 +82,13 @@
     <string name="country_unverified">Страна выхода не подтверждена</string>
     <string name="country_current">%1$s %2$s · %3$s\nСтрана выхода по данным Cloudflare</string>
     <string name="country_stale">%1$s %2$s · старые данные (%3$s)\nСтрана текущего подключения не подтверждена</string>
+    <string name="regional_watch_channel">Ожидание ответа публичного сайта</string>
+    <string name="regional_watch_title">%1$s: публичный сайт отвечает</string>
+    <string name="regional_watch_message">Получены два свежих публичных ответа. Доступ к аккаунту и функциям не проверен.</string>
+    <string name="regional_watch_arm">Сообщить, когда публичный сайт ответит</string>
+    <string name="regional_watch_cancel">Ожидаю до %1$s · отменить</string>
+    <string name="regional_watch_help">После подтверждённого регионального отказа можно запросить одно уведомление о двух свежих публичных ответах с интервалом от 15 секунд. Запрос действует до 24 часов; проверки идут при включённом мониторинге. Это не подтверждает работу аккаунта. Действуют тихие часы, заглушение, плановые паузы и настройки уведомлений.</string>
+    <string name="regional_watch_channel_settings">Канал уведомлений об ответе сайта</string>
+    <string name="regional_watch_saved">Ожидание публичного ответа обновлено</string>
+    <string name="regional_watch_changed">Состояние изменилось или запрос не сохранился. Проверьте экран и повторите.</string>
 </resources>

@@ -61,7 +61,7 @@ if [[ "$api_level" -ge 33 ]]; then
   adb shell pm set-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
   permission_status=0
   adb shell am instrument -w -r -e class \
-    'ru.tgwatch.EventNotificationTest#disabledAppNotificationsReportNoSummaryDelivery,ru.tgwatch.OnboardingFlowTest#permanentlyDeniedNotificationActionReturnsFromSettings' \
+    'ru.tgwatch.EventNotificationTest#disabledAppNotificationsReportNoSummaryDelivery,ru.tgwatch.OnboardingFlowTest#permanentlyDeniedNotificationActionReturnsFromSettings,ru.tgwatch.RegionalWatchIntegrationTest#deniedAppNotificationsDoNotConsumeTheArmedWatch' \
     ru.tgwatch.test/androidx.test.runner.AndroidJUnitRunner > "$permission_log" || permission_status=$?
   adb shell pm clear-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
   adb shell pm grant ru.tgwatch android.permission.POST_NOTIFICATIONS

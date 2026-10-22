@@ -27,7 +27,7 @@ internal object RegionalPreferences {
     }
 
     private fun key(service: RegionalService, suffix: String) = "$PREFIX${service.wire}.$suffix"
-    private fun profileRevision(ctx: Context, service: RegionalService): Long =
+    fun profileRevision(ctx: Context, service: RegionalService): Long =
         Prefs.sp(ctx).getLong(key(service, "enabled_revision"), 0)
     fun notificationAllowed(ctx: Context, service: RegionalService, network: Long): Boolean {
         val prefs = Prefs.sp(ctx)

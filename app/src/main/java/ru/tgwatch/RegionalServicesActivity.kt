@@ -20,6 +20,7 @@ class RegionalServicesActivity : Activity() {
     private val switches = mutableMapOf<RegionalService, Switch>()
     private lateinit var country: TextView
     private lateinit var verification: RegionalVerificationUi
+    private lateinit var watches: RegionalWatchUi
     private var writing = false
     private var binding = false
     private val ticker = object : Runnable {
@@ -48,6 +49,8 @@ class RegionalServicesActivity : Activity() {
             startActivity(Intent(this, RegionalComparisonActivity::class.java))
         }
         verification = RegionalVerificationUi(this)
+        watches = RegionalWatchUi(this)
+        content.addView(TextView(this).apply { setText(R.string.regional_watch_help) })
         RegionalService.entries.forEach { service -> addProfile(content, service) }
         button(content, R.string.regional_check) {
             if (!MonitorService.requestRegionalCheck())
@@ -58,6 +61,12 @@ class RegionalServicesActivity : Activity() {
             startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                 .putExtra(Settings.EXTRA_CHANNEL_ID, RegionalNotifications.CHANNEL))
+        }
+        button(content, R.string.regional_watch_channel_settings) {
+            RegionalPublicNotifications(this)
+            startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, RegionalPublicNotifications.CHANNEL))
         }
         content.addView(TextView(this).apply { setText(R.string.regional_maintenance) })
         MaintenanceSettingsUi.add(this, content,
@@ -97,6 +106,7 @@ class RegionalServicesActivity : Activity() {
         })
         button(content, R.string.regional_why) { RegionalExplanationUi.show(this, service) }
         verification.add(content, service)
+        watches.add(content, service)
         toggle.setOnCheckedChangeListener { _, checked -> configure(service, checked) }
     }
 
@@ -138,6 +148,7 @@ class RegionalServicesActivity : Activity() {
                 getString(R.string.regional_source_public), detail)
         }
         verification.render()
+        watches.render()
     }
 
     private fun resultText(result: RegionalResult): String {
