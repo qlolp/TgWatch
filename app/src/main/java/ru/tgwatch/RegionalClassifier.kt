@@ -24,13 +24,15 @@ object RegionalClassifier {
     private val headings = Regex("<(h1|h2)\\b[^>]*>(.*?)</\\1\\s*>",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private const val MAX_VISIBLE_REGION_TEXT = 4_096
+    private const val MAX_CODE_LENGTH = 128
 
     fun classify(code: Int, contentType: String, body: String, locationHost: String = "",
         complete: Boolean = true): RegionalStatus = when {
-        code == 401 -> RegionalStatus.AUTH_REQUIRED
-        code == 429 -> RegionalStatus.RATE_LIMITED
-        code in 300..399 && locationHost.lowercase(Locale.ROOT) in loginHosts -> RegionalStatus.AUTH_REQUIRED
-        code !in 200..299 && code !in 400..499 -> RegionalStatus.UNKNOWN
+        code == RegionalHttpStatus.AUTH_REQUIRED -> RegionalStatus.AUTH_REQUIRED
+        code == RegionalHttpStatus.RATE_LIMITED -> RegionalStatus.RATE_LIMITED
+        code in RegionalHttpStatus.redirect && locationHost.lowercase(Locale.ROOT) in loginHosts ->
+            RegionalStatus.AUTH_REQUIRED
+        code !in RegionalHttpStatus.success && code !in RegionalHttpStatus.denial -> RegionalStatus.UNKNOWN
         contentType.substringBefore(';').trim().lowercase(Locale.ROOT) == "application/json" ->
             json(body, complete, code)
         else -> visible(code, body, complete)
@@ -43,9 +45,9 @@ object RegionalClassifier {
         return when {
             complete && challengePhrases.any(clean::contains) -> RegionalStatus.CHALLENGE
             complete && clean.length <= MAX_VISIBLE_REGION_TEXT && regionPhrases.any(clean::contains) &&
-                (code in 400..499 || regionHeading(body)) ->
+                (code in RegionalHttpStatus.denial || regionHeading(body)) ->
                 RegionalStatus.REGION_RESTRICTED
-            code in 200..299 -> RegionalStatus.WEB_REACHABLE
+            code in RegionalHttpStatus.success -> RegionalStatus.WEB_REACHABLE
             else -> RegionalStatus.UNKNOWN
         }
     }
@@ -67,7 +69,7 @@ object RegionalClassifier {
                 if (name == "error" && reader.nextType == '{') {
                     error = true
                     reader.objectFields { field ->
-                        if (field == "code" && reader.nextType == '"') errorCode = reader.string(128)
+                        if (field == "code" && reader.nextType == '"') errorCode = reader.string(MAX_CODE_LENGTH)
                         else reader.skipValue()
                     }
                 } else reader.skipValue()
@@ -76,7 +78,7 @@ object RegionalClassifier {
             when {
                 errorCode?.lowercase(Locale.ROOT) in regionCodes -> RegionalStatus.REGION_RESTRICTED
                 error -> RegionalStatus.UNKNOWN
-                code in 200..299 -> RegionalStatus.WEB_REACHABLE
+                code in RegionalHttpStatus.success -> RegionalStatus.WEB_REACHABLE
                 else -> RegionalStatus.UNKNOWN
             }
         } catch (_: IllegalArgumentException) { RegionalStatus.UNKNOWN }

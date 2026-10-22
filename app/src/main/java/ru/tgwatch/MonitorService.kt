@@ -104,13 +104,7 @@ class MonitorService : Service() {
         @Volatile private var lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
 
         fun endpointOutcomes(): List<ProbeOutcome> = lastEndpoints
-        internal fun requestRegionalCheck(): Boolean {
-            val service = activeService ?: return false
-            if (!service.acceptsRunningCheck(service) || !RegionalPreferences.anyEnabled(service)) return false
-            service.regionalMonitor?.request()
-            service.worker.post { service.rearmChecks() }
-            return true
-        }
+        internal var regionalRequest: (() -> Boolean)? = null
         fun schedulingDiagnostics(): ScheduleDiagnostics.Snapshot =
             activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
 
@@ -375,7 +369,7 @@ class MonitorService : Service() {
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        createChannels()
+        OngoingNotification.createChannels(this, nm)
         eventNotifications = EventNotifications(this, nm)
         targetAlertController = TargetAlertController(this, nm) { acceptsRunningCheck(this) }
         slowController = SlowAlertController(this, eventNotifications, {
@@ -393,7 +387,7 @@ class MonitorService : Service() {
         regionalMonitor = RegionalMonitor(this, { acceptsRunningCheck(this) }, {
             lastProgressMono = SystemClock.elapsedRealtime()
             worker.post { releaseWakeLock(); rearmChecks() }
-        })
+        }).also { regionalRequest = it::request }
 
         running = true
         lastProgressMono = SystemClock.elapsedRealtime()
@@ -467,8 +461,7 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
-        targetMonitoring?.let { targets -> worker.post { targets.refresh() } }
-        regionalMonitor?.tick()
+        worker.post { targetMonitoring?.refresh(); regionalMonitor?.tick() }
         if (action == ACTION_HEALTH) ensureProgress()
         val first = beginLoop()
         slowController?.reconcile()
@@ -538,6 +531,7 @@ class MonitorService : Service() {
         targetAlertController?.close()
         targetMonitoring?.close()
         regionalMonitor?.close()
+        if (activeService === this) regionalRequest = null
         deferredExtra = null
         extraCoordinator.close()
         scheduleDiagnostics.canceled()
@@ -861,7 +855,7 @@ class MonitorService : Service() {
 
         targetMonitoring?.onTelegram(newState, p.outcomes)
         NetworkStats.record(this, now, probeNetwork, newState.status.name)
-        refreshEgressCountry()
+        EgressCountryUi.refreshActive(this)
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
@@ -880,14 +874,6 @@ class MonitorService : Service() {
         }
     }
 
-    /** Informational only: never blocks the check and never stores the egress address. */
-    private fun refreshEgressCountry() {
-        val network = cm.activeNetwork ?: return
-        EgressCountryUi.refresh(this, network.networkHandle) { url ->
-            network.openConnection(url) as java.net.HttpURLConnection
-        }
-    }
-
     private fun publishEventAlerts(p: Probe, changed: Boolean, sound: Boolean, alertsAllowed: Boolean) {
         val fire = changed || sound
         if (fire && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
@@ -897,8 +883,6 @@ class MonitorService : Service() {
     }
 
     // ------------------------------------------------------------ уведомление
-
-    private fun createChannels() = OngoingNotification.createChannels(this, nm)
 
     private fun goForeground(): Boolean {
         val view = notificationView(state)
@@ -958,8 +942,7 @@ class MonitorService : Service() {
     private fun notificationView(s: State, now: Long = System.currentTimeMillis()): OngoingView =
         if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled)
             OngoingNotification.view(s, currentNotificationStats(), now)
-        else if (RegionalPreferences.anyEnabled(this) &&
-            TargetId.entries.none { TargetPreferences.definition(this, it).enabled })
+        else if (RegionalPreferences.onlyRegional(this))
             OngoingNotification.regional(this, now)
         else OngoingNotification.targets(TargetId.entries.filter { it != TargetId.TELEGRAM &&
             Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled }

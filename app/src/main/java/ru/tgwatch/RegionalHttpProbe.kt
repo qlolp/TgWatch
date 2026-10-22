@@ -17,6 +17,9 @@ internal object RegionalHttpProbe {
     private const val TIMEOUT_MS = 3_000
     private const val BUDGET_MS = 9_000L
     private const val MAX_BYTES = 32 * 1024
+    private const val HOPS = 3
+    private const val BUFFER_BYTES = 2_048
+    private const val MAX_LOCATION = 2_048
     private val deadlines = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "regional-deadline").apply { isDaemon = true }
     }
@@ -43,51 +46,66 @@ internal object RegionalHttpProbe {
     private fun request(service: RegionalService, network: Network,
         cancellation: ProbeCancellation): Measured {
         var uri = URI(service.address)
-        repeat(3) { hop ->
-            cancellation.check()
-            val connection = network.openConnection(uri.toURL()) as HttpsURLConnection
-            cancellation.register { connection.disconnect() }
-            try {
-                connection.connectTimeout = TIMEOUT_MS
-                connection.readTimeout = TIMEOUT_MS
-                connection.instanceFollowRedirects = false
-                connection.useCaches = false
-                connection.setRequestProperty("Accept", "text/html, application/json")
-                connection.setRequestProperty("Accept-Encoding", "identity")
-                connection.setRequestProperty("Cookie", "")
-                val code = connection.responseCode
-                if (code in 300..399) {
-                    val location = connection.getHeaderField("Location")?.takeIf { it.length <= 2_048 }
-                    val next = location?.let { runCatching { uri.resolve(it) }.getOrNull() }
-                    val status = RegionalClassifier.classify(code, "", "", next?.host.orEmpty())
-                    if (status == RegionalStatus.AUTH_REQUIRED) return Measured(status, code)
-                    if (hop == 2 || next == null || !allowed(service, next))
-                        return Measured(RegionalStatus.UNKNOWN, code)
-                    uri = next
-                } else {
-                    val input = if (code >= 400) connection.errorStream else connection.inputStream
-                    val bytes = ByteArrayOutputStream()
-                    var complete = true
-                    input?.use { stream ->
-                        val buffer = ByteArray(2_048)
-                        while (true) {
-                            cancellation.check()
-                            val count = stream.read(buffer, 0, minOf(buffer.size, MAX_BYTES + 1 - bytes.size()))
-                            if (count < 0) break
-                            bytes.write(buffer, 0, count)
-                            if (bytes.size() > MAX_BYTES) { complete = false; break }
-                        }
-                    }
-                    cancellation.check()
-                    val body = bytes.toByteArray().toString(Charsets.UTF_8)
-                    return Measured(RegionalClassifier.classify(code, connection.contentType.orEmpty(), body,
-                        complete = complete), code)
-                }
-            } finally { connection.disconnect() }
+        repeat(HOPS) { hop ->
+            val step = exchange(service, network, cancellation, uri, hop)
+            if (step.result != null) return step.result
+            uri = checkNotNull(step.next)
         }
         return Measured(RegionalStatus.UNKNOWN)
     }
 
+    private data class Step(val next: URI? = null, val result: Measured? = null)
+
+    private fun exchange(service: RegionalService, network: Network, cancellation: ProbeCancellation,
+        uri: URI, hop: Int): Step {
+        cancellation.check()
+        val connection = network.openConnection(uri.toURL()) as HttpsURLConnection
+        cancellation.register { connection.disconnect() }
+        try {
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            connection.instanceFollowRedirects = false
+            connection.useCaches = false
+            connection.setRequestProperty("Accept", "text/html, application/json")
+            connection.setRequestProperty("Accept-Encoding", "identity")
+            connection.setRequestProperty("Cookie", "")
+            val code = connection.responseCode
+            return if (code in RegionalHttpStatus.redirect) redirect(service, connection, uri, hop, code)
+            else Step(result = body(connection, code, cancellation))
+        } finally { connection.disconnect() }
+    }
+
+    private fun redirect(service: RegionalService, connection: HttpsURLConnection,
+        uri: URI, hop: Int, code: Int): Step {
+        val location = connection.getHeaderField("Location")?.takeIf { it.length <= MAX_LOCATION }
+        val next = location?.let { runCatching { uri.resolve(it) }.getOrNull() }
+        val status = RegionalClassifier.classify(code, "", "", next?.host.orEmpty())
+        return when {
+            status == RegionalStatus.AUTH_REQUIRED -> Step(result = Measured(status, code))
+            hop < HOPS - 1 && next != null && allowed(service, next) -> Step(next = next)
+            else -> Step(result = Measured(RegionalStatus.UNKNOWN, code))
+        }
+    }
+
+    private fun body(connection: HttpsURLConnection, code: Int, cancellation: ProbeCancellation): Measured {
+        val input = if (code >= RegionalHttpStatus.denial.first) connection.errorStream else connection.inputStream
+        val bytes = ByteArrayOutputStream()
+        input?.use { stream ->
+            val buffer = ByteArray(BUFFER_BYTES)
+            var count = stream.read(buffer)
+            while (count >= 0 && bytes.size() <= MAX_BYTES) {
+                cancellation.check()
+                if (count == 0) throw IOException("Empty transport read")
+                bytes.write(buffer, 0, count)
+                count = if (bytes.size() <= MAX_BYTES)
+                    stream.read(buffer, 0, minOf(buffer.size, MAX_BYTES + 1 - bytes.size())) else -1
+            }
+        }
+        cancellation.check()
+        return Measured(RegionalClassifier.classify(code, connection.contentType.orEmpty(),
+            bytes.toByteArray().toString(Charsets.UTF_8), complete = bytes.size() <= MAX_BYTES), code)
+    }
+
     private fun allowed(service: RegionalService, uri: URI): Boolean = uri.scheme == "https" &&
-        uri.host in service.canonicalHosts && uri.userInfo == null && uri.port in setOf(-1, 443)
+        uri.host in service.canonicalHosts && uri.userInfo == null && uri.port in setOf(-1, RegionalHttpStatus.TLS_PORT)
 }

@@ -38,6 +38,7 @@ object Prefs {
     private const val KEY_EGRESS_ISO = "egress_iso"
     private const val KEY_EGRESS_AT = "egress_at"
     private const val KEY_EGRESS_NET = "egress_net"
+    private const val KEY_EGRESS_BOOT = "egress_boot"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
     private const val KEY_LAST_LATENCY = "last_latency"
@@ -284,7 +285,7 @@ object Prefs {
     }
 
     @Synchronized
-    private fun alertMuteRemaining(ctx: Context, now: Long): Long =
+    internal fun alertMuteRemaining(ctx: Context, now: Long): Long =
         AlertMute.remaining(alertMuteStore(ctx), now, SystemClock.elapsedRealtime(), bootCount(ctx))
 
     /** The wall-clock argument is retained for existing callers; the new timer ignores clock corrections. */
@@ -401,8 +402,11 @@ object Prefs {
 
     /** Device-local egress country; the address itself is never persisted. */
     fun egressCountry(ctx: Context): EgressCountry.Snapshot? {
-        val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) } ?: return null
-        return EgressCountry.Snapshot(iso, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+        val sameBoot = bootCount(ctx) >= 0 && sp(ctx).getInt(KEY_EGRESS_BOOT, -1) == bootCount(ctx)
+        val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) && sameBoot }
+        return iso?.let {
+            EgressCountry.Snapshot(it, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+        }
     }
 
     fun setEgressCountry(ctx: Context, snapshot: EgressCountry.Snapshot) {
@@ -411,6 +415,7 @@ object Prefs {
             .putString(KEY_EGRESS_ISO, snapshot.iso)
             .putLong(KEY_EGRESS_AT, snapshot.checkedAt)
             .putLong(KEY_EGRESS_NET, snapshot.networkHandle)
+            .putInt(KEY_EGRESS_BOOT, bootCount(ctx))
             .apply()
     }
 
@@ -419,6 +424,7 @@ object Prefs {
             .remove(KEY_EGRESS_ISO)
             .remove(KEY_EGRESS_AT)
             .remove(KEY_EGRESS_NET)
+            .remove(KEY_EGRESS_BOOT)
             .apply()
     }
 }

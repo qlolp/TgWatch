@@ -23,7 +23,7 @@ class RegionalServicesActivity : Activity() {
     private var writing = false
     private var binding = false
     private val ticker = object : Runnable {
-        override fun run() { render(); ui.postDelayed(this, 1_000L) }
+        override fun run() { render(); ui.postDelayed(this, REDRAW_MS) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,7 +31,7 @@ class RegionalServicesActivity : Activity() {
         title = getString(R.string.regional_title)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val padding = (16 * resources.displayMetrics.density).toInt()
+            val padding = (PADDING_DP * resources.displayMetrics.density).toInt()
             setPadding(padding, padding, padding, padding)
         }
         setContentView(ScrollView(this).apply { addView(content) })
@@ -60,7 +60,7 @@ class RegionalServicesActivity : Activity() {
     private fun button(content: LinearLayout, text: Int, action: () -> Unit) {
         content.addView(Button(this).apply {
             setText(text)
-            minimumHeight = (48 * resources.displayMetrics.density).toInt()
+            minimumHeight = (TOUCH_DP * resources.displayMetrics.density).toInt()
             setOnClickListener { action() }
         })
     }
@@ -68,7 +68,7 @@ class RegionalServicesActivity : Activity() {
     private fun addProfile(content: LinearLayout, service: RegionalService) {
         val toggle = Switch(this).apply {
             text = service.title
-            minimumHeight = (48 * resources.displayMetrics.density).toInt()
+            minimumHeight = (TOUCH_DP * resources.displayMetrics.density).toInt()
             isChecked = RegionalPreferences.enabled(this@RegionalServicesActivity, service)
             isSaveEnabled = false
         }
@@ -133,5 +133,11 @@ class RegionalServicesActivity : Activity() {
         RegionalStatus.RATE_LIMITED -> R.string.regional_rate
         RegionalStatus.NETWORK_ERROR -> R.string.regional_network
         RegionalStatus.UNKNOWN -> R.string.regional_unverified
+    }
+
+    private companion object {
+        const val REDRAW_MS = 1_000L
+        const val TOUCH_DP = 48
+        const val PADDING_DP = 16
     }
 }

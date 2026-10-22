@@ -18,6 +18,8 @@ internal object RegionalStateStore {
     @Synchronized fun clear() { results.clear() }
 }
 
+internal fun MonitorService.Companion.requestRegionalCheck(): Boolean = regionalRequest?.invoke() == true
+
 /** One physical worker per process, including service restart and transports that ignore cancellation. */
 private object RegionalWorkers {
     val executor = ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, SynchronousQueue(),
@@ -50,8 +52,10 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         notifications.clearAll()
     }
 
-    @Synchronized fun request() {
-        if (!closed && active()) { RegionalService.entries.forEach { due[it] = 0L }; tick() }
+    @Synchronized fun request(): Boolean {
+        val allowed = !closed && active() && RegionalPreferences.anyEnabled(ctx)
+        if (allowed) { RegionalService.entries.forEach { due[it] = 0L }; tick(); progress() }
+        return allowed
     }
 
     @Synchronized fun tick() {
@@ -61,13 +65,23 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         val now = SystemClock.elapsedRealtime()
         reconcile(now)
         if (cancellation != null) return
+        startDue(now, config)
+    }
+
+    private fun startDue(now: Long, config: Long) {
         val service = RegionalService.entries.firstOrNull {
             RegionalPreferences.enabled(ctx, it) && (due[it] ?: 0L) <= now
         } ?: return
         val network = connectivity.activeNetwork
         due[service] = now + if (network == null) RETRY_MS else intervalMs
-        if (network == null) return
-        val permit = ProbeAdmission.process.tryAcquire("regional_services", ProbeLane.SECONDARY) ?: return
+        if (network != null) startProbe(service, network, now, config)
+    }
+
+    private fun startProbe(service: RegionalService, network: android.net.Network, now: Long, config: Long) {
+        val permit = ProbeAdmission.process.tryAcquire("regional_services", ProbeLane.SECONDARY) ?: run {
+            due[service] = now + RETRY_MS
+            return
+        }
         val cancel = ProbeCancellation()
         cancellation = cancel
         val captured = ++ticket
@@ -91,10 +105,7 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
     @Synchronized private fun complete(captured: Long, result: RegionalResult) {
         if (captured != ticket || closed) return
         cancellation = null
-        if (!active() || result.networkRevision != revision ||
-            result.configurationRevision != RegionalPreferences.revision(ctx) ||
-            result.networkHandle != connectivity.activeNetwork?.networkHandle ||
-            !RegionalPreferences.enabled(ctx, result.service)) return
+        if (!active() || !current(result)) return
         RegionalStateStore.put(result)
         val evidence = consensus.getOrPut(result.service) { RegionalConsensus() }
         evidence.update(result.status, "${result.networkHandle}:$revision:$configuration", result.checkedElapsed)
@@ -105,6 +116,13 @@ internal class RegionalMonitor(private val ctx: Context, private val active: () 
         reconcile(SystemClock.elapsedRealtime())
         progress()
     }
+
+    private fun current(result: RegionalResult): Boolean = identityMatches(result) &&
+        RegionalPreferences.enabled(ctx, result.service)
+
+    private fun identityMatches(result: RegionalResult): Boolean = result.networkRevision == revision &&
+        result.configurationRevision == RegionalPreferences.revision(ctx) &&
+        result.networkHandle == connectivity.activeNetwork?.networkHandle
 
     private fun reconcile(now: Long) {
         RegionalService.entries.forEach { service ->

@@ -51,8 +51,7 @@ internal object EgressCountryUi {
         val stored = Prefs.egressCountry(ctx)
         if (!force && !EgressCountry.needsRefresh(stored, now, networkHandle)) return
         val elapsed = android.os.SystemClock.elapsedRealtime()
-        if (!force && lastAttemptElapsed > 0 && lastAttemptNetwork == networkHandle &&
-            elapsed - lastAttemptElapsed < COALESCE_MS) return
+        if (!force && coalesced(networkHandle, elapsed)) return
         lastAttemptElapsed = elapsed
         lastAttemptNetwork = networkHandle
         val ticket = lookup.begin(networkHandle, now)
@@ -68,6 +67,9 @@ internal object EgressCountryUi {
             lookup.finish(ticket, activeHandle(ctx), null) { Prefs.setEgressCountry(ctx, it) }
         }
     }
+
+    private fun coalesced(network: Long, elapsed: Long): Boolean = lastAttemptElapsed > 0 &&
+        lastAttemptNetwork == network && elapsed - lastAttemptElapsed < COALESCE_MS
 
     fun refreshActive(ctx: Context, force: Boolean = false) {
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager

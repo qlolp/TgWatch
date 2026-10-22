@@ -1,6 +1,5 @@
 package ru.tgwatch
 
-import android.app.NotificationManager
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.SystemClock
@@ -70,7 +69,9 @@ class RegionalIntegrationTest {
         val result = RegionalResult(RegionalService.GEMINI, RegionalStatus.REGION_RESTRICTED,
             System.currentTimeMillis(), SystemClock.elapsedRealtime(), 1, 1, 1)
         val notifications = RegionalNotifications(ctx)
-        Prefs.setQuietHoursMinutes(ctx, 0, 0)
+        val calendar = java.util.Calendar.getInstance()
+        val minute = calendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 + calendar.get(java.util.Calendar.MINUTE)
+        Prefs.setQuietHoursMinutes(ctx, (minute + 1439) % 1440, (minute + 2) % 1440)
         Prefs.sp(ctx).edit().putBoolean("quiet_hours", true).commit()
         assertFalse(notifications.post(result))
         Prefs.sp(ctx).edit().putBoolean("quiet_hours", false).commit()
