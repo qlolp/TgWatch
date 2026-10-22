@@ -1,0 +1,8 @@
+<resources>
+    <string name="country_refresh">Refresh exit country</string>
+    <string name="country_no_network">Exit country: no active network</string>
+    <string name="country_checking">Checking exit country…</string>
+    <string name="country_unverified">Exit country is unverified</string>
+    <string name="country_current">%1$s %2$s · %3$s\nExit country according to Cloudflare</string>
+    <string name="country_stale">%1$s %2$s · old result (%3$s)\nCurrent connection’s country is unverified</string>
+</resources>

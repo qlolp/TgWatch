@@ -1,0 +1,8 @@
+<resources>
+    <string name="country_refresh">Обновить страну выхода</string>
+    <string name="country_no_network">Страна выхода: нет активной сети</string>
+    <string name="country_checking">Определяем страну выхода…</string>
+    <string name="country_unverified">Страна выхода не подтверждена</string>
+    <string name="country_current">%1$s %2$s · %3$s\nСтрана выхода по данным Cloudflare</string>
+    <string name="country_stale">%1$s %2$s · старые данные (%3$s)\nСтрана текущего подключения не подтверждена</string>
+</resources>

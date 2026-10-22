@@ -156,6 +156,8 @@
                         android:textColor="@color/on_status"
                         android:textSize="14sp"
                         android:visibility="gone" />
+                    <Button android:id="@+id/btnRefreshCountry" style="@style/ButtonText"
+                        android:layout_width="match_parent" android:text="@string/country_refresh" />
                 </LinearLayout>
             </LinearLayout>
 
