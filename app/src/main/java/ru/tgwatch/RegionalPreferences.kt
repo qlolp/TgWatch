@@ -8,7 +8,7 @@ import android.provider.Settings
 internal object RegionalPreferences {
     const val PREFIX = "regional."
     const val MAINTENANCE = "regional.maintenance"
-    private const val REVISION = "regional.revision"
+    internal const val REVISION = "regional.revision"
     private const val UNSEEN_BOOT = -2
     fun revision(ctx: Context): Long = Prefs.sp(ctx).getLong(REVISION, 0)
     fun enabled(ctx: Context, service: RegionalService): Boolean =

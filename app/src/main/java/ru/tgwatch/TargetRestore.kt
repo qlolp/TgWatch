@@ -40,6 +40,7 @@ internal object TargetRestore {
                 cleared.forEach(edit::remove)
                 preferences.keys.filter { it.startsWith("target.") || it.startsWith(RegionalPreferences.PREFIX) }
                     .forEach(edit::remove)
+                edit.putLong(RegionalPreferences.REVISION, Math.addExact(RegionalPreferences.revision(ctx), 1L))
                 imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
                 for (id in TargetId.entries) {
                     val definition = imported.snapshot.targets.firstOrNull { it.id == id }

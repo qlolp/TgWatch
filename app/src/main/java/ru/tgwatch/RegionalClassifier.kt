@@ -10,17 +10,23 @@ object RegionalClassifier {
         "consent.google.com", "consent.youtube.com")
     private val regionCodes = setOf("unsupported_country_region_territory", "unsupported_country",
         "country_not_supported", "region_not_supported", "unsupported_location", "region_unsupported")
-    private val regionPhrases = listOf("not available in your country", "not supported in your country",
-        "not available in your region", "unavailable in your country", "недоступен в вашей стране",
-        "недоступно в вашей стране", "недоступен в вашем регионе", "не поддерживается в вашей стране")
+    private const val SERVICE =
+        "(?:this service|the service|gemini|youtube|notebook|notebooklm|gemini notebook|antigravity|chatgpt)"
+    private val englishError = Regex("^(?:$SERVICE\\s+)?(?:is\\s+)?(?:currently\\s+)?" +
+        "(?:not available|not supported|unavailable|isn't available|isn't supported) in your (?:country|region)" +
+        "(?: yet| at this time| right now)?[.!]?$")
+    private val russianError = Regex("^(?:(?:gemini|youtube|notebook|gemini notebook|antigravity|chatgpt|" +
+        "сервис|этот сервис)\\s+)?(?:пока\\s+)?(?:недоступен|недоступно|не поддерживается) в " +
+        "(?:вашей стране|вашем регионе)[.!]?$")
     private val challengePhrases = listOf("verify you are human", "unusual traffic", "checking your browser",
         "подтвердите, что вы человек", "подозрительный трафик")
     private val ignored = Regex(
-        "<(script|style|head|template|noscript|pre|code)\\b[^>]*>(?:.*?</\\1\\s*>|.*\\z)",
+        "<(script|style|head|template|noscript|pre|code|blockquote|q|article)\\b[^>]*>(?:.*?</\\1\\s*>|.*\\z)",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val comments = Regex("<!--.*?(?:-->|$)", RegexOption.DOT_MATCHES_ALL)
     private val tags = Regex("<[^>]*>")
     private val spaces = Regex("\\s+")
+    private val rendering = Regex("<(?:script|style|link)\\b", RegexOption.IGNORE_CASE)
     private val headings = Regex("<(h1|h2)\\b[^>]*>(.*?)</\\1\\s*>",
         setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private const val MAX_VISIBLE_REGION_TEXT = 4_096
@@ -39,26 +45,28 @@ object RegionalClassifier {
     }
 
     private fun visible(code: Int, body: String, complete: Boolean): RegionalStatus {
-        val markup = RegionalMarkup.removeHidden(body.replace(comments, " ").replace(ignored, " "))
-        val clean = markup.replace(tags, " ")
-            .replace("&nbsp;", " ").replace("&#39;", "'")
-            .lowercase(Locale.ROOT).replace(spaces, " ").trim()
+        val uncommented = body.replace(comments, " ")
+        val markup = RegionalMarkup.removeHidden(uncommented.replace(ignored, " "))
+        val clean = text(markup)
+        val regionEvidence = complete && regionEvidence(code, markup, clean)
         return when {
             complete && challengePhrases.any(clean::contains) -> RegionalStatus.CHALLENGE
-            complete && clean.length <= MAX_VISIBLE_REGION_TEXT && regionPhrases.any(clean::contains) &&
-                (code in RegionalHttpStatus.denial || regionHeading(markup)) ->
-                RegionalStatus.REGION_RESTRICTED
+            regionEvidence && rendering.containsMatchIn(uncommented) -> RegionalStatus.UNKNOWN
+            regionEvidence -> RegionalStatus.REGION_RESTRICTED
             code in RegionalHttpStatus.success -> RegionalStatus.WEB_REACHABLE
             else -> RegionalStatus.UNKNOWN
         }
     }
 
-    private fun regionHeading(body: String): Boolean = headings.findAll(
-        body.replace(comments, " ").replace(ignored, " ")
-    ).any { match ->
-        val heading = match.groupValues[2].replace(tags, " ").lowercase(Locale.ROOT)
-        regionPhrases.any(heading::contains) && !heading.trim().endsWith('?')
-    }
+    private fun text(body: String): String = body.replace(tags, " ").replace("&nbsp;", " ")
+        .replace("&#39;", "'").replace('’', '\'').lowercase(Locale.ROOT).replace(spaces, " ").trim()
+
+    private fun directError(message: String): Boolean = englishError.matches(message) || russianError.matches(message)
+
+    private fun regionEvidence(code: Int, markup: String, clean: String): Boolean =
+        clean.length <= MAX_VISIBLE_REGION_TEXT && (headings.findAll(markup).any {
+            directError(text(it.groupValues[2]))
+        } || code in RegionalHttpStatus.denial && directError(clean))
 
     private fun json(body: String, complete: Boolean, code: Int): RegionalStatus {
         if (!complete) return RegionalStatus.UNKNOWN

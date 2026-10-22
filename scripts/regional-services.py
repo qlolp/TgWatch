@@ -26,12 +26,18 @@ LOGIN_HOSTS = {'accounts.google.com', 'auth.openai.com', 'auth0.openai.com',
                'consent.google.com', 'consent.youtube.com'}
 REGION_CODES = {'unsupported_country_region_territory', 'unsupported_country',
                 'country_not_supported', 'region_not_supported', 'unsupported_location', 'region_unsupported'}
-REGION_PHRASES = ('not available in your country', 'not supported in your country',
-                  'not available in your region', 'unavailable in your country', 'недоступен в вашей стране',
-                  'недоступно в вашей стране', 'недоступен в вашем регионе', 'не поддерживается в вашей стране')
+SERVICE_NAME = r'(?:this service|the service|gemini|youtube|notebook|notebooklm|gemini notebook|antigravity|chatgpt)'
+ENGLISH_ERROR = re.compile(r'^(?:' + SERVICE_NAME + r"\s+)?(?:is\s+)?(?:currently\s+)?"
+    r"(?:not available|not supported|unavailable|isn't available|isn't supported) in your (?:country|region)"
+    r'(?: yet| at this time| right now)?[.!]?$')
+RUSSIAN_ERROR = re.compile(r'^(?:(?:gemini|youtube|notebook|gemini notebook|antigravity|chatgpt|'
+    r'сервис|этот сервис)\s+)?(?:пока\s+)?(?:недоступен|недоступно|не поддерживается) в '
+    r'(?:вашей стране|вашем регионе)[.!]?$')
 CHALLENGES = ('verify you are human', 'unusual traffic', 'checking your browser',
               'подтвердите, что вы человек', 'подозрительный трафик')
-IGNORED = re.compile(r'<(script|style|head|template|noscript|pre|code)\b[^>]*>(?:.*?</\1\s*>|.*\Z)', re.I | re.S)
+IGNORED = re.compile(r'<(script|style|head|template|noscript|pre|code|blockquote|q|article)\b[^>]*>'
+                     r'(?:.*?</\1\s*>|.*\Z)', re.I | re.S)
+RENDERING = re.compile(r'<(?:script|style|link)\b', re.I)
 COMMENTS = re.compile(r'<!--.*?(?:-->|$)', re.S)
 HEADINGS = re.compile(r'<(h1|h2)\b[^>]*>(.*?)</\1\s*>', re.I | re.S)
 TAGS = re.compile(r'<[^>]*>')
@@ -131,16 +137,20 @@ def classify(code, content_type, body, location_host='', complete=True):
         except (ValueError, RecursionError):
             return 'UNKNOWN'
     markup = VisibleMarkup()
-    markup.feed(IGNORED.sub(' ', COMMENTS.sub(' ', body)))
+    uncommented = COMMENTS.sub(' ', body)
+    markup.feed(IGNORED.sub(' ', uncommented))
     filtered = '' if markup.invalid else ''.join(markup.parts)
-    visible = ' '.join(TAGS.sub(' ', filtered).replace('&nbsp;', ' ').replace('&#39;', "'").lower().split())
-    heading = any(any(phrase in TAGS.sub(' ', match[1]).lower() for phrase in REGION_PHRASES)
-                  and not TAGS.sub(' ', match[1]).strip().endswith('?') for match in HEADINGS.findall(filtered))
+    def text(value):
+        return ' '.join(TAGS.sub(' ', value).replace('&nbsp;', ' ').replace('&#39;', "'")
+                        .replace('’', "'").lower().split())
+    def direct_error(value):
+        return bool(ENGLISH_ERROR.fullmatch(value) or RUSSIAN_ERROR.fullmatch(value))
+    visible = text(filtered)
+    heading = any(direct_error(text(match[1])) for match in HEADINGS.findall(filtered))
     if complete and any(phrase in visible for phrase in CHALLENGES):
         return 'CHALLENGE'
-    if complete and len(visible) <= 4096 and any(phrase in visible for phrase in REGION_PHRASES) and (
-            400 <= code <= 499 or heading):
-        return 'REGION_RESTRICTED'
+    if complete and len(visible) <= 4096 and (heading or 400 <= code <= 499 and direct_error(visible)):
+        return 'UNKNOWN' if RENDERING.search(uncommented) else 'REGION_RESTRICTED'
     return 'WEB_REACHABLE' if 200 <= code <= 299 else 'UNKNOWN'
 
 

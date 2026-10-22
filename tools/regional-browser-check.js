@@ -8,20 +8,23 @@
         "www.antigravity.google": "Antigravity",
         "antigravity.google.com": "Antigravity", "chatgpt.com": "ChatGPT / dots"
     };
-    const region = ["not available in your country", "not supported in your country",
-        "not available in your region", "unavailable in your country", "недоступен в вашей стране",
-        "недоступно в вашей стране", "недоступен в вашем регионе", "не поддерживается в вашей стране"];
+    const serviceName = "(?:this service|the service|gemini|youtube|notebook|notebooklm|gemini notebook|antigravity|chatgpt)";
+    const englishError = new RegExp("^(?:" + serviceName + "\\s+)?(?:is\\s+)?(?:currently\\s+)?" +
+        "(?:not available|not supported|unavailable|isn't available|isn't supported) in your (?:country|region)" +
+        "(?: yet| at this time| right now)?[.!]?$");
+    const russianError = new RegExp("^(?:(?:gemini|youtube|notebook|gemini notebook|antigravity|chatgpt|" +
+        "сервис|этот сервис)\\s+)?(?:пока\\s+)?(?:недоступен|недоступно|не поддерживается) в " +
+        "(?:вашей стране|вашем регионе)[.!]?$");
     const challenges = ["verify you are human", "unusual traffic", "checking your browser",
         "подтвердите, что вы человек", "подозрительный трафик"];
-    const normalize = text => text.toLowerCase().replace(/\s+/g, " ").trim();
+    const normalize = text => text.toLowerCase().replace(/’/g, "'").replace(/\s+/g, " ").trim();
+    const directError = text => englishError.test(text) || russianError.test(text);
     function classifyVisible(text, headings, complete = true) {
         const body = normalize(text);
         const titles = headings.map(normalize);
         if (!complete) return "UNKNOWN";
         if (challenges.some(phrase => body.includes(phrase))) return "CHALLENGE";
-        const regionalHeading = titles.some(title => !title.endsWith("?") &&
-            region.some(phrase => title.includes(phrase)));
-        if (body.length <= 4096 && regionalHeading && region.some(phrase => body.includes(phrase)))
+        if (body.length <= 4096 && titles.some(directError))
             return "REGION_RESTRICTED";
         if (titles.some(title => ["sign in", "sign in to continue", "войти", "войдите, чтобы продолжить"]
             .includes(title))) return "AUTH_REQUIRED";
@@ -34,10 +37,15 @@
         if (win.location.protocol !== "https:" || !service) return {source: "browser_session", status: "UNKNOWN"};
         const raw = doc.body ? doc.body.innerText : "";
         const visible = node => {
-            const style = win.getComputedStyle(node);
-            return style.display !== "none" && style.visibility !== "hidden" && node.getClientRects().length > 0;
+            if (!node.getClientRects().length) return false;
+            for (let current = node; current; current = current.parentElement) {
+                const style = win.getComputedStyle(current);
+                if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+            }
+            return !node.closest("blockquote,q,pre,code,article,[role=article],[contenteditable=true]," +
+                "[data-message-author-role],[data-message-id]");
         };
-        const headings = Array.from(doc.querySelectorAll("h1,h2,[role=alert]"))
+        const headings = Array.from(doc.querySelectorAll("h1,[role=alert]"))
             .slice(0, 200).filter(visible).map(node => node.innerText.slice(0, 4096));
         return {source: "browser_session", service,
             status: classifyVisible(raw.slice(0, 32768), headings, raw.length <= 32768)};
