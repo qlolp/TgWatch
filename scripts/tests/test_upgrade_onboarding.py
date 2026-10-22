@@ -152,6 +152,33 @@ class UpgradeOnboardingTests(unittest.TestCase):
         module.prepare(command, 12, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
         self.assertEqual(1, len(taps))
 
+    def test_a_restored_bottom_viewport_rewinds_to_the_real_start_button(self):
+        module = self.load()
+        now, offset, taps, swipes = [0.0], [900], [], []
+        def command(args):
+            if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                return 'isForeground=true' if taps else ''
+            if args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                marker = 'tvVersion' if offset[0] >= 800 else 'targetSelector' if offset[0] <= 0 else ''
+                extra = ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/' + marker +
+                         '" bounds="[10,20][110,60]" />') if marker else ''
+                if 100 <= offset[0] <= 400:
+                    extra += ('<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                              'enabled="true" clickable="true" bounds="[10,300][110,360]" />')
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                        'bounds="[0,20][320,620]" scrollable="true" />' + extra + '</hierarchy>')
+            if args[:3] == ['shell', 'input', 'swipe']:
+                swipes.append(args)
+                offset[0] += int(args[4]) - int(args[6])
+                now[0] += int(args[-1]) / 1_000
+            if args[:3] == ['shell', 'input', 'tap']: taps.append(args)
+            return ''
+        module.prepare(command, 12, lambda: now[0], lambda seconds: now.__setitem__(0, now[0] + seconds))
+        self.assertEqual(1, len(taps))
+        self.assertTrue(any(int(call[4]) < int(call[6]) for call in swipes))
+
     def test_bounds_reject_missing_negative_or_empty_coordinates(self):
         module = self.load()
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:

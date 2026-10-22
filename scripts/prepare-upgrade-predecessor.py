@@ -35,6 +35,7 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
     started = False
     captures = swipes = 0
     disabled = None
+    rewinding = False
     control_state = 'unread'
     last_failure = 'none'
     while clock() < deadline:
@@ -73,20 +74,25 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                     started = tap('btnToggle')
                     scroll = nodes.get('ru.tgwatch:id/mainScroll')
                     if not started and scroll is not None:
+                        if any('ru.tgwatch:id/' + name in nodes for name in ('btnAdvanced', 'tvVersion')):
+                            rewinding = True
+                        if any('ru.tgwatch:id/' + name in nodes for name in ('targetSelector', 'btnTargetSettings')):
+                            rewinding = False
                         match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', scroll.get('bounds', ''))
                         if match and center(scroll.get('bounds')):
                             left, top, right, bottom = map(int, match.groups())
                             x = str((left + right) // 2)
                             # Overlapping, slow steps keep every row observable instead of flinging past it.
-                            command(['shell', 'input', 'swipe', x, str(top + (bottom - top) * 3 // 4),
-                                     x, str(top + (bottom - top) // 2), '1000'])
+                            start, end = top + (bottom - top) * 3 // 4, top + (bottom - top) // 2
+                            if rewinding: start, end = end, start
+                            command(['shell', 'input', 'swipe', x, str(start), x, str(end), '1000'])
                             swipes += 1
         except (subprocess.SubprocessError, ET.ParseError, ValueError) as error:
             last_failure = type(error).__name__
         pause(.5)
     raise UiPreparationError('Predecessor did not enter foreground monitoring through its UI; '
         f'captures={captures}, skipped={skipped}, started={started}, disabled={disabled}, swipes={swipes}, '
-        f'last_failure={last_failure}, controls={control_state}')
+        f'rewinding={rewinding}, last_failure={last_failure}, controls={control_state}')
 
 
 def main():
