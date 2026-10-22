@@ -26,6 +26,8 @@ data class DiagnosticSnapshot(
     val monitorHealth: MonitorHealth = MonitorHealth(),
     val targets: List<TargetDiagnostic> = emptyList(),
     val crashes: CrashJournal.Summary = CrashJournal.Summary(0, null),
+    /** ISO egress country only; the address is never included. */
+    val egressCountry: String? = null,
 ) {
     fun toJson(): String {
         val json = JSONObject().put("schema_version", SCHEMA_VERSION)
@@ -58,6 +60,7 @@ data class DiagnosticSnapshot(
         .put("checked_at_ms", status.checkedAt.coerceAtLeast(0))
         .put("stale", stale)
         .put("latency_ms", status.latencyMs.coerceIn(-1, MAX_LATENCY_MS))
+        .put("egress_country", egressCountry?.takeIf { EgressCountry.isValid(it) } ?: JSONObject.NULL)
 
     private fun statsJson(stats: TimeStats? = dailyStats): Any = stats?.let { stats ->
         val coverage = CoverageStats.from(stats, CoverageStats.DAY_MS)
@@ -130,7 +133,7 @@ data class DiagnosticSnapshot(
         .put("overlapping_requests", scheduling.overlappingRequests)
 
     companion object {
-        private const val SCHEMA_VERSION = 4
+        private const val SCHEMA_VERSION = 5
         const val MAX_BYTES = 16 * 1024
         private const val MAX_LATENCY_MS = 60_000L
         private const val MAX_SDK = 1_000

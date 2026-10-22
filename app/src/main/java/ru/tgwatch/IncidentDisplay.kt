@@ -4,7 +4,7 @@ import android.content.Context
 
 internal data class IncidentDisplay(val version: Long, val at: Long, val cards: List<String>) {
     companion object {
-        private const val MAX_DAYS = 7
+        private val MAX_DAYS get() = RetentionPolicy.maxDays()
         fun load(ctx: Context, days: Int, id: TargetId = TargetId.TELEGRAM): IncidentDisplay = synchronized(History) {
             val now = System.currentTimeMillis()
             val rows = TargetHistories.rows(ctx, id, now)

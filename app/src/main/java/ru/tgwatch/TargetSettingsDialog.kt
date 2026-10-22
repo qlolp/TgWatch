@@ -55,6 +55,7 @@ internal object TargetSettingsDialog {
         val threshold = threshold(activity, definition.alerts.slowThresholdMs, thresholdLabel).also(content::addView)
         val endpoint = if (id == TargetId.MATRIX || id == TargetId.CUSTOM) endpoint(activity, content) else null
         val health = if (id == TargetId.CUSTOM) CustomHealthSettingsUi(activity, content) else null
+        MaintenanceSettingsUi.add(activity, content, id)
         attachTemplates(activity, id, content, endpoint, health)
         val dialog = AlertDialog.Builder(activity).setTitle(TargetNames.label(activity, id))
             .setView(ScrollView(activity).apply { addView(content) })

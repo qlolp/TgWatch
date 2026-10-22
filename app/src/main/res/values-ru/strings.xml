@@ -24,6 +24,10 @@
     <string name="history_retention_week">7 дней</string>
     <string name="history_retention_month">30 дней</string>
     <string name="history_retention_quarter">90 дней</string>
+    <string name="maintenance_add">Добавить окно обслуживания</string>
+    <string name="maintenance_clear">Убрать окна обслуживания</string>
+    <string name="maintenance_empty">Плановых остановок нет</string>
+    <string name="maintenance_line">Остановка %1$s–%2$s</string>
     <string name="period_week">Период: неделя</string>
     <string name="history_empty">Пока нет данных — подожди несколько проверок.</string>
     <string name="share_summary">Поделиться сводкой</string>

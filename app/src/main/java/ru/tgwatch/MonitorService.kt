@@ -819,7 +819,8 @@ class MonitorService : Service() {
             HistoryPublication(newState, changed, partialAlert || Prefs.notifyFor(this, "PARTIAL"),
                 p.outcomes, TargetPersistence.active?.generationId), { recovery ->
                 synchronized(this) {
-                    if (acceptsRunningCheck(this) && state === newState) {
+                    if (acceptsRunningCheck(this) && state === newState &&
+                        !MaintenanceWindows.isActive(this, TargetId.TELEGRAM, now)) {
                         if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
                             Prefs.soundFor(this, "RECOVERY"), Prefs.alertsAllowed(this))
                         if (Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this)) Vibe.recovery(this)
@@ -828,12 +829,10 @@ class MonitorService : Service() {
             }, { refreshNotificationStats(now) })
 
         try {
+            val maintenance = MaintenanceWindows.isActive(this, TargetId.TELEGRAM, now)
             if (p.status !in setOf(Status.TG_DOWN, Status.PARTIAL)) eventNotifications.clearOutage()
             if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
-            if ((changed || sound) && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
-                eventNotifications.outage(p.reason, sound, alertsAllowed)
-            if ((changed || sound) && p.status == Status.PARTIAL && Prefs.notifyFor(this, "PARTIAL"))
-                eventNotifications.partial(p.reason, sound, alertsAllowed)
+            if (!maintenance) publishEventAlerts(p, changed, sound, alertsAllowed)
             if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this, "TG_DOWN")) eventNotifications.clearOutage()
             if (p.status == Status.PARTIAL && !Prefs.notifyFor(this, "PARTIAL")) eventNotifications.clearOutage()
             slowController?.onCheck(p.status.name, p.latencyMs, mono)
@@ -866,6 +865,14 @@ class MonitorService : Service() {
         EgressCountryUi.refresh(this, network.networkHandle) { url ->
             network.openConnection(url) as java.net.HttpURLConnection
         }
+    }
+
+    private fun publishEventAlerts(p: Probe, changed: Boolean, sound: Boolean, alertsAllowed: Boolean) {
+        val fire = changed || sound
+        if (fire && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
+            eventNotifications.outage(p.reason, sound, alertsAllowed)
+        if (fire && p.status == Status.PARTIAL && Prefs.notifyFor(this, "PARTIAL"))
+            eventNotifications.partial(p.reason, sound, alertsAllowed)
     }
 
     // ------------------------------------------------------------ уведомление

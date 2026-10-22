@@ -38,8 +38,7 @@ class BackupUi(private val activity: Activity) {
                     activity.renderString(
                     R.string.copy_backup_ui_restoring), {
                     BackupManager.recoverPending(activity.applicationContext)
-                }, { activity.recreate() }, activity.renderString(
-                    R.string.copy_backup_ui_couldn_t_finish_restoring)) }
+                }, { activity.recreate() }, R.string.copy_backup_ui_couldn_t_finish_restoring) }
                 .setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
                     ).also { dialogs.add(it) }
             return
@@ -48,7 +47,7 @@ class BackupUi(private val activity: Activity) {
     }
     fun importCsv() = document(Intent.ACTION_OPEN_DOCUMENT, CSV, "*/*")
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "TooGenericExceptionCaught") // SAF failures collapse to one toast.
     private fun document(action: String, code: Int, type: String, name: String? = null) {
         if (busy) return
         try {
@@ -57,7 +56,9 @@ class BackupUi(private val activity: Activity) {
                 this.type = type
                 if (name != null) putExtra(Intent.EXTRA_TITLE, name)
             }, code)
-        } catch (_: Exception) { message(activity.renderString(R.string.copy_backup_ui_couldn_t_open_the)) }
+        } catch (e: Exception) {
+            UiErrors.show(activity, R.string.copy_backup_ui_couldn_t_open_the, e)
+        }
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {
@@ -74,18 +75,18 @@ class BackupUi(private val activity: Activity) {
                         ?: error("No output")
                 } finally { pass.fill('\u0000') }
             }, { message(activity.renderString(R.string.copy_backup_ui_encrypted_backup_saved_you)) },
-                activity.renderString(R.string.copy_backup_ui_couldn_t_save_the)) }
+                R.string.copy_backup_ui_couldn_t_save_the) }
             RESTORE -> password(false) { pass -> work(activity.renderString(
                 R.string.copy_backup_ui_checking_backup), {
                 try { PortableBackupCodec.decryptTargetImport(read(uri, PortableBackupCodec.MAX_ENVELOPE_BYTES), pass) }
                 finally { pass.fill('\u0000') }
-            }, { previewTargets(it) }, activity.renderString(R.string.copy_backup_ui_wrong_password_or_damaged)) }
+            }, { previewTargets(it) }, R.string.copy_backup_ui_wrong_password_or_damaged) }
             CSV -> work(activity.renderString(R.string.copy_backup_ui_checking_csv), {
                 val bytes = read(uri, TargetBackupCodec.MAX_PLAINTEXT_BYTES)
                 val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
                 CsvDocument(TargetCsv.parse(text), TargetCsv.isLegacy(text))
-            }, { previewCsv(it) }, activity.renderString(R.string.copy_backup_ui_the_csv_is_damaged))
+            }, { previewCsv(it) }, R.string.copy_backup_ui_the_csv_is_damaged)
         }
         return true
     }
@@ -153,7 +154,7 @@ class BackupUi(private val activity: Activity) {
                     BackupManager.recoverPending(activity.applicationContext)
                 }, { message(activity.renderString(
                     R.string.copy_backup_ui_data_restored_all_targets)); activity.recreate() },
-                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
+                    R.string.copy_backup_ui_restore_interrupted_please_retry)
             }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
                 ).also { dialogs.add(it) }
     }
@@ -172,13 +173,13 @@ class BackupUi(private val activity: Activity) {
                     else BackupManager.importHistories(activity.applicationContext, rows)
                 }, { message(activity.renderString(
                     R.string.copy_backup_ui_history_restored_all_targets)); activity.recreate() },
-                    activity.renderString(R.string.copy_backup_ui_restore_interrupted_please_retry))
+                    R.string.copy_backup_ui_restore_interrupted_please_retry)
             }.setNegativeButton(activity.renderString(R.string.copy_backup_ui_cancel), null).show(
                 ).also { dialogs.add(it) }
     }
 
     @Suppress("DEPRECATION")
-    private fun <T> work(title: String, block: () -> T, success: (T) -> Unit, failure: String) {
+    private fun <T> work(title: String, block: () -> T, success: (T) -> Unit, failure: Int) {
         if (busy) return
         busy = true
         val progress = ProgressDialog(activity).apply { setMessage(title); setCancelable(false); show() }
@@ -190,7 +191,7 @@ class BackupUi(private val activity: Activity) {
                 progress.dismiss()
                 dialogs.remove(progress)
                 if (!activity.isFinishing && !activity.isDestroyed) {
-                    result.fold(success) { message(failure) }
+                    result.fold(success) { error -> UiErrors.show(activity, failure, error) }
                 }
             }
         }, "tg-backup").start()

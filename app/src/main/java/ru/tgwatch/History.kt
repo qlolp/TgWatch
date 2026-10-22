@@ -199,6 +199,8 @@ object History {
     }
     @Synchronized fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long, expectedSec: Int = 30) {
         if (!ready(ctx)) return
+        // Planned downtime is unobserved time, not an incident: keep the gap out of history.
+        if (MaintenanceWindows.isActive(ctx, TargetId.TELEGRAM, now)) return
         ensureClock(ctx, now)
         prune(ctx, now)
         // Bound inferred coverage to one expected interval plus the bounded network-check budget.
@@ -251,7 +253,9 @@ object History {
     @Synchronized fun readStats(ctx: Context, days: Int = 1,
         now: Long = System.currentTimeMillis()): HistoryRead<TimeStats> {
         if (!ready(ctx)) {
-            val last = statsCache.entries.lastOrNull { it.key.endsWith(":${days.coerceIn(1, 7)}") }?.value
+            val last = statsCache.entries.lastOrNull {
+                it.key.endsWith(":${days.coerceIn(1, RetentionPolicy.maxDays())}")
+            }?.value
             return HistoryRead.Unavailable(last, failure ?: HistoryFailure.READ)
         }
         val value = computeStats(ctx, days, now)
@@ -262,11 +266,11 @@ object History {
     private fun computeStats(ctx: Context, days: Int, now: Long): TimeStats {
         ensureClock(ctx, now)
         prune(ctx, now)
-        val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1,7)}"
+        val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1, RetentionPolicy.maxDays())}"
         statsCache[cacheKey]?.let { return it }
         if (statsCache.size > 4) statsCache.clear()
         val checks = preparation.prepare(samples, version, now - keepMs(ctx)).checks
-        return Timeline.stats(checks, now - days.coerceIn(1,7) * 86_400_000L, now)
+        return Timeline.stats(checks, now - days.coerceIn(1, RetentionPolicy.maxDays()) * 86_400_000L, now)
             .also { statsCache[cacheKey] = it }
     }
     @Synchronized fun incidents(ctx: Context, days: Int = 7,
@@ -278,7 +282,8 @@ object History {
         ensureClock(ctx, now)
         prune(ctx, now)
         val checks = preparation.prepare(samples, version, now - keepMs(ctx)).checks
-        val value = OutageEpisodes.derivePrepared(checks, now - days.coerceIn(1, 7) * 86_400_000L, now)
+        val value = OutageEpisodes.derivePrepared(checks,
+            now - days.coerceIn(1, RetentionPolicy.maxDays()) * 86_400_000L, now)
         val problem = failure
         return if (problem == null) HistoryRead.Ready(value) else HistoryRead.Unavailable(value, problem)
     }

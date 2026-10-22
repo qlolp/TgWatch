@@ -13,7 +13,7 @@ internal class TargetCsvExportUi(private val activity: Activity, saved: Bundle?)
     private var targetId = TargetId.fromWire(saved?.getString("export_target").orEmpty()) ?: TargetId.TELEGRAM
     private companion object {
         const val REQUEST = 20
-        const val MAX_DAYS = 7
+        val MAX_DAYS get() = RetentionPolicy.maxDays()
         val writing = AtomicBoolean()
     }
     fun export(id: TargetId, window: Int) {

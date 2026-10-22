@@ -195,10 +195,15 @@ object Prefs {
         pattern.name).apply() }
 
     /** Portable history window; week is the established default and migration never lengthens it. */
-    fun historyRetention(ctx: Context): Retention = Retention.entries.firstOrNull {
-        it.name == sp(ctx).getString(KEY_HISTORY_RETENTION, Retention.WEEK.name)
-    } ?: Retention.WEEK
+    fun historyRetention(ctx: Context): Retention {
+        val stored = Retention.entries.firstOrNull {
+            it.name == sp(ctx).getString(KEY_HISTORY_RETENTION, Retention.WEEK.name)
+        } ?: Retention.WEEK
+        if (stored != RetentionPolicy.current()) RetentionPolicy.update(stored)
+        return stored
+    }
     fun setHistoryRetention(ctx: Context, value: Retention) {
+        RetentionPolicy.update(value)
         sp(ctx).edit().putString(KEY_HISTORY_RETENTION, value.name).apply()
     }
 

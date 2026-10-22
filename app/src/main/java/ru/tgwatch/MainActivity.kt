@@ -386,7 +386,7 @@ class MainActivity : Activity() {
 
     private fun bindRetentionPicker() = RetentionPicker.bind(this)
 
-    private fun notifyServiceSettingsChanged() {
+    internal fun notifyServiceSettingsChanged() {
         if (MonitorService.running) MonitorService.send(this, MonitorService.ACTION_SETTINGS)
     }
 

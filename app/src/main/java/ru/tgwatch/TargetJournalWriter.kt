@@ -32,7 +32,8 @@ internal class TargetJournalWriter(private val source: (TargetId) -> List<Target
             row.copy(clockEpoch = prepared.maxOfOrNull { it.clockEpoch } ?: 0L), revision)
         val updated = current.rows.filter { it.endpointRevision != revision } +
             prepared.map { TargetObservation(it, revision) } + observation
-        val retained = TargetJournal.retained(updated, row.at - KEEP_MS, TargetBackupCodec.rowLimit(id))
+        val retained = TargetJournal.retained(updated, row.at - RetentionPolicy.totalMs(),
+            TargetBackupCodec.rowLimit(id))
         if (retained != updated) {
             current.prunedWall = maxOf(current.prunedWall ?: row.at, row.at)
             current.compaction.onPruned()
@@ -49,7 +50,7 @@ internal class TargetJournalWriter(private val source: (TargetId) -> List<Target
         val rolled = Timeline.clockRollback(own, now)
         val all = current.rows.filter { it.endpointRevision != revision } +
             rolled.map { TargetObservation(it, revision) }
-        val retained = TargetJournal.retained(all, now - KEEP_MS, TargetBackupCodec.rowLimit(id))
+        val retained = TargetJournal.retained(all, now - RetentionPolicy.totalMs(), TargetBackupCodec.rowLimit(id))
         val rewoundAfterPrune = current.prunedWall?.let { now < it } == true
         if (retained != all) {
             current.prunedWall = maxOf(current.prunedWall ?: now, now)
@@ -99,5 +100,4 @@ internal class TargetJournalWriter(private val source: (TargetId) -> List<Target
     fun clear() { entries.clear(); TargetId.entries.forEach(::changed) }
     private fun changed(id: TargetId) { revisions = revisions + (id to Math.addExact(revisions.getValue(id), 1L)) }
     private fun cache(id: TargetId): Cached = entries.getOrPut(id) { Cached(source(id)) }
-    private companion object { const val KEEP_MS = 7 * CoverageStats.DAY_MS }
 }

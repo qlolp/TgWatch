@@ -15,8 +15,9 @@ internal object RetentionPicker {
         val group = activity.findViewById<RadioGroup>(R.id.rgRetention)
         group.check(ids[Prefs.historyRetention(activity)] ?: R.id.rbRetentionWeek)
         group.setOnCheckedChangeListener { _, checkedId ->
-            Prefs.setHistoryRetention(activity, ids.entries.firstOrNull { it.value == checkedId }?.key
-                ?: Retention.WEEK)
+            val value = ids.entries.firstOrNull { it.value == checkedId }?.key ?: Retention.WEEK
+            Prefs.setHistoryRetention(activity, value)
+            (activity as? MainActivity)?.notifyServiceSettingsChanged()
         }
     }
 }

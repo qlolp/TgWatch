@@ -6,7 +6,7 @@ import android.content.Context
 internal object TargetHistories {
     private const val CHECK_BUDGET_MS = 15_000L
     private const val MS_PER_SECOND = 1_000L
-    private const val MAX_DAYS = 7
+    private val MAX_DAYS get() = RetentionPolicy.maxDays()
     private val sessions = TargetSessionLedger()
     @Volatile var failures: Map<TargetId, HistoryFailure?> = emptyMap()
         private set
@@ -18,7 +18,7 @@ internal object TargetHistories {
         measured: Boolean = state.status != TargetStatus.UNKNOWN,
         recovered: (RecoveryEvent) -> Unit = {}): Boolean {
         require(state.id != TargetId.TELEGRAM)
-        if (!measured) return false
+        if (!measured || MaintenanceWindows.isActive(ctx, state.id, state.checkedAtMs)) return false
         return HistorySessions.queue(ctx).submit(session) { synchronized(History) {
             sessions.recorded(session, state.id)
             val duration = state.expectedIntervalSec * MS_PER_SECOND + CHECK_BUDGET_MS

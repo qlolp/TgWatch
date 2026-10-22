@@ -19,7 +19,7 @@ class DiagnosticSnapshotTest {
         val state = TargetSnapshot(TargetId.MATRIX, TargetStatus.DOWN, 1_000, 1_000)
         val json = JSONObject(snapshot().copy(targets = listOf(TargetDiagnostic(state,
             running = true, stale = false, stats = null, failure = HistoryFailure.WRITE))).toJson())
-        assertEquals(4, json.getInt("schema_version"))
+        assertEquals(5, json.getInt("schema_version"))
         val goals = json.getJSONArray("targets")
         assertEquals(1, goals.length())
         val goal = goals.getJSONObject(0)
@@ -77,7 +77,8 @@ class DiagnosticSnapshotTest {
         val json = JSONObject(snapshot().toJson())
         assertEquals(setOf("schema_version", "app", "os", "flags", "state", "last_24_hours", "endpoints", "scheduling", "monitor_health", "targets", "crashes"),
             json.keyNames())
-        assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms"), json.getJSONObject("state").keyNames())
+        assertEquals(setOf("running", "status", "checked_at_ms", "stale", "latency_ms", "egress_country"),
+            json.getJSONObject("state").keyNames())
         assertEquals(setOf("ok_ms", "down_ms", "partial_ms", "offline_ms", "unknown_ms", "checks", "outage_count", "availability_percent", "coverage_percent", "assessed_ms", "window_ms"),
             json.getJSONObject("last_24_hours").keyNames())
         assertEquals(setOf("sdk_int"), json.getJSONObject("os").keyNames())

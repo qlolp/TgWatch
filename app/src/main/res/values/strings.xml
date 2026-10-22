@@ -24,6 +24,10 @@
     <string name="history_retention_week">7 days</string>
     <string name="history_retention_month">30 days</string>
     <string name="history_retention_quarter">90 days</string>
+    <string name="maintenance_add">Add maintenance window</string>
+    <string name="maintenance_clear">Clear maintenance windows</string>
+    <string name="maintenance_empty">No planned downtime</string>
+    <string name="maintenance_line">Downtime %1$s–%2$s</string>
     <string name="period_week">Period: week</string>
     <string name="history_empty">No data yet — wait for a few checks.</string>
     <string name="share_summary">Share summary</string>

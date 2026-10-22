@@ -13,7 +13,7 @@ internal data class HistoryDisplay(
     val chart: ChartView.Companion.Prepared,
 ) {
     companion object {
-        private const val MAX_DAYS = 7
+        private val MAX_DAYS get() = RetentionPolicy.maxDays()
         private const val WEEK_MINUTES = 7 * 24 * 60
         private const val HOUR_MINUTES = 60
 
