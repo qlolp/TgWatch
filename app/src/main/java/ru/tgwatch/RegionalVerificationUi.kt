@@ -50,7 +50,8 @@ internal class RegionalVerificationUi(private val activity: Activity) {
             .setPositiveButton(R.string.regional_report_choose) { _, _ -> choose(service, layer, choices) }
             .setNeutralButton(if (layer == RegionalVerificationLayer.BROWSER) R.string.regional_report_help
                 else R.string.regional_why_browser) { _, _ ->
-                if (layer == RegionalVerificationLayer.BROWSER) help() else RegionalExplanationUi.open(activity, service)
+                if (layer == RegionalVerificationLayer.BROWSER) help()
+                else RegionalExplanationUi.open(activity, service)
             }
             .setNegativeButton(android.R.string.cancel, null).show()
     }
