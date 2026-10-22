@@ -74,7 +74,9 @@ class RegionalVerificationIntegrationTest {
         val enlarged = android.content.res.Configuration(previous).apply { fontScale = 2f }
         @Suppress("DEPRECATION")
         ctx.resources.updateConfiguration(enlarged, ctx.resources.displayMetrics)
-        val monitor = instrumentation.addMonitor(IntentFilter(Intent.ACTION_VIEW),
+        // A filter without a data scheme also matches an explicit intent with no action/data.
+        // Intercept only the HTTPS browser navigation, never ActivityScenario's own launch/recreation.
+        val monitor = instrumentation.addMonitor(IntentFilter(Intent.ACTION_VIEW).apply { addDataScheme("https") },
             Instrumentation.ActivityResult(android.app.Activity.RESULT_CANCELED, null), true)
         try {
             ActivityScenario.launch<RegionalServicesActivity>(Intent(ctx, RegionalServicesActivity::class.java))
