@@ -1,9 +1,47 @@
 import importlib.util
 from pathlib import Path
+import subprocess
 import unittest
 
 
 class UpgradeOnboardingTests(unittest.TestCase):
+    def test_continuously_updating_predecessor_still_starts_through_visible_controls(self):
+        module = self.load()
+        base, pause, now, taps = self.run_fixture(module)
+        def command(args):
+            if taps and args[:3] == ['shell', 'uiautomator', 'dump']:
+                # Android's dump waits for one idle second; the status screen ticks every second.
+                raise subprocess.CalledProcessError(1, args, stderr='could not get idle state')
+            return base(args)
+        try:
+            module.prepare(command, 8, lambda: now[0], pause)
+        except ValueError:
+            self.fail('A ticking status screen must not prevent starting through real controls')
+        self.assertEqual(2, len(taps))
+
+    def test_failed_snapshot_cannot_click_coordinates_from_an_old_xml_file(self):
+        module = self.load()
+        now = [0.0]
+        stale_file = [True]
+        taps = []
+        def command(args):
+            if args[:3] == ['shell', 'rm', '-f']:
+                stale_file[0] = False
+            elif args[:3] == ['shell', '-T', 'cat']:
+                if args[-1].endswith('tgwatch.xml'):
+                    return '<map><boolean name="enabled" value="false" /></map>'
+                if not stale_file[0]:
+                    raise subprocess.CalledProcessError(1, args)
+                return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                        'enabled="true" clickable="true" bounds="[10,20][110,80]" /></hierarchy>')
+            elif args[:3] == ['shell', 'input', 'tap']:
+                taps.append(args)
+            # A capture process can exit without producing a hierarchy (null root or idle timeout).
+            return ''
+        with self.assertRaises(ValueError):
+            module.prepare(command, 2, lambda: now[0], lambda delay: now.__setitem__(0, now[0] + delay))
+        self.assertEqual([], taps, 'A missing fresh snapshot must never reuse stale coordinates')
+
     def load(self):
         path = Path(__file__).resolve().parents[1] / 'prepare-upgrade-predecessor.py'
         self.assertTrue(path.exists(), 'Missing real predecessor onboarding preparation')
