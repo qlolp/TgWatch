@@ -47,7 +47,7 @@ class BackupUi(private val activity: Activity) {
     }
     fun importCsv() = document(Intent.ACTION_OPEN_DOCUMENT, CSV, "*/*")
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "TooGenericExceptionCaught") // SAF failures collapse to one toast.
     private fun document(action: String, code: Int, type: String, name: String? = null) {
         if (!jobs.available()) return
         try {
@@ -56,7 +56,9 @@ class BackupUi(private val activity: Activity) {
                 this.type = type
                 if (name != null) putExtra(Intent.EXTRA_TITLE, name)
             }, code)
-        } catch (_: Exception) { jobs.message(activity.renderString(R.string.copy_backup_ui_couldn_t_open_the)) }
+        } catch (error: Exception) {
+            UiErrors.show(activity, R.string.copy_backup_ui_couldn_t_open_the, error)
+        }
     }
 
     fun onResult(code: Int, result: Int, data: Intent?): Boolean {

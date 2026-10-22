@@ -104,6 +104,7 @@ class MonitorService : Service() {
         @Volatile private var lastScheduleDiagnostics = ScheduleDiagnostics.Snapshot()
 
         fun endpointOutcomes(): List<ProbeOutcome> = lastEndpoints
+        internal var regionalRequest: (() -> Boolean)? = null
         fun schedulingDiagnostics(): ScheduleDiagnostics.Snapshot =
             activeService?.scheduleDiagnostics?.snapshot() ?: lastScheduleDiagnostics
 
@@ -197,6 +198,7 @@ class MonitorService : Service() {
         }
 
         fun clearRestoredState() {
+            RegionalStateStore.clear()
             activeService?.let { synchronized(it) { it.extraCoordinator.invalidate() } }
             state = State()
             lastEndpoints = emptyList()
@@ -211,6 +213,7 @@ class MonitorService : Service() {
 
     private var historySession = 0L
     private var targetMonitoring: TargetMonitoring? = null
+    private var regionalMonitor: RegionalMonitor? = null
     @Volatile private var telegramDueElapsed: Long? = null
     @Volatile private var primarySettingsRevision: Long? = null
     private var deferredExtra: Probe? = null
@@ -277,6 +280,7 @@ class MonitorService : Service() {
             if (RecoveryCoordinator.state == RecoveryState.FAILED) { stopSelf(); return }
             slowController?.reconcile()
             targetAlertController?.reconcile()
+            regionalMonitor?.tick()
             postNotification(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
             scheduleStatisticsRefresh()
@@ -308,6 +312,7 @@ class MonitorService : Service() {
             runCheck()
         }
         targets?.startDue()
+        regionalMonitor?.tick()
         if (targets != null) { releaseWakeLock(); rearmChecks() }
     }
 
@@ -336,6 +341,8 @@ class MonitorService : Service() {
         deferredExtra = null
         checkSchedule.networkChanged(delayMs)
         targetMonitoring?.networkChanged(checkSchedule.revision)
+        regionalMonitor?.changed()
+        EgressCountryUi.refreshActive(this, force = true)
     }
 
     /** Unlocking after sleep should not show a result from the long screen-off interval. */
@@ -362,7 +369,7 @@ class MonitorService : Service() {
         cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        createChannels()
+        OngoingNotification.createChannels(this, nm)
         eventNotifications = EventNotifications(this, nm)
         targetAlertController = TargetAlertController(this, nm) { acceptsRunningCheck(this) }
         slowController = SlowAlertController(this, eventNotifications, {
@@ -377,6 +384,7 @@ class MonitorService : Service() {
         workerThread.start()
         worker = Handler(workerThread.looper)
         targetMonitoring = createTargetMonitoring()
+        regionalMonitor = RegionalMonitor(checkNotNull(targetMonitoring).host).also { regionalRequest = it::request }
 
         running = true
         lastProgressMono = SystemClock.elapsedRealtime()
@@ -436,7 +444,8 @@ class MonitorService : Service() {
             Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled
         }
         val command = TargetServiceCommands.route(intent?.action,
-            intent?.getStringExtra(TargetAutomation.EXTRA_TARGET_ID), intended)
+            intent?.getStringExtra(TargetAutomation.EXTRA_TARGET_ID), intended,
+            Prefs.isEnabled(this) && RegionalPreferences.anyEnabled(this))
         if (command.ignored) return START_STICKY
         val action = command.action
         if (command.stopTarget) TargetPreferences.stop(this, command.targetId)
@@ -449,7 +458,7 @@ class MonitorService : Service() {
             return START_NOT_STICKY
         }
 
-        targetMonitoring?.let { targets -> worker.post { targets.refresh() } }
+        worker.post { targetMonitoring?.refresh(); regionalMonitor?.tick() }
         if (action == ACTION_HEALTH) ensureProgress()
         val first = beginLoop()
         slowController?.reconcile()
@@ -518,6 +527,8 @@ class MonitorService : Service() {
         slowController?.close()
         targetAlertController?.close()
         targetMonitoring?.close()
+        regionalMonitor?.close()
+        if (activeService === this) regionalRequest = null
         deferredExtra = null
         extraCoordinator.close()
         scheduleDiagnostics.canceled()
@@ -596,7 +607,7 @@ class MonitorService : Service() {
         if (destroyed || stopping) return
         val targets = targetMonitoring ?: return
         val primary = telegramDueElapsed.takeIf { targets.telegramEnabled }
-        val delay = CheckAlarm.nextDelay(SystemClock.elapsedRealtime(), primary, targets.nextWakeElapsed())
+        val delay = nextMonitoringDelay(primary, targets, regionalMonitor)
         worker.removeCallbacks(checkRunnable)
         if (delay == null) cancelAlarm() else {
             worker.postDelayed(checkRunnable, delay)
@@ -819,7 +830,8 @@ class MonitorService : Service() {
             HistoryPublication(newState, changed, partialAlert || Prefs.notifyFor(this, "PARTIAL"),
                 p.outcomes, TargetPersistence.active?.generationId), { recovery ->
                 synchronized(this) {
-                    if (acceptsRunningCheck(this) && state === newState) {
+                    if (acceptsRunningCheck(this) && state === newState &&
+                        !MaintenanceWindows.isActive(this, TargetId.TELEGRAM, now)) {
                         if (Prefs.notifyFor(this, "RECOVERY")) eventNotifications.recovered(recovery,
                             Prefs.soundFor(this, "RECOVERY"), Prefs.alertsAllowed(this))
                         if (Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this)) Vibe.recovery(this)
@@ -828,12 +840,10 @@ class MonitorService : Service() {
             }, { refreshNotificationStats(now) })
 
         try {
+            val maintenance = MaintenanceWindows.isActive(this, TargetId.TELEGRAM, now)
             if (p.status !in setOf(Status.TG_DOWN, Status.PARTIAL)) eventNotifications.clearOutage()
             if (changed && p.status != Status.OK) eventNotifications.clearRecovery()
-            if ((changed || sound) && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
-                eventNotifications.outage(p.reason, sound, alertsAllowed)
-            if ((changed || sound) && p.status == Status.PARTIAL && Prefs.notifyFor(this, "PARTIAL"))
-                eventNotifications.partial(p.reason, sound, alertsAllowed)
+            if (!maintenance) publishEventAlerts(p, changed, sound, alertsAllowed)
             if (p.status == Status.TG_DOWN && !Prefs.notifyFor(this, "TG_DOWN")) eventNotifications.clearOutage()
             if (p.status == Status.PARTIAL && !Prefs.notifyFor(this, "PARTIAL")) eventNotifications.clearOutage()
             slowController?.onCheck(p.status.name, p.latencyMs, mono)
@@ -841,6 +851,7 @@ class MonitorService : Service() {
 
         targetMonitoring?.onTelegram(newState, p.outcomes)
         NetworkStats.record(this, now, probeNetwork, newState.status.name)
+        EgressCountryUi.refreshActive(this)
         postNotification(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
@@ -859,9 +870,15 @@ class MonitorService : Service() {
         }
     }
 
-    // ------------------------------------------------------------ уведомление
+    private fun publishEventAlerts(p: Probe, changed: Boolean, sound: Boolean, alertsAllowed: Boolean) {
+        val fire = changed || sound
+        if (fire && p.status == Status.TG_DOWN && Prefs.notifyFor(this, "TG_DOWN"))
+            eventNotifications.outage(p.reason, sound, alertsAllowed)
+        if (fire && p.status == Status.PARTIAL && Prefs.notifyFor(this, "PARTIAL"))
+            eventNotifications.partial(p.reason, sound, alertsAllowed)
+    }
 
-    private fun createChannels() = OngoingNotification.createChannels(this, nm)
+    // ------------------------------------------------------------ уведомление
 
     private fun goForeground(): Boolean {
         val view = notificationView(state)
@@ -921,6 +938,8 @@ class MonitorService : Service() {
     private fun notificationView(s: State, now: Long = System.currentTimeMillis()): OngoingView =
         if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled)
             OngoingNotification.view(s, currentNotificationStats(), now)
+        else if (RegionalPreferences.onlyRegional(this))
+            OngoingNotification.regional(this, now)
         else OngoingNotification.targets(TargetId.entries.filter { it != TargetId.TELEGRAM &&
             Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled }
             .map { TargetStateStore.current(this, it) }, now, SystemClock.elapsedRealtime())
@@ -948,7 +967,8 @@ class MonitorService : Service() {
     }
 
     private fun releaseWakeLock() {
-        val checksActive = checkStartedMono > 0L || targetMonitoring?.hasInFlight == true
+        val checksActive = checkStartedMono > 0L || targetMonitoring?.hasInFlight == true ||
+            regionalMonitor?.hasInFlight == true
         if (!destroyed && checksActive) return
         try {
             wakeLock?.let { if (it.isHeld) it.release() }

@@ -20,6 +20,14 @@
     <string name="check_now">Check now</string>
     <string name="history_title">Availability history</string>
     <string name="period_day">Period: 24 hours</string>
+    <string name="history_retention_label">Keep history</string>
+    <string name="history_retention_week">7 days</string>
+    <string name="history_retention_month">30 days</string>
+    <string name="history_retention_quarter">90 days</string>
+    <string name="maintenance_add">Add maintenance window</string>
+    <string name="maintenance_clear">Clear maintenance windows</string>
+    <string name="maintenance_empty">No planned downtime</string>
+    <string name="maintenance_line">Downtime %1$s–%2$s</string>
     <string name="period_week">Period: week</string>
     <string name="history_empty">No data yet — wait for a few checks.</string>
     <string name="share_summary">Share summary</string>
@@ -106,6 +114,11 @@
     <string name="alert_mute_save_failed">Could not save the alert pause change</string>
     <string name="history_loading">Preparing history…</string>
     <string name="history_load_failed">History is temporarily unavailable</string>
+    <string name="error_reason_unknown">unexpected error</string>
+    <string name="error_reason_permission">system permission required</string>
+    <string name="error_reason_no_app">no app can handle this action</string>
+    <string name="error_reason_storage">local storage unavailable</string>
+    <string name="error_reason_state">monitor is not ready</string>
     <string name="incidents_title">Incident cards</string>
     <string name="incidents_hint">Latest 100 episodes in this period. Gaps and lost internet are shown separately; onset or recovery may be unobserved. Sharing includes only times and duration totals.</string>
     <string name="incidents_empty">No outage or partial availability was observed in this period.</string>

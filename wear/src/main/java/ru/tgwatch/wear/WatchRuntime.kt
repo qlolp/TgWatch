@@ -28,7 +28,7 @@ class WatchApplication : Application() {
 /** Passive cache and network observer. Only a user's controller request opens probe transports. */
 internal object WatchRuntime {
     private val main = Handler(Looper.getMainLooper())
-    private val io = ThreadPoolExecutor(1, 1, 30L, TimeUnit.SECONDS, ArrayBlockingQueue(1),
+    private val io = ThreadPoolExecutor(1, 1, IO_KEEP_ALIVE_SECONDS, TimeUnit.SECONDS, ArrayBlockingQueue(1),
         { task -> Thread(task, "tg-watch-cache").apply { isDaemon = true } })
     private val observers = mutableListOf<WeakReference<Observer>>()
     private val networkRevision = AtomicLong()
@@ -52,22 +52,21 @@ internal object WatchRuntime {
         cm = context.getSystemService(ConnectivityManager::class.java)
         store = WatchStore(context)
         network = cm.activeNetwork
-        captive = cm.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true
+        captive = isCaptive(cm.getNetworkCapabilities(network))
         cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(value: Network) = updateNetwork(value,
-                cm.getNetworkCapabilities(value)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true)
+                isCaptive(cm.getNetworkCapabilities(value)))
             override fun onLost(value: Network) { synchronized(this@WatchRuntime) {
                 if (network == value) updateNetwork(null, false)
             } }
             override fun onCapabilitiesChanged(value: Network, caps: NetworkCapabilities) {
-                if (value == cm.activeNetwork) updateNetwork(value,
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL))
+                if (value == cm.activeNetwork) updateNetwork(value, isCaptive(caps))
             }
         })
         io.execute {
             runCatching { WatchSurfaceAction.initialize(context) }
             boot = runCatching { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT).toLong() }
-                .getOrElse { (SecureRandom().nextLong() and Long.MAX_VALUE) or (1L shl 32) }
+                .getOrElse { (SecureRandom().nextLong() and Long.MAX_VALUE) or SYNTHETIC_BOOT_FLAG }
             val restored = store.load()
             snapshot = restored?.let { if (it.bootSession == boot) it else it.copy(checkedElapsedMs = 0) }
             WatchExecution.process.seedRevision(restored?.revision ?: 0)
@@ -75,6 +74,8 @@ internal object WatchRuntime {
             notifyChanged()
         }
     }
+    private fun isCaptive(caps: NetworkCapabilities?): Boolean =
+        caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true
     @Synchronized private fun updateNetwork(value: Network?, isCaptive: Boolean) {
         if (network != value || captive != isCaptive) {
             network = value
@@ -102,12 +103,14 @@ internal object WatchRuntime {
                 bound == null -> ProbeReport(emptyList(), connected = false)
                 caps == null -> ProbeReport(emptyList())
                 !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) -> ProbeReport(emptyList(), false)
+                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) ->
+                    ProbeReport(emptyList(), connected = false)
                 else -> WatchProbeRunner(object : ProbeTransport {
                     override val userAgent = "TgWatch/${BuildConfig.VERSION_NAME} (Wear OS)"
-                    override fun openConnection(url: URL): HttpURLConnection = bound.openConnection(url) as HttpURLConnection
+                    override fun openConnection(url: URL): HttpURLConnection =
+                        bound.openConnection(url) as HttpURLConnection
                     override fun openSocket(): Socket = bound.socketFactory.createSocket()
-                }).check(attempt.rotation, (attempt.deadlineElapsed - SystemClock.elapsedRealtime() - 100)
+                }).check(attempt.rotation, (attempt.deadlineElapsed - SystemClock.elapsedRealtime() - PROBE_MARGIN_MS)
                     .coerceIn(1, WatchProbePlan.NETWORK_BUDGET_MS))
             }
             WatchProbeResult(report, currentNetwork = cm.activeNetwork == bound)
@@ -116,9 +119,14 @@ internal object WatchRuntime {
     private fun publish(value: WatchSnapshot) {
         snapshot = value
         notifyChanged()
-        runCatching { androidx.wear.tiles.TileService.getUpdater(cmContext).requestUpdate(StatusTileService::class.java) }
-        runCatching { androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
-            .create(cmContext, android.content.ComponentName(cmContext, StatusComplicationService::class.java)).requestUpdateAll() }
+        runCatching {
+            androidx.wear.tiles.TileService.getUpdater(cmContext).requestUpdate(StatusTileService::class.java)
+        }
+        runCatching {
+            val component = android.content.ComponentName(cmContext, StatusComplicationService::class.java)
+            androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
+                .create(cmContext, component).requestUpdateAll()
+        }
         synchronized(this) {
             pending = value
             if (saving) return
@@ -133,4 +141,8 @@ internal object WatchRuntime {
             }
         }
     }
+
+    private const val IO_KEEP_ALIVE_SECONDS = 30L
+    private const val SYNTHETIC_BOOT_FLAG = 1L shl 32
+    private const val PROBE_MARGIN_MS = 100
 }

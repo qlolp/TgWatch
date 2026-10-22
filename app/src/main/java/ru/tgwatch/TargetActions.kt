@@ -20,7 +20,8 @@ internal object TargetActions {
 
     fun reconcile(ctx: Context, changedId: TargetId = TargetId.TELEGRAM) {
         when {
-            !Prefs.isEnabled(ctx) || TargetId.entries.none { TargetPreferences.storedDefinition(ctx, it).enabled } -> {
+            !Prefs.isEnabled(ctx) || TargetId.entries.none { TargetPreferences.storedDefinition(ctx, it).enabled } &&
+                !RegionalPreferences.anyEnabled(ctx) -> {
                 Prefs.setEnabled(ctx, false)
                 MonitorService.stop(ctx)
             }

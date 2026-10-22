@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -54,6 +55,8 @@ internal object TargetSettingsDialog {
         val threshold = threshold(activity, definition.alerts.slowThresholdMs, thresholdLabel).also(content::addView)
         val endpoint = if (id == TargetId.MATRIX || id == TargetId.CUSTOM) endpoint(activity, content) else null
         val health = if (id == TargetId.CUSTOM) CustomHealthSettingsUi(activity, content) else null
+        MaintenanceSettingsUi.add(activity, content, id)
+        attachTemplates(activity, id, content, endpoint, health)
         val dialog = AlertDialog.Builder(activity).setTitle(TargetNames.label(activity, id))
             .setView(ScrollView(activity).apply { addView(content) })
             .setNegativeButton(R.string.target_cancel, null)
@@ -147,6 +150,37 @@ internal object TargetSettingsDialog {
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             content.addView(this)
         }
+    }
+
+    private fun attachTemplates(activity: Activity, id: TargetId, content: LinearLayout,
+        endpoint: EditText?, health: CustomHealthSettingsUi?) {
+        if (id != TargetId.CUSTOM || endpoint == null || health == null) return
+        templates(activity, content, endpoint, health)
+    }
+
+    private fun templates(activity: Activity, content: LinearLayout, endpoint: EditText,
+        health: CustomHealthSettingsUi) {
+        content.addView(TextView(activity).apply { setText(R.string.target_templates_label) })
+        val row = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isSaveEnabled = false
+        }
+        for (template in StatusPageTemplates.all) {
+            row.addView(Button(activity).apply {
+                text = AndroidText.resolve(activity, textOf(template.labelKey))
+                isSaveEnabled = false
+                setOnClickListener {
+                    endpoint.setText(template.url)
+                    health.apply(template.condition)
+                }
+            })
+        }
+        content.addView(HorizontalScrollView(activity).apply {
+            isSaveEnabled = false
+            isFillViewport = true
+            addView(row)
+        })
+        content.addView(TextView(activity).apply { setText(R.string.target_templates_help) })
     }
 
     private fun threshold(activity: Activity, value: Long, label: TextView): SeekBar = SeekBar(activity).apply {

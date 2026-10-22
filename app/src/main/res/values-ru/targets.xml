@@ -46,7 +46,7 @@
     <string name="target_custom_help">Проверяется успешный ответ настроенного HTTPS-адреса.</string>
     <string name="target_history_failed">Не удалось сохранить историю. Измеренный результат доступности не изменился.</string>
     <string name="target_health_code">Ожидаемый HTTP-код (необязательно, 200–599)</string>
-    <string name="target_health_field">Строковое поле JSON (необязательно)</string>
+    <string name="target_health_field">Строковое поле JSON или путь через точку (необязательно)</string>
     <string name="target_health_value">Ожидаемая строка (может быть пустой)</string>
     <string name="target_health_clear">Сбросить условия; сохранить адрес</string>
     <string name="target_health_help">Пустые поля сохраняют условия. Новый адрес заменяет их. JSON проверяется одним GET: строгий UTF-8, не более 32 КиБ. Условия приватны и не входят в резервную копию.</string>
@@ -57,4 +57,12 @@
     <string name="target_health_dns">DNS не разрешил адрес.</string>
     <string name="target_health_tls">Не удалось установить защищённое TLS-соединение.</string>
     <string name="target_health_timeout">Истёк срок ожидания проверки.</string>
+    <string name="target_templates_label">Пресеты status-страниц</string>
+    <string name="target_templates_help">Подставляет публичный JSON-адрес статуса и поле проверки. Адрес остаётся на устройстве.</string>
+    <string name="template_discord">Discord</string>
+    <string name="template_github">GitHub</string>
+    <string name="template_cloudflare">Cloudflare</string>
+    <string name="template_atlassian">Atlassian</string>
+    <string name="template_spotify">Spotify</string>
+    <string name="template_openai">OpenAI</string>
 </resources>

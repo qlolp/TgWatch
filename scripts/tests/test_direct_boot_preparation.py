@@ -44,7 +44,11 @@ elif a==['shell','cat','/proc/sys/kernel/random/boot_id']:
         code=1;err='error: device offline'
     else: out=s['boot']
 else: code=7;err='Unexpected fixture command'
-p.write_text(json.dumps(s))
+# The real command deadline may kill this process during a journal write.
+# Keep the last complete state readable, as the readiness fixture already does.
+pending=p.with_name(p.name + '.' + str(os.getpid()) + '.tmp')
+pending.write_text(json.dumps(s))
+os.replace(pending,p)
 if out: print(out)
 if err: print(err,file=sys.stderr)
 sys.exit(code)

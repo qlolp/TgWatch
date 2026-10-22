@@ -6,12 +6,15 @@ import java.util.concurrent.*
 class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long = 6_000L,
     private val admission: ProbeAdmission = ProbeAdmission.process,
     private val lane: ProbeLane = ProbeLane.PRIMARY) {
-    fun run(endpoints: List<ProbeEndpoint>, operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> =
+    fun run(endpoints: List<ProbeEndpoint>,
+        operation: (ProbeEndpoint, ProbeCancellation) -> ProbeOutcome): List<ProbeOutcome> =
         runMapped(endpoints, { ep, detail, measurement ->
             ProbeOutcome(ep.name, ep.group, false, -1L, detail, measurement)
         }, operation)
 
     /** Adapters may preserve their existing DTOs without copying the scheduling/protocol implementation. */
+    // Probe transport failures are classified later; any Exception is a failed probe.
+    @Suppress("TooGenericExceptionCaught")
     fun <R : Any> runMapped(endpoints: List<ProbeEndpoint>,
         fallback: (ProbeEndpoint, ProbeDetail, ProbeMeasurement) -> R,
         operation: (ProbeEndpoint, ProbeCancellation) -> R): List<R> {
@@ -34,7 +37,9 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
                 val cancellation = ProbeCancellation()
                 try {
                     val future = queue.submit(Callable {
-                        if (!lease.start()) return@Callable index to unavailable(endpoint, ProbeDetailCode.CANCELLED)
+                        if (!lease.start()) {
+                            return@Callable index to unavailable(endpoint, ProbeDetailCode.CANCELLED)
+                        }
                         try {
                             cancellation.check()
                             started.add(index)
@@ -64,9 +69,11 @@ class ProbeBatch(private val pool: ExecutorService, private val timeoutMs: Long 
             }
         }
         checkCoordinator()
-        return endpoints.mapIndexed { index, endpoint -> results.firstOrNull { it.first == index }?.second ?: fallback(endpoint,
-            ProbeDetail(ProbeDetailCode.TIME_LIMIT),
-            if (index in started) ProbeMeasurement.FAILURE else ProbeMeasurement.NOT_MEASURED) }
+        return endpoints.mapIndexed { index, endpoint ->
+            results.firstOrNull { it.first == index }?.second ?: fallback(endpoint,
+                ProbeDetail(ProbeDetailCode.TIME_LIMIT),
+                if (index in started) ProbeMeasurement.FAILURE else ProbeMeasurement.NOT_MEASURED)
+        }
     }
     private fun checkCoordinator() {
         if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")

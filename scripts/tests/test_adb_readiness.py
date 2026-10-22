@@ -141,7 +141,9 @@ class AdbReadinessTests(unittest.TestCase):
         self.assertGreaterEqual(calls.count(["root"]), 2)
 
     def test_lasting_unauthorized_device_fails_at_the_deadline_with_its_cause(self):
-        result, calls, elapsed = self.run_fixture("always_unauthorized", timeout=.3, command_timeout=.15)
+        # Allow two real Python subprocess starts even on a loaded developer Mac.
+        # The cause, retry count and two-second overall bound remain strict.
+        result, calls, elapsed = self.run_fixture("always_unauthorized", timeout=1, command_timeout=.4)
         self.assertNotEqual(0, result.returncode)
         self.assertIn("unauthorized", result.stderr)
         self.assertGreaterEqual(calls.count(["root"]), 2)

@@ -1,0 +1,32 @@
+<resources>
+    <string name="regional_title">Regional service checks</string>
+    <string name="regional_open">Open %1$s in browser</string>
+    <string name="regional_open_failed">Could not open the browser</string>
+    <string name="regional_explanation">Public website checks from this phone. They cannot verify video playback, account access or AI features. A country flag and a generic HTTP refusal do not prove an IP block. An alert requires two explicit regional responses on the same connection. Normally every 5 minutes; 10 minutes with the screen off or battery saver.</string>
+    <string name="regional_check">Check enabled services now</string>
+    <string name="regional_enable_first">Enable a service and start monitoring first</string>
+    <string name="regional_channel_settings">Regional notification settings</string>
+    <string name="regional_maintenance">Maintenance windows for regional warnings</string>
+    <string name="regional_mute">Mute all alerts for an hour</string>
+    <string name="regional_alert_channel">Regional service restrictions</string>
+    <string name="regional_alert_title">%1$s: regional restriction reported</string>
+    <string name="regional_alert_message">%1$s returned an explicit regional restriction twice on this phone’s connection. The exact cause may also depend on the account or service policy. Open the service to verify.</string>
+    <string name="regional_off">Monitoring off</string>
+    <string name="regional_unverified">Unverified</string>
+    <string name="regional_result">%1$s · %2$s</string>
+    <string name="regional_http">%1$s · HTTP %2$d</string>
+    <string name="regional_confirmed">Regional restriction reported twice on this connection</string>
+    <string name="regional_web_reachable">Public website responds; features unverified</string>
+    <string name="regional_restricted">Service reports a regional restriction; confirmation required for alert</string>
+    <string name="regional_auth">Sign-in or consent required</string>
+    <string name="regional_challenge">CAPTCHA or browser verification</string>
+    <string name="regional_rate">Rate limited</string>
+    <string name="regional_network">Network error</string>
+    <string name="regional_ongoing">Regional monitoring: %1$d services</string>
+    <string name="country_refresh">Refresh exit country</string>
+    <string name="country_no_network">Exit country: no active network</string>
+    <string name="country_checking">Checking exit country…</string>
+    <string name="country_unverified">Exit country is unverified</string>
+    <string name="country_current">%1$s %2$s · %3$s\nExit country according to Cloudflare</string>
+    <string name="country_stale">%1$s %2$s · old result (%3$s)\nCurrent connection’s country is unverified</string>
+</resources>

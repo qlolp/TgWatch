@@ -84,30 +84,54 @@ private object MatrixVersions {
 private object CustomHttpHealth {
     private const val MAX_BYTES = 32 * 1024
     private const val MAX_VALUE_CHARS = 256
+    private const val HTTP_OK = 200
+    private const val HTTP_LAST_SUCCESS = 299
+
     fun confirm(connection: HttpURLConnection, cancellation: ProbeCancellation,
         condition: HttpProbeCondition, code: Int): HttpProbeResult {
-        val codeMatches = condition.expectedCode?.let { it == code } ?: (code in 200..299)
-        if (!codeMatches) return HttpProbeResult(code, false, HttpConditionFailure.CODE_MISMATCH)
-        if (condition.jsonField == null) return HttpProbeResult(code, true)
+        val codeMatches = condition.expectedCode?.let { it == code } ?: (code in HTTP_OK..HTTP_LAST_SUCCESS)
+        return when {
+            !codeMatches -> HttpProbeResult(code, false, HttpConditionFailure.CODE_MISMATCH)
+            condition.jsonField == null -> HttpProbeResult(code, true)
+            jsonMatches(connection, cancellation, condition) -> HttpProbeResult(code, true)
+            else -> unconfirmed(code)
+        }
+    }
+
+    private fun jsonMatches(connection: HttpURLConnection, cancellation: ProbeCancellation,
+        condition: HttpProbeCondition): Boolean {
         val encoding = connection.contentEncoding
-        if (encoding != null && !encoding.equals("identity", ignoreCase = true)) return unconfirmed(code)
-        val bytes = BoundedHttpBody.read(connection, cancellation, MAX_BYTES,
-            errorBody = code >= HttpURLConnection.HTTP_BAD_REQUEST) ?: return unconfirmed(code)
-        val matches = try {
-            val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
-            val reader = StrictJsonReader(StringReader(text))
-            var found = false
-            reader.objectFields { key ->
-                if (key == condition.jsonField && reader.nextType == '"')
-                    found = reader.string(MAX_VALUE_CHARS) == condition.expectedValue
-                else reader.skipValue()
+        val identityEncoding = encoding == null || encoding.equals("identity", ignoreCase = true)
+        val bytes = if (!identityEncoding) null else BoundedHttpBody.read(connection, cancellation, MAX_BYTES,
+            errorBody = connection.responseCode >= HttpURLConnection.HTTP_BAD_REQUEST)
+        return bytes != null && confirmBytes(bytes, condition)
+    }
+
+    private fun confirmBytes(bytes: ByteArray, condition: HttpProbeCondition): Boolean = try {
+        val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
+        val reader = StrictJsonReader(StringReader(text))
+        val found = confirmStringPath(reader, condition.pathSegments(), condition.expectedValue.orEmpty())
+        reader.finish()
+        found
+    } catch (_: IllegalArgumentException) { false }
+    catch (_: CharacterCodingException) { false }
+
+    /** Walk a dotted object path; the terminal value must be a JSON string equal to [expected]. */
+    private fun confirmStringPath(reader: StrictJsonReader, path: List<String>, expected: String): Boolean {
+        var matched = false
+        fun walk(at: StrictJsonReader, remaining: List<String>) {
+            val key = remaining.first()
+            val last = remaining.size == 1
+            at.objectFields { field ->
+                if (field == key && if (last) at.nextType == '"' else at.nextType == '{') {
+                    if (last) matched = matched || at.string(MAX_VALUE_CHARS) == expected
+                    else walk(at, remaining.drop(1))
+                } else at.skipValue()
             }
-            reader.finish()
-            found
-        } catch (_: IllegalArgumentException) { false }
-        catch (_: CharacterCodingException) { false }
-        return if (matches) HttpProbeResult(code, true) else unconfirmed(code)
+        }
+        walk(reader, path)
+        return matched
     }
     private fun unconfirmed(code: Int) = HttpProbeResult(code, false, HttpConditionFailure.JSON_NOT_CONFIRMED)
 }

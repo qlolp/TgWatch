@@ -20,6 +20,14 @@
     <string name="check_now">Проверить сейчас</string>
     <string name="history_title">История доступности</string>
     <string name="period_day">Период: сутки</string>
+    <string name="history_retention_label">Хранить историю</string>
+    <string name="history_retention_week">7 дней</string>
+    <string name="history_retention_month">30 дней</string>
+    <string name="history_retention_quarter">90 дней</string>
+    <string name="maintenance_add">Добавить окно обслуживания</string>
+    <string name="maintenance_clear">Убрать окна обслуживания</string>
+    <string name="maintenance_empty">Плановых остановок нет</string>
+    <string name="maintenance_line">Остановка %1$s–%2$s</string>
     <string name="period_week">Период: неделя</string>
     <string name="history_empty">Пока нет данных — подожди несколько проверок.</string>
     <string name="share_summary">Поделиться сводкой</string>
@@ -106,6 +114,11 @@
     <string name="alert_mute_save_failed">Не удалось сохранить изменение паузы оповещений</string>
     <string name="history_loading">Готовлю историю…</string>
     <string name="history_load_failed">История временно недоступна</string>
+    <string name="error_reason_unknown">непредвиденная ошибка</string>
+    <string name="error_reason_permission">нужно системное разрешение</string>
+    <string name="error_reason_no_app">нет приложения для этого действия</string>
+    <string name="error_reason_storage">локальное хранилище недоступно</string>
+    <string name="error_reason_state">монитор не готов</string>
     <string name="incidents_title">Карточки сбоев</string>
     <string name="incidents_hint">Последние 100 эпизодов за период. Пробелы и отсутствие сети показаны отдельно; начало или восстановление могут быть не наблюдены. Сводка содержит только время и длительности.</string>
     <string name="incidents_empty">В этом периоде не наблюдалось сбоев или частичной доступности.</string>
