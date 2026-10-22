@@ -78,7 +78,7 @@ def registry(raw):
     if not isinstance(value, dict) or set(value) != {
             'formatVersion', 'createdAt', 'settings', 'targets', 'observations', 'log'}:
         raise ValueError('Invalid registry shape')
-    if type(value['formatVersion']) is not int or value['formatVersion'] != 3:
+    if type(value['formatVersion']) is not int or value['formatVersion'] not in (3, 4):
         raise ValueError('Unsupported registry')
     targets = value['targets']
     if not isinstance(targets, list) or not 1 <= len(targets) <= len(IDS):
