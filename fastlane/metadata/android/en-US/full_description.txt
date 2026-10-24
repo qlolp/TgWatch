@@ -1,4 +1,4 @@
-TgWatch privately monitors Telegram reachability from your Android device. Optional independent Matrix, WhatsApp Web and custom HTTPS targets have their own seven-day history, intervals and alerts. Telegram remains the default; additional targets and integrations start disabled. No Telegram account, phone number or message access is needed.
+TgWatch privately monitors Telegram reachability from your Android device. Optional independent Matrix, WhatsApp Web and custom HTTPS targets have their own 7/30/90-day history retention, intervals and alerts. Regional profiles also provide a local seven-day journal, fresh connection comparisons and an optional one-shot recovery watch. Telegram remains the default; additional targets and integrations start disabled. No Telegram account, phone number or message access is needed.
 
 Telegram checks combine an unauthenticated MTProto greeting with HTTPS web probes. Matrix checks its versions response; WhatsApp checks its web resource. These measurements do not prove message delivery or authenticate a Telegram server. Offline, unknown, unmeasured and observed outages are distinct; gaps never become healthy uptime.
 
@@ -8,6 +8,7 @@ Features:
 * Widgets with target selection, expanded history/coverage, check and mute buttons; a Telegram Quick Settings tile.
 * Exact latency percentiles, local approximate DC histograms and slow-response alerts.
 * Charts, incident summaries, CSV export/import and password-encrypted portable backups. After restore, targets remain disabled for review.
+* Regional public-service checks with separate user-reported results and an optional 24-hour recovery watch. Public reachability does not certify account features or regional access.
 * Frozen status preview shared as text or PNG, without private addresses or credentials.
 * English and Russian interface, first-run guide, Material You on Android12+.
 

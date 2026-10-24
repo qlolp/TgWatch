@@ -61,24 +61,27 @@ An optional daily summary reports the last 24 hours while monitoring is on.
 The home-screen widget and Quick Settings tile offer the current status and a
 manual check.
 
-Seven-day history distinguishes measured intervals from gaps. Offline or unknown
-time does not silently become a Telegram outage. Uptime is calculated by time;
-check counts and mean recovery time are separate metrics. Clock-epoch metadata
-is excluded from check counts and the chart. A temporary storage write failure
-is repaired by saving the complete retained snapshot on the next successful write.
-History preparation is cached; the main screen loads statistics and chart buckets
-off the UI thread. Incident cards list the latest 100 episodes in the selected
-day/week window, distinguish outage/partial/offline/unknown time, and mark clipped
-starts and unobserved recovery. Explicit sharing exports only episode times and
-duration totals. See [1.15.0](releases/1.15.0.md).
+Selectable 7/30/90-day history distinguishes measured intervals from gaps. The
+week uses raw observations; longer retention adds minute and five-minute rollups.
+Offline or unknown time does not silently become a Telegram outage. Uptime is
+calculated by time; check counts and mean recovery time are separate metrics.
+Clock-epoch metadata is excluded from check counts and the chart. A temporary
+storage write failure is repaired by saving the complete retained snapshot on the
+next successful write. History preparation is cached; the main screen loads
+statistics and chart buckets off the UI thread. Incident cards list the latest
+100 episodes in the selected day/week window, distinguish
+outage/partial/offline/unknown time, and mark clipped starts and unobserved
+recovery. Explicit sharing exports only episode times and duration totals.
+See [1.15.0](releases/1.15.0.md).
 
 ## Backup, automation and diagnostics
 
 The encrypted portable backup contains settings, history and the event log. New
 exports use AES-256-GCM and PBKDF2-HMAC-SHA256 with 600,000 iterations. Keep the
 password: there is no recovery service. Restoring replaces data and leaves
-monitoring stopped. Current all-target exports use TGWB v3 with JSON payload
-version 3. A separate Telegram-only v2 export supports older installations;
+monitoring stopped. Current all-target exports use the TGWB v3 container with
+JSON payload version 4, including the selected history retention; JSON v3 remains
+readable. A separate Telegram-only v2 export supports older installations;
 private addresses are excluded from both new export formats. Older supported
 backups remain readable. CSV export/import is also supported.
 See [backup formats](backup.md).
@@ -102,8 +105,8 @@ The optional [HTTPS webhook](automation.md#webhook-alert) supports text or a bou
 JSON event with per-target status filters. The JSON contains public status, previous
 status, measurement time, latency and network class, without endpoints or tokens.
 One physical request, a ten-second deadline, rate limits and settings-generation
-fences apply. The [Home Assistant example](examples/home-assistant/tgwatch-events.yaml)
-uses events, without a heartbeat or MQTT client in the app.
+fences apply. The [Home Assistant JSON v1 example](examples/home-assistant/tgwatch-events.yaml)
+uses events without a heartbeat. JSON v2 heartbeat is a separate opt-in format.
 
 ## Latency and surfaces
 

@@ -79,9 +79,13 @@ class RegionalWatchIntegrationTest {
     @Test fun bootDisableAndRestoreCannotReviveAnOldArmedRequest() {
         assertFalse(RegionalWatchPreferences.arm(ctx, result(RegionalStatus.WEB_REACHABLE)))
         val old = arm()
-        Prefs.sp(ctx).edit().putInt("regional.watch.gemini.boot", old.boot + 1).commit()
-        assertNull(RegionalWatchPreferences.current(ctx, service))
-        arm()
+        val wallNow = System.currentTimeMillis() + 5_000
+        val restored = RegionalWatchPreferences.current(ctx, service, now = 5_000,
+            wallNow = wallNow, currentBoot = old.boot + 1)
+        assertNotNull(restored)
+        assertTrue(restored!!.restoredAfterBoot)
+        assertEquals(5_000L, restored.request.armedElapsed)
+        assertTrue(restored.request.deadlineElapsed < 5_000 + RegionalWatchRequest.TTL_MS)
         assertTrue(RegionalPreferences.setEnabled(ctx, service, false))
         assertNull(RegionalWatchPreferences.current(ctx, service))
         assertTrue(RegionalPreferences.setEnabled(ctx, service, true))

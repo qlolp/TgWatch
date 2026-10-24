@@ -100,4 +100,15 @@ class RegionalChangeWatchTest {
         assertFalse(stored.current(2, 3, false, 2_000))
         assertFalse(stored.current(2, 3, true, request.deadlineElapsed))
     }
+
+    @Test fun rebootRebasesOnlyTheRemainingDeadlineAndRejectsClockRollbackOrExpiry() {
+        val rebased = request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS, 25_000)
+        assertEquals(500L, rebased?.armedElapsed)
+        assertEquals(500L + RegionalWatchRequest.TTL_MS - 15_000, rebased?.deadlineElapsed)
+        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS, 9_999))
+        assertNull(request.afterReboot(500, 25_000, 10_000 + RegionalWatchRequest.TTL_MS, 24_999))
+        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS,
+            10_000 + RegionalWatchRequest.TTL_MS))
+        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS + 1, 25_000))
+    }
 }

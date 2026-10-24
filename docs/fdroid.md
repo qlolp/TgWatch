@@ -1,9 +1,11 @@
 # F-Droid packaging candidate
 
-`metadata/ru.tgwatch.yml` is a disabled phone-only candidate for1.20.1,
-code1020001, tag `v1.20.1`, source
-`4b2aba4d1c87606ed482752cf027c85e5896dece`. The separate Wear application is not
-included. The candidate has not been submitted to or accepted by the catalog.
+`metadata/ru.tgwatch.yml` currently points to the disabled phone-only 1.23.0
+candidate, code1023000, tag `v1.23.0`; its recipe has not been validated for that
+version. The last exact-tag local verification recorded below applies to 1.20.1,
+code1020001, source `4b2aba4d1c87606ed482752cf027c85e5896dece`, and is not evidence
+for 1.23.0. The separate Wear application is not included. Neither candidate has
+been submitted to or accepted by the catalog.
 
 ## Exact-tag local verification
 

@@ -6,7 +6,8 @@ Gradle scripts are outside its source set. Execute `bash ./gradlew detekt`.
 
 The initial baseline was generated from the Kotlin source in commit e3d5348,
 before the 1.13 changes, using the same pinned analyzer/configuration. It
-contains 412 legacy findings. New automation, diagnostics and other new files
+contains 408 legacy findings. CI reports the count and fails if the baseline
+grows. New automation, diagnostics and other new files
 were excluded from baseline generation. An existing baseline ID can still
 match a modified function: baseline analysis catches new finding identities,
 not every increase in severity inside a previously flagged function.
