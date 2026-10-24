@@ -8,10 +8,15 @@ data class RegionalWatchRequest(val armedElapsed: Long, val deadlineElapsed: Lon
     fun active(now: Long): Boolean = now >= armedElapsed && now < deadlineElapsed
     fun afterReboot(nowElapsed: Long, armedWall: Long, deadlineWall: Long,
         nowWall: Long): RegionalWatchRequest? {
-        if (nowElapsed < 0 || armedWall < 0 || deadlineWall <= armedWall ||
-            deadlineWall - armedWall !in 1L..TTL_MS || nowWall < armedWall || nowWall >= deadlineWall) return null
-        val remaining = deadlineWall - nowWall
-        return runCatching { RegionalWatchRequest(nowElapsed, Math.addExact(nowElapsed, remaining)) }.getOrNull()
+        return runCatching {
+            require(nowElapsed >= 0)
+            require(armedWall >= 0)
+            require(deadlineWall > armedWall)
+            require(deadlineWall - armedWall in 1L..TTL_MS)
+            require(nowWall >= armedWall && nowWall < deadlineWall)
+            val remaining = deadlineWall - nowWall
+            RegionalWatchRequest(nowElapsed, Math.addExact(nowElapsed, remaining))
+        }.getOrNull()
     }
     companion object { const val TTL_MS = 24 * 60 * 60_000L }
 }
