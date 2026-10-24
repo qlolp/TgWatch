@@ -35,6 +35,7 @@ internal object RegionalWatchPreferences {
                     } else {
                         val saved = prefs.edit().putLong(key(service, "armed"), rebased.armedElapsed)
                             .putLong(key(service, "deadline"), rebased.deadlineElapsed)
+                            .putLong(key(service, "armed_wall"), wallNow)
                             .putInt(key(service, "boot"), currentBoot)
                             .putBoolean(key(service, "restored"), true).commit()
                         if (saved) RegionalWatchMetadata(rebased, currentBoot, profile, true) else null
