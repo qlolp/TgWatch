@@ -1,48 +1,29 @@
 package ru.tgwatch
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.os.SystemClock
 import android.provider.Settings
 
 /** Only armed intent is durable. No network identity or positive observation is stored here. */
 internal object RegionalWatchPreferences {
-    private fun key(service: RegionalService, suffix: String) =
+    internal fun key(service: RegionalService, suffix: String) =
         "${RegionalPreferences.PREFIX}watch.${service.wire}.$suffix"
-    private fun boot(ctx: Context) = Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)
+    internal fun boot(ctx: Context) = Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)
 
     @Synchronized fun current(ctx: Context, service: RegionalService,
-        now: Long = SystemClock.elapsedRealtime(), wallNow: Long = System.currentTimeMillis(),
-        currentBoot: Int = boot(ctx)): RegionalWatchMetadata? {
+        now: Long = SystemClock.elapsedRealtime()): RegionalWatchMetadata? {
         if (BackupManager.hasPending() || RecoveryCoordinator.state != RecoveryState.READY) return null
         return runCatching {
             val prefs = Prefs.sp(ctx)
-            if (!prefs.contains(key(service, "armed")) || currentBoot < 0) null else {
+            if (!prefs.contains(key(service, "armed"))) null else {
                 val request = RegionalWatchRequest(prefs.getLong(key(service, "armed"), -1),
                     prefs.getLong(key(service, "deadline"), -1))
-                val profile = prefs.getLong(key(service, "profile"), -1)
-                val storedBoot = prefs.getInt(key(service, "boot"), -1)
-                val metadata = if (storedBoot == currentBoot) {
-                    RegionalWatchMetadata(request, storedBoot, profile,
-                        prefs.getBoolean(key(service, "restored"), false))
-                } else {
-                    val rebased = request.afterReboot(now, prefs.getLong(key(service, "armed_wall"), -1),
-                        prefs.getLong(key(service, "deadline_wall"), -1), wallNow)
-                    if (rebased == null || !RegionalPreferences.enabled(ctx, service) ||
-                        profile != RegionalPreferences.profileRevision(ctx, service)) {
-                        clear(prefs, service)
-                        null
-                    } else {
-                        val saved = prefs.edit().putLong(key(service, "armed"), rebased.armedElapsed)
-                            .putLong(key(service, "deadline"), rebased.deadlineElapsed)
-                            .putLong(key(service, "armed_wall"), wallNow)
-                            .putInt(key(service, "boot"), currentBoot)
-                            .putBoolean(key(service, "restored"), true).commit()
-                        if (saved) RegionalWatchMetadata(rebased, currentBoot, profile, true) else null
-                    }
-                }
-                metadata?.takeIf {
-                    it.current(currentBoot, RegionalPreferences.profileRevision(ctx, service),
+                RegionalWatchMetadata(request, prefs.getInt(key(service, "boot"), -1),
+                    prefs.getLong(key(service, "profile"), -1),
+                    prefs.getBoolean(key(service, "restored"), false)).takeIf {
+                    it.current(boot(ctx), RegionalPreferences.profileRevision(ctx, service),
                         RegionalPreferences.enabled(ctx, service), now)
                 }
             }
@@ -79,7 +60,7 @@ internal object RegionalWatchPreferences {
         return clear(Prefs.sp(ctx), service)
     }
 
-    private fun clear(prefs: android.content.SharedPreferences, service: RegionalService): Boolean {
+    internal fun clear(prefs: SharedPreferences, service: RegionalService): Boolean {
         val editor = prefs.edit()
         listOf("armed", "deadline", "armed_wall", "deadline_wall", "boot", "profile", "restored")
             .forEach { editor.remove(key(service, it)) }

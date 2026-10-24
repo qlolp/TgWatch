@@ -101,14 +101,38 @@ class RegionalChangeWatchTest {
         assertFalse(stored.current(2, 3, true, request.deadlineElapsed))
     }
 
-    @Test fun rebootRebasesOnlyTheRemainingDeadlineAndRejectsClockRollbackOrExpiry() {
-        val rebased = request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS, 25_000)
-        assertEquals(500L, rebased?.armedElapsed)
-        assertEquals(500L + RegionalWatchRequest.TTL_MS - 15_000, rebased?.deadlineElapsed)
-        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS, 9_999))
-        assertNull(request.afterReboot(500, 25_000, 10_000 + RegionalWatchRequest.TTL_MS, 24_999))
-        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS,
-            10_000 + RegionalWatchRequest.TTL_MS))
-        assertNull(request.afterReboot(500, 10_000, 10_000 + RegionalWatchRequest.TTL_MS + 1, 25_000))
+    @Test fun onlyAResumedRequestMayBeShorterThanTheFullLifetime() {
+        val short = RegionalWatchRequest(500, 500 + RegionalWatchRequest.TTL_MS - 15_000)
+        assertThrows(IllegalArgumentException::class.java) { RegionalWatchMetadata(short, 2, 3) }
+        assertTrue(RegionalWatchMetadata(short, 2, 3, restoredAfterBoot = true).current(2, 3, true, 600))
+        assertThrows(IllegalArgumentException::class.java) {
+            RegionalWatchRequest(0, RegionalWatchRequest.TTL_MS + 1)
+        }
+    }
+
+    @Test fun rebootResumesOnlyTheRemainingWallTime() {
+        val armed = 10_000L
+        val deadline = armed + RegionalWatchRequest.TTL_MS
+        val resumed = RegionalWatchRequest.resume(500, armed, deadline, 25_000)
+        assertEquals(RegionalWatchResume.Resumed(RegionalWatchRequest(500,
+            500 + RegionalWatchRequest.TTL_MS - 15_000)), resumed)
+        assertEquals(RegionalWatchResume.Resumed(RegionalWatchRequest(0, 1)),
+            RegionalWatchRequest.resume(0, armed, deadline, deadline - 1))
+    }
+
+    @Test fun aClockBehindTheArmingTimeWaitsInsteadOfDroppingTheRequest() {
+        val deadline = 10_000 + RegionalWatchRequest.TTL_MS
+        assertEquals(RegionalWatchResume.Wait, RegionalWatchRequest.resume(500, 10_000, deadline, 9_999))
+        assertEquals(RegionalWatchResume.Wait, RegionalWatchRequest.resume(500, 10_000, deadline, 0))
+    }
+
+    @Test fun expiryMissingOrOversizedAnchorsDropTheRequest() {
+        val deadline = 10_000 + RegionalWatchRequest.TTL_MS
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(500, 10_000, deadline, deadline))
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(500, 10_000, deadline + 1, 25_000))
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(500, -1, -1, 25_000))
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(500, 10_000, 10_000, 10_000))
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(-1, 10_000, deadline, 25_000))
+        assertEquals(RegionalWatchResume.Drop, RegionalWatchRequest.resume(Long.MAX_VALUE, 10_000, deadline, 25_000))
     }
 }

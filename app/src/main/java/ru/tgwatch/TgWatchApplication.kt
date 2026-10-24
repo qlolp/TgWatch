@@ -13,6 +13,8 @@ class TgWatchApplication : Application() {
         // Text built in code (notifications, widget, tile) follows the resource locale.
 
         RecoveryCoordinator.start(this)
+        // A reboot or a clock change while the process was dead must not stretch a public-response watch.
+        RegionalWatchClock.schedule(this)
         StatusShareJobs.cleanup(this)
         // Alarms do not survive reboot, update or restore; re-arming on each process start is cheap.
         DailySummaryReceiver.schedule(this)
