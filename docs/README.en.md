@@ -102,8 +102,8 @@ The optional [HTTPS webhook](automation.md#webhook-alert) supports text or a bou
 JSON event with per-target status filters. The JSON contains public status, previous
 status, measurement time, latency and network class, without endpoints or tokens.
 One physical request, a ten-second deadline, rate limits and settings-generation
-fences apply. The [Home Assistant example](examples/home-assistant/tgwatch-events.yaml)
-uses events, without a heartbeat or MQTT client in the app.
+fences apply. The [Home Assistant JSON v1 example](examples/home-assistant/tgwatch-events.yaml)
+uses events without a heartbeat. JSON v2 heartbeat is a separate opt-in format.
 
 ## Latency and surfaces
 

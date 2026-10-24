@@ -1,6 +1,6 @@
-# Архитектура TgWatch 1.15.0
+# Архитектура TgWatch
 
-Android 8.0+; native Views и существующая foreground-служба. Чистые Kotlin policies и codecs отделены от Android-хранилища, Network/SAF и UI. Карта показывает потоки данных; наличие пути не заменяет отчёт о его проверке.
+Android 8.0+; native Views и foreground-служба. Чистые Kotlin policies и codecs отделены от Android-хранилища, Network/SAF и UI. Карта показывает потоки данных; наличие пути не заменяет отчёт о его проверке.
 
 ```mermaid
 flowchart TD
