@@ -87,6 +87,7 @@
     <string name="regional_watch_message">Получены два свежих публичных ответа. Доступ к аккаунту и функциям не проверен.</string>
     <string name="regional_watch_arm">Сообщить, когда публичный сайт ответит</string>
     <string name="regional_watch_cancel">Ожидаю до %1$s · отменить</string>
+    <string name="regional_watch_cancel_restored">Восстановлено после перезагрузки · ожидаю до %1$s · отменить</string>
     <string name="regional_watch_help">После подтверждённого регионального отказа можно запросить одно уведомление о двух свежих публичных ответах с интервалом от 15 секунд. Запрос действует до 24 часов; проверки идут при включённом мониторинге. Это не подтверждает работу аккаунта. Действуют тихие часы, заглушение, плановые паузы и настройки уведомлений.</string>
     <string name="regional_watch_channel_settings">Канал уведомлений об ответе сайта</string>
     <string name="regional_watch_saved">Ожидание публичного ответа обновлено</string>

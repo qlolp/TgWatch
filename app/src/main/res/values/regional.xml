@@ -85,6 +85,7 @@
     <string name="regional_watch_message">Two fresh public responses were observed. Account and feature access remain unverified.</string>
     <string name="regional_watch_arm">Tell me when the public site responds</string>
     <string name="regional_watch_cancel">Waiting until %1$s · cancel</string>
+    <string name="regional_watch_cancel_restored">Restored after reboot · waiting until %1$s · cancel</string>
     <string name="regional_watch_help">After a confirmed regional refusal, you can request one alert after two fresh public responses at least 15 seconds apart. The request lasts up to 24 hours while monitoring is enabled. This does not confirm account features. Quiet hours, mute, maintenance and notification settings still apply.</string>
     <string name="regional_watch_channel_settings">Public-response notification channel</string>
     <string name="regional_watch_saved">Public-response watch updated</string>

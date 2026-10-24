@@ -12,16 +12,36 @@ internal object RegionalWatchPreferences {
     private fun boot(ctx: Context) = Settings.Global.getInt(ctx.contentResolver, Settings.Global.BOOT_COUNT, -1)
 
     @Synchronized fun current(ctx: Context, service: RegionalService,
-        now: Long = SystemClock.elapsedRealtime()): RegionalWatchMetadata? {
+        now: Long = SystemClock.elapsedRealtime(), wallNow: Long = System.currentTimeMillis(),
+        currentBoot: Int = boot(ctx)): RegionalWatchMetadata? {
         if (BackupManager.hasPending() || RecoveryCoordinator.state != RecoveryState.READY) return null
         return runCatching {
             val prefs = Prefs.sp(ctx)
-            if (!prefs.contains(key(service, "armed"))) null else {
+            if (!prefs.contains(key(service, "armed")) || currentBoot < 0) null else {
                 val request = RegionalWatchRequest(prefs.getLong(key(service, "armed"), -1),
                     prefs.getLong(key(service, "deadline"), -1))
-                RegionalWatchMetadata(request, prefs.getInt(key(service, "boot"), -1),
-                    prefs.getLong(key(service, "profile"), -1)).takeIf {
-                    it.current(boot(ctx), RegionalPreferences.profileRevision(ctx, service),
+                val profile = prefs.getLong(key(service, "profile"), -1)
+                val storedBoot = prefs.getInt(key(service, "boot"), -1)
+                val metadata = if (storedBoot == currentBoot) {
+                    RegionalWatchMetadata(request, storedBoot, profile,
+                        prefs.getBoolean(key(service, "restored"), false))
+                } else {
+                    val rebased = request.afterReboot(now, prefs.getLong(key(service, "armed_wall"), -1),
+                        prefs.getLong(key(service, "deadline_wall"), -1), wallNow)
+                    if (rebased == null || !RegionalPreferences.enabled(ctx, service) ||
+                        profile != RegionalPreferences.profileRevision(ctx, service)) {
+                        clear(prefs, service)
+                        null
+                    } else {
+                        val saved = prefs.edit().putLong(key(service, "armed"), rebased.armedElapsed)
+                            .putLong(key(service, "deadline"), rebased.deadlineElapsed)
+                            .putInt(key(service, "boot"), currentBoot)
+                            .putBoolean(key(service, "restored"), true).commit()
+                        if (saved) RegionalWatchMetadata(rebased, currentBoot, profile, true) else null
+                    }
+                }
+                metadata?.takeIf {
+                    it.current(currentBoot, RegionalPreferences.profileRevision(ctx, service),
                         RegionalPreferences.enabled(ctx, service), now)
                 }
             }
@@ -40,18 +60,28 @@ internal object RegionalWatchPreferences {
             RecoveryCoordinator.state == RecoveryState.READY
         return allowed && runCatching {
             val service = result.service
+            val wallNow = System.currentTimeMillis() -
+                (SystemClock.elapsedRealtime() - now).coerceAtLeast(0L)
             Prefs.sp(ctx).edit().putLong(key(service, "armed"), now)
                 .putLong(key(service, "deadline"), Math.addExact(now, RegionalWatchRequest.TTL_MS))
+                .putLong(key(service, "armed_wall"), wallNow)
+                .putLong(key(service, "deadline_wall"), Math.addExact(wallNow, RegionalWatchRequest.TTL_MS))
                 .putInt(key(service, "boot"), boot(ctx))
-                .putLong(key(service, "profile"), RegionalPreferences.profileRevision(ctx, service)).commit()
+                .putLong(key(service, "profile"), RegionalPreferences.profileRevision(ctx, service))
+                .putBoolean(key(service, "restored"), false).commit()
         }.getOrDefault(false)
     }
 
     @Synchronized fun cancel(ctx: Context, service: RegionalService,
         expected: RegionalWatchMetadata? = null): Boolean {
         if (expected != null && current(ctx, service) != expected) return false
-        val editor = Prefs.sp(ctx).edit()
-        listOf("armed", "deadline", "boot", "profile").forEach { editor.remove(key(service, it)) }
+        return clear(Prefs.sp(ctx), service)
+    }
+
+    private fun clear(prefs: android.content.SharedPreferences, service: RegionalService): Boolean {
+        val editor = prefs.edit()
+        listOf("armed", "deadline", "armed_wall", "deadline_wall", "boot", "profile", "restored")
+            .forEach { editor.remove(key(service, it)) }
         return editor.commit()
     }
 

@@ -2,14 +2,22 @@ package ru.tgwatch
 
 data class RegionalWatchRequest(val armedElapsed: Long, val deadlineElapsed: Long) {
     init {
-        require(armedElapsed >= 0 && deadlineElapsed > armedElapsed)
-        require(deadlineElapsed - armedElapsed == TTL_MS)
+        require(armedElapsed >= 0 && deadlineElapsed > armedElapsed &&
+            deadlineElapsed - armedElapsed in 1L..TTL_MS)
     }
     fun active(now: Long): Boolean = now >= armedElapsed && now < deadlineElapsed
+    fun afterReboot(nowElapsed: Long, armedWall: Long, deadlineWall: Long,
+        nowWall: Long): RegionalWatchRequest? {
+        if (nowElapsed < 0 || armedWall < 0 || deadlineWall <= armedWall ||
+            deadlineWall - armedWall !in 1L..TTL_MS || nowWall < armedWall || nowWall >= deadlineWall) return null
+        val remaining = deadlineWall - nowWall
+        return runCatching { RegionalWatchRequest(nowElapsed, Math.addExact(nowElapsed, remaining)) }.getOrNull()
+    }
     companion object { const val TTL_MS = 24 * 60 * 60_000L }
 }
 
-data class RegionalWatchMetadata(val request: RegionalWatchRequest, val boot: Int, val profileRevision: Long) {
+data class RegionalWatchMetadata(val request: RegionalWatchRequest, val boot: Int, val profileRevision: Long,
+    val restoredAfterBoot: Boolean = false) {
     init { require(boot >= 0 && profileRevision >= 0) }
     fun current(currentBoot: Int, revision: Long, enabled: Boolean, now: Long): Boolean =
         currentBoot >= 0 && currentBoot == boot && profileRevision == revision && enabled && request.active(now)

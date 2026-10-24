@@ -31,7 +31,8 @@ internal class RegionalWatchUi(private val activity: Activity) {
             button.isEnabled = service !in writing && (request != null || confirmed)
             button.text = if (request == null) activity.getString(R.string.regional_watch_arm) else {
                 val remaining = request.request.deadlineElapsed - SystemClock.elapsedRealtime()
-                activity.getString(R.string.regional_watch_cancel,
+                activity.getString(if (request.restoredAfterBoot) R.string.regional_watch_cancel_restored
+                    else R.string.regional_watch_cancel,
                     RegionalPresentation.time(activity, System.currentTimeMillis() + remaining.coerceAtLeast(0)))
             }
         }
