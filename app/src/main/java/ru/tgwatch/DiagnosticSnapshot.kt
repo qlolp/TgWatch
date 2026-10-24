@@ -25,6 +25,9 @@ data class DiagnosticSnapshot(
     val scheduling: ScheduleDiagnostics.Snapshot,
     val monitorHealth: MonitorHealth = MonitorHealth(),
     val targets: List<TargetDiagnostic> = emptyList(),
+    val crashes: CrashJournal.Summary = CrashJournal.Summary(0, null),
+    /** ISO egress country only; the address is never included. */
+    val egressCountry: String? = null,
 ) {
     fun toJson(): String {
         val json = JSONObject().put("schema_version", SCHEMA_VERSION)
@@ -39,6 +42,7 @@ data class DiagnosticSnapshot(
             .put("scheduling", schedulingJson())
             .put("monitor_health", healthJson())
             .put("targets", targetsJson())
+            .put("crashes", crashesJson())
         return json.toString(2).also { check(it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) }
     }
 
@@ -56,6 +60,7 @@ data class DiagnosticSnapshot(
         .put("checked_at_ms", status.checkedAt.coerceAtLeast(0))
         .put("stale", stale)
         .put("latency_ms", status.latencyMs.coerceIn(-1, MAX_LATENCY_MS))
+        .put("egress_country", egressCountry?.takeIf { EgressCountry.isValid(it) } ?: JSONObject.NULL)
 
     private fun statsJson(stats: TimeStats? = dailyStats): Any = stats?.let { stats ->
         val coverage = CoverageStats.from(stats, CoverageStats.DAY_MS)
@@ -102,6 +107,20 @@ data class DiagnosticSnapshot(
         return outcomes
     }
 
+    private fun crashesJson(): JSONObject {
+        val last = crashes.last?.let(CrashJournal::redacted)
+        return JSONObject().put("retained", crashes.retained.coerceIn(0, MAX_CRASH_RECORDS))
+            .put("last", last?.let { record ->
+                JSONObject().put("at_ms", record.atMs.coerceAtLeast(0))
+                    .put("thread", record.thread.take(MAX_CRASH_THREAD_CHARS))
+                    .put("type", record.type.take(MAX_CRASH_TYPE_CHARS))
+                    .put("frames", JSONArray().apply {
+                        record.frames.take(MAX_CRASH_FRAMES)
+                            .forEach { frame -> put(frame.take(MAX_CRASH_FRAME_CHARS)) }
+                    })
+            } ?: JSONObject.NULL)
+    }
+
     private fun schedulingJson() = JSONObject()
         .put("scope", "service_session")
         .put("scheduled_arrivals", scheduling.scheduledArrivals)
@@ -114,10 +133,15 @@ data class DiagnosticSnapshot(
         .put("overlapping_requests", scheduling.overlappingRequests)
 
     companion object {
-        private const val SCHEMA_VERSION = 3
+        private const val SCHEMA_VERSION = 5
         const val MAX_BYTES = 16 * 1024
         private const val MAX_LATENCY_MS = 60_000L
         private const val MAX_SDK = 1_000
+        private const val MAX_CRASH_RECORDS = 5
+        private const val MAX_CRASH_FRAMES = 24
+        private const val MAX_CRASH_FRAME_CHARS = 200
+        private const val MAX_CRASH_THREAD_CHARS = 64
+        private const val MAX_CRASH_TYPE_CHARS = 160
         private val VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,3}(\\.[0-9]{1,3})?")
         private val ENDPOINTS = mapOf(
             "api.telegram.org" to ProbeGroup.WEB, "web.telegram.org" to ProbeGroup.WEB,

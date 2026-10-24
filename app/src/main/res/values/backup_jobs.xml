@@ -1,0 +1,7 @@
+<resources>
+    <string name="backup_job_busy">A backup or import is already in progress. Finish or cancel it first.</string>
+    <string name="backup_job_stopping">Cancellation requested. Waiting for file access to finish. You can close this message.</string>
+    <string name="backup_job_cancelled">Operation cancelled. An exported file may be incomplete.</string>
+    <string name="backup_job_timed_out">File access took too long. Try again or choose a local file. An exported file may be incomplete.</string>
+    <string name="backup_job_expired">The import preview expired. Open the file again to check it.</string>
+</resources>

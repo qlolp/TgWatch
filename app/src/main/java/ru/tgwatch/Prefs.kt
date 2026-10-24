@@ -23,6 +23,7 @@ object Prefs {
     private const val KEY_NOTIFY_RECOVERY = "notify_recovery"
     private const val KEY_EVENT_SOUND = "event_sound"
     private const val KEY_ALARM_PATTERN = "vibration_pattern"
+    private const val KEY_HISTORY_RETENTION = "history_retention"
     private const val KEY_QUIET_HOURS = "quiet_hours"
     private const val KEY_QUIET_START = "quiet_start_hour"
     private const val KEY_QUIET_END = "quiet_end_hour"
@@ -34,6 +35,10 @@ object Prefs {
     private const val KEY_EXTRA_WHATSAPP = "extra_probe_whatsapp"
     private const val KEY_EXTRA_CUSTOM = "extra_probe_custom"
     private const val KEY_LAST_STATUS = "last_status"
+    private const val KEY_EGRESS_ISO = "egress_iso"
+    private const val KEY_EGRESS_AT = "egress_at"
+    private const val KEY_EGRESS_NET = "egress_net"
+    private const val KEY_EGRESS_BOOT = "egress_boot"
     private const val KEY_LAST_CHECKED = "last_checked"
     private const val KEY_LAST_SINCE = "last_since"
     private const val KEY_LAST_LATENCY = "last_latency"
@@ -190,6 +195,19 @@ object Prefs {
     fun setAlarmPattern(ctx: Context, pattern: AlarmPattern) { sp(ctx).edit().putString(KEY_ALARM_PATTERN,
         pattern.name).apply() }
 
+    /** Portable history window; week is the established default and migration never lengthens it. */
+    fun historyRetention(ctx: Context): Retention {
+        val stored = Retention.entries.firstOrNull {
+            it.name == sp(ctx).getString(KEY_HISTORY_RETENTION, Retention.WEEK.name)
+        } ?: Retention.WEEK
+        if (stored != RetentionPolicy.current()) RetentionPolicy.update(stored)
+        return stored
+    }
+    fun setHistoryRetention(ctx: Context, value: Retention) {
+        RetentionPolicy.update(value)
+        sp(ctx).edit().putString(KEY_HISTORY_RETENTION, value.name).apply()
+    }
+
     /** Opt-in: an upgrade must not start posting a new daily notification. */
     fun dailySummary(ctx: Context): Boolean = sp(ctx).getBoolean(KEY_DAILY_SUMMARY, false)
     fun setDailySummary(ctx: Context, value: Boolean) {
@@ -267,7 +285,7 @@ object Prefs {
     }
 
     @Synchronized
-    private fun alertMuteRemaining(ctx: Context, now: Long): Long =
+    internal fun alertMuteRemaining(ctx: Context, now: Long): Long =
         AlertMute.remaining(alertMuteStore(ctx), now, SystemClock.elapsedRealtime(), bootCount(ctx))
 
     /** The wall-clock argument is retained for existing callers; the new timer ignores clock corrections. */
@@ -379,6 +397,35 @@ object Prefs {
             .remove(KEY_LAST_VIBE)
             .remove("last_diagnostics")
             .remove("last_expected_sec")
+            .apply()
+    }
+
+    /** Device-local egress country; the address itself is never persisted. */
+    fun egressCountry(ctx: Context): EgressCountry.Snapshot? {
+        val boot = bootCount(ctx)
+        val sameBoot = boot != null && sp(ctx).getInt(KEY_EGRESS_BOOT, -1) == boot
+        val iso = sp(ctx).getString(KEY_EGRESS_ISO, null)?.takeIf { EgressCountry.isValid(it) && sameBoot }
+        return iso?.let {
+            EgressCountry.Snapshot(it, sp(ctx).getLong(KEY_EGRESS_AT, 0L), sp(ctx).getLong(KEY_EGRESS_NET, 0L))
+        }
+    }
+
+    fun setEgressCountry(ctx: Context, snapshot: EgressCountry.Snapshot) {
+        require(EgressCountry.isValid(snapshot.iso))
+        sp(ctx).edit()
+            .putString(KEY_EGRESS_ISO, snapshot.iso)
+            .putLong(KEY_EGRESS_AT, snapshot.checkedAt)
+            .putLong(KEY_EGRESS_NET, snapshot.networkHandle)
+            .putInt(KEY_EGRESS_BOOT, bootCount(ctx) ?: -1)
+            .apply()
+    }
+
+    fun clearEgressCountry(ctx: Context) {
+        sp(ctx).edit()
+            .remove(KEY_EGRESS_ISO)
+            .remove(KEY_EGRESS_AT)
+            .remove(KEY_EGRESS_NET)
+            .remove(KEY_EGRESS_BOOT)
             .apply()
     }
 }

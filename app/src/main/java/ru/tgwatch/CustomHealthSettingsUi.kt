@@ -50,6 +50,14 @@ internal class CustomHealthSettingsUi(activity: Activity, content: LinearLayout)
     }
     fun clear() { listOf(code, field, value).forEach { it.text.clear() } }
 
+    /** Pre-fill from a status-page preset; the user can still edit every field. */
+    fun apply(condition: HttpProbeCondition) {
+        clear.isChecked = false
+        code.text.clear()
+        field.setText(condition.jsonField.orEmpty())
+        value.setText(condition.expectedValue.orEmpty())
+    }
+
     private companion object {
         const val CODE_CHARS = 3
         const val FIELD_CHARS = 64

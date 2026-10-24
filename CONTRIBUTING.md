@@ -25,7 +25,7 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.20.1`; код `1020001` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.23.0`; код `1023000` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
@@ -43,6 +43,10 @@ baseline существующих замечаний из исходного `ma
 Успешный запуск означает отсутствие новых замечаний по выбранным правилам,
 а не полное устранение старых. Не обновляйте baseline для сокрытия новых ошибок;
 обоснованное локальное suppression указывается рядом с причиной.
+CI дополнительно сравнивает множество ID с базой PR или предыдущим commit push.
+Локально: `python3 scripts/check-detekt-baseline.py config/detekt/baseline.xml --base-ref <base-sha> --max 408`.
+Для отдельного XML используйте `--reference <previous-baseline.xml>`. Удалять записи
+можно вплоть до пустого baseline; заменять их новыми под старым числовым бюджетом нельзя.
 
 Для changes в логике нужна meaningful regression с ожидаемым RED assertion и GREEN.
 Не заменяйте malformed-input/tamper/process-death/cancellation проверки тривиальными mocks.
@@ -84,6 +88,13 @@ Upgrade baseline для CI — настоящий `v1.10.47` APK с фиксир
 Дополнительный сценарий использует последний стабильный опубликованный предшественник;
 его APK сверяется с checksum, production-сертификатом и версией тега. Данные очищаются
 только между двумя независимыми сценариями, без удаления между old → new внутри каждого.
+
+Для запуска предшественника через реальные кнопки smoke собирает собственный тестовый JAR
+`scripts/build-upgrade-ui.py` из закреплённого SDK35 и Build Tools36.0.0. Стандартный
+UIAutomator читает свежую иерархию без ожидания неподвижного экрана; перед чтением старый
+снимок удаляется. В пределах общего срока 30 секунд host нажимает только найденные
+доступные реальные кнопки, затем отдельно проверяет foreground service и новую
+сохранённую строку истории. Это fixture одноразового эмулятора, вне APK и файлов публикации.
 `scripts/signed-upgrade-smoke.sh <previous.apk> <current.apk>` проверяет сохранение истории,
 legacy hour settings и independent event options без clearing data. Локальный upgrade с общей
 development-подписью проверяет миграцию, но не production certificate continuity. Батарея,

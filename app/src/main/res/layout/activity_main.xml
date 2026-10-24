@@ -147,6 +147,20 @@
                         android:layout_marginTop="2dp"
                         android:textColor="@color/on_status"
                         android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvEgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/on_status"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+                    <Button android:id="@+id/btnRegionalServices" style="@style/ButtonText"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/regional_title" />
+                    <Button android:id="@+id/btnRefreshCountry" style="@style/ButtonText"
+                        android:layout_width="match_parent" android:text="@string/country_refresh" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -155,6 +169,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
+                android:accessibilityLiveRegion="polite"
                 android:lineSpacingExtra="2dp"
                 android:textColor="@color/on_status"
                 android:textSize="14sp" />
@@ -243,6 +258,37 @@
                 android:text="@string/history_title" />
 
             <Button android:id="@+id/btnPeriod" style="@style/ButtonText" android:text="@string/period_day" />
+            <TextView
+                style="@style/CardTitle"
+                android:layout_marginTop="8dp"
+                android:text="@string/history_retention_label" />
+            <RadioGroup
+                android:id="@+id/rgRetention"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <RadioButton
+                    android:id="@+id/rbRetentionWeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:text="@string/history_retention_week" />
+                <RadioButton
+                    android:id="@+id/rbRetentionMonth"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:text="@string/history_retention_month" />
+                <RadioButton
+                    android:id="@+id/rbRetentionQuarter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:text="@string/history_retention_quarter" />
+            </RadioGroup>
             <Button android:id="@+id/btnLatency" style="@style/ButtonText" android:text="@string/latency_title" />
             <Button android:id="@+id/btnShareStatus" style="@style/ButtonText" android:text="@string/share_status_title" />
             <Button android:id="@+id/btnIncidents" style="@style/ButtonText" android:text="@string/incidents_title" />

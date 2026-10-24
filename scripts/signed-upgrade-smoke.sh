@@ -3,7 +3,12 @@
 set -euo pipefail
 old_apk=${1:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
 new_apk=${2:?Usage: signed-upgrade-smoke.sh old.apk new.apk}
-trap 'adb logcat -d > signed-upgrade-logcat.txt 2>/dev/null || true' EXIT
+ui_fixture_dir=$(mktemp -d)
+cleanup() {
+  adb logcat -d > signed-upgrade-logcat.txt 2>/dev/null || true
+  rm -rf -- "$ui_fixture_dir"
+}
+trap cleanup EXIT
 prefs=/data/user_de/0/ru.tgwatch/shared_prefs/tgwatch.xml
 last_check() {
   adb shell cat "$prefs" 2>/dev/null |
@@ -14,6 +19,13 @@ await_observation() {
 }
 # The same bounded reconnect/root/boot gate used by the Android smoke suite.
 python3 scripts/adb-readiness.py --timeout 180
+if [[ "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" != 1 ]]; then
+  echo 'Signed upgrade requires a disposable emulator' >&2
+  exit 1
+fi
+python3 scripts/build-upgrade-ui.py --out "$ui_fixture_dir/ui.jar"
+adb push "$ui_fixture_dir/ui.jar" /data/local/tmp/tgwatch-upgrade-ui.jar
+adb shell chmod 444 /data/local/tmp/tgwatch-upgrade-ui.jar
 adb install -g "$old_apk"
 adb shell am start -W -n ru.tgwatch/.MainActivity
 python3 scripts/prepare-upgrade-predecessor.py

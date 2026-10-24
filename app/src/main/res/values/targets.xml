@@ -49,7 +49,7 @@
     <string name="target_custom_help">Checks whether the configured HTTPS endpoint responds successfully.</string>
     <string name="target_history_failed">History could not be saved. The measured reachability result is unchanged.</string>
     <string name="target_health_code">Expected HTTP code (optional, 200–599)</string>
-    <string name="target_health_field">JSON string field (optional)</string>
+    <string name="target_health_field">JSON string field or dotted path (optional)</string>
     <string name="target_health_value">Expected string value (may be empty)</string>
     <string name="target_health_clear">Clear health criteria; keep address</string>
     <string name="target_health_help">Blank inputs keep saved criteria. A new address replaces them. JSON checks use one GET, strict UTF-8 and at most 32 KiB. Criteria stay private and are excluded from backups.</string>
@@ -60,6 +60,14 @@
     <string name="target_health_dns">DNS could not resolve the address.</string>
     <string name="target_health_tls">A secure TLS connection could not be established.</string>
     <string name="target_health_timeout">The check timed out.</string>
+    <string name="target_templates_label">Status page presets</string>
+    <string name="target_templates_help">Fills a public status JSON URL and its health field. The address stays on this device.</string>
+    <string name="template_discord">Discord</string>
+    <string name="template_github">GitHub</string>
+    <string name="template_cloudflare">Cloudflare</string>
+    <string name="template_atlassian">Atlassian</string>
+    <string name="template_spotify">Spotify</string>
+    <string name="template_openai">OpenAI</string>
     <item type="id" name="targetHealthCodeInput" />
     <item type="id" name="targetHealthFieldInput" />
     <item type="id" name="targetHealthValueInput" />

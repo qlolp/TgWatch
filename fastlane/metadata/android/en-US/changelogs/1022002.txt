@@ -1,0 +1,1 @@
+Backups survive screen recreation, with cancellation and timeouts before restore commits. Bounded network statistics and correct matching for probes sharing a name. TGWBv4 and all 1.22.1 features remain supported.

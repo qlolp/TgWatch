@@ -38,7 +38,10 @@ class NetworkProbe(private val pool: ExecutorService, private val extraPool: Exe
         checkSecondary(extras.filter { it.group == ProbeGroup.EXTRA }, EXTRA_TIMEOUT_MS)
     fun checkSecondary(endpoints: List<ProbeEndpoint>, timeoutMs: Long): List<ProbeOutcome> =
         ProbeBatch(extraPool, timeoutMs, lane = ProbeLane.SECONDARY)
-            .run(endpoints.filter { it.group == ProbeGroup.EXTRA || it.group == ProbeGroup.CONTROL }, endpointProbe::probe)
+            .run(
+                endpoints.filter { it.group == ProbeGroup.EXTRA || it.group == ProbeGroup.CONTROL },
+                endpointProbe::probe,
+            )
     fun checkPrimary(): ProbeReport {
         val results = ProbeBatch(pool).run(telegram, endpointProbe::probe).toMutableList()
         if (results.none { it.reachable }) results += ProbeBatch(pool).run(controls, endpointProbe::probe)

@@ -14,6 +14,11 @@ The report is limited to 16 KiB and contains an explicit field allowlist:
   typed storage failure and recovery state.
 - Last completed probe's known endpoint names, group, reachability, and latency.
 - Scheduling counters for the latest service session.
+- A bounded crash journal: the newest five uncaught exceptions as exception class,
+  crashing thread name and up to 24 stack frames. Exception messages are never stored,
+  so endpoints, tokens and document paths cannot reach the report. Records live in
+  device-protected storage, rotate by count and byte budget, and are cleared with
+  **Clear the log**.
 
 The report excludes raw history, logs, settings, account information, passwords,
 automation tokens, IP addresses, device identifiers, network names, and free-form
@@ -101,6 +106,17 @@ with fixed public IDs. Each entry has `target_id`, `running`, `status`,
 A failed history read produces null aggregates and a typed failure, never zero
 availability. No target address, free-form label, credential or raw history is
 included. The existing `state.running` refers specifically to Telegram.
+
+## Local crash journal (schema 4)
+
+The explicit report adds `crashes.retained` and `crashes.last` (or null).
+At most five local exceptions are retained. Messages are never stored. Thread names
+are reduced to fixed app worker roles or `other`. Classes must resolve without
+initialization in allowed app/platform namespaces; fabricated method names are
+redacted. Source filenames must match their declaring class; paths and unknown
+names become `redacted`. This validation applies to old journal entries and again
+at the JSON export boundary. The journal is cleared with the event log; nothing
+is uploaded automatically.
 
 ## Private HTTPS health failures
 

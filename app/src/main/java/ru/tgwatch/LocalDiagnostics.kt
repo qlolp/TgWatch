@@ -91,6 +91,8 @@ object LocalDiagnostics {
             dailyStats = (stats as? HistoryRead.Ready)?.value, endpoints = MonitorService.endpointOutcomes(),
             monitorHealth = MonitorService.healthSnapshot(),
             scheduling = MonitorService.schedulingDiagnostics(), targets = targets(ctx),
+            crashes = CrashJournal.summary(ctx),
+            egressCountry = Prefs.egressCountry(ctx)?.iso,
         )
     }
 

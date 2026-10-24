@@ -42,6 +42,7 @@ object History {
     private const val FILE = "history-v2.csv"
     private const val MAX_APPEND_BYTES = 128L
     private const val KEEP_MS = 7 * 24 * 60 * 60_000L
+    private const val MAX_RETAINED = 65_000
     private var samples = mutableListOf<Observation>()
     private var loaded = false
     private var migrated = false
@@ -132,7 +133,41 @@ object History {
         HistoryStorage.syncDirectory(marker.parentFile!!)
         return HistoryStorage.Migration(merged, true)
     }
-    private fun prune(now: Long) {
+    private fun keepMs(ctx: Context): Long = retentionOf(ctx).totalMs
+
+    /** Context-free JVM fixtures fall back to the established week window. */
+    private fun retentionOf(ctx: Context): Retention = try {
+        Prefs.historyRetention(ctx)
+    } catch (_: Exception) {
+        Retention.WEEK
+    }
+
+    /**
+     * Week keeps the established raw window. Longer retention rolls older checks into
+     * HistoryRollup buckets before the shared row budget is applied.
+     */
+    private fun prune(ctx: Context, now: Long) {
+        val retention = retentionOf(ctx)
+        if (retention == Retention.WEEK) pruneWeek(now)
+        else pruneRolled(retention, now)
+    }
+
+    private fun pruneRolled(retention: Retention, now: Long) {
+        val rolled = HistoryRollup.asObservations(HistoryRollup.rollup(samples, now, retention))
+            .takeLast(MAX_RETAINED)
+        if (rolled != samples) {
+            samples = rolled.toMutableList()
+            dirty = true
+            compaction.onPruned(now)
+            version++
+            statsCache.clear()
+            preparation.clear()
+        }
+        appliedPreparation = preparation.prepare(samples, version, now - retention.rawMs)
+        preparation.acceptRevision(version)
+    }
+
+    private fun pruneWeek(now: Long) {
         val prepared = preparation.prepare(samples, version, now - KEEP_MS)
         if (prepared === appliedPreparation) return
         if (prepared.rows != samples) {
@@ -145,7 +180,7 @@ object History {
         appliedPreparation = prepared
     }
     private fun ensureClock(ctx: Context, now: Long) {
-        val latest = preparation.prepare(samples, version, now - KEEP_MS).latestAt
+        val latest = preparation.prepare(samples, version, now - keepMs(ctx)).latestAt
         if (latest == null || latest <= now) return
         val rolled = Timeline.clockRollback(samples, now)
         if (rolled !== samples) {
@@ -153,7 +188,7 @@ object History {
             dirty = true
             version++
             // The epoch marker must fit the logical cap before its durable replacement.
-            prune(now)
+            prune(ctx, now)
             flush(ctx, now)
         }
     }
@@ -164,15 +199,17 @@ object History {
     }
     @Synchronized fun record(ctx: Context, now: Long, kind: Kind, latencyMs: Long, expectedSec: Int = 30) {
         if (!ready(ctx)) return
+        // Planned downtime is unobserved time, not an incident: keep the gap out of history.
+        if (MaintenanceWindows.isActive(ctx, TargetId.TELEGRAM, now)) return
         ensureClock(ctx, now)
-        prune(now)
+        prune(ctx, now)
         // Bound inferred coverage to one expected interval plus the bounded network-check budget.
         val end = now + (expectedSec.coerceIn(10, 300) * 1000L + 15_000L)
         val status = when (kind) { Kind.FAIL -> "TG_DOWN"; Kind.OFFLINE -> "NO_NETWORK"; else -> kind.name }
         samples.add(Observation(now, end, status, latencyMs, samples.maxOfOrNull { it.clockEpoch } ?: 0))
         version++
         // Adding a row can exceed the row cap or replace a same-time epoch marker.
-        prune(now)
+        prune(ctx, now)
         try {
             if (dirty || compaction.needsReplacement(now, physicalRows + 1, file(ctx).length() + MAX_APPEND_BYTES)) {
                 writeRows(ctx, samples)
@@ -216,7 +253,9 @@ object History {
     @Synchronized fun readStats(ctx: Context, days: Int = 1,
         now: Long = System.currentTimeMillis()): HistoryRead<TimeStats> {
         if (!ready(ctx)) {
-            val last = statsCache.entries.lastOrNull { it.key.endsWith(":${days.coerceIn(1, 7)}") }?.value
+            val last = statsCache.entries.lastOrNull {
+                it.key.endsWith(":${days.coerceIn(1, RetentionPolicy.maxDays())}")
+            }?.value
             return HistoryRead.Unavailable(last, failure ?: HistoryFailure.READ)
         }
         val value = computeStats(ctx, days, now)
@@ -226,12 +265,12 @@ object History {
 
     private fun computeStats(ctx: Context, days: Int, now: Long): TimeStats {
         ensureClock(ctx, now)
-        prune(now)
-        val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1,7)}"
+        prune(ctx, now)
+        val cacheKey = "$version:${now / 60_000L}:${days.coerceIn(1, RetentionPolicy.maxDays())}"
         statsCache[cacheKey]?.let { return it }
         if (statsCache.size > 4) statsCache.clear()
-        val checks = preparation.prepare(samples, version, now - KEEP_MS).checks
-        return Timeline.stats(checks, now - days.coerceIn(1,7) * 86_400_000L, now)
+        val checks = preparation.prepare(samples, version, now - keepMs(ctx)).checks
+        return Timeline.stats(checks, now - days.coerceIn(1, RetentionPolicy.maxDays()) * 86_400_000L, now)
             .also { statsCache[cacheKey] = it }
     }
     @Synchronized fun incidents(ctx: Context, days: Int = 7,
@@ -241,9 +280,10 @@ object History {
         now: Long = System.currentTimeMillis()): HistoryRead<List<OutageEpisode>> {
         if (!ready(ctx)) return HistoryRead.Unavailable(null, failure ?: HistoryFailure.READ)
         ensureClock(ctx, now)
-        prune(now)
-        val checks = preparation.prepare(samples, version, now - KEEP_MS).checks
-        val value = OutageEpisodes.derivePrepared(checks, now - days.coerceIn(1, 7) * 86_400_000L, now)
+        prune(ctx, now)
+        val checks = preparation.prepare(samples, version, now - keepMs(ctx)).checks
+        val value = OutageEpisodes.derivePrepared(checks,
+            now - days.coerceIn(1, RetentionPolicy.maxDays()) * 86_400_000L, now)
         val problem = failure
         return if (problem == null) HistoryRead.Ready(value) else HistoryRead.Unavailable(value, problem)
     }
@@ -260,10 +300,10 @@ object History {
     @Synchronized fun lastMinutes(ctx: Context, count: Int, now: Long = System.currentTimeMillis()): List<Minute> {
         if (!ready(ctx)) return emptyList()
         ensureClock(ctx, now)
-        prune(now)
+        prune(ctx, now)
         val from = now / 60_000L - count + 1
         val bins = sortedMapOf<Long, Minute>()
-        for (s in preparation.prepare(samples, version, now - KEEP_MS).checks) {
+        for (s in preparation.prepare(samples, version, now - keepMs(ctx)).checks) {
             if (s.at / 60_000L < from || s.at > now) continue
             val m = bins.getOrPut(s.at / 60_000L) { Minute(s.at / 60_000L) }
             when (s.kind) {
@@ -280,19 +320,19 @@ object History {
         check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
         val now = System.currentTimeMillis()
         ensureClock(ctx, now)
-        prune(now)
-        return Timeline.csv(samples, now - days.coerceIn(1,7) * 86_400_000L, now)
+        prune(ctx, now)
+        return Timeline.csv(samples, now - days.coerceIn(1, retentionOf(ctx).days) * 86_400_000L, now)
     }
     @Synchronized fun snapshot(ctx: Context): List<Observation> {
         check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
-        prune(System.currentTimeMillis())
+        prune(ctx, System.currentTimeMillis())
         return samples.toList()
     }
     @Synchronized fun replaceSnapshot(ctx: Context, rows: List<Observation>) {
         val now = System.currentTimeMillis()
         dirty = true
         HistoryStorage.validateSnapshot(rows)
-        val retained = Timeline.retained(rows, now - KEEP_MS)
+        val retained = Timeline.retained(rows, now - keepMs(ctx))
         writeRows(ctx, retained, replaceAll = true)
         // A restored snapshot supersedes legacy history on subsequent process starts too.
         val marker = File(ctx.applicationContext.createDeviceProtectedStorageContext().filesDir, "history-migrated-v2")
@@ -318,7 +358,7 @@ object History {
     @Synchronized fun snapshot(ctx: Context, now: Long): List<Observation> {
         check(ready(ctx)) { ctx.renderString(R.string.copy_history_history_is_temporarily_unavailable) }
         ensureClock(ctx,now)
-        prune(now)
+        prune(ctx, now)
         val epoch = samples.maxOfOrNull { it.clockEpoch } ?: 0
         val result = samples.mapNotNull { if (it.clockEpoch != epoch || it.isEpochMetadata) it else
             if (it.at >= now) null else it.copy(until=minOf(it.until,now)) }

@@ -11,12 +11,13 @@ internal object TargetServiceCommands {
             if (it.id == TargetId.TELEGRAM) telegramActualSec else secondaryIntervals[it.id] ?: it.intervalSec
         } ?: TargetDefinition.DEFAULT_TELEGRAM_SEC
 
-    fun route(action: String?, rawId: String?, enabled: Set<TargetId>): TargetServiceCommand {
+    fun route(action: String?, rawId: String?, enabled: Set<TargetId>,
+        regionalEnabled: Boolean = false): TargetServiceCommand {
         val id = if (rawId == null) TargetId.TELEGRAM else TargetId.fromWire(rawId)
         if (id == null) return TargetServiceCommand(null, TargetId.TELEGRAM, ignored = true)
         return when (action) {
             MonitorService.ACTION_STOP -> {
-                val last = (enabled - id).isEmpty()
+                val last = (enabled - id).isEmpty() && !regionalEnabled
                 TargetServiceCommand(if (last) action else MonitorService.ACTION_SETTINGS, id, true, last)
             }
             MonitorService.ACTION_CHECK_NOW -> TargetServiceCommand(action.takeIf { id in enabled }, id)

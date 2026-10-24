@@ -30,11 +30,13 @@ class TargetBackupCodecTest {
             else -> emptyList()
         } }, listOf("local log 🛰️"))
 
-    @Test fun v3RoundTripExcludesCredentialsAndUsesSevenElementTuples() {
-        val original = sample()
+    @Test fun v4RoundTripExcludesCredentialsAndUsesSevenElementTuples() {
+        val original = sample().copy(globalSettings = sample().globalSettings +
+            ("history_retention" to Retention.MONTH.name))
         val encoded = TargetBackupCodec.encode(original)
         val json = JSONObject(encoded.toString(Charsets.UTF_8))
-        assertEquals(3, json.getInt("formatVersion"))
+        assertEquals(4, json.getInt("formatVersion"))
+        assertEquals("MONTH", json.getJSONObject("settings").getString("history_retention"))
         assertEquals(7, json.getJSONArray("observations").getJSONArray(0).length())
         assertEquals("telegram", json.getJSONArray("observations").getJSONArray(0).getString(0))
         assertEquals("DOWN", json.getJSONArray("observations").getJSONArray(0).getString(3))
@@ -46,6 +48,17 @@ class TargetBackupCodecTest {
             }
         }
         assertFalse(encoded.toString(Charsets.UTF_8).contains("https://"))
+    }
+
+    @Test fun v3ArchiveWithoutRetentionStillDecodes() {
+        val v3 = JSONObject(TargetBackupCodec.encode(sample()).toString(Charsets.UTF_8))
+            .put("formatVersion", 3).toString()
+        val decoded = TargetBackupCodec.decode(v3.toByteArray(Charsets.UTF_8))
+        assertFalse(decoded.globalSettings.containsKey("history_retention"))
+        assertThrows(IllegalArgumentException::class.java) {
+            TargetBackupCodec.decode(JSONObject(TargetBackupCodec.encode(sample()).toString(Charsets.UTF_8))
+                .put("formatVersion", 5).toString().toByteArray(Charsets.UTF_8))
+        }
     }
 
     @Test fun rejectDuplicateIdsBadTupleUnknownKeysAndDepth() {

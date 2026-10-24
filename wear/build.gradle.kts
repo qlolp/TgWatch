@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 val releaseStore = providers.environmentVariable("TGWATCH_KEYSTORE_PATH").orNull
@@ -48,6 +49,14 @@ android {
             if (!releaseStore.isNullOrBlank()) signingConfig = signingConfigs.getByName("production")
         }
     }
+    packaging {
+        dex {
+            // AGP stores dex uncompressed for minSdk >= 28: on this watch that costs more than a
+            // megabyte of transfer and storage for a small cold-start gain. Compressed dex keeps
+            // the standalone APK close to its code size; revisit with R8 before changing this.
+            useLegacyPackaging = true
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -65,6 +74,19 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+}
+
+// Wear sources use the same rules as the phone app and must pass without a baseline.
+detekt {
+    toolVersion = "1.23.8"
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    source.setFrom(files("src/main/java"))
+}
+configurations.matching { it.name == "detekt" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+    }
 }
 
 extra["auditSourceVersion"] = sourceVersion

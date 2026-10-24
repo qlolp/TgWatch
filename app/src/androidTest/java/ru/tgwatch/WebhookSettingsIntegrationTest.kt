@@ -233,6 +233,73 @@ class WebhookSettingsIntegrationTest {
         assertEquals(previous, WebhookSettings.configuration(ctx))
     }
 
+    @Test fun targetSelectionIsPrivateVersionedAndDoesNotEnableMonitoring() {
+        val initial = WebhookSettings.configuration(ctx)
+        assertEquals(WebhookStatuses.services, initial.services)
+        val targetDefinitions = TargetPreferences.definitions(ctx)
+        assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setTargetsResult(ctx, setOf("matrix")))
+        val selected = WebhookSettings.configuration(ctx)
+        assertEquals(setOf("matrix"), selected.services)
+        assertTrue(selected.generation > initial.generation)
+        assertFalse(selected.enabled)
+        assertEquals(targetDefinitions, TargetPreferences.definitions(ctx))
+        assertFalse(ctx.createDeviceProtectedStorageContext()
+            .getSharedPreferences(WebhookSettings.FILE, Context.MODE_PRIVATE).contains("services"))
+        assertEquals(WebhookSettings.WriteResult.INVALID, WebhookSettings.setTargetsResult(ctx, setOf("private-endpoint")))
+        assertEquals(selected, WebhookSettings.configuration(ctx))
+        assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setTargetsResult(ctx, emptySet()))
+        assertTrue(WebhookSettings.configuration(ctx).services.isEmpty())
+        assertTrue(WebhookSettings.clear(ctx))
+        assertEquals(WebhookStatuses.services, WebhookSettings.configuration(ctx).services)
+    }
+
+    @Test fun targetChooserSavesOnlyFixedPublicGoalIds() {
+        ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
+            val shown = java.util.concurrent.atomic.AtomicReference<android.app.AlertDialog>()
+            scenario.onActivity { activity ->
+                val helper = AutomationSettingsActivity::class.java.getDeclaredField("webhookDelivery")
+                    .apply { isAccessible = true }.get(activity) as WebhookDeliverySettingsUi
+                shown.set(helper.chooseTargets())
+            }
+            // AlertDialog applies the initial multi-choice check states as rows are rendered.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario.onActivity { activity ->
+                val dialog = shown.get()
+                assertTrue(dialog.isShowing)
+                assertEquals(4, dialog.listView.adapter.count)
+                TargetId.entries.forEachIndexed { index, id ->
+                    assertEquals(TargetNames.label(activity, id), dialog.listView.adapter.getItem(index))
+                    assertTrue("The actual initial checkbox must be rendered", dialog.listView.isItemChecked(index))
+                    if (id != TargetId.MATRIX) {
+                        val row = dialog.listView.getChildAt(index - dialog.listView.firstVisiblePosition)
+                        assertNotNull("Click a rendered checkbox", row)
+                        dialog.listView.performItemClick(row, index, dialog.listView.adapter.getItemId(index))
+                        assertFalse(dialog.listView.isItemChecked(index))
+                    }
+                }
+                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick()
+            }
+            // AlertDialog queues its positive callback on the main looper; do not
+            // assert persistence until the actual save callback has executed.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario.onActivity { activity ->
+                try {
+                    assertEquals(setOf("matrix"), WebhookSettings.configuration(ctx).services)
+                    assertEquals(activity.getString(R.string.webhook_targets_current, 1, 4),
+                        activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_TARGETS).text.toString())
+                    assertFalse(WebhookSettings.enabled(ctx))
+                } finally {
+                    shown.get().dismiss()
+                }
+            }
+            scenario.recreate()
+            scenario.onActivity { activity ->
+                assertEquals(activity.getString(R.string.webhook_targets_current, 1, 4),
+                    activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_TARGETS).text.toString())
+            }
+        }
+    }
+
     @Test fun failedSaveInvalidatesInMemoryGeneration() {
         assertTrue(WebhookSettings.setUrl(ctx, secret))
         assertTrue(WebhookSettings.setEnabled(ctx, true))

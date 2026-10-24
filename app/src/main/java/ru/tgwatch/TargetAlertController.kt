@@ -46,6 +46,7 @@ internal class TargetAlertController(private val ctx: Context, private val manag
     @Synchronized fun unmeasured(id: TargetId) { if (!closed) slow.unmeasured(id) }
 
     private fun outage(state: TargetSnapshot, previous: TargetSnapshot?, definition: TargetDefinition) {
+        if (MaintenanceWindows.isActive(ctx, state.id, state.checkedAtMs)) return
         if (previous?.status != state.status && definition.alerts.notifyOutage) {
             val allowed = Prefs.alertsAllowed(ctx, id = state.id)
             val sound = Prefs.soundFor(ctx, if (state.status == TargetStatus.DOWN) "TG_DOWN" else "PARTIAL")
@@ -55,6 +56,7 @@ internal class TargetAlertController(private val ctx: Context, private val manag
     }
 
     @Synchronized fun recovered(state: TargetSnapshot, recovery: RecoveryEvent) {
+        if (MaintenanceWindows.isActive(ctx, state.id, state.checkedAtMs)) return
         val definition = TargetPreferences.definition(ctx, state.id)
         val current = !closed && active() && definition.enabled && latest[state.id] === state
         if (current && definition.alerts.notifyRecovery && !stale(state))

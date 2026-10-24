@@ -21,9 +21,10 @@ object BackupCodec {
         "daily_summary_minute" to 0..1439)
     private val profiles = setOf("ECONOMY", "BALANCED", "FREQUENT", "CUSTOM")
     private val patterns = setOf("STANDARD", "SHORT", "LONG")
+    private val retentions = Retention.entries.map { it.name }.toSet()
     /** Public probe address only; the webhook address is a credential and never enters backups. */
     private const val CUSTOM_PROBE_URL = "extra_probe_custom_url"
-    private val stringKeys = setOf("power_profile", "vibration_pattern", CUSTOM_PROBE_URL)
+    private val stringKeys = setOf("power_profile", "vibration_pattern", CUSTOM_PROBE_URL, "history_retention")
     internal val settingKeys: Set<String> = booleanKeys + integerRanges.keys + stringKeys
     private val maxObjectKeys = maxOf(rootKeys.size, rowKeys.size,
         booleanKeys.size + integerRanges.size + stringKeys.size)
@@ -93,16 +94,19 @@ object BackupCodec {
     }
 
     private fun validateSettings(settings: Map<String, Any>) {
-        settings.forEach { (key, value) ->
-            when {
-                key in booleanKeys -> require(value is Boolean)
-                key in integerRanges -> require(value is Int && value in integerRanges.getValue(key))
-                key == "power_profile" -> require(value is String && value in profiles)
-                key == "vibration_pattern" -> require(value is String && value in patterns)
-                key == CUSTOM_PROBE_URL -> require(value is String &&
-                    (value.isEmpty() || ExtraProbes.normalizeCustomUrl(value) == value))
-                else -> invalid()
-            }
+        settings.forEach { (key, value) -> validateSetting(key, value) }
+    }
+
+    private fun validateSetting(key: String, value: Any) {
+        when {
+            key in booleanKeys -> require(value is Boolean)
+            key in integerRanges -> require(value is Int && value in integerRanges.getValue(key))
+            key == "power_profile" -> require(value is String && value in profiles)
+            key == "vibration_pattern" -> require(value is String && value in patterns)
+            key == "history_retention" -> require(value is String && value in retentions)
+            key == CUSTOM_PROBE_URL -> require(value is String &&
+                (value.isEmpty() || ExtraProbes.normalizeCustomUrl(value) == value))
+            else -> invalid()
         }
     }
 

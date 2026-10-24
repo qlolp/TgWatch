@@ -24,7 +24,7 @@ internal interface TargetMonitorHost {
 }
 
 /** Android network/configuration adapter. The primary owner invokes this after Telegram publication. */
-internal class TargetMonitoring(private val host: TargetMonitorHost,
+internal class TargetMonitoring(internal val host: TargetMonitorHost,
     powerStateReader: (() -> TargetPowerState)? = null,
     private val runnerFactory: ((Network) -> TargetRunner)? = null) : Closeable {
     private val cm = host.context.getSystemService(ConnectivityManager::class.java)

@@ -18,6 +18,7 @@ object WebhookSettings {
     private const val KEY_URL = "url"
     private const val KEY_FORMAT = "format"
     private const val KEY_EVENTS = "events"
+    private const val KEY_SERVICES = "services"
     private var generation = 0L
 
     private fun store(ctx: Context): SharedPreferences {
@@ -47,7 +48,16 @@ object WebhookSettings {
         val events = current?.getStringSet(KEY_EVENTS, null)?.mapNotNull { saved ->
             WebhookEventKind.DELIVERY_EVENTS.firstOrNull { it.name == saved }
         }?.toSet() ?: WebhookEventKind.DELIVERY_EVENTS
-        return WebhookConfiguration(url(ctx), enabled(ctx), generation, format, events)
+        val services = current?.getStringSet(KEY_SERVICES, null)
+            ?.filter { it in WebhookStatuses.services }?.toSet() ?: WebhookStatuses.services
+        return WebhookConfiguration(url(ctx), enabled(ctx), generation, format, events, services)
+    }
+
+    /** Selection only controls delivery; it never enables monitoring or changes a target's address. */
+    @Synchronized fun setTargetsResult(ctx: Context, services: Set<String>): WriteResult = when {
+        !WebhookStatuses.services.containsAll(services) -> WriteResult.INVALID
+        !unlocked(ctx) -> WriteResult.STORAGE_FAILED
+        else -> committed(store(ctx).edit().putStringSet(KEY_SERVICES, services.toSet()))
     }
 
     /** Format and filter form one credential configuration generation; an empty filter is allowed. */
@@ -82,7 +92,7 @@ object WebhookSettings {
     /** Removes the address and turns the webhook off. */
     @Synchronized fun clear(ctx: Context): Boolean =
         unlocked(ctx) && committed(store(ctx).edit().remove(KEY_URL).remove(KEY_ENABLED)
-            .remove(KEY_FORMAT).remove(KEY_EVENTS)) == WriteResult.SAVED
+            .remove(KEY_FORMAT).remove(KEY_EVENTS).remove(KEY_SERVICES)) == WriteResult.SAVED
 
     /** Even a failed disk commit can replace SharedPreferences' in-memory configuration. */
     private fun committed(editor: SharedPreferences.Editor): WriteResult {

@@ -34,5 +34,5 @@ class TargetHistory(private val read: (TargetId) -> List<TargetObservation>,
             it.days == days && it.endpointRevision == endpointRevision(id)
         }?.stats, failure)
 
-    private companion object { const val MAX_DAYS = 7 }
+    private companion object { val MAX_DAYS get() = RetentionPolicy.maxDays() }
 }

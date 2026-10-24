@@ -38,7 +38,9 @@ internal object TargetRestore {
             TargetPersistence.replaceGeneration(ctx, complete) {
                 val edit = Prefs.sp(ctx).edit().putBoolean("enabled", false).putBoolean(TargetPowerSettings.KEY, false)
                 cleared.forEach(edit::remove)
-                preferences.keys.filter { it.startsWith("target.") }.forEach(edit::remove)
+                preferences.keys.filter { it.startsWith("target.") || it.startsWith(RegionalPreferences.PREFIX) }
+                    .forEach(edit::remove)
+                edit.putLong(RegionalPreferences.REVISION, Math.addExact(RegionalPreferences.revision(ctx), 1L))
                 imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
                 for (id in TargetId.entries) {
                     val definition = imported.snapshot.targets.firstOrNull { it.id == id }
@@ -54,6 +56,8 @@ internal object TargetRestore {
                 imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
                 EventLog.replace(ctx, imported.snapshot.log)
                 LastSuccessStore.clear(ctx)
+                RegionalRepository.clearForRestore(ctx)
+                EgressCountryUi.invalidate(ctx)
                 MonitorService.clearRestoredState()
                 syncPreferences(File(ctx.applicationContext.createDeviceProtectedStorageContext()
                     .dataDir, "shared_prefs"))

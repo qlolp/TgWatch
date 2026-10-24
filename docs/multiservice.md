@@ -79,11 +79,19 @@ for matched physical-device tests; emulator checks do not establish a battery-sa
 
 CUSTOM uses HEAD and accepts any 2xx response by default; GET is used only when
 HEAD returns 405 or 501. Optional criteria in **Target settings** can instead
-require one code from 200–599 and/or a top-level JSON string. For example, field
-`status` with expected value `ok` accepts `{"status":"ok"}` and rejects
-`{"status":"error"}` even when both responses have HTTP 200. Empty expected strings
-are allowed; the field name is 1–64 characters and the value at most 256 characters.
+require one code from 200–599 and/or a JSON string at a short object path.
+For example, field `status` with expected value `ok` accepts `{"status":"ok"}` and
+rejects `{"status":"error"}` even when both responses have HTTP 200. A dotted path
+of at most three object keys selects a nested string, for example `status.indicator`
+with expected value `none` accepts `{"status":{"indicator":"none"}}`. Empty expected
+strings are allowed; the path is 1–64 characters and the value at most 256 characters.
 Comparison is exact and case-sensitive; there is no JSONPath or scripting.
+
+Status-page presets (Discord, GitHub, Cloudflare, Atlassian, Spotify, OpenAI) fill a
+public status JSON URL and the `status.indicator` = `none` path. Presets are a typing
+aid only: the address stays private on this device and the health field remains
+editable. A successful status-page JSON match still proves only the HTTP/JSON
+criteria, not message delivery.
 
 JSON mode uses one GET with `Accept: application/json` and identity encoding,
 strict UTF-8, at most 32 KiB, depth at most 10, and full JSON validation including
