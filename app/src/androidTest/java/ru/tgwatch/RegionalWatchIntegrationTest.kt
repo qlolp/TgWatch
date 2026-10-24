@@ -79,13 +79,9 @@ class RegionalWatchIntegrationTest {
     @Test fun bootDisableAndRestoreCannotReviveAnOldArmedRequest() {
         assertFalse(RegionalWatchPreferences.arm(ctx, result(RegionalStatus.WEB_REACHABLE)))
         val old = arm()
-        val wallNow = System.currentTimeMillis() + 5_000
-        val restored = RegionalWatchPreferences.current(ctx, service, now = 5_000,
-            wallNow = wallNow, currentBoot = old.boot + 1)
-        assertNotNull(restored)
-        assertTrue(restored!!.restoredAfterBoot)
-        assertEquals(5_000L, restored.request.armedElapsed)
-        assertTrue(restored.request.deadlineElapsed < 5_000 + RegionalWatchRequest.TTL_MS)
+        Prefs.sp(ctx).edit().putInt("regional.watch.gemini.boot", old.boot + 1).commit()
+        assertNull(RegionalWatchPreferences.current(ctx, service))
+        arm()
         assertTrue(RegionalPreferences.setEnabled(ctx, service, false))
         assertNull(RegionalWatchPreferences.current(ctx, service))
         assertTrue(RegionalPreferences.setEnabled(ctx, service, true))
@@ -93,6 +89,94 @@ class RegionalWatchIntegrationTest {
         arm()
         BackupManager.restoreTargets(ctx, snapshot)
         assertFalse(Prefs.sp(ctx).all.keys.any { it.startsWith("regional.watch.") })
+    }
+
+    private fun key(suffix: String) = "regional.watch.${service.wire}.$suffix"
+    private fun stored(suffix: String) = Prefs.sp(ctx).getLong(key(suffix), -1)
+    private fun watchKeys() = Prefs.sp(ctx).all.keys.filter { it.startsWith("regional.watch.") }
+    private fun moveToAnotherBoot() =
+        check(Prefs.sp(ctx).edit().putInt(key("boot"), Prefs.sp(ctx).getInt(key("boot"), 0) + 1).commit())
+
+    @Test fun aRebootResumesOnlyTheRemainingTimeAndASecondRebootKeepsShrinkingIt() {
+        val old = arm()
+        val armedWall = stored("armed_wall")
+        assertEquals(RegionalWatchRequest.TTL_MS, stored("deadline_wall") - armedWall)
+        moveToAnotherBoot()
+        assertNull(RegionalWatchPreferences.current(ctx, service))
+        val first = SystemClock.elapsedRealtime()
+        assertTrue(RegionalWatchClock.reconcile(ctx, now = first, wallNow = armedWall + 15_000))
+        val resumed = RegionalWatchPreferences.current(ctx, service)!!
+        assertTrue(resumed.restoredAfterBoot)
+        assertNotEquals(old, resumed)
+        assertEquals(RegionalWatchRequest(first, first + RegionalWatchRequest.TTL_MS - 15_000), resumed.request)
+        assertFalse(RegionalWatchClock.reconcile(ctx, now = first, wallNow = armedWall + 15_000))
+        assertEquals(resumed, RegionalWatchPreferences.current(ctx, service))
+
+        moveToAnotherBoot()
+        val second = SystemClock.elapsedRealtime()
+        assertTrue(RegionalWatchClock.reconcile(ctx, now = second, wallNow = armedWall + 75_000))
+        assertEquals(RegionalWatchRequest(second, second + RegionalWatchRequest.TTL_MS - 75_000),
+            RegionalWatchPreferences.current(ctx, service)!!.request)
+    }
+
+    @Test fun aClockChangeBeforeTheRebootCannotStretchTheLifetime() {
+        arm()
+        val now = SystemClock.elapsedRealtime()
+        val remaining = stored("deadline").let { it - now }
+        val movedBack = System.currentTimeMillis() - 10 * 60 * 60_000L
+        assertFalse(RegionalWatchClock.reconcile(ctx, now = now, wallNow = movedBack))
+        assertEquals(movedBack + remaining, stored("deadline_wall"))
+        moveToAnotherBoot()
+        val later = SystemClock.elapsedRealtime()
+        assertTrue(RegionalWatchClock.reconcile(ctx, now = later, wallNow = movedBack + 30_000))
+        assertEquals(RegionalWatchRequest(later, later + remaining - 30_000),
+            RegionalWatchPreferences.current(ctx, service)!!.request)
+    }
+
+    @Test fun aClockBehindTheArmingTimeKeepsTheRequestUntilTheClockSyncs() {
+        arm()
+        val armedWall = stored("armed_wall")
+        moveToAnotherBoot()
+        val keys = watchKeys().toSet()
+        assertFalse(RegionalWatchClock.reconcile(ctx, wallNow = armedWall - 60_000))
+        assertEquals(keys, watchKeys().toSet())
+        assertNull(RegionalWatchPreferences.current(ctx, service))
+        assertTrue(RegionalWatchClock.reconcile(ctx, wallNow = armedWall + 1_000))
+        assertTrue(RegionalWatchPreferences.current(ctx, service)!!.restoredAfterBoot)
+    }
+
+    @Test fun aDisabledOrReEnabledProfileIsNotResumedAfterReboot() {
+        arm()
+        moveToAnotherBoot()
+        assertTrue(RegionalPreferences.setEnabled(ctx, service, false))
+        assertFalse(RegionalWatchClock.reconcile(ctx, wallNow = stored("armed_wall") + 1_000))
+        assertTrue(watchKeys().isEmpty())
+
+        assertTrue(RegionalPreferences.setEnabled(ctx, service, true))
+        arm()
+        moveToAnotherBoot()
+        assertTrue(RegionalPreferences.setEnabled(ctx, service, false))
+        assertTrue(RegionalPreferences.setEnabled(ctx, service, true))
+        assertFalse(RegionalWatchClock.reconcile(ctx, wallNow = stored("armed_wall") + 1_000))
+        assertTrue(watchKeys().isEmpty())
+        assertNull(RegionalWatchPreferences.current(ctx, service))
+    }
+
+    @Test fun aWatchArmedBeforeWallAnchorsGainsThemInTheSameBootAndEndsOnReboot() {
+        val old = arm()
+        fun dropAnchors() = check(Prefs.sp(ctx).edit().remove(key("armed_wall")).remove(key("deadline_wall")).commit())
+        dropAnchors()
+        val now = SystemClock.elapsedRealtime()
+        val wall = System.currentTimeMillis()
+        assertFalse(RegionalWatchClock.reconcile(ctx, now = now, wallNow = wall))
+        assertEquals(wall + old.request.deadlineElapsed - now, stored("deadline_wall"))
+        assertEquals(RegionalWatchRequest.TTL_MS, stored("deadline_wall") - stored("armed_wall"))
+        assertEquals(old, RegionalWatchPreferences.current(ctx, service))
+
+        dropAnchors()
+        moveToAnotherBoot()
+        assertFalse(RegionalWatchClock.reconcile(ctx))
+        assertTrue(watchKeys().isEmpty())
     }
 
     @Test fun quietMuteMaintenanceAndMissingOrBlockedChannelDoNotConsumeTheGoal() {

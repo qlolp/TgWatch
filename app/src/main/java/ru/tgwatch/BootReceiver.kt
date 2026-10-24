@@ -15,6 +15,7 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED) {
             DailySummaryReceiver.schedule(context)
+            RegionalWatchClock.schedule(context)
             return
         }
         val boot = action == Intent.ACTION_BOOT_COMPLETED ||

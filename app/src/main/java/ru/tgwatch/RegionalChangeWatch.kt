@@ -6,24 +6,37 @@ data class RegionalWatchRequest(val armedElapsed: Long, val deadlineElapsed: Lon
             deadlineElapsed - armedElapsed in 1L..TTL_MS)
     }
     fun active(now: Long): Boolean = now >= armedElapsed && now < deadlineElapsed
-    fun afterReboot(nowElapsed: Long, armedWall: Long, deadlineWall: Long,
-        nowWall: Long): RegionalWatchRequest? {
-        return runCatching {
-            require(nowElapsed >= 0)
-            require(armedWall >= 0)
-            require(deadlineWall > armedWall)
-            require(deadlineWall - armedWall in 1L..TTL_MS)
-            require(nowWall >= armedWall && nowWall < deadlineWall)
-            val remaining = deadlineWall - nowWall
-            RegionalWatchRequest(nowElapsed, Math.addExact(nowElapsed, remaining))
-        }.getOrNull()
+    companion object {
+        const val TTL_MS = 24 * 60 * 60_000L
+
+        /** The wall clock is the only clock that crosses a reboot; a clock behind the anchor may still sync. */
+        fun resume(nowElapsed: Long, armedWall: Long, deadlineWall: Long, nowWall: Long): RegionalWatchResume {
+            val valid = nowElapsed >= 0 && armedWall >= 0 && deadlineWall - armedWall in 1L..TTL_MS
+            return when {
+                !valid || nowWall >= deadlineWall -> RegionalWatchResume.Drop
+                nowWall < armedWall -> RegionalWatchResume.Wait
+                else -> runCatching {
+                    RegionalWatchResume.Resumed(RegionalWatchRequest(nowElapsed,
+                        Math.addExact(nowElapsed, deadlineWall - nowWall)))
+                }.getOrDefault(RegionalWatchResume.Drop)
+            }
+        }
     }
-    companion object { const val TTL_MS = 24 * 60 * 60_000L }
 }
 
+sealed interface RegionalWatchResume {
+    data class Resumed(val request: RegionalWatchRequest) : RegionalWatchResume
+    data object Wait : RegionalWatchResume
+    data object Drop : RegionalWatchResume
+}
+
+/** A request armed in this boot always lasts exactly [RegionalWatchRequest.TTL_MS]; only a resumed one is shorter. */
 data class RegionalWatchMetadata(val request: RegionalWatchRequest, val boot: Int, val profileRevision: Long,
     val restoredAfterBoot: Boolean = false) {
-    init { require(boot >= 0 && profileRevision >= 0) }
+    init {
+        require(boot >= 0 && profileRevision >= 0)
+        require(restoredAfterBoot || request.deadlineElapsed - request.armedElapsed == RegionalWatchRequest.TTL_MS)
+    }
     fun current(currentBoot: Int, revision: Long, enabled: Boolean, now: Long): Boolean =
         currentBoot >= 0 && currentBoot == boot && profileRevision == revision && enabled && request.active(now)
 }
