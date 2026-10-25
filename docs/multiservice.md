@@ -6,6 +6,12 @@ Each has its own status, interval, history, incident list, outage/recovery alert
 slow-response threshold and temporary mute. Quiet hours and the older global mute
 apply to every target. A first successful check does not create a recovery alert.
 
+**All targets overview** lists every added target with its own measured state,
+last-check age and stopped/pending/stale state. Selecting a row opens that target's
+existing details. It is a status snapshot, not a combined score: no cross-service
+availability percentage is calculated. Private addresses and health criteria are
+not shown.
+
 Matrix's public default checks `/_matrix/client/versions`; a custom Matrix base
 address is optional. WhatsApp measures its public website, not messaging delivery.
 Custom HTTPS accepts an HTTPS address without credentials, query or fragment.

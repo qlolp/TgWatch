@@ -45,6 +45,12 @@
             android:minHeight="48dp" />
 
         <Button
+            android:id="@+id/btnTargetOverview"
+            style="@style/ButtonOutlined"
+            android:layout_width="match_parent"
+            android:text="@string/target_overview" />
+
+        <Button
             android:id="@+id/btnTargetSettings"
             style="@style/ButtonOutlined"
             android:layout_width="match_parent"

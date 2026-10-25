@@ -80,6 +80,35 @@ class TargetUiIntegrationTest {
         }
     }
 
+    @Test fun overviewListsIndependentTargetsWithoutAddressesAndSelectsOne() {
+        val secret = "https://private.example/overview-must-not-show-this"
+        check(privateStore.edit().putString(TargetId.CUSTOM.wire, secret).commit())
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.findViewById<Button>(R.id.btnTargetOverview).performClick()
+                val selection = MainActivity::class.java.getDeclaredField("targetUi").apply { isAccessible = true }
+                    .get(activity)
+                val overview = selection.javaClass.getDeclaredField("overview").apply { isAccessible = true }
+                    .get(selection)
+                val dialog = overview.javaClass.getDeclaredField("dialog").apply { isAccessible = true }
+                    .get(overview) as AlertDialog
+                assertTrue(dialog.isShowing)
+                val buttons = findButtons(dialog.window!!.decorView)
+                for (id in TargetSlots.visible(activity)) {
+                    val label = TargetNames.label(activity, id)
+                    assertTrue("Missing independent overview row for $label",
+                        buttons.any { it.text.toString().startsWith(label + "\n") })
+                }
+                assertFalse(buttons.joinToString("\n") { it.text.toString() }.contains(secret))
+                val matrix = buttons.single { it.text.toString().startsWith("Matrix\n") }
+                matrix.performClick()
+                assertFalse(dialog.isShowing)
+                assertEquals(TargetId.MATRIX.ordinal,
+                    activity.findViewById<Spinner>(R.id.targetSelector).selectedItemPosition)
+            }
+        }
+    }
+
     @Test fun privateEndpointIsNotPrefilledSavedOrExportedFromTheSettingsDialog() {
         val secret = "https://private.example/never-export-this-path"
         check(privateStore.edit().putString(TargetId.CUSTOM.wire, secret).commit())
@@ -144,6 +173,12 @@ class TargetUiIntegrationTest {
 
     private fun findSpinner(view: View): Spinner? = if (view is Spinner) view else if (view is ViewGroup)
         (0 until view.childCount).asSequence().mapNotNull { findSpinner(view.getChildAt(it)) }.firstOrNull() else null
+
+    private fun findButtons(view: View): List<Button> = when {
+        view is Button -> listOf(view)
+        view is ViewGroup -> (0 until view.childCount).flatMap { findButtons(view.getChildAt(it)) }
+        else -> emptyList()
+    }
 
     private fun select(scenario: ActivityScenario<MainActivity>, id: TargetId) {
         scenario.onActivity { it.findViewById<Spinner>(R.id.targetSelector).setSelection(id.ordinal) }

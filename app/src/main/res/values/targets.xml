@@ -10,6 +10,12 @@
     <string name="target_power_screen_off">screen off</string>
     <string name="target_select">Monitoring target</string>
     <string name="target_settings">Target settings</string>
+    <string name="target_overview">All targets overview</string>
+    <string name="target_overview_title">Independent targets</string>
+    <string name="target_overview_note">Each service has its own measurements. There is no combined availability percentage. Select a target to open its details.</string>
+    <string name="target_overview_off">Monitoring is off</string>
+    <string name="target_overview_stale">Last measurement is stale</string>
+    <string name="target_overview_no_checks">No checks recorded yet</string>
     <string name="target_add">Add custom HTTPS target</string>
     <string name="target_add_full">All %1$d custom HTTPS targets are in use</string>
     <string name="target_remove">Remove this target</string>

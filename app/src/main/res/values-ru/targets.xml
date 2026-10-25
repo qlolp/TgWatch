@@ -7,6 +7,12 @@
     <string name="target_power_screen_off">экран выключен</string>
     <string name="target_select">Цель мониторинга</string>
     <string name="target_settings">Настройки цели</string>
+    <string name="target_overview">Обзор всех целей</string>
+    <string name="target_overview_title">Независимые цели</string>
+    <string name="target_overview_note">У каждого сервиса свои измерения. Общего процента доступности нет. Выберите цель, чтобы открыть подробности.</string>
+    <string name="target_overview_off">Мониторинг выключен</string>
+    <string name="target_overview_stale">Последнее измерение устарело</string>
+    <string name="target_overview_no_checks">Проверок ещё не было</string>
     <string name="target_add">Добавить свой HTTPS</string>
     <string name="target_add_full">Все %1$d мест для своих HTTPS заняты</string>
     <string name="target_remove">Удалить эту цель</string>

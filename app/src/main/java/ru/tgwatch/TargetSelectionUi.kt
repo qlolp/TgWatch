@@ -26,6 +26,10 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
     private val spinner = activity.findViewById<Spinner>(R.id.targetSelector)
     private val add = activity.findViewById<Button>(R.id.btnAddTarget)
     private val status = TargetStatusUi(activity, color)
+    private val overview = TargetOverviewUi(activity, { goals }, { id ->
+        spinner.setSelection(goals.indexOf(id))
+        select(id)
+    })
     private var dialog: AlertDialog? = null
 
     init {
@@ -37,6 +41,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
             }
         }
         activity.findViewById<Button>(R.id.btnTargetSettings).setOnClickListener { settings() }
+        activity.findViewById<Button>(R.id.btnTargetOverview).setOnClickListener { overview.show() }
         add.setOnClickListener { addCustom() }
         activity.findViewById<Button>(R.id.btnToggle).setOnClickListener {
             val busy = TargetSettingsExecutor.busy(selected)
@@ -58,6 +63,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
     fun render(now: Long) {
         val visible = TargetSlots.visible(activity)
         if (visible != goals) {
+            overview.close()
             goals = visible
             val removed = selected !in goals
             if (removed) selected = TargetId.TELEGRAM
@@ -128,7 +134,7 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
         changed()
         dialog?.dismiss(); dialog = TargetSettingsDialog.show(activity, id)
     }
-    fun close() { dialog?.dismiss(); dialog = null }
+    fun close() { overview.close(); dialog?.dismiss(); dialog = null }
     private fun settings() {
         val id = selected
         if (TargetConfigTransactions.isPending(id)) {
