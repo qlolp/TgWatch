@@ -11,7 +11,9 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
-IDS = ('telegram', 'matrix', 'whatsapp', 'custom')
+IDS = ('telegram', 'matrix', 'whatsapp', 'custom', 'custom2', 'custom3', 'custom4', 'custom5')
+# Custom HTTPS slots added in 1.24; a generation written before them has no journal for them.
+OPTIONAL = ('custom2', 'custom3', 'custom4', 'custom5')
 KINDS = {'OK', 'DOWN', 'PARTIAL', 'NO_NETWORK', 'UNKNOWN'}
 MANIFEST = 'targets-v1/active-generation'
 ROOT = '/data/user_de/0/ru.tgwatch/files/'
@@ -78,7 +80,7 @@ def registry(raw):
     if not isinstance(value, dict) or set(value) != {
             'formatVersion', 'createdAt', 'settings', 'targets', 'observations', 'log'}:
         raise ValueError('Invalid registry shape')
-    if type(value['formatVersion']) is not int or value['formatVersion'] not in (3, 4):
+    if type(value['formatVersion']) is not int or value['formatVersion'] not in (3, 4, 5):
         raise ValueError('Unsupported registry')
     targets = value['targets']
     if not isinstance(targets, list) or not 1 <= len(targets) <= len(IDS):
@@ -104,7 +106,7 @@ def registry(raw):
         if type(target['enabled']) is not bool or type(target['requiresEndpoint']) is not bool:
             raise ValueError('Invalid registry flags')
         if (name in ('telegram', 'whatsapp') and target['requiresEndpoint']) or (
-                name == 'custom' and not target['requiresEndpoint']):
+                name.startswith('custom') and not target['requiresEndpoint']):
             raise ValueError('Invalid registry endpoint mode')
         alerts = target['alerts']
         if not isinstance(alerts, dict) or set(alerts) != {
@@ -115,6 +117,8 @@ def registry(raw):
             raise ValueError('Invalid slow threshold')
         if any(type(alerts[key]) is not bool for key in ('notifyOutage', 'notifyRecovery', 'notifySlow')):
             raise ValueError('Invalid alert flags')
+    if value['formatVersion'] < 5 and seen & set(OPTIONAL):
+        raise ValueError('Optional custom targets require registry version 5')
     if value['observations'] != []:
         raise ValueError('Registry must reference journals rather than carry observations')
     return seen
@@ -133,7 +137,12 @@ def capture(read, now_ms=None):
             declared = registry(read(f'targets-v1/{generation}/registry.json'))
             observations = []
             for target in IDS:
-                own = rows(read(f'targets-v1/{generation}/{target}.csv'), target)
+                try:
+                    own = rows(read(f'targets-v1/{generation}/{target}.csv'), target)
+                except FileNotFoundError:
+                    if target in declared or target not in OPTIONAL:
+                        raise
+                    own = []
                 if target not in declared and own:
                     raise ValueError('Undeclared target journal')
                 observations.extend(own)
@@ -231,7 +240,7 @@ def adb(*args, missing=False):
 def remote_read(name):
     # name is generated only by capture() from fixed segments and a validated 32-character ID.
     if name != 'history-v2.csv' and name != MANIFEST and not re.fullmatch(
-            r'targets-v1/[a-f0-9]{32}/(registry.json|telegram.csv|matrix.csv|whatsapp.csv|custom.csv)', name):
+            r'targets-v1/[a-f0-9]{32}/(registry.json|telegram.csv|matrix.csv|whatsapp.csv|custom[2-5]?.csv)', name):
         raise ValueError('Invalid app file path')
     return adb('shell', '-T', 'cat', ROOT + name, missing=True)
 
