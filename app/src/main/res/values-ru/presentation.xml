@@ -51,6 +51,7 @@
     <string name="text_target_matrix">"Matrix"</string>
     <string name="text_target_whatsapp">"WhatsApp (веб)"</string>
     <string name="text_target_custom">"Свой HTTPS"</string>
+    <string name="text_target_custom_numbered">"Свой HTTPS %1$d"</string>
     <string name="text_percent_value">"%1$s %%"</string>
     <plurals name="text_daily_checks">
         <item quantity="one">Проверок: %1$d</item>

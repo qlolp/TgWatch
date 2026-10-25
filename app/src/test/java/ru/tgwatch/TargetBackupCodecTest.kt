@@ -22,9 +22,10 @@ class TargetBackupCodecTest {
         }
         assertThrows(IllegalArgumentException::class.java) { TargetBackupReader(source).read() }
     }
+    private val builtIn = TargetId.entries.filterNot { it.isOptional }
     private fun sample(): TargetBackupSnapshot = TargetBackupSnapshot(10_000,
         mapOf("interval_sec" to 30, "notify_slow" to true),
-        TargetId.entries.map(TargetDefinition::default), TargetId.entries.associateWith { id -> when (id) {
+        builtIn.map(TargetDefinition::default), builtIn.associateWith { id -> when (id) {
             TargetId.TELEGRAM -> listOf(TargetObservation(Observation(1_000, 2_000, "DOWN"), 0))
             TargetId.MATRIX -> listOf(TargetObservation(Observation(2_000, 3_000, "OK", 80), 2))
             else -> emptyList()
@@ -57,7 +58,7 @@ class TargetBackupCodecTest {
         assertFalse(decoded.globalSettings.containsKey("history_retention"))
         assertThrows(IllegalArgumentException::class.java) {
             TargetBackupCodec.decode(JSONObject(TargetBackupCodec.encode(sample()).toString(Charsets.UTF_8))
-                .put("formatVersion", 5).toString().toByteArray(Charsets.UTF_8))
+                .put("formatVersion", 6).toString().toByteArray(Charsets.UTF_8))
         }
     }
 
@@ -104,11 +105,28 @@ class TargetBackupCodecTest {
             TargetBackupCodec.encode(original.copy(log = listOf("x".repeat(4_097))))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            TargetBackupCodec.decode(ByteArray(16 * 1024 * 1024 + 1))
+            TargetBackupCodec.decode(ByteArray(24 * 1024 * 1024 + 1))
         }
         assertEquals(8 * 1024 * 1024, BackupCodec.MAX_PLAINTEXT_BYTES)
         assertEquals(65_000, BackupCodec.MAX_OBSERVATIONS)
         assertEquals(8 * 1024 * 1024 + 56, BackupCrypto.MAX_ENVELOPE_BYTES)
+    }
+
+    @Test fun optionalCustomGoalsAreWrittenAsV5AndRejectedInOlderFormats() {
+        val extra = sample().copy(targets = sample().targets + TargetDefinition.default(TargetId.CUSTOM_3),
+            observations = sample().observations + (TargetId.CUSTOM_3 to
+                listOf(TargetObservation(Observation(4_000, 5_000, "OK", 120), 1))))
+        val encoded = TargetBackupCodec.encode(extra)
+        val json = JSONObject(encoded.toString(Charsets.UTF_8))
+        assertEquals(5, json.getInt("formatVersion"))
+        assertEquals(extra, TargetBackupCodec.decode(encoded))
+        assertTrue(encoded.toString(Charsets.UTF_8).contains("\"custom3\""))
+        for (older in listOf(3, 4)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                TargetBackupCodec.decode(json.put("formatVersion", older).toString().toByteArray(Charsets.UTF_8))
+            }
+        }
+        assertEquals(4, JSONObjectFormatVersion(TargetBackupCodec.encode(sample())))
     }
 
     @Test fun endpointAndClockMetadataDoNotInventChecks() {
@@ -137,9 +155,13 @@ class TargetBackupCodecTest {
         val original = TargetBackupSnapshot(Long.MAX_VALUE, emptyMap(), definitions, rows,
             List(150) { "\u0000".repeat(4_096) })
         val encoded = TargetBackupCodec.encode(original)
-        assertTrue(encoded.size <= 16 * 1024 * 1024)
+        assertTrue(encoded.size <= 24 * 1024 * 1024)
+        assertEquals(5, JSONObjectFormatVersion(encoded))
         val decoded = TargetBackupCodec.decode(encoded)
-        assertEquals(98_000, decoded.observations.values.sumOf { it.size })
+        assertEquals(142_000, decoded.observations.values.sumOf { it.size })
         assertEquals(original, decoded)
     }
+
+    private fun JSONObjectFormatVersion(bytes: ByteArray): Int =
+        JSONObject(bytes.toString(Charsets.UTF_8)).getInt("formatVersion")
 }

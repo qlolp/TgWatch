@@ -6,11 +6,15 @@ data class TargetBackupSnapshot(val createdAtMs: Long, val globalSettings: Map<S
     val log: List<String>)
 
 object TargetBackupCodec {
-    /** v3 omitted history_retention; v4 writes it. Older readers reject v4 by schema version. */
-    const val FORMAT_VERSION = 4
+    /**
+     * v3 omitted history_retention; v4 writes it; v5 is written only when a backup holds an optional
+     * custom HTTPS goal (custom2..custom5), so older readers reject exactly the backups they cannot represent.
+     */
+    const val FORMAT_VERSION = 5
+    const val SINGLE_CUSTOM_FORMAT = 4
     const val READABLE_FORMAT_MIN = 3
-    const val MAX_PLAINTEXT_BYTES = 16 * 1024 * 1024
-    const val MAX_OBSERVATIONS = 98_000
+    const val MAX_PLAINTEXT_BYTES = 24 * 1024 * 1024
+    const val MAX_OBSERVATIONS = 142_000
     const val TELEGRAM_ROWS = 65_000
     const val EXTRA_ROWS = 11_000
     const val LEGACY_ENDPOINT_KEY = "extra_probe_custom_url"
@@ -18,6 +22,9 @@ object TargetBackupCodec {
     private val kinds = TargetStatus.entries.map { it.name }.toSet()
 
     fun rowLimit(id: TargetId): Int = if (id == TargetId.TELEGRAM) TELEGRAM_ROWS else EXTRA_ROWS
+
+    fun formatVersion(targets: Collection<TargetId>): Int =
+        if (targets.any { it.isOptional }) FORMAT_VERSION else SINGLE_CUSTOM_FORMAT
 
     fun encode(snapshot: TargetBackupSnapshot): ByteArray = checked {
         validate(snapshot)

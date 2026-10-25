@@ -53,8 +53,8 @@ internal object TargetSettingsDialog {
         val slow = toggle(R.string.target_notify_slow, definition.alerts.notifySlow)
         val thresholdLabel = TextView(activity).also(content::addView)
         val threshold = threshold(activity, definition.alerts.slowThresholdMs, thresholdLabel).also(content::addView)
-        val endpoint = if (id == TargetId.MATRIX || id == TargetId.CUSTOM) endpoint(activity, content) else null
-        val health = if (id == TargetId.CUSTOM) CustomHealthSettingsUi(activity, content) else null
+        val endpoint = if (id == TargetId.MATRIX || id.isCustom) endpoint(activity, content) else null
+        val health = if (id.isCustom) CustomHealthSettingsUi(activity, content) else null
         MaintenanceSettingsUi.add(activity, content, id)
         attachTemplates(activity, id, content, endpoint, health)
         val dialog = AlertDialog.Builder(activity).setTitle(TargetNames.label(activity, id))
@@ -66,6 +66,7 @@ internal object TargetSettingsDialog {
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.setOnDismissListener { endpoint?.text?.clear(); health?.clear() }
         conversion(activity, id, content) { dialog.dismiss() }
+        TargetRemovalUi.add(activity, id, content) { dialog.dismiss() }
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val criteria = if (health == null) null else health.selection() ?: return@setOnClickListener
@@ -154,7 +155,7 @@ internal object TargetSettingsDialog {
 
     private fun attachTemplates(activity: Activity, id: TargetId, content: LinearLayout,
         endpoint: EditText?, health: CustomHealthSettingsUi?) {
-        if (id != TargetId.CUSTOM || endpoint == null || health == null) return
+        if (!id.isCustom || endpoint == null || health == null) return
         templates(activity, content, endpoint, health)
     }
 

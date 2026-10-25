@@ -42,12 +42,13 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
         format.text = activity.getString(R.string.webhook_format_current,
             activity.getString(formatLabel(current.format)))
         filters.text = activity.getString(R.string.webhook_filters_current, current.events.size, events.size)
+        val goals = TargetSlots.visible(activity)
         targets.text = activity.getString(R.string.webhook_targets_current,
-            current.services.size, TargetId.entries.size)
+            goals.count { it.wire in current.services }, goals.size)
     }
 
     fun chooseTargets(): AlertDialog {
-        val goals = TargetId.entries
+        val goals = TargetSlots.visible(activity)
         val current = WebhookSettings.configuration(activity)
         val selected = BooleanArray(goals.size) { goals[it].wire in current.services }
         return secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_targets_title)

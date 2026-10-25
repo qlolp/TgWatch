@@ -50,6 +50,12 @@
             android:layout_width="match_parent"
             android:text="@string/target_settings" />
 
+        <Button
+            android:id="@+id/btnAddTarget"
+            style="@style/ButtonOutlined"
+            android:layout_width="match_parent"
+            android:text="@string/target_add" />
+
         <!-- Чеклист первого запуска: без этого значок врёт -->
         <LinearLayout
             android:id="@+id/setupCard"

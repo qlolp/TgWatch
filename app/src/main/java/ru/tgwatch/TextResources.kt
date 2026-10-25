@@ -53,6 +53,7 @@ internal val textResources: Map<TextKey, Int> = mapOf(
     TextKey.TARGET_MATRIX to R.string.text_target_matrix,
     TextKey.TARGET_WHATSAPP to R.string.text_target_whatsapp,
     TextKey.TARGET_CUSTOM to R.string.text_target_custom,
+    TextKey.TARGET_CUSTOM_NUMBERED to R.string.text_target_custom_numbered,
     TextKey.COPY_ONGOING_NOTIFICATION_TELEGRAM_IS_REACHABLE to R.string.copy_ongoing_notification_telegram_is_reachable,
     TextKey.COPY_ONGOING_NOTIFICATION_PERSISTENT_ICON_WHILE_TELEGRAM to
         R.string.copy_ongoing_notification_persistent_icon_while_telegram,

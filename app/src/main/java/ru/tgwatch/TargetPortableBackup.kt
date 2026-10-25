@@ -49,14 +49,15 @@ internal object TargetPortableBackup {
 
     internal fun legacy(snapshot: BackupSnapshot): TargetBackupImport {
         val settings = snapshot.settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY
-        val definitions = TargetId.entries.map { id ->
+        // A pre-target backup knows only the built-in goals; optional custom slots stay unused.
+        val definitions = TargetId.entries.filterNot { it.isOptional }.map { id ->
             val defaults = TargetDefinition.default(id)
             if (id != TargetId.TELEGRAM) defaults else defaults.copy(
                 intervalSec = settings["interval_sec"] as? Int ?: TargetDefinition.DEFAULT_TELEGRAM_SEC,
                 alerts = TargetAlertSettings(settings["notify_outage"] as? Boolean ?: true,
                     settings["notify_recovery"] as? Boolean ?: true, settings["notify_slow"] as? Boolean ?: true))
         }
-        val observations = TargetId.entries.associateWith { id ->
+        val observations = definitions.map { it.id }.associateWith { id ->
             if (id != TargetId.TELEGRAM) emptyList() else snapshot.observations.map { row ->
                 TargetObservation(if (row.kind == "TG_DOWN") row.copy(kind = "DOWN") else row, 0L)
             }

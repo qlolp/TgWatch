@@ -10,6 +10,11 @@
     <string name="target_power_screen_off">screen off</string>
     <string name="target_select">Monitoring target</string>
     <string name="target_settings">Target settings</string>
+    <string name="target_add">Add custom HTTPS target</string>
+    <string name="target_add_full">All %1$d custom HTTPS targets are in use</string>
+    <string name="target_remove">Remove this target</string>
+    <string name="target_remove_confirm">Remove %1$s? Its address, history, alerts and maintenance windows are deleted from this phone.</string>
+    <string name="target_remove_failed">The target could not be changed. Try again.</string>
     <string name="target_telegram_profile">Telegram — profile: %1$s</string>
     <string name="target_custom_interval">Custom interval</string>
     <string name="target_telegram_intervals">Telegram check interval</string>

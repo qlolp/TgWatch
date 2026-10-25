@@ -1,8 +1,17 @@
 package ru.tgwatch
 
-enum class TargetId(val wire: String) {
-    TELEGRAM("telegram"), MATRIX("matrix"), WHATSAPP("whatsapp"), CUSTOM("custom");
-    companion object { fun fromWire(value: String): TargetId? = entries.firstOrNull { it.wire == value } }
+/** Custom HTTPS goals are fixed slots: the first keeps the pre-1.24 wire ID, so its history needs no migration. */
+enum class TargetId(val wire: String, val isCustom: Boolean = false) {
+    TELEGRAM("telegram"), MATRIX("matrix"), WHATSAPP("whatsapp"), CUSTOM("custom", true),
+    CUSTOM_2("custom2", true), CUSTOM_3("custom3", true), CUSTOM_4("custom4", true), CUSTOM_5("custom5", true);
+    /** 1 for the first custom goal, 0 for built-in services; custom entries stay last and in order. */
+    val customSlot: Int get() = if (isCustom) ordinal - CUSTOM.ordinal + 1 else 0
+    /** Slots after the first exist only after the user adds them. */
+    val isOptional: Boolean get() = customSlot > 1
+    companion object {
+        fun fromWire(value: String): TargetId? = entries.firstOrNull { it.wire == value }
+        val custom: List<TargetId> get() = entries.filter { it.isCustom }
+    }
 }
 
 enum class TargetStatus {
@@ -31,7 +40,7 @@ data class TargetDefinition(val id: TargetId, val enabled: Boolean, val interval
         val range = if (id == TargetId.TELEGRAM) MIN_TELEGRAM_SEC..MAX_TELEGRAM_SEC else MIN_TARGET_SEC..MAX_TARGET_SEC
         require(intervalSec in range)
         require(id !in setOf(TargetId.TELEGRAM, TargetId.WHATSAPP) || !requiresEndpoint)
-        require(id != TargetId.CUSTOM || requiresEndpoint)
+        require(!id.isCustom || requiresEndpoint)
     }
     companion object {
         const val MIN_TELEGRAM_SEC = 10
@@ -41,7 +50,7 @@ data class TargetDefinition(val id: TargetId, val enabled: Boolean, val interval
         const val MAX_TARGET_SEC = 300
         fun default(id: TargetId) = TargetDefinition(id, id == TargetId.TELEGRAM,
             if (id == TargetId.TELEGRAM) DEFAULT_TELEGRAM_SEC else MIN_TARGET_SEC,
-            id == TargetId.CUSTOM, TargetAlertSettings(notifySlow = id == TargetId.TELEGRAM))
+            id.isCustom, TargetAlertSettings(notifySlow = id == TargetId.TELEGRAM))
     }
 }
 

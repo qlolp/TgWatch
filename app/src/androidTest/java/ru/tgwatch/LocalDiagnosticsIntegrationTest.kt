@@ -84,8 +84,9 @@ class LocalDiagnosticsIntegrationTest {
                     .forEach { assertFalse(it, contents.contains(it)) }
                 assertEquals(5, json.getInt("schema_version"))
                 val goals = json.getJSONArray("targets")
-                assertEquals(TargetId.entries.size, goals.length())
-                assertEquals(TargetId.entries.map { it.wire }.toSet(),
+                // Custom HTTPS slots that were never added stay out of diagnostics.
+                assertEquals(TargetSlots.visible(ctx).size, goals.length())
+                assertEquals(TargetSlots.visible(ctx).map { it.wire }.toSet(),
                     (0 until goals.length()).map { goals.getJSONObject(it).getString("target_id") }.toSet())
                 assertEquals(Build.VERSION.SDK_INT, json.getJSONObject("os").getInt("sdk_int"))
                 assertEquals("OK", json.getJSONObject("state").getString("status"))

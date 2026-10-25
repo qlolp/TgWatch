@@ -7,11 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HistoryRetentionTest {
+    private val builtIn = TargetId.entries.filterNot { it.isOptional }
+
     @Test fun backupAcceptsRetentionAndRejectsUnknownValues() {
         val snapshot = TargetBackupSnapshot(1L,
             mapOf("interval_sec" to 30, "history_retention" to Retention.QUARTER.name),
-            TargetId.entries.map(TargetDefinition::default),
-            TargetId.entries.associateWith { emptyList() },
+            builtIn.map(TargetDefinition::default),
+            builtIn.associateWith { emptyList() },
             emptyList())
         val decoded = TargetBackupCodec.decode(TargetBackupCodec.encode(snapshot))
         assertEquals("QUARTER", decoded.globalSettings["history_retention"])

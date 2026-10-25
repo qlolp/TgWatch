@@ -61,7 +61,8 @@ Result data is null. Only success includes these result extras:
 ## Independent targets (version 2)
 
 Use the same explicit component and bearer token, with one of these actions and a
-string extra `target_id`: `telegram`, `matrix`, `whatsapp`, or `custom`. The ID is
+string extra `target_id`: `telegram`, `matrix`, `whatsapp`, `custom`, or `custom2` …
+`custom5` for added custom goals (a slot that was not added reports a stopped goal). The ID is
 required and case sensitive; unknown or missing IDs return result `2` without state.
 
 | Action | Behavior |
@@ -228,8 +229,8 @@ The fixture test checks YAML structure, mappings and the documented payload cont
 it does not certify a running Home Assistant instance or render every HA template.
 
 The supplied packages explicitly select `service_id: telegram`. For another goal,
-adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp` or
-`custom`; use separate entities for separate goals. A target filter in TgWatch
+adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp`,
+`custom` or `custom2` … `custom5`; use separate entities for separate goals. A target filter in TgWatch
 does not change the receiving package's service-ID validation.
 
 Native MQTT, multiple destinations and custom headers remain separate extensions.
@@ -239,7 +240,7 @@ Native MQTT, multiple destinations and custom headers remain separate extensions
 The same explicit receiver and bearer-token checks also accept
 `ru.tgwatch.automation.GET_TARGET_STATE` and
 `ru.tgwatch.automation.CHECK_TARGET_NOW`, with a required `target_id` extra:
-`telegram`, `matrix`, `whatsapp`, or `custom`. Missing/unknown IDs are rejected.
+`telegram`, `matrix`, `whatsapp`, `custom`, or `custom2` … `custom5`. Missing/unknown IDs are rejected.
 State replies use `api_version=2`, generic `DOWN`, `target_id`, the existing public
 state fields and optional `latency_ms`; they contain no addresses or history.
 CHECK operates only against the existing active target and never starts it.

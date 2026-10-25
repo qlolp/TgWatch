@@ -33,6 +33,7 @@ internal class TargetBackupReader(source: Reader) {
             TargetBackupCodec.FORMAT_VERSION.toLong())
         val definitions = checkNotNull(targets)
         val ids = definitions.map { it.id }.toSet()
+        require(checkNotNull(version) >= TargetBackupCodec.FORMAT_VERSION || ids.none { it.isOptional })
         val supplied = checkNotNull(observations)
         require(supplied.keys.all { it in ids })
         return TargetBackupSnapshot(checkNotNull(createdAt), checkNotNull(settings), definitions,

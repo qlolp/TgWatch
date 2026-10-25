@@ -19,6 +19,18 @@ address starts a new endpoint revision; previous revisions remain archived and
 do not contribute to the new address's statistics. Device clock rollback also
 separates statistics into clock epochs.
 
+## Several custom HTTPS goals
+
+**Add custom HTTPS** on the main screen creates up to four more custom goals
+(five in total). They are fixed slots with stable public IDs `custom2` …
+`custom5` and fixed labels "Custom HTTPS 2" … "Custom HTTPS 5"; the address is
+never used as a name. The first goal keeps the ID `custom` and its history, so
+an upgrade needs no migration. Each added goal has its own address, health
+criteria, interval, power saving, alerts, scheduled pauses and history.
+**Remove this goal** in its settings (added goals only) stops it and deletes its
+address, history, alert state and pauses from the phone. Adding a slot again
+always starts empty, so nothing from its earlier use can reappear.
+
 Existing EXTRA diagnostics do not enable independent targets during upgrade.
 When a diagnostic is enabled, the corresponding target's settings offer an
 explicit conversion button. Custom HTTPS copies the old address only on the
@@ -43,7 +55,9 @@ file picker opens. The UTF-8 header is:
 from_utc,until_utc,status,duration_ms,latency_ms,clock_epoch,in_current_statistics,target_id,endpoint_revision
 ```
 
-`target_id` is one of `telegram`, `matrix`, `whatsapp`, `custom`. Status uses generic
+`target_id` is one of `telegram`, `matrix`, `whatsapp`, `custom`, `custom2` … `custom5`.
+Importing rows for a goal that was not added adds it, stopped and without an address.
+Older versions reject a CSV with `custom2` … `custom5`. Status uses generic
 `DOWN`. Endpoint revisions and clock epochs remain separate; only the current
 revision's current epoch has `in_current_statistics=true`. Zero-width UNKNOWN
 metadata preserves identity without inventing a check. Unknown gaps remain
@@ -53,7 +67,7 @@ Import validates the complete document before stopping monitoring. It replaces
 only histories explicitly named in the document, retains settings, log and other
 histories, and leaves every target off for manual restart. Only imported private
 targets require renewed endpoint review. The old five- and seven-column CSVs
-still import into Telegram. Limits: 16 MiB / 98,000 rows for v3, at most 65,000
+still import into Telegram. Limits: 24 MiB / 142,000 rows for v3, at most 65,000
 Telegram rows and 11,000 for each other target; legacy CSV retains its 8 MiB limit.
 
 History charts, incidents, CSV, daily summaries and diagnostics keep targets

@@ -6,7 +6,7 @@ import java.io.OutputStreamWriter
 internal object TargetBackupWriter {
     fun write(snapshot: TargetBackupSnapshot): ByteArray {
         val out = TargetJsonOutput()
-        out.raw("{\"formatVersion\":${TargetBackupCodec.FORMAT_VERSION},")
+        out.raw("{\"formatVersion\":${TargetBackupCodec.formatVersion(snapshot.targets.map { it.id })},")
         out.raw("\"createdAt\":${snapshot.createdAtMs},\"settings\":")
         settings(out, snapshot.globalSettings)
         out.raw(",\"targets\":[")

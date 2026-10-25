@@ -80,10 +80,37 @@ class TargetUpgradeTests(unittest.TestCase):
         value['settings']['history_retention'] = 'WEEK'
         files[path] = json.dumps(value).encode()
         self.assertTrue(module.has_observation(module.capture(self.reader(files)), 'telegram', 3000))
-        for version in (True, 2, 5):
+        for version in (True, 2, 6):
             value['formatVersion'] = version
             files[path] = json.dumps(value).encode()
             with self.assertRaises(ValueError): module.capture(self.reader(files))
+
+    def test_v5_registry_with_custom_slots_and_old_generation_without_their_journals(self):
+        module = self.load()
+        files = self.generation({'telegram': '3000,4000,OK,20,1,0\n'})
+        path = f'targets-v1/{GEN}/registry.json'
+        value = json.loads(files[path])
+        value['targets'].append(dict(value['targets'][-1], id='custom2'))
+        files[f'targets-v1/{GEN}/custom2.csv'] = b'5000,6000,OK,30,1,0\n'
+        for version, accepted in ((5, True), (4, False)):
+            value['formatVersion'] = version
+            files[path] = json.dumps(value).encode()
+            if accepted:
+                data = module.capture(self.reader(files))
+                self.assertTrue(module.has_observation(data, 'custom2', 5000))
+            else:
+                with self.assertRaises(ValueError): module.capture(self.reader(files))
+        # A pre-1.24 generation has no journals for the new slots; that is empty, not damaged.
+        old = self.generation({'telegram': '3000,4000,OK,20,1,0\n'})
+        self.assertTrue(module.has_observation(module.capture(self.reader(old)), 'telegram', 3000))
+        # A declared slot still needs its journal.
+        del files[f'targets-v1/{GEN}/custom2.csv']
+        value['formatVersion'] = 5
+        files[path] = json.dumps(value).encode()
+        with self.assertRaises(ValueError): module.capture(self.reader(files))
+        with patch.object(module, 'adb', return_value=b''):
+            module.remote_read(f'targets-v1/{GEN}/custom5.csv')
+            with self.assertRaises(ValueError): module.remote_read(f'targets-v1/{GEN}/custom6.csv')
 
     def test_manifest_selects_whole_generation_and_ignores_uncommitted_stage(self):
         module = self.load()
@@ -207,6 +234,7 @@ class TargetUpgradeTests(unittest.TestCase):
             if name == 'targets-v1/active-generation':
                 reads += 1
                 return files[name] if reads == 1 else newer[name]
+            if name not in files: raise FileNotFoundError(name)
             return files[name]
         data = module.capture(read, 4000)
         self.assertEqual('b' * 32, data['generation'])

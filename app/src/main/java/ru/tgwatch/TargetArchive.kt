@@ -9,7 +9,9 @@ internal object TargetArchive {
         val telegram = History.snapshot(ctx, now)
         val public = TargetPersistence.storage().snapshot()
         val revision = TargetPreferences.endpointRevision(ctx, TargetId.TELEGRAM)
-        val rows = public.observations.mapValues { (id, rows) ->
+        // Unused optional slots stay out, so a backup without them remains readable by older versions.
+        val present = TargetSlots.visible(ctx).toSet()
+        val rows = public.observations.filterKeys { it in present }.mapValues { (id, rows) ->
             if (id == TargetId.TELEGRAM) rows.filter { it.endpointRevision != revision } +
                 telegram.map { TargetObservation(TargetPersistence.publicRow(it), revision) }
             else clip(TargetPersistence.storage().recordedRows(id,
@@ -17,7 +19,7 @@ internal object TargetArchive {
                     TargetPreferences.endpointRevision(ctx, id))
         }
         TargetBackupSnapshot(now, BackupManager.snapshot(ctx, now).settings - TargetBackupCodec.LEGACY_ENDPOINT_KEY,
-            TargetPreferences.definitions(ctx), rows, EventLog.all(ctx).toList())
+            TargetPreferences.definitions(ctx).filter { it.id in present }, rows, EventLog.all(ctx).toList())
     }
 
     fun rows(ctx: Context, id: TargetId, now: Long): List<TargetObservation> = synchronized(History) {
