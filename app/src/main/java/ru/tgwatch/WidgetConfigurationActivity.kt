@@ -32,17 +32,19 @@ class WidgetConfigurationActivity : Activity() {
             setPadding(padding, padding, padding, padding)
         }
         content.addView(TextView(this).apply { setText(R.string.widget_configure) })
+        val goals = TargetSlots.visible(this)
         selector = Spinner(this).apply {
             adapter = ArrayAdapter(this@WidgetConfigurationActivity, android.R.layout.simple_spinner_dropdown_item,
-                TargetId.entries.map { TargetNames.label(this@WidgetConfigurationActivity, it) })
-            setSelection(savedInstanceState?.getInt(SELECTION) ?: WidgetPreferences.target(context, widgetId).ordinal)
+                goals.map { TargetNames.label(this@WidgetConfigurationActivity, it) })
+            setSelection(savedInstanceState?.getInt(SELECTION)?.takeIf { it in goals.indices }
+                ?: goals.indexOf(WidgetPreferences.target(context, widgetId)).coerceAtLeast(0))
             minimumHeight = (TOUCH_DP * resources.displayMetrics.density).toInt()
             contentDescription = getString(R.string.widget_configure)
         }
         content.addView(selector)
         content.addView(Button(this).apply {
             setText(R.string.target_save)
-            setOnClickListener { save(TargetId.entries[selector.selectedItemPosition]) }
+            setOnClickListener { save(goals[selector.selectedItemPosition]) }
         })
         setContentView(content)
         ScreenInsets.apply(this, content)

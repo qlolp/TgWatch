@@ -14,11 +14,14 @@ internal object TargetSettingWrites {
     fun endpoint(ctx: Context, id: TargetId, raw: String, expectedRevision: Long? = null,
         condition: HttpProbeCondition? = null): Boolean {
         val normalized = HttpsUrlPolicy.normalize(raw, MAX_ENDPOINT_CHARS, allowQuery = false)
-        val valid = id in setOf(TargetId.MATRIX, TargetId.CUSTOM) && (raw.isBlank() || normalized != null) &&
-            (condition == null || id == TargetId.CUSTOM && normalized != null)
+        val valid = (id == TargetId.MATRIX || id.isCustom) && (raw.isBlank() || normalized != null) &&
+            (condition == null || id.isCustom && normalized != null)
         if (!valid) return false
         return change(ctx, id, expectedRevision) { TargetConfigTransactions.change(ctx, id, normalized, condition) }
     }
+
+    /** Adds or removes an optional custom slot with the same fence and ordering as an endpoint change. */
+    fun slot(ctx: Context, id: TargetId, operation: () -> Unit): Boolean = change(ctx, id, null) { operation() }
 
     private fun change(ctx: Context, id: TargetId, expectedRevision: Long?,
         operation: (TargetSettingsFence.Token) -> Unit): Boolean {

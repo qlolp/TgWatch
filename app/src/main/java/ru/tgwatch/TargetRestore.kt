@@ -42,17 +42,9 @@ internal object TargetRestore {
                     .forEach(edit::remove)
                 edit.putLong(RegionalPreferences.REVISION, Math.addExact(RegionalPreferences.revision(ctx), 1L))
                 imported.snapshot.globalSettings.forEach { (key, value) -> put(edit, key, value) }
-                for (id in TargetId.entries) {
-                    val definition = imported.snapshot.targets.firstOrNull { it.id == id }
-                        ?: TargetDefinition.default(id)
-                    definitions(edit, definition)
-                    val revision = imported.snapshot.observations[id].orEmpty()
-                        .maxOfOrNull { it.endpointRevision } ?: 0L
-                    edit.putLong(TargetPreferences.key(id, "endpoint_revision"), revision)
-                    edit.putBoolean(TargetPreferences.key(id, "endpoint_review"),
-                        review(preferences, imported, definition))
-                }
+                TargetId.entries.forEach { target(edit, preferences, imported, it) }
                 check(edit.commit()) { "Cannot restore target settings" }
+                removeAbsentSlots(privatePreferences, imported)
                 imported.legacyEndpoint?.let { check(PrivateEndpoints.setLegacy(ctx, it, duringRecovery = true)) }
                 EventLog.replace(ctx, imported.snapshot.log)
                 LastSuccessStore.clear(ctx)
@@ -83,6 +75,25 @@ internal object TargetRestore {
         TargetPersistence.storage().cleanupRetired()
         StatusWidget.updateAll(ctx)
         DailySummaryReceiver.schedule(ctx)
+    }
+
+    private fun target(edit: android.content.SharedPreferences.Editor, preferences: Map<String, *>,
+        imported: TargetBackupImport, id: TargetId) {
+        val definition = imported.snapshot.targets.firstOrNull { it.id == id } ?: TargetDefinition.default(id)
+        definitions(edit, definition)
+        TargetSlots.putPresent(edit, id, imported.snapshot.targets.any { it.id == id })
+        val revision = imported.snapshot.observations[id].orEmpty().maxOfOrNull { it.endpointRevision } ?: 0L
+        edit.putLong(TargetPreferences.key(id, "endpoint_revision"), revision)
+        edit.putBoolean(TargetPreferences.key(id, "endpoint_review"), review(preferences, imported, definition))
+    }
+
+    /** A custom slot the backup does not describe is removed, so its private address goes too. */
+    private fun removeAbsentSlots(privatePreferences: android.content.SharedPreferences, imported: TargetBackupImport) {
+        val absent = TargetId.entries.filter { id -> id.isOptional && imported.snapshot.targets.none { it.id == id } }
+        if (absent.none { privatePreferences.contains(it.wire) }) return
+        val edit = privatePreferences.edit()
+        absent.forEach { edit.remove(it.wire) }
+        check(edit.commit()) { "Cannot remove private endpoints" }
     }
 
     private fun review(preferences: Map<String, *>, imported: TargetBackupImport,

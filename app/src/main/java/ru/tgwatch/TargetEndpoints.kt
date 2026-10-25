@@ -21,8 +21,9 @@ object TargetEndpoints {
                 if (url.trimEnd('/').endsWith(MATRIX_VERSIONS_PATH)) url.trimEnd('/')
                 else url.trimEnd('/') + MATRIX_VERSIONS_PATH, HttpProbeMode.MATRIX_VERSIONS)
             TargetId.WHATSAPP -> ProbeEndpoint("WhatsApp Web", ProbeGroup.EXTRA, ExtraProbes.WHATSAPP_URL)
-            TargetId.CUSTOM -> ProbeEndpoint("Custom HTTPS", ProbeGroup.EXTRA, url, HttpProbeMode.STRICT_2XX, condition)
             TargetId.TELEGRAM -> null
+            else -> ProbeEndpoint(if (definition.id.isOptional) "Custom HTTPS ${definition.id.customSlot}"
+                else "Custom HTTPS", ProbeGroup.EXTRA, url, HttpProbeMode.STRICT_2XX, condition)
         } }
     }
     fun informational(extras: List<ProbeEndpoint>, definitions: List<TargetDefinition>,

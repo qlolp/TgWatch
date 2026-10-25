@@ -3,7 +3,7 @@ package ru.tgwatch
 import ru.tgwatch.probe.HttpProbeCondition
 
 /**
- * One-tap HTTPS presets for [TargetId.CUSTOM].
+ * One-tap HTTPS presets for custom HTTPS goals ([TargetId.isCustom]).
  *
  * Each entry matches a public status-page JSON document with a top-level or
  * `status.indicator` string field. Addresses are ordinary public HTTPS URLs

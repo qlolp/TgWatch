@@ -40,7 +40,7 @@ internal object MaintenanceWindows {
     fun active(windows: List<MaintenanceWindow>, now: Long): Boolean =
         MaintenanceSchedule.activeAt(windows, now)
 
-    private fun key(id: TargetId) = "maintenance.${id.wire}"
+    fun key(id: TargetId) = "maintenance.${id.wire}"
 
     private fun encode(window: MaintenanceWindow) =
         listOf(window.id, window.startMinuteOfDay, window.endMinuteOfDay, window.daysMask,

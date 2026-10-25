@@ -89,7 +89,11 @@ object BackupManager {
             WatchdogReceiver.cancel(ctx)
             MonitorService.stopAndAwait(ctx)
             val current = snapshotTargets(ctx)
-            val changed = current.copy(observations = current.observations + observations)
+            // Imported history for an unused custom slot brings that goal back, disabled and without an address.
+            val known = current.targets.map { it.id }.toSet()
+            val changed = current.copy(targets = current.targets + observations.keys.filter { it !in known }
+                .map { TargetDefinition.default(it).copy(enabled = false) },
+                observations = current.observations + observations)
             TargetRestore.stage(ctx, TargetBackupImport(changed,
                 metadata = PrivateRestoreMetadata(observations.keys)))
             recoverPending(ctx)

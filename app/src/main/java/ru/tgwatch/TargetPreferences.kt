@@ -23,7 +23,8 @@ object TargetPreferences {
             preferences.getInt(key(id, "interval"), defaults.intervalSec))
             .coerceIn(if (telegram) TargetDefinition.MIN_TELEGRAM_SEC else TargetDefinition.MIN_TARGET_SEC,
                 if (telegram) TargetDefinition.MAX_TELEGRAM_SEC else TargetDefinition.MAX_TARGET_SEC)
-        return TargetDefinition(id, preferences.getBoolean(key(id, "enabled"), telegram),
+        val enabled = preferences.getBoolean(key(id, "enabled"), telegram) && TargetSlots.present(ctx, id)
+        return TargetDefinition(id, enabled,
             interval, preferences.getBoolean(key(id, "requires_endpoint"), defaults.requiresEndpoint),
             TargetAlertSettings(if (telegram) Prefs.notifyFor(ctx, "TG_DOWN") else
                 preferences.getBoolean(key(id, "notify_outage"), defaults.alerts.notifyOutage),
@@ -75,5 +76,5 @@ private fun readPrivateProbeConfig(ctx: Context, id: TargetId): PrivateProbeConf
         Prefs.sp(ctx).getBoolean(TargetPreferences.key(id, "endpoint_review"), false)) return null
     val raw = app.getSharedPreferences(TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE).getString(id.wire, null)
     return raw?.let { runCatching { PrivateProbeConfigCodec.decode(it) }.getOrNull() }
-        ?.takeIf { id == TargetId.CUSTOM || it.condition == null }
+        ?.takeIf { id.isCustom || it.condition == null }
 }

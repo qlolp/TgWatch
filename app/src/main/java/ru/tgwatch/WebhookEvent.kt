@@ -17,7 +17,7 @@ data class WebhookObservation(val serviceId: String, val status: String, val che
 data class WebhookEvent(val kind: WebhookEventKind, val observation: WebhookObservation?, val previousStatus: String?)
 
 internal object WebhookStatuses {
-    val services = setOf("telegram", "matrix", "whatsapp", "custom")
+    val services: Set<String> = TargetId.entries.map { it.wire }.toSet()
     fun normalize(status: String?): String? = when (status) {
         "TG_DOWN", "DOWN" -> "DOWN"
         "OK", "PARTIAL", "NO_NETWORK" -> status

@@ -57,8 +57,8 @@ internal object TargetConfigTransactions {
         val revision = TargetPreferences.endpointRevision(ctx, id)
         val rows = store.recordedRows(id, revision, now).valueOrThrow()
         val next = TargetEndpointRevision.change(rows, revision, now, TargetBackupCodec.rowLimit(id))
-        val definition = old.copy(requiresEndpoint = id == TargetId.CUSTOM || endpoint != null,
-            enabled = old.enabled && (id != TargetId.CUSTOM || endpoint != null))
+        val definition = old.copy(requiresEndpoint = id.isCustom || endpoint != null,
+            enabled = old.enabled && (!id.isCustom || endpoint != null))
         val data = TargetBackupSnapshot(System.currentTimeMillis(), emptyMap(), listOf(definition),
             mapOf(id to next.observations), emptyList())
         val bytes = TargetBackupCodec.encode(data)
@@ -96,7 +96,7 @@ internal object TargetConfigTransactions {
         synchronized(TargetPreferences) {
             // A stop received during private IO wins over the enabled flag captured at preparation time.
             val enabled = TargetPreferences.storedDefinition(ctx, id).enabled &&
-                (id != TargetId.CUSTOM || endpoint != null)
+                (!id.isCustom || endpoint != null)
             TargetSettingWrites.write(Prefs.sp(ctx).edit(), definition.copy(enabled = enabled))
                 .putLong(TargetPreferences.key(id, "endpoint_revision"), rows.maxOf { it.endpointRevision })
                 .putBoolean(TargetPreferences.key(id, "endpoint_review"), false).apply()

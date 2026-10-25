@@ -49,7 +49,8 @@ internal class StatusShareDocument private constructor(val snapshot: StatusShare
             TargetId.TELEGRAM -> "Telegram"
             TargetId.MATRIX -> "Matrix"
             TargetId.WHATSAPP -> ctx.renderString(R.string.copy_status_share_document_whatsapp_web)
-            TargetId.CUSTOM -> ctx.renderString(R.string.copy_status_share_document_custom_service)
+            else -> ctx.renderString(R.string.copy_status_share_document_custom_service) +
+                if (value.targetId.isOptional) " ${value.targetId.customSlot}" else ""
         }
         private fun status(ctx: android.content.Context, status: TargetStatus): String {
             return when (status) {

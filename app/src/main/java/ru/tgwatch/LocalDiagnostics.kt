@@ -99,7 +99,7 @@ object LocalDiagnostics {
     private fun targets(ctx: Context): List<TargetDiagnostic> {
         val now = System.currentTimeMillis()
         val elapsed = android.os.SystemClock.elapsedRealtime()
-        return TargetId.entries.map { id ->
+        return TargetSlots.visible(ctx).map { id ->
             val state = TargetStateStore.current(ctx, id)
             val running = MonitorService.running && TargetPreferences.definition(ctx, id).enabled
             val stale = !running || if (state.checkedElapsedMs > 0L)

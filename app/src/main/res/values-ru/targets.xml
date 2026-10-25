@@ -7,6 +7,11 @@
     <string name="target_power_screen_off">экран выключен</string>
     <string name="target_select">Цель мониторинга</string>
     <string name="target_settings">Настройки цели</string>
+    <string name="target_add">Добавить свой HTTPS</string>
+    <string name="target_add_full">Все %1$d мест для своих HTTPS заняты</string>
+    <string name="target_remove">Удалить эту цель</string>
+    <string name="target_remove_confirm">Удалить «%1$s»? Её адрес, история, уведомления и плановые паузы будут удалены с телефона.</string>
+    <string name="target_remove_failed">Не удалось изменить цель. Попробуйте ещё раз.</string>
     <string name="target_telegram_profile">Telegram — профиль: %1$s</string>
     <string name="target_custom_interval">Свой интервал</string>
     <string name="target_telegram_intervals">Интервал проверки Telegram</string>

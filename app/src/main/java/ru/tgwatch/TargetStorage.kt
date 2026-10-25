@@ -14,12 +14,22 @@ class TargetStorage private constructor(private val directory: File, private val
     val generationId: String? get() = active
     val legacyMigrationComplete: Boolean get() = File(generation, LEGACY_COMPLETE).isFile
 
-    @Synchronized fun read(id: TargetId): List<TargetObservation> =
-        TargetJournal.retained(TargetJournal.read(journalFile(id), id), Long.MIN_VALUE, TargetBackupCodec.rowLimit(id))
+    @Volatile private var registered: Set<TargetId>? = null
+
+    /** A goal added after this generation was written has no journal yet; that is empty, not damaged. */
+    @Synchronized fun read(id: TargetId): List<TargetObservation> {
+        val file = journalFile(id)
+        val known = registered ?: registry().targets.map { it.id }.toSet().also { registered = it }
+        if (!file.isFile && id !in known) return emptyList()
+        return TargetJournal.retained(TargetJournal.read(file, id), Long.MIN_VALUE, TargetBackupCodec.rowLimit(id))
+    }
 
     @Synchronized fun snapshot(): TargetBackupSnapshot {
         val registry = registry()
-        return registry.copy(observations = registry.targets.associate { it.id to read(it.id) })
+        val known = registry.targets.map { it.id }.toSet()
+        return registry.copy(targets = registry.targets + TargetId.entries.filter { it !in known }
+            .map { TargetDefinition.default(it).copy(enabled = false) },
+            observations = TargetId.entries.associateWith { read(it) })
     }
 
     /** Path lookup is deliberately lock-free; callers hold the History monitor while switching generations. */
@@ -55,6 +65,7 @@ class TargetStorage private constructor(private val directory: File, private val
             published = true
             io.syncDirectory(directory)
             active = name
+            registered = null
             materialize()
             writer.clear()
         }
@@ -63,6 +74,7 @@ class TargetStorage private constructor(private val directory: File, private val
             if (published) runCatching {
                 TargetManifest.restore(directory, previous)
                 active = previous
+                registered = null
             }.exceptionOrNull()?.let(failure::addSuppressed)
             val retired = !published || runCatching { TargetManifest.read(directory) != name }.getOrDefault(false)
             if (retired) staged.deleteRecursively()

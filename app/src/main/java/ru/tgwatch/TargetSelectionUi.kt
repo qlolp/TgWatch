@@ -4,36 +4,40 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
+import android.widget.Toast
+import java.lang.ref.WeakReference
 
 /** Only fixed public IDs survive rotation; endpoint input is owned by a disposable secure dialog. */
 internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
     private val history: MainHistoryUi, private val changed: () -> Unit, color: (Int) -> Unit) {
     private companion object { const val SELECTED = "selected_target" }
-    var selected: TargetId = TargetId.fromWire(saved?.getString(SELECTED).orEmpty())
-        ?: TargetId.fromWire(activity.intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty())
-        ?: TargetId.TELEGRAM
+    private var goals: List<TargetId> = TargetSlots.visible(activity)
+    var selected: TargetId = (TargetId.fromWire(saved?.getString(SELECTED).orEmpty())
+        ?: TargetId.fromWire(activity.intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty()))
+        ?.takeIf { it in goals } ?: TargetId.TELEGRAM
         private set
     private val spinner = activity.findViewById<Spinner>(R.id.targetSelector)
+    private val add = activity.findViewById<Button>(R.id.btnAddTarget)
     private val status = TargetStatusUi(activity, color)
     private var dialog: AlertDialog? = null
 
     init {
-        spinner.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
-            TargetId.entries.map { TargetNames.label(activity, it) })
-        spinner.setSelection(selected.ordinal)
+        bind()
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, itemId: Long) {
-                val id = TargetId.entries[position]
-                if (selected != id) { selected = id; history.selectTarget(id); changed() }
+                goals.getOrNull(position)?.let(::select)
             }
         }
         activity.findViewById<Button>(R.id.btnTargetSettings).setOnClickListener { settings() }
+        add.setOnClickListener { addCustom() }
         activity.findViewById<Button>(R.id.btnToggle).setOnClickListener {
             val busy = TargetSettingsExecutor.busy(selected)
             if (busy || Prefs.isEnabled(activity) && TargetPreferences.storedDefinition(activity, selected).enabled)
@@ -52,6 +56,19 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
     }
 
     fun render(now: Long) {
+        val visible = TargetSlots.visible(activity)
+        if (visible != goals) {
+            goals = visible
+            val removed = selected !in goals
+            if (removed) selected = TargetId.TELEGRAM
+            bind()
+            if (removed) history.selectTarget(selected)
+        }
+        TargetSlots.free(activity).let { free ->
+            add.isEnabled = free != null && !TargetSettingsExecutor.busy(free)
+            add.text = if (free != null) activity.getString(R.string.target_add)
+                else activity.getString(R.string.target_add_full, TargetId.custom.size)
+        }
         status.render(selected, now)
         val raw = TargetPreferences.storedDefinition(activity, selected)
         val stopping = TargetSettingsExecutor.busy(selected) || Prefs.isEnabled(activity) && raw.enabled
@@ -73,9 +90,43 @@ internal class TargetSelectionUi(private val activity: Activity, saved: Bundle?,
     fun open(intent: Intent) {
         (TargetId.fromWire(intent.getStringExtra(TargetAutomation.EXTRA_TARGET_ID).orEmpty())
             ?: TargetId.TELEGRAM.takeIf { !intent.hasExtra(TargetAutomation.EXTRA_TARGET_ID) &&
-                intent.action != Intent.ACTION_MAIN })?.let {
-            spinner.setSelection(it.ordinal)
+                intent.action != Intent.ACTION_MAIN })?.takeIf { it in goals }?.let {
+            spinner.setSelection(goals.indexOf(it))
         }
+    }
+
+    private fun bind() {
+        spinner.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item,
+            goals.map { TargetNames.label(activity, it) })
+        spinner.setSelection(goals.indexOf(selected).coerceAtLeast(0))
+    }
+
+    private fun select(id: TargetId) {
+        if (selected != id) { selected = id; history.selectTarget(id); changed() }
+    }
+
+    /** The new slot is wiped and shown on the settings worker; its dialog opens once that is durable. */
+    private fun addCustom() {
+        val id = TargetSlots.free(activity) ?: return
+        val app = activity.applicationContext
+        val screen = WeakReference(this)
+        val ui = Handler(Looper.getMainLooper())
+        add.isEnabled = false
+        val started = TargetSettingsExecutor.background(id, { TargetSlots.add(app, id) }) { added ->
+            ui.post { screen.get()?.added(id, added) }
+        }
+        if (!started) Toast.makeText(activity, R.string.target_settings_busy, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun added(id: TargetId, added: Boolean) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        if (!added) { Toast.makeText(activity, R.string.target_remove_failed, Toast.LENGTH_SHORT).show(); return }
+        goals = TargetSlots.visible(activity)
+        selected = id
+        bind()
+        history.selectTarget(id)
+        changed()
+        dialog?.dismiss(); dialog = TargetSettingsDialog.show(activity, id)
     }
     fun close() { dialog?.dismiss(); dialog = null }
     private fun settings() {
