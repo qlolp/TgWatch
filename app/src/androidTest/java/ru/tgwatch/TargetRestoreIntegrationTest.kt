@@ -155,9 +155,11 @@ class TargetRestoreIntegrationTest {
             observations = it.observations.filterKeys { it == TargetId.MATRIX }) }
         BackupManager.restoreTargets(ctx, source)
         val exported = BackupManager.snapshotTargets(ctx)
-        assertEquals(TargetId.entries.toSet(), exported.observations.keys)
+        // Custom HTTPS slots the backup does not describe stay removed and out of the re-export.
+        val present = TargetId.entries.filterNot { it.isOptional }
+        assertEquals(present.toSet(), exported.observations.keys)
         assertTrue(exported.targets.none { it.enabled })
-        for (id in TargetId.entries.filter { it != TargetId.MATRIX })
+        for (id in present.filter { it != TargetId.MATRIX })
             assertTrue(exported.observations.getValue(id).isEmpty())
         TargetBackupCodec.decode(TargetBackupCodec.encode(exported))
     }

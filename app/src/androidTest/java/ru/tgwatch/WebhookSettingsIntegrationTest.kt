@@ -267,7 +267,7 @@ class WebhookSettingsIntegrationTest {
                 val dialog = shown.get()
                 assertTrue(dialog.isShowing)
                 assertEquals(4, dialog.listView.adapter.count)
-                TargetId.entries.forEachIndexed { index, id ->
+                TargetSlots.visible(activity).forEachIndexed { index, id ->
                     assertEquals(TargetNames.label(activity, id), dialog.listView.adapter.getItem(index))
                     assertTrue("The actual initial checkbox must be rendered", dialog.listView.isItemChecked(index))
                     if (id != TargetId.MATRIX) {

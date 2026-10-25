@@ -39,7 +39,8 @@ class StatusShareIntegrationTest {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         history = BackupManager.snapshotTargets(ctx)
-        BackupManager.restoreTargets(ctx, history.copy(observations = TargetId.entries.associateWith { emptyList() }))
+        BackupManager.restoreTargets(ctx, history.copy(observations =
+            history.targets.associate { it.id to emptyList<TargetObservation>() }))
         check(privatePrefs.edit().putString("custom", secrets.first()).commit())
         check(Prefs.sp(ctx).edit().putString("last_reason", secrets.joinToString(" "))
             .putString("last_diagnostics", secrets.joinToString(" "))
