@@ -1,6 +1,11 @@
 # TG Монитор 1.23.0
 
-[English overview](docs/README.en.md)
+> **In English:** TgWatch is an Android app (8.0+) that checks locally whether Telegram is reachable,
+> using MTProto with a random nonce plus Telegram's web resources. It tells you whether Telegram is
+> down, partly down, or whether your own internet is the problem. No Telegram account, phone number
+> or access to messages is needed, and your data stays on the phone unless you turn on a webhook.
+> Optional targets: Matrix, WhatsApp Web and your own HTTPS services.
+> [English overview](docs/README.en.md) · [Download APK](https://github.com/qlolp/TgWatch/releases/latest)
 
 [![Build APK](https://github.com/qlolp/TgWatch/actions/workflows/build-apk.yml/badge.svg?branch=main)](https://github.com/qlolp/TgWatch/actions/workflows/build-apk.yml)
 [![Release](https://img.shields.io/github/v/release/qlolp/TgWatch)](https://github.com/qlolp/TgWatch/releases/latest)
