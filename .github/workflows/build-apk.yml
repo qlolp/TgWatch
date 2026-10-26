@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 env:
-  BUILD_TOOLS: "36.0.0"
+  BUILD_TOOLS: "37.0.0"
   PYTHONDONTWRITEBYTECODE: "1"
 jobs:
   build:

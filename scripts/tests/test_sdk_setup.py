@@ -21,7 +21,8 @@ class AndroidSdkSetupTest(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual(["--install", "platforms;android-35", "platforms;android-36",
-                              "build-tools;35.0.0", "build-tools;36.0.0"], arguments.read_text().splitlines())
+                              "platforms;android-37.0", "build-tools;35.0.0", "build-tools;36.0.0",
+                              "build-tools;37.0.0"], arguments.read_text().splitlines())
 
 
 if __name__ == "__main__":
