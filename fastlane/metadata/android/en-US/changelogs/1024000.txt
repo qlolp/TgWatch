@@ -1,0 +1,1 @@
+Up to five custom HTTPS targets, each with its own history and alerts. A new overview shows every target's status and freshness. Public-response watches survive a reboot. Backups with the new targets use format v5; private addresses and conditions stay out of backups. Existing signing and upgrade checks preserved.

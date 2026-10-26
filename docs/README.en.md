@@ -6,8 +6,10 @@ TgWatch monitors Telegram reachability locally on Android 8.0 and later. It need
 no Telegram account, phone number or access to messages. The interface supports
 English and Russian; Android 13+ also provides a per-app language setting.
 
-Optional independent targets cover Matrix, WhatsApp Web and a custom HTTPS service,
-each with its own history, intervals and alerts. Telegram remains the default;
+Optional independent targets cover Matrix, WhatsApp Web and up to five custom HTTPS
+services, each with its own history, intervals and alerts. Version 1.24.0 adds the extra
+custom slots (`custom2` … `custom5`), an overview of every added target and reboot-safe
+public-response watches; see the [1.24.0 notes](releases/1.24.0.md). Telegram remains the default;
 additional targets and integrations start disabled. See [targets](multiservice.md).
 
 Optional regional profiles cover YouTube, Gemini, Notebook, Antigravity and ChatGPT/dots.
@@ -140,7 +142,7 @@ separate `TgWatch-wear` prefix; every unified release includes both apps' six fi
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.23.0` (Android code `1023000`), phone target API36, Wear target API35.
+The source version is `1.24.0` (Android code `1024000`), phone target API36, Wear target API35.
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed
