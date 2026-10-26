@@ -24,10 +24,10 @@ RepoType: git
 Repo: https://github.com/qlolp/TgWatch.git
 
 Builds:
-  - versionName: 1.23.0
-    versionCode: 1023000
+  - versionName: 1.24.0
+    versionCode: 1024000
     disable: Pending F-Droid maintainer review; recipe not validated for this version
-    commit: v1.23.0
+    commit: v1.24.0
     subdir: app
     gradle:
       - "yes"
