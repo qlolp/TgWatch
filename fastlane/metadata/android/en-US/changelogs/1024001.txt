@@ -1,0 +1,1 @@
+Built with Android SDK 37, AGP 9.2.1 and Gradle 9.4.1; AndroidX Core updated. Android 8.0+ and targetSdk 36 retained. Wear OS, monitoring, history, backups and APIs retain 1.24.0 behavior.

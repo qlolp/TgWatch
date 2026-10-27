@@ -7,7 +7,7 @@ phone target API36, Wear target API35; native UI, Direct Boot, настройк�
 
 ## Сборка и проверки
 
-Нужны JDK 17, Android SDK Platforms35/36 и Build Tools35.0.0/36.0.0, Python 3.11+, принятые лицензии SDK.
+Нужны JDK 17, Android SDK Platforms35/36/37.0 и Build Tools35.0.0/36.0.0/37.0.0, Python 3.11+, принятые лицензии SDK.
 Используйте закреплённые Kotlin/AGP и Gradle Wrapper. SDK задаётся через `ANDROID_HOME` либо
 неотслеживаемый `local.properties`; ключи, пароли и локальные пути не коммитятся.
 
@@ -25,7 +25,7 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.24.0`; код `1024000` вычисляется одинаково локально и
+`version.properties` задаёт SemVer `1.24.1`; код `1024001` вычисляется одинаково локально и
 в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,

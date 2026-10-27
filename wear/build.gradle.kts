@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("io.gitlab.arturbosch.detekt")
 }
 
@@ -25,7 +24,7 @@ require(!providers.gradleProperty("versionCode").isPresent && !providers.gradleP
 android {
     namespace = "ru.tgwatch.wear"
     compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    buildToolsVersion = "37.0.0"
     defaultConfig {
         applicationId = "ru.tgwatch.wear"
         minSdk = 30

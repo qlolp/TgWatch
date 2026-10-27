@@ -1,10 +1,10 @@
 # F-Droid packaging candidate
 
-`metadata/ru.tgwatch.yml` currently points to the disabled phone-only 1.24.0
-candidate, code1024000, tag `v1.24.0`; its recipe has not been validated for that
+`metadata/ru.tgwatch.yml` currently points to the disabled phone-only 1.24.1
+candidate, code1024001, tag `v1.24.1`; its recipe has not been validated for that
 version. The last exact-tag local verification recorded below applies to 1.20.1,
 code1020001, source `4b2aba4d1c87606ed482752cf027c85e5896dece`, and is not evidence
-for 1.24.0. The separate Wear application is not included. Neither candidate has
+for 1.24.1. The separate Wear application is not included. Neither candidate has
 been submitted to or accepted by the catalog.
 
 ## Exact-tag local verification
@@ -34,8 +34,10 @@ This result is separate from official F-Droid server validation or catalog accep
 
 ## Toolchain and assembly
 
-Pins: Gradle8.14.6, AGP8.13.2, Kotlin2.4.21, JDK17, phone compile/target36,
-build-tools36.0.0 and detekt1.23.8. Wear retains compile/target35 independently.
+Current pins: Gradle9.4.1, AGP9.2.1, Kotlin2.4.21, JDK17, phone compile37/target36,
+build-tools37.0.0 and detekt1.23.8. Wear retains compile/target35 independently.
+The earlier exact-tag verification above used the older1.20.1 toolchain; it does not
+validate the current recipe.
 `version.properties` is the authority; code is major*1000000+minor*1000+patch.
 No CI-run override is accepted. The phone includes Kotlin stdlib, AndroidX and
 MIT first-party `:probe-core`, with separate resolved inventories/SBOMs for both apps.

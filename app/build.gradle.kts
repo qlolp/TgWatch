@@ -10,7 +10,6 @@ import javax.inject.Inject
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("io.gitlab.arturbosch.detekt")
 }
 
@@ -32,8 +31,8 @@ require(!providers.gradleProperty("versionCode").isPresent && !providers.gradleP
     !providers.environmentVariable("TGWATCH_VERSION_NAME").isPresent) { "Version overrides are unsupported" }
 android {
     namespace = "ru.tgwatch"
-    compileSdk = 36
-    buildToolsVersion = "36.0.0"
+    compileSdk = 37
+    buildToolsVersion = "37.0.0"
     defaultConfig {
         applicationId = "ru.tgwatch"
         minSdk = 26
@@ -76,7 +75,7 @@ kotlin {
 }
 dependencies {
     implementation(project(":probe-core"))
-    implementation("androidx.core:core:1.16.0")
+    implementation("androidx.core:core:1.19.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:runner:1.7.0")

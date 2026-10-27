@@ -1,0 +1,1 @@
+Сборка на Android SDK 37, AGP 9.2.1 и Gradle 9.4.1; обновлён AndroidX Core. Android 8.0+ и targetSdk 36 сохранены. Wear OS, мониторинг, история, бэкапы и API сохраняют поведение 1.24.0.
