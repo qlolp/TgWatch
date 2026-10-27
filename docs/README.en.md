@@ -6,6 +6,9 @@ TgWatch monitors Telegram reachability locally on Android 8.0 and later. It need
 no Telegram account, phone number or access to messages. The interface supports
 English and Russian; Android 13+ also provides a per-app language setting.
 
+Version 1.24.1 updates the Android build to SDK 37, AGP 9.2.1 and Gradle 9.4.1,
+retaining Android 8.0+ and targetSdk 36. See the [1.24.1 notes](releases/1.24.1.md).
+
 Optional independent targets cover Matrix, WhatsApp Web and up to five custom HTTPS
 services, each with its own history, intervals and alerts. Version 1.24.0 adds the extra
 custom slots (`custom2` … `custom5`), an overview of every added target and reboot-safe

@@ -1,4 +1,4 @@
-# TG Монитор 1.24.0
+# TG Монитор 1.24.1
 
 > **In English:** TgWatch is an Android app (8.0+) that checks locally whether Telegram is reachable,
 > using MTProto with a random nonce plus Telegram's web resources. It tells you whether Telegram is
@@ -20,7 +20,8 @@ Android-приложение для локального наблюдения з
 
 ## Что показывает
 
-Версия исходников 1.24.0 добавляет до пяти своих HTTPS-целей и общий обзор всех целей,
+Версия исходников 1.24.1 обновляет сборку до Android SDK 37, сохраняя Android 8.0+ и targetSdk 36.
+[Заметки выпуска 1.24.1](docs/releases/1.24.1.md). Версия 1.24.0 добавила до пяти своих HTTPS-целей и общий обзор всех целей,
 а ожидание публичного ответа теперь переживает перезагрузку. [Заметки выпуска](docs/releases/1.24.0.md).
 В 1.23.0 появились региональная история, сравнения A/B и объяснения результатов
 ([заметки 1.23.0](docs/releases/1.23.0.md), [как пользоваться](docs/regional-services.md)).
