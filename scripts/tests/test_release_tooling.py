@@ -751,7 +751,7 @@ path.write_text(json.dumps(state))
 
 
 class FinalSignedApkWorkflowTests(unittest.TestCase):
-    def run_guard(self, *, tamper=False, fingerprint=None, name="1.15.0", code="1015000"):
+    def run_guard(self, *, tamper=False, fingerprint=None, name="1.15.0", code="1015000", certificate_prefix="Signer #1"):
         import yaml
         steps = yaml.safe_load((ROOT / ".github/workflows/build-apk.yml").read_text())["jobs"]["release"]["steps"]
         guard = next(step for step in steps if step.get("name") == "Re-verify the signed APK before publication")
@@ -769,17 +769,24 @@ class FinalSignedApkWorkflowTests(unittest.TestCase):
             tools = root / "sdk/build-tools/35.0.0"
             tools.mkdir(parents=True)
             certificate = fingerprint or "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1"
-            for executable, output in (("apksigner", "Signer #1 certificate SHA-256 digest: " + certificate),
+            for executable, output in (("apksigner", certificate_prefix + " certificate SHA-256 digest: " + certificate),
                                        ("aapt2", f"package: name='ru.tgwatch' versionCode='{code}' versionName='{name}'")):
                 path = tools / executable
                 path.write_text("#!/usr/bin/env python3\nprint(" + repr(output) + ")\n")
                 path.chmod(0o755)
+            (root / "scripts").mkdir()
+            for module in ("apk_verification.py", "release_apps.py"):
+                (root / "scripts" / module).write_text((SCRIPTS / module).read_text())
             env = dict(os.environ, APK_SHA256=original, WEAR_APK_SHA256=original,
                        ANDROID_HOME=str(root / "sdk"), BUILD_TOOLS="35.0.0")
             return subprocess.run(["bash", "-c", guard["run"]], cwd=root, env=env, text=True, capture_output=True)
 
     def test_original_signed_apk_can_pass_publication_guard(self):
         result = self.run_guard()
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_build_tools37_report_can_pass_publication_guard(self):
+        result = self.run_guard(certificate_prefix="V2 Signer:")
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_replacing_both_apk_and_checksum_cannot_replace_original_signed_bytes(self):

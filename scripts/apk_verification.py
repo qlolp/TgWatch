@@ -41,12 +41,21 @@ def verify_apk_identity(apk, version, code, aapt2, application_id=None):
         raise ValueError('APK minSdk differs from the approved application floor')
 
 
+def verify_certificate_report(output):
+    # SDK37 labels a single signer by scheme; older tools use "Signer #1".
+    # Collect every certificate line first: unknown/additional signers must fail closed.
+    lines = [line for line in output.splitlines() if "certificate SHA-256 digest:" in line]
+    match = re.fullmatch(
+        r"(?:Signer #1|V[12] Signer:|V3\.0 Signer:) certificate SHA-256 digest: ([0-9a-fA-F]{64})",
+        lines[0]) if len(lines) == 1 else None
+    if match is None or match[1].lower() != PRODUCTION_CERTIFICATE:
+        raise ValueError("APK production signing identity mismatch")
+    return match[1].lower()
+
+
 def verify_production_signature(apk, apksigner):
     result = subprocess.run([str(apksigner), "verify", "--print-certs", str(apk)],
                             text=True, capture_output=True, timeout=30)
     if result.returncode:
         raise RuntimeError(f"APK signature verification failed: {result.stderr.strip()}")
-    lines = re.findall(r"^Signer #[0-9]+ certificate SHA-256 digest:.*$", result.stdout, re.M)
-    expected = "Signer #1 certificate SHA-256 digest: " + PRODUCTION_CERTIFICATE
-    if [line.lower() for line in lines] != [expected.lower()]:
-        raise ValueError("APK production signing identity mismatch")
+    verify_certificate_report(result.stdout)
