@@ -87,7 +87,7 @@ class TargetAutomationIntegrationTest {
         while (!MonitorService.running && SystemClock.elapsedRealtime() < end) SystemClock.sleep(25)
         assertTrue(MonitorService.running)
         assertEquals(AutomationReceiver.RESULT_STOPPED, request(AutomationReceiver.ACTION_CHECK_NOW, "matrix").first)
-        val legacy = request(AutomationReceiver.ACTION_GET_STATE, "matrix")
+        val legacy = readState(AutomationReceiver.ACTION_GET_STATE, "matrix")
         assertEquals(AutomationReceiver.RESULT_OK, legacy.first)
         assertFalse(legacy.second!!.getBoolean("running"))
         assertTrue(legacy.second!!.getBoolean("stale"))

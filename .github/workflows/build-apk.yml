@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 env:
-  BUILD_TOOLS: "36.0.0"
+  BUILD_TOOLS: "37.0.0"
   PYTHONDONTWRITEBYTECODE: "1"
 jobs:
   build:
@@ -249,13 +249,12 @@ jobs:
           signer="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
           "$signer" verify --print-certs previous/TgWatch.apk > previous-signature.txt
           "$signer" verify --print-certs TgWatch.apk > release-signature.txt
-          diff <(grep 'Signer #1 certificate SHA-256 digest:' previous-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
           python3 - <<'PY'
-          import pathlib, re
-          expected = 'ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1'
+          import pathlib, sys
+          sys.path.insert(0, 'scripts')
+          from apk_verification import verify_certificate_report
           for name in ('previous-signature.txt', 'release-signature.txt'):
-              digests = re.findall(r'^Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})$', pathlib.Path(name).read_text(), re.M)
-              assert [digest.lower() for digest in digests] == [expected], 'Production signing identity mismatch'
+              verify_certificate_report(pathlib.Path(name).read_text())
           PY
       - name: Select and verify the latest stable published predecessor
         id: latest_baseline
@@ -271,8 +270,13 @@ jobs:
         run: |
           set -euo pipefail
           "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --print-certs previous-latest/TgWatch.apk > latest-signature.txt
-          grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' latest-signature.txt
-          diff <(grep 'Signer #1 certificate SHA-256 digest:' latest-signature.txt) <(grep 'Signer #1 certificate SHA-256 digest:' release-signature.txt)
+          python3 - <<'PY'
+          import pathlib, sys
+          sys.path.insert(0, 'scripts')
+          from apk_verification import verify_certificate_report
+          for name in ('latest-signature.txt', 'release-signature.txt'):
+              verify_certificate_report(pathlib.Path(name).read_text())
+          PY
       - name: Enable KVM for signed upgrade
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -410,10 +414,12 @@ jobs:
           echo "$WEAR_APK_SHA256  TgWatch-wear.apk" | sha256sum -c -
           [ "$(cut -d' ' -f1 TgWatch-wear.apk.sha256)" = "$WEAR_APK_SHA256" ]
           "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --print-certs TgWatch.apk > publish-signature.txt
-          grep -qx 'Signer #1 certificate SHA-256 digest: ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1' publish-signature.txt
           "$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2" dump badging TgWatch.apk > publish-badging.txt
           python3 - <<'PY'
-          import pathlib, re
+          import pathlib, re, sys
+          sys.path.insert(0, 'scripts')
+          from apk_verification import verify_certificate_report
+          verify_certificate_report(pathlib.Path('publish-signature.txt').read_text())
           versions = [line.split('=', 1)[1] for line in pathlib.Path('version.properties').read_text().splitlines()
                       if line.startswith('version=')]
           assert len(versions) == 1, 'Missing unique source version'

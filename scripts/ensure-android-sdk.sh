@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phone and Wear deliberately compile against separate pinned Android SDKs.
+# Keep previous platforms for UI fixtures; the phone spike compiles against API37.
 set -euo pipefail
 if command -v sdkmanager >/dev/null 2>&1; then
   manager=$(command -v sdkmanager)
@@ -12,5 +12,5 @@ else
   fi
 fi
 "$manager" --install \
-  'platforms;android-35' 'platforms;android-36' \
-  'build-tools;35.0.0' 'build-tools;36.0.0'
+  'platforms;android-35' 'platforms;android-36' 'platforms;android-37.0' \
+  'build-tools;35.0.0' 'build-tools;36.0.0' 'build-tools;37.0.0'
