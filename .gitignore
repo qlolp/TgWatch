@@ -25,3 +25,4 @@ __pycache__/
 # Disposable Android smoke output; reports are copied into build reports by CI.
 /legacy-history.csv
 /smoke-logcat.txt
+/device-evidence/
