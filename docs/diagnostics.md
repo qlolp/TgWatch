@@ -115,8 +115,9 @@ are reduced to fixed app worker roles or `other`. Classes must resolve without
 initialization in allowed app/platform namespaces; fabricated method names are
 redacted. Source filenames must match their declaring class; paths and unknown
 names become `redacted`. This validation applies to old journal entries and again
-at the JSON export boundary. The journal is cleared with the event log; nothing
-is uploaded automatically.
+at the JSON export boundary. The journal is cleared with the event log and is not
+uploaded automatically. A separate remote report is sent only when its collector
+and explicit consent are configured as described below.
 
 ## Optional remote crash reporting
 

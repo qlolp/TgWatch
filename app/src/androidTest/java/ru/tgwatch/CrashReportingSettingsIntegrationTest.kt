@@ -1,6 +1,12 @@
 package ru.tgwatch
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
+import android.app.AlertDialog
+import android.widget.Button
+import android.widget.EditText
+import java.lang.reflect.Proxy
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -104,4 +110,65 @@ class CrashReportingSettingsIntegrationTest {
             }
         }
     }
+
+        @Test fun setEndpointButtonOpensSecureDialogAndSavesReplacementAddress() {
+            val replacement = "https://collector.private.example/replaced"
+            assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEndpoint(ctx, endpoint))
+            assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEnabled(ctx, true))
+
+            ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.findViewById<Button>(AutomationSettingsActivity.ID_CRASH_REPORTING_SET).performClick()
+                    val dialog = checkNotNull(activity.crashEndpointDialog)
+                    assertTrue(dialog.isShowing)
+                    assertTrue((dialog.window!!.attributes.flags and
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0)
+                    val input = dialog.findViewById<EditText>(AutomationSettingsActivity.ID_CRASH_REPORTING_INPUT)
+                    assertTrue("The saved endpoint must not be prefilled", input.text.isEmpty())
+                    input.setText(replacement)
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                assertEquals(replacement, CrashReportingSettings.endpoint(ctx))
+                assertFalse("Replacing the endpoint revokes prior consent", CrashReportingSettings.enabled(ctx))
+            }
+        }
+
+        @Test fun failedClearCommitFailsClosedUntilASuccessfulPrivateWrite() {
+            assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEndpoint(ctx, endpoint))
+            assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEnabled(ctx, true))
+            val backing = store()
+            val failedPreferences = Proxy.newProxyInstance(SharedPreferences::class.java.classLoader,
+                arrayOf(SharedPreferences::class.java)) { _, method, args ->
+                when (method.name) {
+                    "getBoolean", "getString" -> method.invoke(backing, *(args ?: emptyArray()))
+                    "edit" -> {
+                        val actual = backing.edit()
+                        lateinit var editor: SharedPreferences.Editor
+                        editor = Proxy.newProxyInstance(SharedPreferences.Editor::class.java.classLoader,
+                            arrayOf(SharedPreferences.Editor::class.java)) { _, editMethod, editArgs ->
+                            when {
+                                editMethod.name == "remove" -> { editMethod.invoke(actual, *(editArgs ?: emptyArray())); editor }
+                                editMethod.name == "commit" -> false
+                                else -> editor
+                            }
+                        } as SharedPreferences.Editor
+                        editor
+                    }
+                    else -> method.invoke(backing, *(args ?: emptyArray()))
+                }
+            } as SharedPreferences
+            val failingContext = object : ContextWrapper(ctx) {
+                override fun getApplicationContext(): Context = this
+                override fun getSharedPreferences(name: String, mode: Int): SharedPreferences = failedPreferences
+            }
+
+            assertFalse(CrashReportingSettings.clear(failingContext))
+            assertFalse("A failed clear must never leave the reporter visibly enabled",
+                CrashReportingSettings.enabled(ctx))
+            assertNull(CrashReportingSettings.activeEndpoint(ctx))
+            assertEquals(CrashReportingSettings.WriteResult.SAVED,
+                CrashReportingSettings.setEndpoint(ctx, "https://collector.example/new"))
+            assertFalse("Recovery requires fresh consent", CrashReportingSettings.enabled(ctx))
+        }
 }

@@ -41,6 +41,7 @@ class AutomationSettingsActivity : Activity() {
         const val ID_CRASH_REPORTING_ENABLE = 0x00a7100c
         const val ID_CRASH_REPORTING_ENDPOINT = 0x00a7100d
         const val ID_CRASH_REPORTING_SET = 0x00a7100e
+        const val ID_CRASH_REPORTING_INPUT = 0x00a7100f
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
@@ -71,6 +72,8 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var webhookHealth: TextView
     private lateinit var crashReportingToggle: Switch
     private lateinit var crashEndpointView: TextView
+    internal var crashEndpointDialog: AlertDialog? = null
+        private set
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
@@ -292,11 +295,12 @@ class AutomationSettingsActivity : Activity() {
         dialog.show()
     }
 
-    private fun editCrashEndpoint() {
+    internal fun editCrashEndpoint(): AlertDialog {
         val input = EditText(this).apply {
             setHint(R.string.crash_reporting_endpoint_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            id = ID_CRASH_REPORTING_INPUT
             filters = arrayOf(InputFilter.LengthFilter(CrashReportingPolicy.MAX_ENDPOINT_LENGTH))
             setSingleLine(true)
             isSaveEnabled = false
@@ -322,20 +326,12 @@ class AutomationSettingsActivity : Activity() {
                     CrashReportingSettings.WriteResult.STORAGE_FAILED -> storageError()
                 }
                 refresh()
-            }
-        }
-        crashReportingToggle.setOnCheckedChangeListener { _, enabled ->
-            if (!refreshing) {
-                when (CrashReportingSettings.setEnabled(this, enabled)) {
-                    CrashReportingSettings.WriteResult.SAVED -> Unit
-                    CrashReportingSettings.WriteResult.INVALID ->
-                        Toast.makeText(this, R.string.crash_reporting_endpoint_required, Toast.LENGTH_SHORT).show()
-                    CrashReportingSettings.WriteResult.STORAGE_FAILED -> storageError()
-                }
-                refresh()
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        crashEndpointDialog = dialog
+        dialog.setOnDismissListener { crashEndpointDialog = null }
         dialog.show()
+        return dialog
     }
 
     private fun sendWebhookTest() {
