@@ -138,6 +138,7 @@ credential-protected and excluded from Direct Boot, both backup formats, CSV,
 diagnostics, sharing, webhook, logs and saved view state. The screen reports only
 a safe mismatch/DNS/TLS/timeout category; response bodies and configured values
 are never error text. Existing backup/restore readers remain supported and a
-restored private target remains stopped pending review.
+restored private target remains stopped pending review. Private envelope version 2 is used
+for the new fields; version 1 remains readable, and legacy envelopes carrying new fields are rejected.
 A successful health response does not prove message delivery. Matrix, WhatsApp
 and Telegram checks retain their previous behavior.
