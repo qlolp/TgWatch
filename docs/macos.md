@@ -39,7 +39,8 @@ Gatekeeper; при ошибке сборка завершается без за�
 Имена артефактов отражают результат: `TgWatch-mac-local-build.zip` для локальной ad-hoc-сборки,
 `TgWatch-mac-developer-id-build.zip` для подписи без нотариализации и
 `TgWatch-mac-notarized-build.zip` только после принятого запроса, stapling и assessment.
-CI без Apple credentials сохраняет только честно обозначенную локальную сборку.
+CI без Apple credentials сохраняет только честно обозначенную локальную сборку. Успешный CI подтверждает
+сборку и ad-hoc-подпись, но не заменяет Developer ID, Apple notarization и отдельную Gatekeeper-проверку.
 
 ## Настройки
 
