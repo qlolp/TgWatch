@@ -12,7 +12,8 @@ import java.io.IOException
  * A record contains the exception class, the crashing thread name and stack frames. Exception
  * messages are never stored: they can carry endpoints, tokens or document paths. The journal is
  * written at crash time, survives the process death, keeps the newest [MAX_RECORDS] records and is
- * exposed only through the explicit diagnostics document. Nothing is uploaded.
+ * exposed only through the explicit diagnostics document. Remote reporting, when separately
+ * configured and consented to, sends one sanitized record to the user's own collector.
  */
 @Suppress("TooManyFunctions") // One bounded format: storage, rotation and parsing primitives belong together.
 object CrashJournal {
@@ -46,6 +47,8 @@ object CrashJournal {
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             try {
                 record(dir, thread, error, System.currentTimeMillis())
+                RemoteCrashReporter.report(ctx.applicationContext,
+                    format(thread, error, System.currentTimeMillis()))
             } finally {
                 previous?.uncaughtException(thread, error)
             }

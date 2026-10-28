@@ -4,7 +4,7 @@ package ru.tgwatch
 internal data class WebhookConfiguration(val url: String?, val enabled: Boolean, val generation: Long,
     val format: WebhookFormat = WebhookFormat.TEXT,
     val events: Set<WebhookEventKind> = WebhookEventKind.DELIVERY_EVENTS,
-    val services: Set<String> = WebhookStatuses.services) {
+    val services: Set<String> = WebhookStatuses.services, val receiverId: Int = 0) {
     fun admits(captured: WebhookConfiguration, observation: WebhookObservation): Boolean =
         captured == this && observation.serviceId in services
 }
@@ -12,6 +12,7 @@ internal data class WebhookConfiguration(val url: String?, val enabled: Boolean,
 /** Compare one complete credential configuration; transports keep their own physical identity. */
 internal class WebhookConfigurationFence {
     private var installed: WebhookConfiguration? = null
+    fun reset() { installed = null }
     fun changed(current: WebhookConfiguration): Boolean {
         val changed = current != installed
         installed = current
@@ -61,8 +62,9 @@ object WebhookPolicy {
 }
 
 /**
- * Per-process send decisions. Called for every published status so a post skipped by the rate
- * limit or a failed delivery is retried by a later check. At most one request is in flight.
+ * Per-process, per-recipient send decisions. Called for every published status so a post skipped
+ * by the rate limit or a failed delivery is retried by a later check. Each gate owns at most one
+ * admitted request; independent recipient gates share the notifier's bounded physical queue.
  */
 internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS,
     private val testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {

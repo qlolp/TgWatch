@@ -62,12 +62,17 @@
     <string name="target_health_code">Expected HTTP code (optional, 200–599)</string>
     <string name="target_health_field">JSON string field or dotted path (optional)</string>
     <string name="target_health_value">Expected string value (may be empty)</string>
+    <string name="target_health_more_condition">Additional JSON condition — all conditions must match</string>
+    <string name="target_health_body">Body must contain this exact text (optional)</string>
+    <string name="target_health_headers">Request headers, one per line: Name: value (up to 8)</string>
     <string name="target_health_clear">Clear health criteria; keep address</string>
-    <string name="target_health_help">Blank inputs keep saved criteria. A new address replaces them. JSON checks use one GET, strict UTF-8 and at most 32 KiB. Criteria stay private and are excluded from backups.</string>
+    <string name="target_health_help">Blank inputs keep saved criteria. A new address replaces them. Body/JSON checks use one GET, strict UTF-8 and at most 32 KiB. All JSON conditions must match. Criteria and headers stay private and are excluded from backups.</string>
     <string name="target_health_invalid_code">Enter a code from 200 to 599.</string>
     <string name="target_health_invalid_field">Enter the JSON field name.</string>
+    <string name="target_health_invalid_condition">Enter a valid JSON path (up to 3 keys).</string>
+    <string name="target_health_invalid_headers">Check header format, count, and allowed characters.</string>
     <string name="target_health_code_mismatch">The HTTP response code did not match the health criteria.</string>
-    <string name="target_health_json_unconfirmed">The JSON response did not confirm the required health value.</string>
+    <string name="target_health_json_unconfirmed">The response body did not match the health criteria.</string>
     <string name="target_health_dns">DNS could not resolve the address.</string>
     <string name="target_health_tls">A secure TLS connection could not be established.</string>
     <string name="target_health_timeout">The check timed out.</string>
@@ -82,5 +87,13 @@
     <item type="id" name="targetHealthCodeInput" />
     <item type="id" name="targetHealthFieldInput" />
     <item type="id" name="targetHealthValueInput" />
+    <item type="id" name="targetHealthField2Input" />
+    <item type="id" name="targetHealthValue2Input" />
+    <item type="id" name="targetHealthField3Input" />
+    <item type="id" name="targetHealthValue3Input" />
+    <item type="id" name="targetHealthField4Input" />
+    <item type="id" name="targetHealthValue4Input" />
+    <item type="id" name="targetHealthBodyInput" />
+    <item type="id" name="targetHealthHeadersInput" />
     <item type="id" name="targetHealthClear" />
 </resources>

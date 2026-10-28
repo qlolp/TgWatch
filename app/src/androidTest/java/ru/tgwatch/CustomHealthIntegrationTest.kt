@@ -22,7 +22,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import ru.tgwatch.probe.HttpJsonCondition
 import ru.tgwatch.probe.HttpProbeCondition
+import ru.tgwatch.probe.HttpRequestHeader
 
 @RunWith(AndroidJUnit4::class)
 class CustomHealthIntegrationTest {
@@ -30,7 +32,9 @@ class CustomHealthIntegrationTest {
     private val ctx get() = instrumentation.targetContext
     private val id = TargetId.CUSTOM
     private val address = "https://private.example/private-path"
-    private val condition = HttpProbeCondition(204, "private-field", "private-value")
+    private val condition = HttpProbeCondition(204, "private-field", "private-value", "body-secret",
+        listOf(HttpJsonCondition("nested.path", "json-secret")),
+        listOf(HttpRequestHeader("X-Private-Header", "header-secret")))
     private val credentials get() = ctx.getSharedPreferences(TargetPreferences.PRIVATE_FILE, Context.MODE_PRIVATE)
     private lateinit var backup: TargetBackupSnapshot
     private lateinit var settings: Map<String, *>
@@ -70,7 +74,8 @@ class CustomHealthIntegrationTest {
             WebhookPayload.encode(WebhookEvent(WebhookEventKind.TEST, null, null), WebhookFormat.JSON)
                 .bytes.toString(Charsets.UTF_8),
             StatusShareDocument.prepare(ctx, StatusShareSnapshot.capture(ctx, id)).text)
-        for (value in exports) for (secret in listOf(address, "private-field", "private-value"))
+        for (value in exports) for (secret in listOf(address, "private-field", "private-value", "body-secret",
+            "nested.path", "json-secret", "X-Private-Header", "header-secret"))
             assertFalse("Private configuration escaped an export allowlist", value.contains(secret))
         assertTrue(TargetSettingWrites.endpoint(ctx, id, address))
         assertNull(TargetPreferences.configuration(ctx, id)!!.condition)
@@ -83,6 +88,8 @@ class CustomHealthIntegrationTest {
         assertNull(TargetPreferences.configuration(ctx, id))
         val marker = File(ctx.createDeviceProtectedStorageContext().filesDir, "target-config-custom-pending")
         assertTrue(marker.readText().matches(Regex("[a-f0-9]{32}")))
+        for (secret in listOf("private-field", "private-value", "body-secret", "nested.path", "json-secret",
+            "X-Private-Header", "header-secret")) assertFalse(marker.readText().contains(secret))
         assertTrue(TargetConfigTransactions.retry(ctx, id))
         assertFalse(TargetConfigTransactions.isPending(id))
         assertEquals(PrivateProbeConfig(address, condition), TargetPreferences.configuration(ctx, id))
@@ -121,7 +128,11 @@ class CustomHealthIntegrationTest {
                 val code = dialog.findViewById<EditText>(R.id.targetHealthCodeInput)
                 val field = dialog.findViewById<EditText>(R.id.targetHealthFieldInput)
                 val value = dialog.findViewById<EditText>(R.id.targetHealthValueInput)
-                inputs.set(listOf(code, field, value))
+                val body = dialog.findViewById<EditText>(R.id.targetHealthBodyInput)
+                val headers = dialog.findViewById<EditText>(R.id.targetHealthHeadersInput)
+                val extraField = dialog.findViewById<EditText>(R.id.targetHealthField2Input)
+                val extraValue = dialog.findViewById<EditText>(R.id.targetHealthValue2Input)
+                inputs.set(listOf(code, field, value, extraField, extraValue, body, headers))
                 for (input in listOf(code, field, value)) {
                     assertTrue(input.text.isEmpty())
                     assertFalse(input.isSaveEnabled)
@@ -133,6 +144,7 @@ class CustomHealthIntegrationTest {
                 assertTrue(dialog.isShowing)
                 assertNotNull(code.error)
                 code.setText("204"); field.setText("private-field"); value.setText("private-value")
+                body.setText("body-secret"); headers.setText("X-Private-Header: header-secret")
                 dialog.dismiss()
             }
             // Android posts OnDismissListener to the main queue; verify after that delivery.
@@ -156,6 +168,37 @@ class CustomHealthIntegrationTest {
             awaitSettings()
             assertEquals(address, TargetPreferences.endpoint(ctx, id))
             assertNull(TargetPreferences.configuration(ctx, id)!!.condition)
+        }
+    }
+    @Test fun settingsEditorStoresBodyMultipleJsonChecksAndHeadersPrivately() {
+        val headerValue = "test-header-value"
+        val saved = HttpProbeCondition(jsonField = "status", expectedValue = "ok", bodySubstring = "service online",
+            jsonConditions = listOf(HttpJsonCondition("nested.ready", "yes")),
+            headers = listOf(HttpRequestHeader("Authorization", headerValue)))
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val dialog = TargetSettingsDialog.show(activity, id)
+                dialog.findViewById<EditText>(R.id.targetHealthFieldInput).setText("status")
+                dialog.findViewById<EditText>(R.id.targetHealthValueInput).setText("ok")
+                dialog.findViewById<EditText>(R.id.targetHealthField2Input).setText("nested.ready")
+                dialog.findViewById<EditText>(R.id.targetHealthValue2Input).setText("yes")
+                dialog.findViewById<EditText>(R.id.targetHealthBodyInput).setText("service online")
+                dialog.findViewById<EditText>(R.id.targetHealthHeadersInput)
+                    .setText("Authorization: $headerValue")
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            }
+            awaitSettings()
+            assertEquals(PrivateProbeConfig(address, saved), TargetPreferences.configuration(ctx, id))
+            val credential = credentials.getString(id.wire, "").orEmpty()
+            val privateValues = listOf("service online", "nested.ready", "Authorization", headerValue)
+            for (secret in privateValues)
+                assertTrue(credential.contains(secret))
+            for (value in listOf(BackupCodec.encode(BackupManager.snapshot(ctx)).toString(Charsets.UTF_8),
+                TargetBackupCodec.encode(BackupManager.snapshotTargets(ctx)).toString(Charsets.UTF_8),
+                LocalDiagnostics.snapshot(ctx).toJson())) {
+                for (secret in privateValues)
+                    assertFalse(value.contains(secret))
+            }
         }
     }
     private fun awaitSettings() {

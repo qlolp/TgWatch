@@ -9,6 +9,8 @@ flowchart TD
     UI["MainActivity · цели, история, SAF preview"]
     REGIONAL_UI["RegionalServicesActivity · профили, A/B, объяснения"]
     SERVICE["MonitorService · foreground lifecycle"]
+    PRIMARY["PrimaryCheckController · Telegram probe + revision-gated publication"]
+    ONGOING["OngoingNotificationController · notification + background statistics"]
     TARGETS["TargetRepository / TargetRunner · независимые цели"]
     SCHEDULE["CheckSchedule / TargetSchedule / OfflineBackoff"]
     NETWORK["Android Network adapter"]
@@ -26,7 +28,9 @@ flowchart TD
     REGJOURNAL["RegionalJournal · до 1000 событий за 7 дней"]
     REGWATCH["RegionalChangeWatch · durable intent, fresh evidence"]
     MUTE["AlertMute · elapsed time + boot identity"]
-    WEBHOOK["WebhookDelivery · generation + 10s result deadline"]
+    WEBHOOK["WebhookNotifier · up to 5 receivers · generation + 10s deadline"]
+    MQTT["MqttNotifier · native MQTT/TLS transport"]
+    CRASH["RemoteCrashReporter · opt-in bounded HTTPS attempt"]
     PREFS["Prefs / TargetPreferences / RegionalPreferences"]
     SUCCESS["LastSuccessStore / LastSuccessPolicy · published OK only"]
     PRESENT["StatusWidget / EventNotifications / RegionalNotifications"]
@@ -51,6 +55,8 @@ flowchart TD
     SERVICE --> SCHEDULE
     SERVICE --> NETWORK
     SERVICE --> EXTRAS
+    SERVICE --> PRIMARY
+    SERVICE --> ONGOING
     SERVICE --> WEBHOOK
     SERVICE --> SUCCESS
     SERVICE --> LOG
@@ -60,6 +66,9 @@ flowchart TD
     TARGETS --> HISTORY
     TARGETS --> WEBHOOK
     TARGETS --> PRESENT
+    PRIMARY --> NETWORK
+    PRIMARY --> TARGETS
+    ONGOING --> PRESENT
     SCHEDULE --> SERVICE
     NETWORK --> PROBE
     PROBE --> HTTP
@@ -81,6 +90,8 @@ flowchart TD
     UI --> MUTE
     MUTE --> PRESENT
     WEBHOOK --> CREDENTIALS
+    WEBHOOK --> MQTT
+    MQTT --> CREDENTIALS
     PREFS --> SERVICE
 
     REGIONAL_UI --> REGIONAL
@@ -95,6 +106,8 @@ flowchart TD
     HISTORY --> SNAP
     PREFS --> SNAP
     LOG --> SNAP
+    LOG --> CRASH
+    CRASH --> CREDENTIALS
     SNAP --> CRYPTO
     CRYPTO --> FILE
     FILE --> LEGACY
@@ -117,12 +130,14 @@ flowchart TD
 ## Границы поведения
 
 - **MTProto:** unauthenticated greeting без аккаунта и RPC. Парсер проверяет весь TL `resPQ` и canonical abridged frame ≤4096 байт. Ответ с nonce подтверждает протокол, но не подлинность сервера или доставку сообщений. Telegram сохраняет общий бюджет 6 с и дополнительный бюджет controls; отмена закрывает транспорт.
-- **Независимые цели:** Telegram, Matrix, WhatsApp Web и один Custom HTTPS имеют собственные настройки, истории, endpoint revisions и оповещения. Одна служба ограничивает физическую работу шестнадцатью primary и тремя secondary workers. EXTRA остаётся информационной диагностикой и не включает самостоятельную цель автоматически. Общего cross-service процента доступности нет.
+- **Контроллеры службы:** `PrimaryCheckController` подготавливает Telegram probe и публикует результат только при совпадении settings/network revisions под service publication lock. `OngoingNotificationController` владеет отображением постоянного уведомления и фоновым обновлением статистики; foreground lifecycle остаётся в `MonitorService`.
+- **Независимые цели:** Telegram, Matrix, WhatsApp Web и до пяти Custom HTTPS имеют собственные настройки, истории, endpoint revisions и оповещения. Необязательные HTTPS-слоты скрыты до явного добавления; удаление стирает их приватные настройки и историю. Одна служба ограничивает физическую работу шестнадцатью primary и тремя secondary workers. EXTRA остаётся информационной диагностикой и не включает самостоятельную цель автоматически. Общего cross-service процента доступности нет.
 - **Региональные профили:** проверяют только публичные страницы выбранных сервисов. Для регионального предупреждения нужны два явных ответа на одном соединении с интервалом не менее 15 секунд. A/B-сравнения и пользовательские отметки не подменяют автоматическую классификацию. Журнал ограничен 1000 событиями за семь дней и не входит в переносимые бэкапы.
 - **Одноразовое ожидание:** сохраняется только намерение и оставшийся срок, не положительные свидетельства. После перезагрузки запрос восстанавливается при неизменном включённом профиле, но требует новой пары свежих ответов. Перевод часов назад, истечение срока, восстановление бэкапа и отключение профиля отменяют запрос.
-- **Паузы и webhook:** обычная пауза оповещений считает elapsed time в пределах одной загрузки устройства; перезагрузка завершает её. Webhook ограничивает ожидание результата 10 секундами, но зависший транспорт занимает физический слот до завершения. JSON v1 событийный, JSON v2 heartbeat — отдельный opt-in формат.
+- **Паузы и webhook:** обычная пауза оповещений считает elapsed time в пределах одной загрузки устройства; перезагрузка завершает её. До пяти независимых webhook-получателей сохраняют отдельные filters, generations и delivery state; ограниченный транспорт имеет 10-секундный deadline, а зависший запрос занимает физический слот до завершения. JSON v1 событийный, JSON v2 heartbeat — отдельный opt-in формат. ntfy preset настраивает обычный HTTPS recipient; native `MqttNotifier` разделяет coordinator/deadline и использует MQTT/TLS transport. Адреса, topics и credentials не входят в backups, diagnostics, logs или view state.
+- **Crash reporting:** `RemoteCrashReporter` отправляет только после отдельного согласия на пользовательский HTTPS collector. Payload и время ограничены, попытка одна на процесс, без очереди и retry; локальный `CrashJournal` остаётся отдельным, а endpoint хранится в credential-protected settings.
 - **История:** выбранное окно составляет 7, 30 или 90 дней; неделя хранит сырые проверки, более длинные окна добавляют минутные и пятиминутные агрегаты. Gaps остаются UNKNOWN time; clock rollback создаёт новую эпоху. MTTR учитывает только полностью наблюдённый TG_DOWN, закрытый свежим OK в текущем окне. PARTIAL может продолжать эпизод; gaps, UNKNOWN/NO_NETWORK и clipping его исключают.
-- **Backup:** новый экспорт всех целей использует TGWB container v3 со строгим JSON `formatVersion=4` и сохраняет `history_retention`; JSON v3 читается. Отдельный Telegram-only экспорт использует совместимый v2. Поддерживаются чтение опубликованного TGWB v1 и локального TGWBKUP1. Пароль экспорта — 12–256 символов; AES-256-GCM аутентифицирует header и ciphertext. Приватные адреса, критерии health-check, токены, диагностический last OK, состояние службы, cooldowns и Android permissions не экспортируются.
+- **Backup:** новый экспорт всех целей использует TGWB container v3 и сохраняет `history_retention`. Обычный набор записывается как JSON `formatVersion=4`; при добавленных HTTPS 2–5 используется `formatVersion=5`, который читают версии 1.24+. JSON v3 и прежние поддерживаемые форматы читаются. Отдельный Telegram-only экспорт использует совместимый v2. Поддерживаются чтение опубликованного TGWB v1 и локального TGWBKUP1. Пароль экспорта — 12–256 символов; AES-256-GCM аутентифицирует header и ciphertext. Приватные адреса, критерии health-check, токены, диагностический last OK, состояние службы, cooldowns и Android permissions не экспортируются.
 - **Restore:** после preview и подтверждения заменяет данные и оставляет все цели остановленными. Pending journal replay идемпотентно завершает прерванную замену до работы компонентов; это серия durable записей, а не обещание одной файловой транзакции Android. Неверный пароль и malformed input не создают transaction и не останавливают действующий monitoring.
 - **CSV:** v3 содержит target id и публичные endpoint revisions, а импорт заменяет только явно названные истории. Legacy CSV относится к Telegram. UNKNOWN-строки положительной длительности опускаются, поскольку формат не отличает реальные UNKNOWN checks от generated gaps; zero-width metadata сохраняет clock epoch и endpoint identity.
 - **Quiet hours и last success:** quiet hours — local minute-of-day с legacy hour fallback; last success — сохранённый опубликованный OK, независимый от свежести текущего состояния.

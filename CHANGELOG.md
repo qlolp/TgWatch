@@ -1,5 +1,15 @@
 # История изменений
 
+## 1.25.0 — автоматизация и подготовка выпуска
+
+- До пяти независимых webhook-получателей, ntfy preset и отдельный native MQTT/TLS-адаптер.
+- Расширены приватные Custom HTTPS-проверки; добавлена опциональная отправка crash report только на collector пользователя и после отдельного согласия.
+- `MonitorService` разделён на `PrimaryCheckController` и `OngoingNotificationController`; bounded pools, revision fences, deadlines, wake lock и порядок завершения сохранены.
+- Подготовлены read-only Android/OEM evidence collector и macOS builder с pinned Python и условными signing/notarization pipeline. Исторический independent exact-tag build относится только к F-Droid-кандидату 1.24.1.
+- Физические OEM-замеры, F-Droid recipe/сравнения/принятие, реальный MQTT broker, Developer ID signing и Apple notarization остаются непроверенными внешними шагами.
+
+[Заметки выпуска](docs/releases/1.25.0.md).
+
 ## 1.24.1 — Android SDK 37 и новая сборочная цепочка
 
 - Сборка телефона переведена на compileSdk 37, AGP 9.2.1, Gradle 9.4.1 и AndroidX Core 1.19.1. Используется встроенный Kotlin AGP; JDK 17 сохранён.

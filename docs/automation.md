@@ -145,13 +145,17 @@ when finished if it is only needed for setup/testing.
 
 ## Webhook alerts and Home Assistant
 
-**Advanced → Automation and webhook** sends optional status-change events to one
-user-owned HTTPS address. It is off by default. Save an address, choose **Text**
-(the default, suitable for an ntfy topic) or **JSON**, and select event filters.
-Use **Targets** to select Telegram, Matrix, WhatsApp Web and/or Custom HTTPS.
-Existing installations retain all four selections. This only filters delivery: it
-never enables a target or monitoring. An empty selection suppresses automatic events
-and heartbeats; the explicit test button still works. The same one HTTPS address is used.
+**Advanced → Automation and webhook** supports up to five independent recipients,
+each with a user-owned HTTPS address. It is off by default. Existing single-webhook
+settings remain recipient 1 in place, with their saved address, enablement, format,
+and filters unchanged. Add and select recipients in the settings screen; each has
+independent enablement, address, format, target/event filters, configuration
+generation, and delivery health/retry state. Save an address, choose **Text**
+(the default, suitable for an ntfy topic) or **JSON**, and select event filters
+for each recipient. **Targets** selects Telegram, Matrix, WhatsApp Web and/or
+Custom HTTPS goals. These filters only control delivery: they never enable a goal
+or monitoring. Empty target/event filters suppress automatic events and heartbeats;
+the explicit test button still works for the selected recipient.
 **Send test message** also works while delivery is disabled; it never changes the
 measured baseline and is not an observation.
 
@@ -195,22 +199,70 @@ Only HTTPS URLs up to 512 characters without user info or fragment are accepted;
 query strings (for example ntfy options) are allowed. Redirects are not followed.
 The User-Agent is `TgWatch/<installed version> (Android)`. Connect/read timeouts
 are five seconds each, with an independent ten-second total monotonic deadline.
-One physical request is allowed in the whole process. A timeout reports once and
-requests cancellation, but a stuck native/DNS operation keeps the slot until it
-actually returns. There is no backlog of old events: later valid monitor checks
-attempt the latest allowed event. Retries retain a minimum 60-second gap per status;
+One shared network worker serves every recipient. Its queue holds at most four
+additional requests across all recipients, so at most five requests can be admitted
+at once; each recipient can own only one admitted request at a time. Queue saturation
+fails admission instead of creating unbounded work. A timeout reports once and
+requests cancellation, but a stuck native/DNS operation keeps the worker occupied
+until it actually returns. There is no backlog of old events: pending events are
+coalesced per recipient/goal, and later valid monitor checks attempt the latest
+allowed event. Retries retain a minimum 60-second gap per status per recipient;
 NO_NETWORK delivery is best effort and normally cannot leave the device.
 
 The private screen shows sanitized delivery health without the address, response
-body or transport exception. URL, enabled switch, format, event and target filters form one
-configuration generation. Saving any of them isolates old callbacks and rate/health
-history, including after a failed disk commit that changed SharedPreferences memory.
-Changing settings does not free an old physical request or send automatically.
+body or transport exception. URL, enabled switch, format, event and target filters
+form one configuration generation per recipient. Saving any of them isolates that
+recipient's old callbacks and rate/health history, including after a failed disk
+commit that changed SharedPreferences memory. Changing settings does not free an
+old physical request or send automatically. Removing a recipient clears its private
+settings; the primary recipient cannot be removed.
 
 All webhook configuration is in credential-protected `webhook-private-v1`, outside
 Direct Boot, portable backup, platform backup/transfer, diagnostics and logs.
 Before the first unlock the adapter is inactive. The screen displays only the saved
 host; paths/queries may grant posting rights and should be treated as credentials.
+
+### ntfy preset and native MQTT adapters (optional)
+
+The HTTPS webhook does not cover brokers that speak only MQTT, or an ntfy server that needs
+an access token without hand-written query parameters. Two opt-in adapters address that.
+Neither changes a goal's measured status, wakes or starts monitoring, or enables anything by
+itself; both only consume already published measurements, and both are off by default.
+
+**ntfy preset** (Advanced → Automation and webhook → *ntfy preset*) is not a second network
+worker. It composes an ordinary HTTPS webhook address for the selected recipient from a
+server (empty means `https://ntfy.sh`; HTTPS, no path), a topic (1–64 letters, digits, `-`
+or `_`) and an optional `tk_…` access token, which is sent as ntfy's `?auth=` query value.
+It also selects the Text format. Delivery, five-recipient limit, one shared worker, queue,
+ten-second deadline, retry gap and health are exactly those of the recipient. The topic and
+token are credentials inside the saved address: stored only in `webhook-private-v1`, never
+prefilled or displayed after saving (only the host is shown).
+
+**Native MQTT** publishes to at most one broker:
+
+- MQTT 3.1.1 over TLS only (default port 8883), certificate and host name verified against
+  the system trust store; no plain TCP, no WebSocket, no user-installed bypass.
+- Bounded settings: host ≤ 253 ASCII characters, port 1–65535, topic ≤ 128 bytes without
+  `#`, `+`, control characters or a leading `$`, optional username ≤ 64 and password ≤ 128
+  printable ASCII bytes. A password requires a username; a previously stored password-only
+  configuration is treated as unconfigured. The payload is the generic JSON v1 body (under 1 KiB),
+  QoS 1, not retained, with a random per-connection client ID.
+- One short connection per message on one dedicated thread: connect, publish, wait for
+  PUBACK, disconnect. There is no persistent socket, so no keep-alive timer or reconnect loop.
+  Connect/read timeouts are five seconds each and the same ten-second total deadline as the
+  webhook applies; the deadline closes the socket.
+- Reconnect model: after a failed attempt new attempts are refused for 30 seconds, doubling
+  per consecutive failure up to 15 minutes, and reset by success or by saving settings. A
+  refused or failed attempt is reported as a failed delivery. There is **no offline queue**:
+  events are coalesced to the latest measured state per goal (at most four), retried only
+  when a later valid check publishes, and heartbeats are not sent.
+- Event filters are all five events and all goals. Test messages work while disabled.
+
+Broker, topic and credentials are stored only in credential-protected `mqtt-private-v1`,
+excluded from platform backup/transfer, portable backups, diagnostics, logs, public replies
+and saved view state; the screen shows only the host. Before the first unlock the adapter is
+inactive. The coordinator sees only a placeholder address. Existing webhook recipients
+(including the legacy first recipient) are unaffected.
 
 ### Home Assistant package
 
@@ -233,7 +285,7 @@ adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp`,
 `custom` or `custom2` … `custom5`; use separate entities for separate goals. A target filter in TgWatch
 does not change the receiving package's service-ID validation.
 
-Native MQTT, multiple destinations and custom headers remain separate extensions.
+Custom request headers remain a separate extension.
 
 ## Independent targets: API v2
 
@@ -252,23 +304,25 @@ API v1 and its exact historical reply fields continue to refer to Telegram.
 When Telegram is disabled while another target keeps the service alive, v1
 reports `running=false` and CHECK returns STOPPED.
 
-Opt-in text/JSON webhooks use the same four `service_id` values. Baselines,
-pending transitions and cooldowns are separate per target, while every target
-shares the existing single physical HTTPS delivery slot. Stale/unmeasured results
-are ignored; settings changes invalidate only the affected goal's pending event.
-The JSON schema remains version 1 with the same eight public fields.
+Opt-in text/JSON webhooks use the supported `service_id` values. Baselines,
+pending transitions and cooldowns are separate per target and per recipient, while
+every recipient shares the same single physical HTTPS worker and bounded queue.
+Stale/unmeasured results are ignored; settings changes invalidate only the affected
+recipient's pending work. The JSON schema remains version 1 with the same eight
+public fields.
 
 ### JSON v2 + heartbeat
 
 Select **JSON v2 + heartbeat** explicitly to send fresh measured status while it
 is stable, including the first OK. Text and JSON v1 remain event-only. No extra
 phone alarm, probe or service is added: a new published measurement is the only
-automatic delivery trigger. Each goal sends a heartbeat at most once per five
-minutes; an admitted v2 event supplies the same freshness and starts that cooldown.
+automatic delivery trigger. Each goal sends a heartbeat at most once per five minutes per recipient/goal; an
+admitted v2 event supplies the same freshness and starts that cooldown.
 Rejected transport submissions do not consume it. A failed admitted request does;
-only a later suitable measurement can retry. Four goals share the existing one
-physical HTTPS request and ten-second deadline. Events have priority, and a
-request that has not returned continues to own its slot after logical timeout.
+only a later suitable measurement can retry. All configured goals and recipients
+share the existing one physical HTTPS worker and bounded queue. Each request keeps
+its ten-second deadline. Events have priority, and a request that has not returned
+continues to own its slot after logical timeout.
 
 The existing event filters also restrict heartbeat statuses: OK follows Recovery,
 DOWN follows Unreachable, PARTIAL follows Partial, and NO_NETWORK follows Network

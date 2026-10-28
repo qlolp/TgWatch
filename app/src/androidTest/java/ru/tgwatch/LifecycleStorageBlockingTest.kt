@@ -44,9 +44,16 @@ class LifecycleStorageBlockingTest {
         MonitorService.start(ctx)
         val deadline = SystemClock.elapsedRealtime() + 10_000
         val notifications = ctx.getSystemService(NotificationManager::class.java)
-        while (notifications.activeNotifications.none { it.id == 1 } &&
-            SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(50)
-        assertTrue(MonitorService.running)
+        while (
+            (!MonitorService.running || notifications.activeNotifications.none { it.id == 1 }) &&
+            SystemClock.elapsedRealtime() < deadline
+        ) {
+            SystemClock.sleep(50)
+        }
+        assertTrue(
+            "The foreground service must be running before testing teardown",
+            MonitorService.running
+        )
         val held = CountDownLatch(1)
         val release = CountDownLatch(1)
         val holder = thread(name = "lifecycle-held-history") {
@@ -74,14 +81,16 @@ class LifecycleStorageBlockingTest {
         val deadline = SystemClock.elapsedRealtime() + 5_000
         while (active.get(null) == null && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(50)
         val service = active.get(null) as MonitorService
-        val method = MonitorService::class.java.getDeclaredMethod("refreshNotificationStats", Long::class.javaPrimitiveType)
+        val delegate = MonitorService::class.java.getDeclaredField("ongoing\$delegate").apply { isAccessible = true }
+        val controller = (delegate.get(service) as Lazy<*>).value!!
+        val method = controller.javaClass.getDeclaredMethod("refreshStats", Long::class.javaPrimitiveType)
             .apply { isAccessible = true }
         synchronized(History) {
             val failure = History::class.java.getDeclaredField("failure").apply { isAccessible = true }
             val previous = failure.get(null)
             try {
                 failure.set(null, HistoryFailure.WRITE)
-                val read = runCatching { method.invoke(service, System.currentTimeMillis() + 120_000) }
+                val read = runCatching { method.invoke(controller, System.currentTimeMillis() + 120_000) }
                 assertTrue("Statistics failures must not escape and kill the service HandlerThread: $read", read.isSuccess)
             } finally { failure.set(null, previous) }
         }

@@ -3,18 +3,17 @@ import Darwin
 
 /// Never invoke a shell or the system developer-tools launcher. All candidates are absolute executables.
 enum MacPythonRuntime {
-    static func candidates(environment: [String: String] = ProcessInfo.processInfo.environment,
-                           knownPaths: [String] = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3",
-                            "/Library/Frameworks/Python.framework/Versions/Current/bin/python3"]) -> [URL] {
-        var seen = Set<String>()
-        let paths = knownPaths + (environment["PATH"] ?? "").split(separator: ":").filter { $0.hasPrefix("/") }
-            .map { String($0) + "/python3" }
-        return paths.compactMap { path in
-            guard path.hasPrefix("/") else { return nil }
-            let url = URL(fileURLWithPath: path).standardizedFileURL
-            guard url.path != "/usr/bin/python3", seen.insert(url.path).inserted else { return nil }
-            return url
-        }.prefix(20).map { $0 }
+#if arch(arm64)
+    static let processArchitecture = "arm64"
+#elseif arch(x86_64)
+    static let processArchitecture = "x86_64"
+#else
+    static let processArchitecture = "unsupported"
+#endif
+    static func candidates(resourcesURL: URL = Bundle.main.resourceURL ?? Bundle.main.bundleURL,
+                           architecture: String = processArchitecture) -> [URL] {
+        guard architecture == "arm64" || architecture == "x86_64" else { return [] }
+        return [resourcesURL.appendingPathComponent("python/\(architecture)/bin/python3")]
     }
     static func find(candidates: [URL], isCurrent: () -> Bool) -> URL? {
         for url in candidates {
@@ -49,6 +48,7 @@ enum RegionalEngineState: Equatable { case starting, running, stopped, missingRu
 /// Process and pipe state belong to one queue. Only the desired generation crosses threads, under a lock.
 final class RegionalEngineProcess: @unchecked Sendable {
     private let script: URL
+    private let runtimeCandidates: [URL]
     private let onLine: @Sendable (Data, UInt64) -> Void
     private let onState: @Sendable (RegionalEngineState, UInt64) -> Void
     private let queue = DispatchQueue(label: "ru.tgwatch.mac.engine")
@@ -58,9 +58,11 @@ final class RegionalEngineProcess: @unchecked Sendable {
     private var output: FileHandle?
     private var buffer = Data()
 
-    init(script: URL, onLine: @escaping @Sendable (Data, UInt64) -> Void,
+    init(script: URL, runtimeCandidates: [URL] = MacPythonRuntime.candidates(),
+         onLine: @escaping @Sendable (Data, UInt64) -> Void,
          onState: @escaping @Sendable (RegionalEngineState, UInt64) -> Void) {
         self.script = script
+        self.runtimeCandidates = runtimeCandidates
         self.onLine = onLine
         self.onState = onState
     }
@@ -71,7 +73,7 @@ final class RegionalEngineProcess: @unchecked Sendable {
             guard isCurrent(generation) else { return }
             guard !services.isEmpty else { onState(.stopped, generation); return }
             onState(.starting, generation)
-            let runtime = MacPythonRuntime.find(candidates: MacPythonRuntime.candidates(),
+            let runtime = MacPythonRuntime.find(candidates: runtimeCandidates,
                                                 isCurrent: { self.isCurrent(generation) })
             guard isCurrent(generation) else { return }
             guard let runtime else { onState(.missingRuntime, generation); return }

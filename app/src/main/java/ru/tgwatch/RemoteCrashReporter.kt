@@ -1,0 +1,81 @@
+package ru.tgwatch
+
+import android.content.Context
+import android.os.Build
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+
+/** A single bounded, best-effort attempt on an uncaught crash; failures are discarded. */
+internal object RemoteCrashReporter {
+    private const val CONNECT_TIMEOUT_MS = 1_500
+    private const val READ_TIMEOUT_MS = 1_500
+    private const val DEADLINE_MS = 2_500L
+    private val attempted = AtomicBoolean(false)
+
+    fun report(ctx: Context, record: CrashJournal.Record) {
+        val endpoint = runCatching { CrashReportingSettings.activeEndpoint(ctx) }.getOrNull()
+        val payload = runCatching {
+            CrashReportingPolicy.payload(BuildConfig.VERSION_NAME, Build.VERSION.SDK_INT, record.type, record.frames)
+        }.getOrNull()
+        if (endpoint != null && payload != null && attempted.compareAndSet(false, true)) {
+            bestEffort(endpoint, payload)
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun bestEffort(endpoint: String, payload: ByteArray) {
+        val connection = AtomicReference<HttpURLConnection?>()
+        var request: FutureTask<Unit>? = null
+        try {
+            val task = FutureTask<Unit> { send(endpoint, payload, connection) }
+            request = task
+            Thread(task, "crash-report").apply {
+                isDaemon = true
+                start()
+            }
+            task.get(DEADLINE_MS, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            connection.get()?.disconnect()
+            request?.cancel(true)
+        } catch (_: InterruptedException) {
+            connection.get()?.disconnect()
+            request?.cancel(true)
+            Thread.currentThread().interrupt()
+        } catch (_: ExecutionException) {
+            // Do not log the endpoint, response, or exception text; there is no retry or queue.
+        } catch (_: Exception) {
+            connection.get()?.disconnect()
+            request?.cancel(true)
+        }
+    }
+
+    private fun send(endpoint: String, payload: ByteArray, connectionRef: AtomicReference<HttpURLConnection?>) {
+        var connection: HttpURLConnection? = null
+        try {
+            connection = URL(endpoint).openConnection() as? HttpURLConnection ?: return
+            connectionRef.set(connection)
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            connection.useCaches = false
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("User-Agent", "TgWatch-CrashReport/1")
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            connection.setFixedLengthStreamingMode(payload.size)
+            connection.outputStream.use { it.write(payload) }
+            connection.responseCode
+        } catch (_: Exception) {
+            // Best effort only.
+        } finally {
+            connection?.disconnect()
+            connectionRef.set(null)
+        }
+    }
+}

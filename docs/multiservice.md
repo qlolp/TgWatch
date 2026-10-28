@@ -98,14 +98,17 @@ for matched physical-device tests; emulator checks do not establish a battery-sa
 ## Custom HTTPS health criteria
 
 CUSTOM uses HEAD and accepts any 2xx response by default; GET is used only when
-HEAD returns 405 or 501. Optional criteria in **Target settings** can instead
-require one code from 200–599 and/or a JSON string at a short object path.
-For example, field `status` with expected value `ok` accepts `{"status":"ok"}` and
-rejects `{"status":"error"}` even when both responses have HTTP 200. A dotted path
-of at most three object keys selects a nested string, for example `status.indicator`
-with expected value `none` accepts `{"status":{"indicator":"none"}}`. Empty expected
-strings are allowed; the path is 1–64 characters and the value at most 256 characters.
-Comparison is exact and case-sensitive; there is no JSONPath or scripting.
+HEAD returns 405 or 501. Optional criteria in **Target settings** can require an
+exact code from 200–599, a case-sensitive body substring (up to 256 characters),
+or up to four JSON string conditions. All configured criteria are ANDed: the
+response code, substring and every JSON condition must match. A path such as
+`status.indicator` selects a string at up to three nested object keys; each path
+is at most 64 characters and each expected value at most 256 characters. Empty
+expected JSON strings are allowed. There is no JSONPath or scripting.
+
+Up to eight request headers may be configured (name up to 64 characters, value up
+to 256 printable ASCII characters; duplicate names are rejected case-insensitively).
+Header lines are sent with the probe request and are not used by other targets.
 
 Status-page presets (Discord, GitHub, Cloudflare, Atlassian, Spotify, OpenAI) fill a
 public status JSON URL and the `status.indicator` = `none` path. Presets are a typing
@@ -113,13 +116,15 @@ aid only: the address stays private on this device and the health field remains
 editable. A successful status-page JSON match still proves only the HTTP/JSON
 criteria, not message delivery.
 
-JSON mode uses one GET with `Accept: application/json` and identity encoding,
-strict UTF-8, at most 32 KiB, depth at most 10, and full JSON validation including
-nested duplicate-key rejection. Missing/nonstring fields, truncated, oversized,
-compressed or malformed responses fail confirmation. Unknown-length responses
-that reach the cap are rejected; a complete, known-length response exactly at
-the cap is allowed. Content never overrides the required HTTP code. TLS,
-redirect restrictions, timeouts and shared connection limits are unchanged.
+Body or JSON criteria use one GET (`Accept: application/json` when JSON is checked)
+with identity encoding, strict UTF-8 and at most 32 KiB. The body is read once and
+reused for the substring and every JSON condition. JSON validation is complete,
+with depth at most 10 and nested duplicate-key rejection. Missing/nonstring fields,
+truncated, oversized, compressed or malformed responses fail confirmation.
+Unknown-length responses that reach the cap are rejected; a complete, known-length
+response exactly at the cap is allowed. Headers without body criteria retain the
+default HEAD behavior. Content never overrides the required HTTP code. TLS,
+redirect restrictions, deadlines, cancellation and shared worker limits are unchanged.
 
 Saved criteria are never prefilled. Blank inputs preserve the saved configuration
 when changing an interval. Entering a new address replaces its criteria; select
@@ -128,10 +133,12 @@ Entering criteria with a blank address changes the current private address's
 criteria. URL and criteria form one private transaction and endpoint revision:
 an older in-flight response cannot update the new configuration's status/history.
 
-The URL, JSON field and expected value are credential-protected and excluded
-from Direct Boot, both backup formats, CSV, diagnostics, sharing, webhook and
-logs. The screen reports only a safe mismatch/DNS/TLS/timeout category; response
-bodies and expected values are never error text. Existing backup/restore readers
-remain supported and a restored private target remains stopped pending review.
+The URL, body substring, JSON paths and values, and header names and values are
+credential-protected and excluded from Direct Boot, both backup formats, CSV,
+diagnostics, sharing, webhook, logs and saved view state. The screen reports only
+a safe mismatch/DNS/TLS/timeout category; response bodies and configured values
+are never error text. Existing backup/restore readers remain supported and a
+restored private target remains stopped pending review. Private envelope version 2 is used
+for the new fields; version 1 remains readable, and legacy envelopes carrying new fields are rejected.
 A successful health response does not prove message delivery. Matrix, WhatsApp
 and Telegram checks retain their previous behavior.

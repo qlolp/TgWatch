@@ -86,6 +86,18 @@ class WebhookDeliveryBehaviorTest {
         assertEquals(listOf(WebhookNotifier.TestResult.TIMED_OUT), f.results)
     }
 
+    @Test fun resetInvalidatesDeliveryWithoutReadingCredentialConfiguration() {
+        var reads = 0
+        val coordinator = WebhookCoordinator(Any(), {
+            reads++
+            WebhookConfiguration(null, false, 0)
+        }, { 0L }, { _, _, _ -> true }, schedule = { _, _ -> {} })
+
+        coordinator.reset()
+
+        assertEquals(0, reads)
+    }
+
     @Test fun submissionAndTimerRejectionsReleaseOnlyWorkThatNeverStarted() {
         val f = Fixture()
         f.accept = false
