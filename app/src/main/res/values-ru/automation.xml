@@ -40,4 +40,25 @@
     <string name="automation_token_hidden">•••••••• · Длина (символов): %1$d</string>
     <string name="webhook_format_json_v2">JSON v2 + heartbeat</string>
     <string name="webhook_heartbeat_help">Передаёт свежий измеренный статус не чаще раза в пять минут на цель. Без новых проверок и таймеров. Фильтры применяются и к heartbeat: OK — Восстановление; DOWN — Недоступность; PARTIAL и Нет сети — соответствующие фильтры. Возврат сети остаётся событием. Тест не подтверждает работающий мониторинг.</string>
+    <string name="ntfy_preset">Шаблон ntfy</string>
+    <string name="ntfy_preset_message">Составляет HTTPS-адрес и текстовый формат для выбранного получателя; доставка — обычный вебхук. Оставьте сервер пустым для ntfy.sh. Тема и необязательный токен доступа — секреты: они хранятся приватно, не показываются и не попадают в резервные копии.</string>
+    <string name="ntfy_server_hint">Сервер (по умолчанию https://ntfy.sh)</string>
+    <string name="ntfy_topic_hint">Тема (буквы, цифры, - и _)</string>
+    <string name="ntfy_token_hint">Токен доступа tk_… (необязательно)</string>
+    <string name="ntfy_invalid">Введите https:// сервер без пути, тему до 64 букв, цифр, - или _ и необязательный токен tk_.</string>
+    <string name="mqtt_title">MQTT (встроенный, необязательно)</string>
+    <string name="mqtt_description">Необязательно публикует смены статуса на один брокер MQTT 3.1.1 только по TLS (QoS 1, JSON). Одно короткое соединение на сообщение с лимитом десять секунд; после сбоев новые попытки ждут 30 секунд, удваивая паузу до 15 минут. Офлайн ничего не копится: позже повторяется только последнее измеренное состояние. Не меняет измеренный статус и не запускает мониторинг. Брокер, тема и учётные данные хранятся приватно, не входят в резервные копии и диагностику и используются только после разблокировки. По умолчанию выключено.</string>
+    <string name="mqtt_enable">Публиковать смены статуса в MQTT</string>
+    <string name="mqtt_unset">Брокер MQTT не задан.</string>
+    <string name="mqtt_saved">Брокер MQTT сохранён: %1$s</string>
+    <string name="mqtt_set">Задать брокер MQTT</string>
+    <string name="mqtt_message">Только TLS. Тема не может содержать # и +. Сохранённые значения не показываются; введите их заново для замены. Имя пользователя и пароль необязательны.</string>
+    <string name="mqtt_host_hint">Имя хоста брокера</string>
+    <string name="mqtt_port_hint">Порт (по умолчанию 8883)</string>
+    <string name="mqtt_topic_hint">Тема</string>
+    <string name="mqtt_username_hint">Имя пользователя (необязательно)</string>
+    <string name="mqtt_password_hint">Пароль (необязательно)</string>
+    <string name="mqtt_invalid">Введите корректные имя хоста, порт, тему без # и + и печатаемые учётные данные в пределах лимитов.</string>
+    <string name="mqtt_required">Сначала задайте корректный брокер MQTT.</string>
+    <string name="mqtt_test">Отправить тестовое сообщение MQTT</string>
 </resources>

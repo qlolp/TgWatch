@@ -40,6 +40,7 @@ object WebhookNotifier {
                 Log.w("TgWatch", "webhook publish: ${e.javaClass.simpleName}")
             }
         }
+        MqttNotifier.onPublished(ctx, observation)
     }
 
     /** Explicit user test from the settings screen, even while the switch is off; [done] runs on the main thread. */
@@ -60,6 +61,7 @@ object WebhookNotifier {
     fun reset() {
         val current = synchronized(this) { coordinators.filterNotNull().toList() }
         current.forEach(WebhookCoordinator::reset)
+        MqttNotifier.reset()
     }
     fun reset(receiverId: Int) {
         require(receiverId in 0 until WebhookSettings.MAX_RECEIVERS)
@@ -69,6 +71,7 @@ object WebhookNotifier {
     fun forget(id: TargetId) {
         val current = synchronized(this) { coordinators.filterNotNull().toList() }
         current.forEach { it.forget(id.wire) }
+        MqttNotifier.forget(id)
     }
 
     internal fun health(ctx: Context): WebhookHealth = health(ctx, 0)

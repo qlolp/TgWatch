@@ -40,4 +40,25 @@
     <string name="automation_token_hidden">•••••••• · Length (characters): %1$d</string>
     <string name="webhook_format_json_v2">JSON v2 + heartbeat</string>
     <string name="webhook_heartbeat_help">Adds fresh measured status at most every five minutes per target. No new checks or timers. Heartbeats follow status filters: OK uses Recovery; DOWN uses Unreachable; PARTIAL and No network use their matching filters. Network restored remains an event. Test messages never claim live monitoring.</string>
+    <string name="ntfy_preset">ntfy preset</string>
+    <string name="ntfy_preset_message">Builds the HTTPS address and Text format for the selected recipient; delivery is the ordinary webhook. Leave the server empty for ntfy.sh. The topic and optional access token are credentials: they are stored privately and are not shown or backed up.</string>
+    <string name="ntfy_server_hint">Server (default https://ntfy.sh)</string>
+    <string name="ntfy_topic_hint">Topic (letters, digits, - and _)</string>
+    <string name="ntfy_token_hint">Access token tk_… (optional)</string>
+    <string name="ntfy_invalid">Enter an https:// server without a path, a topic of up to 64 letters, digits, - or _, and an optional tk_ token.</string>
+    <string name="mqtt_title">MQTT (native, optional)</string>
+    <string name="mqtt_description">Optionally publish status changes to one MQTT 3.1.1 broker over TLS only (QoS 1, JSON payload). One short connection per message with a ten-second deadline; after failures new attempts wait 30 seconds, doubling up to 15 minutes. Nothing is queued while offline: only the latest measured state is retried later. It never changes measured status or starts monitoring. Broker, topic and credentials are stored privately, excluded from backups and diagnostics, and used only after unlock. Off by default.</string>
+    <string name="mqtt_enable">Publish status changes to MQTT</string>
+    <string name="mqtt_unset">MQTT broker is not set.</string>
+    <string name="mqtt_saved">MQTT broker saved: %1$s</string>
+    <string name="mqtt_set">Set MQTT broker</string>
+    <string name="mqtt_message">TLS only. The topic cannot contain # or +. Saved values are not shown; enter them again to replace them. Username and password are optional.</string>
+    <string name="mqtt_host_hint">Broker host name</string>
+    <string name="mqtt_port_hint">Port (default 8883)</string>
+    <string name="mqtt_topic_hint">Topic</string>
+    <string name="mqtt_username_hint">Username (optional)</string>
+    <string name="mqtt_password_hint">Password (optional)</string>
+    <string name="mqtt_invalid">Enter a valid host name, port, topic without # or +, and printable credentials within the limits.</string>
+    <string name="mqtt_required">Set a valid MQTT broker first.</string>
+    <string name="mqtt_test">Send MQTT test message</string>
 </resources>
