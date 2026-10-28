@@ -55,12 +55,12 @@ class MonitorService : Service() {
                 else ProbeRules.isStale(checkedAt, now, expectedIntervalSec))
     }
 
-    private data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
+    internal data class Probe(val status: Status, val latencyMs: Long, val reason: String, val diagnostics: String = "",
         val outcomes: List<ProbeOutcome> = emptyList(), val extraCheck: ExtraCheck? = null) {
         val publishable get() = if (outcomes.isEmpty()) status != Status.UNKNOWN else ProbeReport(outcomes).publishable
     }
 
-    private data class ExtraCheck(val token: ExtraProbeCoordinator.Token, val probe: NetworkProbe,
+    internal data class ExtraCheck(val token: ExtraProbeCoordinator.Token, val probe: NetworkProbe,
         val endpoints: List<ProbeEndpoint>)
 
     companion object {
@@ -211,7 +211,6 @@ class MonitorService : Service() {
     private var targetMonitoring: TargetMonitoring? = null
     private var regionalMonitor: RegionalMonitor? = null
     @Volatile private var telegramDueElapsed: Long? = null
-    @Volatile private var primarySettingsRevision: Long? = null
     private var deferredExtra: Probe? = null
     private lateinit var workerThread: HandlerThread
     private val stopped = CountDownLatch(1)
@@ -269,6 +268,16 @@ class MonitorService : Service() {
     private val probeExecutor: ExecutorService = NetworkProbe.executor()
     private val extraProbeExecutor: ExecutorService = NetworkProbe.extraExecutor()
     private val extraCoordinator = ExtraProbeCoordinator()
+    private val primaryChecks = PrimaryCheckController(this, object : PrimaryCheckHost {
+        override val publicationLock: Any get() = this@MonitorService
+        override fun acceptsRunningCheck() = this@MonitorService.acceptsRunningCheck(this@MonitorService)
+        override fun currentScheduleRevision() = checkSchedule.revision
+        override fun createProbe() = PrimaryAndroidProbe.create(cm, probeExecutor, extraProbeExecutor,
+            extraCoordinator, ::informationalEndpoints)
+        override fun onNetworkKind(kind: NetworkKind) { probeNetwork = kind }
+        override fun onMeasured(result: Probe) = publishMeasured(result)
+        override fun onUnmeasured(result: Probe) = publishUnmeasured(result)
+    })
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var loopStarted = false
@@ -674,11 +683,11 @@ class MonitorService : Service() {
         extraCoordinator.invalidate()
         checkStartedMono = SystemClock.elapsedRealtime()
         val revision = checkSchedule.begin()
-        primarySettingsRevision = TargetPreferences.fence.snapshot(TargetId.TELEGRAM).revision
+        primaryChecks.beginCheck()
         var retryDelayMs: Long? = null
         acquireWakeLockForCheck()
         try {
-            val result = performCheck(revision)
+            val result = primaryChecks.performCheck(revision)
             if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
             if (!acceptsRunningCheck(this)) return
             publishCheckedResult(result, revision)
@@ -704,7 +713,7 @@ class MonitorService : Service() {
             }
             lastProgressMono = SystemClock.elapsedRealtime()
         } finally {
-            primarySettingsRevision = null
+            primaryChecks.finishCheck()
             checkStartedMono = 0L
             releaseWakeLock()
         }
@@ -715,15 +724,6 @@ class MonitorService : Service() {
         }
     }
 
-    private fun performCheck(revision: Long): Probe {
-        val result = PrimaryAndroidProbe.create(cm, probeExecutor, extraProbeExecutor,
-            extraCoordinator, ::informationalEndpoints).check(revision)
-        probeNetwork = result.networkKind
-        return Probe(result.status, result.latencyMs, AndroidText.resolve(this, result.reason),
-            AndroidText.resolve(this, result.diagnostics), result.outcomes,
-            result.extras?.let { ExtraCheck(it.token, it.probe, it.endpoints) })
-    }
-
     private fun informationalEndpoints(): List<ProbeEndpoint> {
         val extras = Prefs.extraProbeEndpoints(this)
         val targets = targetMonitoring ?: return extras
@@ -732,31 +732,24 @@ class MonitorService : Service() {
         }
     }
 
-    /** Network callbacks and primary publication share this lock, including revision validation. */
-    @Synchronized private fun publishCheckedResult(result: Probe, revision: Long) {
-        val settingsRevision = TargetPreferences.fence.snapshot(TargetId.TELEGRAM).revision
-        val currentSettings = primarySettingsRevision?.let { it == settingsRevision } ?: true
-        if (!acceptsRunningCheck(this) || !TargetPreferences.definition(this, TargetId.TELEGRAM).enabled ||
-            !currentSettings) return
-        if (Thread.currentThread().isInterrupted) throw InterruptedException("cancelled")
-        // A result from a network that has since changed is no observation: keep the prior state,
-        // history and alerts. afterCheck() runs the replacement check one second later.
-        if (revision != checkSchedule.revision) return
-        if (result.publishable) {
-            handleResult(result)
-            targetMonitoring?.startDue()
-            startExtras(result)
-        } else {
-            // Admission failure is monitor health, not a new observation about Telegram.
-            slowController?.unmeasured()
-            lastEndpoints = result.outcomes.toList()
-            val generation = TargetPersistence.active?.generationId
-            val at = System.currentTimeMillis()
-            HistorySessions.queue(this).submit(historySession) {
-                DcLatencyRecorder.record(this, result.outcomes, at, generation)
-            }
-            checkSchedule.request(UNMEASURED_RETRY_MS)
+    private fun publishCheckedResult(result: Probe, revision: Long) = primaryChecks.publishCheckedResult(result, revision)
+
+    private fun publishMeasured(result: Probe) {
+        handleResult(result)
+        targetMonitoring?.startDue()
+        startExtras(result)
+    }
+
+    private fun publishUnmeasured(result: Probe) {
+        // Admission failure is monitor health, not a new observation about Telegram.
+        slowController?.unmeasured()
+        lastEndpoints = result.outcomes.toList()
+        val generation = TargetPersistence.active?.generationId
+        val at = System.currentTimeMillis()
+        HistorySessions.queue(this).submit(historySession) {
+            DcLatencyRecorder.record(this, result.outcomes, at, generation)
         }
+        checkSchedule.request(UNMEASURED_RETRY_MS)
     }
 
     @Synchronized private fun startExtras(primary: Probe) {
