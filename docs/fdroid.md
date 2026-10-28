@@ -4,8 +4,39 @@
 candidate, code1024001, tag `v1.24.1`; its recipe has not been validated for that
 version. The last exact-tag local verification recorded below applies to 1.20.1,
 code1020001, source `4b2aba4d1c87606ed482752cf027c85e5896dece`, and is not evidence
-for 1.24.1. The separate Wear application is not included. Neither candidate has
-been submitted to or accepted by the catalog.
+for 1.24.1. A separate 1.24.1 attempt and its blocker are recorded in
+[verification-1.24.1.json](distribution/verification-1.24.1.json). The separate
+Wear application is not included. Neither candidate has been submitted to or
+accepted by the catalog.
+
+## Candidate v1.24.1 — attempted validation
+
+On 28 October 2026, the exact tag resolved to
+`a32d31cc21cf8bbdb56c3f813d4963d74874091b`. `fdroidserver`2.4.5 `readmeta`
+passed. `lint ru.tgwatch` passed in isolated staging with the official
+`Connectivity` category name; that staging was not a full `fdroiddata` checkout.
+The recipe remains disabled in this repository, and both update modes remain
+`None`.
+
+The published phone APK was downloaded from the v1.24.1 GitHub release, its SHA256
+was verified against the release checksum asset, and `apksigner verify` passed.
+It reports `ru.tgwatch`, 1.24.1/code1024001, min26/target36/compile37. Its SHA256 is
+`6dced42b54e878753615f1916c6e3b2d92e01b46ebee5dfe3af75f63e284a50f`.
+
+Both the clean independent Gradle build and normal `fdroid build --test --stop`
+were attempted with Gradle9.4.1 and JDK17. The plugin marker for AGP9.2.1 could not
+be resolved because this environment could not resolve `dl.google.com`. The
+F-Droid build reached source checkout and signing-config cleanup, then stopped
+during Gradle cleanup. Neither build produced an unsigned APK, so unsigned
+byte-comparison and `apksigcopier compare --unsigned` were not run. The verified
+published APK alone does not establish reproducibility.
+
+To retry, provide network/DNS access to `dl.google.com`, use the exact source tag
+and pinned toolchain above, and follow the commands and staging notes in the
+versioned verification record. Remove `disable` only from a temporary staging
+copy; do not use `--force` or `--skip-scan`. Maintainer review is still required.
+No materials were sent to `fdroiddata`, and no server validation or catalog
+acceptance is claimed.
 
 ## Exact-tag local verification
 
