@@ -249,7 +249,7 @@ class MonitorService : Service() {
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
     private val ongoing by lazy(LazyThreadSafetyMode.NONE) {
-        OngoingNotificationController(this, nm, NOTIFICATION_ID, object : OngoingNotificationHost {
+        OngoingNotificationController(this, { nm }, NOTIFICATION_ID, object : OngoingNotificationHost {
             override val isDestroyed get() = destroyed
             override val historySession get() = this@MonitorService.historySession
             override fun currentState() = state

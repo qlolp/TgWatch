@@ -20,7 +20,7 @@ internal interface OngoingNotificationHost {
 /** Отображение постоянного уведомления и ограниченное фоновое обновление статистики. */
 internal class OngoingNotificationController(
     private val context: Context,
-    private val nm: NotificationManager,
+    private val notificationManager: () -> NotificationManager,
     private val notificationId: Int,
     private val host: OngoingNotificationHost,
 ) {
@@ -64,11 +64,11 @@ internal class OngoingNotificationController(
         val view = view(s)
         if (!gate.shouldDraw(view, SystemClock.elapsedRealtime()) && periodic) return
         try {
-            nm.notify(notificationId, build(view))
+            notificationManager().notify(notificationId, build(view))
         } catch (e: Exception) {
             Log.w(TAG, "notify", e)
         }
-        if (host.isDestroyed) nm.cancel(notificationId)
+        if (host.isDestroyed) notificationManager().cancel(notificationId)
     }
 
     /** Complete presentation key, derived only from the immutable state and cached aggregates. */
