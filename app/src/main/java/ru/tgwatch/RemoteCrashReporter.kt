@@ -18,16 +18,18 @@ internal object RemoteCrashReporter {
     private const val DEADLINE_MS = 2_500L
     private val attempted = AtomicBoolean(false)
 
-    @Suppress("TooGenericExceptionCaught")
     fun report(ctx: Context, record: CrashJournal.Record) {
-        val endpoint = runCatching { CrashReportingSettings.activeEndpoint(ctx) }.getOrNull() ?: return
-        if (!attempted.compareAndSet(false, true)) return
-
-        val payload = try {
+        val endpoint = runCatching { CrashReportingSettings.activeEndpoint(ctx) }.getOrNull()
+        val payload = runCatching {
             CrashReportingPolicy.payload(BuildConfig.VERSION_NAME, Build.VERSION.SDK_INT, record.type, record.frames)
-        } catch (_: Exception) {
-            return
+        }.getOrNull()
+        if (endpoint != null && payload != null && attempted.compareAndSet(false, true)) {
+            bestEffort(endpoint, payload)
         }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun bestEffort(endpoint: String, payload: ByteArray) {
         val connection = AtomicReference<HttpURLConnection?>()
         var request: FutureTask<Unit>? = null
         try {

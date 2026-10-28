@@ -9,6 +9,7 @@ internal object CrashReportingPolicy {
     const val MAX_PAYLOAD_BYTES = 8 * 1024
     const val MAX_FRAMES = 24
     const val MAX_ENDPOINT_LENGTH = 512
+    private const val MAX_ANDROID_SDK = 1_000
     private const val MAX_APP_VERSION_LENGTH = 32
 
     fun normalizeEndpoint(raw: String?): String? =
@@ -25,7 +26,7 @@ internal object CrashReportingPolicy {
         } ?: "unknown"
         val json = JSONObject().put("schema_version", SCHEMA_VERSION)
             .put("app_version", version)
-            .put("android_sdk", sdkInt.coerceIn(1, 1000))
+            .put("android_sdk", sdkInt.coerceIn(1, MAX_ANDROID_SDK))
             .put("crash_class", CrashMetadata.type(crashClass))
             .put("stack_frames", frames)
         return json.toString().toByteArray(Charsets.UTF_8).also {

@@ -28,7 +28,7 @@ class CrashReportingSettingsIntegrationTest {
     private fun store() = ctx.getSharedPreferences(CrashReportingSettings.FILE, Context.MODE_PRIVATE)
 
     @Before fun clearFixture() {
-        original = store().all.toMap()
+        original = store().all.toMap<String, Any?>()
         assertTrue(CrashReportingSettings.clear(ctx))
     }
 

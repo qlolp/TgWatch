@@ -154,7 +154,11 @@ class AutomationSettingsActivity : Activity() {
         }
         button(column, R.string.crash_reporting_set_endpoint).apply {
             id = ID_CRASH_REPORTING_SET
-        }.setOnClickListener { editCrashEndpoint() }
+        }.setOnClickListener {
+            crashEndpointDialog = CrashReportingEndpointDialog(this) { refresh() }.show {
+                crashEndpointDialog = null
+            }
+        }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
         // Android 15 uses edge-to-edge; apply fresh padding instead of accumulating insets.
@@ -293,45 +297,6 @@ class AutomationSettingsActivity : Activity() {
             }.create()
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         dialog.show()
-    }
-
-    internal fun editCrashEndpoint(): AlertDialog {
-        val input = EditText(this).apply {
-            setHint(R.string.crash_reporting_endpoint_hint)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            id = ID_CRASH_REPORTING_INPUT
-            filters = arrayOf(InputFilter.LengthFilter(CrashReportingPolicy.MAX_ENDPOINT_LENGTH))
-            setSingleLine(true)
-            isSaveEnabled = false
-            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
-        }
-        val frame = LinearLayout(this).apply {
-            setPadding(dp(SCREEN_PADDING_DP), dp(TEXT_PADDING_DP), dp(SCREEN_PADDING_DP), 0)
-            addView(input, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        }
-        val dialog = AlertDialog.Builder(this).setTitle(R.string.crash_reporting_set_endpoint)
-            .setMessage(R.string.crash_reporting_endpoint_message).setView(frame)
-            .setNegativeButton(R.string.dialog_cancel, null)
-            .setNeutralButton(R.string.dialog_remove) { _, _ ->
-                if (!CrashReportingSettings.clear(this)) storageError()
-                refresh()
-            }
-            .setPositiveButton(R.string.dialog_save) { _, _ ->
-                when (CrashReportingSettings.setEndpoint(this, input.text.toString())) {
-                    CrashReportingSettings.WriteResult.SAVED -> Unit
-                    CrashReportingSettings.WriteResult.INVALID ->
-                        Toast.makeText(this, R.string.crash_reporting_endpoint_invalid, Toast.LENGTH_LONG).show()
-                    CrashReportingSettings.WriteResult.STORAGE_FAILED -> storageError()
-                }
-                refresh()
-            }.create()
-        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        crashEndpointDialog = dialog
-        dialog.setOnDismissListener { crashEndpointDialog = null }
-        dialog.show()
-        return dialog
     }
 
     private fun sendWebhookTest() {
