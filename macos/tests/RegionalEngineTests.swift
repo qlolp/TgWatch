@@ -6,15 +6,27 @@ import Darwin
         if !condition() { FileHandle.standardError.write(Data((message + "\n").utf8)); exit(1) }
     }
     static func main() throws {
-        let candidates = MacPythonRuntime.candidates(environment: ["PATH": ":relative:/usr/bin:/tmp/bin:/tmp/bin"],
-                                                     knownPaths: [])
-        expect(candidates.map(\.path) == ["/tmp/bin/python3"], "No shell, relative PATH, system launcher or duplicates")
+        let resources = URL(fileURLWithPath: "/tmp/TgWatch.app/Contents/Resources")
+        expect(MacPythonRuntime.candidates(resourcesURL: resources, architecture: "arm64").map(\.path) ==
+               ["/tmp/TgWatch.app/Contents/Resources/python/arm64/bin/python3"],
+               "Apple Silicon uses its bundled runtime")
+        expect(MacPythonRuntime.candidates(resourcesURL: resources, architecture: "x86_64").map(\.path) ==
+               ["/tmp/TgWatch.app/Contents/Resources/python/x86_64/bin/python3"],
+               "Intel uses its bundled runtime")
+        expect(MacPythonRuntime.candidates(resourcesURL: resources).map(\.path) ==
+               ["/tmp/TgWatch.app/Contents/Resources/python/\(MacPythonRuntime.processArchitecture)/bin/python3"],
+               "The app process architecture selects its matching bundled interpreter")
+        expect(MacPythonRuntime.candidates(resourcesURL: resources, architecture: "unknown").isEmpty,
+               "Unsupported architectures have no runtime candidate")
         expect(MacPythonRuntime.find(candidates: [], isCurrent: { true }) == nil, "Missing runtime is explicit")
-        expect(MacPythonRuntime.find(candidates: MacPythonRuntime.candidates(), isCurrent: { false }) == nil,
+        expect(MacPythonRuntime.find(candidates: [URL(fileURLWithPath: "/usr/bin/python3")], isCurrent: { false }) == nil,
                "Canceled discovery cannot launch a process")
-        guard MacPythonRuntime.find(candidates: MacPythonRuntime.candidates(), isCurrent: { true }) != nil else {
-            fatalError("Process tests need installed Python3.10+")
+        guard let python = ProcessInfo.processInfo.environment["TGWATCH_TEST_PYTHON"] else {
+            fatalError("Process tests need TGWATCH_TEST_PYTHON")
         }
+        let runtime = URL(fileURLWithPath: python)
+        expect(MacPythonRuntime.find(candidates: [runtime], isCurrent: { true }) == runtime,
+               "An explicitly injected process-test interpreter must pass the version probe")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -32,7 +44,7 @@ import Darwin
         let received = DispatchSemaphore(value: 0)
         let stopped = DispatchSemaphore(value: 0)
         let wrong = DispatchSemaphore(value: 0)
-        let engine = RegionalEngineProcess(script: script, onLine: { data, generation in
+        let engine = RegionalEngineProcess(script: script, runtimeCandidates: [runtime], onLine: { data, generation in
             if generation == 1 && RegionalMenuDecoder.decode(data,
                 now: Date().timeIntervalSince1970 * 1_000, uptime: ProcessInfo.processInfo.systemUptime) != nil {
                 received.signal()
