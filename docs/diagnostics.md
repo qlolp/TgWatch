@@ -134,7 +134,8 @@ timeouts. There is no offline queue, retry, startup request or monitoring reques
 failed sends are discarded. Turning consent off disables sending immediately.
 Remove deletes both the saved endpoint and consent. The endpoint is stored in
 credential-protected private preferences, shown only as a host, and excluded
-from backup, diagnostic exports, logs and saved view state.
+from backup, diagnostic exports, logs and saved view state. A failed private preference
+commit leaves remote reporting inactive; replacing an endpoint always requires fresh consent.
 
 Schema version 1 is bounded to 8 KiB and contains only the app version, Android
 SDK level, a validated technical crash class and up to 24 sanitized first-party
