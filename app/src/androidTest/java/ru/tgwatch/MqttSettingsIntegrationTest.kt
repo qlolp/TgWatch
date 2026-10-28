@@ -53,6 +53,16 @@ class MqttSettingsIntegrationTest {
         assertNull(MqttSettings.endpoint(ctx))
     }
 
+    @Test fun storedPasswordWithoutUsernameFailsClosed() {
+        assertTrue(store().edit().putString("host", secrets[0]).putInt("port", 8883)
+            .putString("topic", secrets[1]).putString("password", secrets[3])
+            .putBoolean("enabled", true).commit())
+
+        assertNull(MqttSettings.endpoint(ctx))
+        assertFalse(MqttSettings.enabled(ctx))
+        assertNull(MqttSettings.configuration(ctx).url)
+    }
+
     @Test fun offByDefaultValidatedPrivateAndOutsideBackupDiagnosticsAndPrefs() {
         assertFalse(MqttSettings.enabled(ctx))
         assertEquals(WebhookSettings.WriteResult.INVALID, MqttSettings.setEnabledResult(ctx, true))

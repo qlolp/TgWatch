@@ -39,7 +39,7 @@ object MqttSettings {
             MqttPolicy.MAX_USERNAME_BYTES)?.ifEmpty { null }
         val password = MqttPolicy.normalizeSecret(saved.getString(KEY_PASSWORD, null),
             MqttPolicy.MAX_PASSWORD_BYTES)?.ifEmpty { null }
-        return if (host == null || port == null || topic == null) null
+        return if (host == null || port == null || topic == null || (username == null && password != null)) null
             else MqttEndpoint(host, port, topic, username, password)
     }
 
