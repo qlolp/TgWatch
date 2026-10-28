@@ -1,0 +1,12 @@
+<resources>
+    <string name="crash_reporting_title">Удалённые отчёты о сбоях (необязательно)</string>
+    <string name="crash_reporting_description">Один минимальный отчёт отправляется только на ваш HTTPS-сборщик после отдельного согласия. Сборщик должен требовать аутентификацию. Вы отвечаете за его работу, регион, срок хранения и условия обработки данных. Очереди и повторных отправок нет.</string>
+    <string name="crash_reporting_enable">Согласен отправлять отчёты о сбоях</string>
+    <string name="crash_reporting_endpoint_unset">Сборщик не задан</string>
+    <string name="crash_reporting_endpoint_saved">Хост сборщика: %1$s</string>
+    <string name="crash_reporting_set_endpoint">Задать HTTPS-сборщик</string>
+    <string name="crash_reporting_endpoint_hint">https://collector.example/crash-secret-path</string>
+    <string name="crash_reporting_endpoint_message">Введите HTTPS-адрес своего сборщика с обязательной аутентификацией. Адрес хранится приватно, не входит в отчёт и удаляется кнопкой «Удалить». После сохранения адреса согласие выключено: включите его отдельно.</string>
+    <string name="crash_reporting_endpoint_invalid">Введите HTTPS-адрес без логина, параметров запроса и фрагмента.</string>
+    <string name="crash_reporting_endpoint_required">Сначала задайте адрес сборщика.</string>
+</resources>

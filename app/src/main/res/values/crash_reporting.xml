@@ -1,0 +1,12 @@
+<resources>
+    <string name="crash_reporting_title">Remote crash reports (optional)</string>
+    <string name="crash_reporting_description">Sends one minimal crash report to your own HTTPS collector only after separate consent. The collector must require authentication. You operate it and control its region, retention and data-processing terms. No report is queued or retried.</string>
+    <string name="crash_reporting_enable">I consent to send crash reports</string>
+    <string name="crash_reporting_endpoint_unset">No collector configured</string>
+    <string name="crash_reporting_endpoint_saved">Collector host: %1$s</string>
+    <string name="crash_reporting_set_endpoint">Set HTTPS collector</string>
+    <string name="crash_reporting_endpoint_hint">https://collector.example/crash-secret-path</string>
+    <string name="crash_reporting_endpoint_message">Enter an HTTPS endpoint for your own authentication-protected collector. The address is stored privately, never included in the report, and is deleted with Remove. Saving an address turns consent off; enable it separately to opt in.</string>
+    <string name="crash_reporting_endpoint_invalid">Enter an HTTPS URL without login, query or fragment.</string>
+    <string name="crash_reporting_endpoint_required">Set a collector endpoint before consenting.</string>
+</resources>

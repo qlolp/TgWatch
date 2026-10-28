@@ -2,4 +2,5 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="automation-private-v1.xml" />
     <exclude domain="sharedpref" path="webhook-private-v1.xml" />
+    <exclude domain="sharedpref" path="crash-reporting-private-v1.xml" />
 </full-backup-content>

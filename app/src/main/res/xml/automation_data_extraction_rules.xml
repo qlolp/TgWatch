@@ -3,9 +3,11 @@
     <cloud-backup>
         <exclude domain="sharedpref" path="automation-private-v1.xml" />
         <exclude domain="sharedpref" path="webhook-private-v1.xml" />
+        <exclude domain="sharedpref" path="crash-reporting-private-v1.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="automation-private-v1.xml" />
         <exclude domain="sharedpref" path="webhook-private-v1.xml" />
+        <exclude domain="sharedpref" path="crash-reporting-private-v1.xml" />
     </device-transfer>
 </data-extraction-rules>
