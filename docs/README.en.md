@@ -172,9 +172,12 @@ configured. See [contributing](../CONTRIBUTING.md) and [F-Droid preparation](fdr
 F-Droid acceptance and a verified reproducible production build are separate
 steps. The code is licensed under [MIT](../LICENSE).
 
-Custom HTTPS optionally checks an exact HTTP code and top-level JSON string (for
-example `status=ok`). These criteria remain private and are excluded from backups
-and exports. See [health criteria and limits](multiservice.md#custom-https-health-criteria).
+Custom HTTPS optionally checks an exact HTTP code, a bounded body substring, up to
+four JSON string conditions (all must match), and up to eight request headers.
+Body checks use one GET and read at most 32 KiB; the default remains HEAD with a
+2xx requirement. URLs, criteria and headers stay in credential-protected storage,
+never in backups, diagnostics, logs, sharing or saved view state. See the detailed
+[health criteria and limits](multiservice.md#custom-https-health-criteria).
 
 The explicit [JSON v2 + heartbeat](automation.md#json-v2--heartbeat) format sends
 fresh measurements without new phone alarms. Its Home Assistant package expires

@@ -11,7 +11,10 @@ import javax.net.ssl.SSLException
 enum class ProbeGroup { WEB, MTPROTO, CONTROL, EXTRA }
 enum class ProbeMeasurement { SUCCESS, FAILURE, NOT_MEASURED }
 data class ProbeEndpoint(val name: String, val group: ProbeGroup, val address: String,
-    val httpMode: HttpProbeMode = HttpProbeMode.REACHABLE, val condition: HttpProbeCondition? = null)
+    val httpMode: HttpProbeMode = HttpProbeMode.REACHABLE, val condition: HttpProbeCondition? = null) {
+    override fun toString() = "ProbeEndpoint(name=$name, group=$group, address=redacted, httpMode=$httpMode, " +
+        "condition=${if (condition == null) "null" else "redacted"})"
+}
 enum class ProbeDetailCode {
     NONE, HTTP_RESPONSE, MTPROTO_CONFIRMED, MTPROTO_UNCONFIRMED, BUSY, CANCELLED, TIME_LIMIT,
     DNS, TLS, TIMEOUT, EXCEPTION, HTTP_CODE_MISMATCH, HTTP_JSON_NOT_CONFIRMED
