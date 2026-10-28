@@ -19,14 +19,13 @@ GitHub Releases; локальная сборка не означает публ�
 
 | Этап | Отслеживание и граница готовности |
 | --- | --- |
-| Декомпозиция `MonitorService` | [#79](https://github.com/qlolp/TgWatch/issues/79): постепенно выделить foreground lifecycle, Telegram check/publication и ongoing notification без изменения bounded pools, deadlines, cancellation и revision isolation. |
+| Декомпозиция `MonitorService` | [#79](https://github.com/qlolp/TgWatch/issues/79): Telegram check/publication и ongoing notification извлечены в отдельные контроллеры; review foreground lifecycle остаётся. |
 | Реальные Android/OEM и батарея | [#75](https://github.com/qlolp/TgWatch/issues/75): заполнить матрицу Pixel, Samsung и Xiaomi/HyperOS, измерить p50/p95 задержки и суточный расход. Эмулятор и локальная сборка не закрывают этот пункт. |
-| F-Droid | [#73](https://github.com/qlolp/TgWatch/issues/73): exact-tag reproducible-build проверка актуального кандидата, maintainer review и upstream submission. Подготовка recipe не означает принятие в каталог. |
-| macOS-дистрибутив | [#76](https://github.com/qlolp/TgWatch/issues/76): bundled Python, Developer ID, notarization и stapling. Без Apple credentials нельзя заявлять подписанный/нотаризованный выпуск. |
-| Несколько webhook-получателей | [#78](https://github.com/qlolp/TgWatch/issues/78): независимые маршруты, поколения и физические ограничения доставки с сохранением приватности адресов. |
-| Custom HTTPS | [#77](https://github.com/qlolp/TgWatch/issues/77): дополнительные body/JSON/header-критерии только с credential-protected секретами и прежними лимитами транспорта. |
-| MQTT / ntfy | [#74](https://github.com/qlolp/TgWatch/issues/74): сначала доказать сценарии, которые не покрывают несколько HTTPS-получателей. |
-| Remote crash reporting | [#72](https://github.com/qlolp/TgWatch/issues/72): только после выбора оператора, consent, retention и проверки redaction; локальный журнал остаётся вариантом по умолчанию. |
+| F-Droid | [#73](https://github.com/qlolp/TgWatch/issues/73): историческая независимая exact-tag сборка относится только к 1.24.1. Recipe build, byte/payload comparisons, maintainer review и upstream submission остаются; принятие каталогом не заявляется. |
+| macOS-дистрибутив | [#76](https://github.com/qlolp/TgWatch/issues/76): bundled Python и signing/notarization pipeline подготовлены; реальная Developer ID подпись, Apple notarization, stapling и Gatekeeper-проверка требуют credentials и остаются внешними. |
+| Интеграции доставки | [#78](https://github.com/qlolp/TgWatch/issues/78), [#74](https://github.com/qlolp/TgWatch/issues/74): до пяти независимых webhook-получателей, ntfy preset и native MQTT/TLS реализованы в кандидате 1.25.0; реальный broker не проверен. |
+| Custom HTTPS | [#77](https://github.com/qlolp/TgWatch/issues/77): дополнительные body/JSON/header-критерии реализованы в кандидате 1.25.0; приватность и прежние транспортные лимиты сохранены. |
+| Remote crash reporting | [#72](https://github.com/qlolp/TgWatch/issues/72): opt-in отправка на HTTPS collector пользователя после отдельного согласия реализована в кандидате 1.25.0; локальный журнал остаётся вариантом по умолчанию. |
 
 Ниже сохранены исторические причины решений. Реализованные функции заменили прежние
 ограничения: мультисервис уже реализован, webhook поддерживает JSON, а отсутствие
@@ -88,14 +87,14 @@ API, локальная диагностика и наблюдаемость з�
 | Robolectric | Нужен для Android adapters, когда он экономит цикл тестирования; он не заменяет реальные alarms, Doze, foreground-service и boot проверки. В текущем пакете добавлены meaningful JVM и Android regressions. |
 | Несколько сервисов | Реализованы Telegram, Matrix, WhatsApp Web и до пяти Custom HTTPS: отдельные идентификаторы, истории, настройки и оповещения. Старые данные мигрируют в Telegram; TGWB v4/v5 переносит все добавленные цели и выбранный retention, сохраняя чтение поддерживаемых старых форматов. Необязательные HTTPS-слоты добавляются явно и по умолчанию выключены. Дальнейшее расширение числа слотов требует отдельного доказательства пользы и пересмотра bounded storage/UI. |
 | Room / расширение истории | Хранение 7/30/90 дней и минутные/пятиминутные rollups уже реализованы в bounded durable storage. Room сам по себе не нужен для этого диапазона; пересмотр оправдан более сложными запросами или неограниченным retention после измерений памяти, миграций CSV/epochs/restore и времени агрегаций. |
-| Webhook / Matrix / bot / ntfy | Реализованы TEXT, JSON v1 и отдельный JSON v2 с heartbeat и примером Home Assistant TTL. Общий физический слот, 10-секундный deadline, фильтры и изоляция поколений сохраняются. Адрес приватный и исключён из бэкапа; интеграция выключена по умолчанию. MQTT, несколько получателей и прямые bot-адаптеры остаются отдельными расширениями. |
+| Webhook / Matrix / bot / ntfy | До пяти получателей, TEXT/JSON и отдельный JSON v2, ntfy preset и MQTT/TLS реализованы; общий bounded transport, 10-секундный deadline, фильтры и изоляция поколений сохраняются. Адреса и credentials приватны и исключены из бэкапа; интеграции выключены по умолчанию. Только прямые bot-адаптеры остаются отдельными расширениями. |
 | Sentry / ACRA | Сторонние SDK не используются. Опциональная отправка идёт только на собственный HTTPS-сборщик пользователя после отдельного согласия; пользователь отвечает за аутентификацию, регион, retention и DPA. Формат ограничен и проверяется redaction-тестами; по умолчанию отправка выключена, очереди нет. |
 | HTTP API на localhost | Излишний постоянно работающий сервер; localhost доступен другим приложениям. Реализован ограниченный explicit-broadcast API с authentication. |
 | Удалённый dc.json | Даже подсказки меняют маршруты запросов: нужны trusted source, границы, rollback и встроенный fallback. resPQ не аутентифицирует сервер. Сейчас сохраняются официальные embedded DC и локальная диагностика. |
 | HMAC / QR secret | AES-GCM уже проверяет целостность и позволяет офлайн проверять догадки пароля. Дополнительный HMAC этого не устраняет. Отдельный секрет должен участвовать в derivation AES-key, а его потеря меняет восстановление; существующий portable format сохраняется. |
 | Hardware-backed release signing | Android Keystore на телефоне относится к ключам устройства, а не замене production build-signing key. Смена сертификата прервёт обновления. Существующий ключ и continuity gate сохраняются. |
 | NTP | Дополнительные внешние запросы и отдельная trust/time модель. Monotonic deadlines, epochs и неизвестные интервалы уже сохраняют честную историю; сетевое время не должно автоматически переписывать наблюдения. |
-| F-Droid listing | Для тега 1.20.1 локально проверены readmeta/lint, нормальная сборка и совпадение unsigned APK; это историческое evidence только для указанного тега. Текущий disabled-кандидат указывает на 1.24.1 и ещё требует exact-tag проверки после обновления toolchain. Автоматические обновления, upstream submission и принятие каталогом — отдельные шаги после review сопровождающих. |
+| F-Droid listing | Для 1.24.1 сохранено историческое evidence независимой exact-tag сборки; recipe build и byte/payload comparisons не завершены. Maintainer review, upstream submission и принятие каталогом остаются отдельными шагами. Более раннее evidence 1.20.1 относится только к своему тегу. |
 
 Второй проход по 1.15.0 (зависший слот вебхука, статистика истории на главном потоке,
 токен записи в рабочем каталоге релизной джобы, мажорные Dependabot PR тулчейна) собран

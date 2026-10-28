@@ -1,0 +1,1 @@
+Up to five independent webhook recipients, an ntfy preset, and native MQTT/TLS. Expanded Custom HTTPS checks. Optional crash reporting sends a small, sanitized report only to your HTTPS collector after separate consent. Monitoring and notification internals were reorganized with their operating limits preserved.
