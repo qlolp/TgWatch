@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 class CrashReportingSettingsIntegrationTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val endpoint = "https://crash.private.example/SECRET_TOKEN"
-    private var original: Map<String, *> = emptyMap()
+    private var original: Map<String, *> = emptyMap<String, Any?>()
 
     private fun store() = ctx.getSharedPreferences(CrashReportingSettings.FILE, Context.MODE_PRIVATE)
 
