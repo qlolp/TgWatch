@@ -44,9 +44,16 @@ class LifecycleStorageBlockingTest {
         MonitorService.start(ctx)
         val deadline = SystemClock.elapsedRealtime() + 10_000
         val notifications = ctx.getSystemService(NotificationManager::class.java)
-        while (notifications.activeNotifications.none { it.id == 1 } &&
-            SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(50)
-        assertTrue(MonitorService.running)
+        while (
+            (!MonitorService.running || notifications.activeNotifications.none { it.id == 1 }) &&
+            SystemClock.elapsedRealtime() < deadline
+        ) {
+            SystemClock.sleep(50)
+        }
+        assertTrue(
+            "The foreground service must be running before testing teardown",
+            MonitorService.running
+        )
         val held = CountDownLatch(1)
         val release = CountDownLatch(1)
         val holder = thread(name = "lifecycle-held-history") {

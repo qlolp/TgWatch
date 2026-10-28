@@ -732,7 +732,8 @@ class MonitorService : Service() {
         }
     }
 
-    private fun publishCheckedResult(result: Probe, revision: Long) = primaryChecks.publishCheckedResult(result, revision)
+    private fun publishCheckedResult(result: Probe, revision: Long) =
+        primaryChecks.publishCheckedResult(result, revision)
 
     private fun publishMeasured(result: Probe) {
         handleResult(result)
@@ -919,4 +920,3 @@ class MonitorService : Service() {
         }
     }
 }
-
