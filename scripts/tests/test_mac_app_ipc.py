@@ -118,7 +118,7 @@ class MacAppIpcTests(unittest.TestCase):
                     module.measure = lambda _: module.bounded_probe('service', sys.argv[2])
                     raise SystemExit(module.main(['--app-json', '--watch', '--service', 'gemini']))
                 '''))
-            parent = subprocess.Popen([sys.executable, str(fixture), str(ROOT / 'scripts'), str(marker)],
+            parent = subprocess.Popen([sys.executable, '-B', str(fixture), str(ROOT / 'scripts'), str(marker)],
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             child = None
             try:

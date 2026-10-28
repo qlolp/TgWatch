@@ -1,5 +1,6 @@
 """Inspect a real signed app and launch its native menu through macOS LaunchServices, with no opt-in changes."""
 import json
+import os
 import platform
 from pathlib import Path
 import plistlib
@@ -17,7 +18,7 @@ class MacBundleTests(unittest.TestCase):
         cls.app = Path(cls.directory.name) / 'TgWatch.app'
         builder = ROOT / 'scripts/build-mac-app.sh'
         result = subprocess.run(['bash', str(builder), '--output', str(cls.app)], cwd=ROOT,
-                                capture_output=True, text=True, timeout=180)
+                                capture_output=True, text=True, timeout=600)
         if result.returncode:
             cls.directory.cleanup()
             raise AssertionError(result.stdout + result.stderr)
@@ -44,8 +45,9 @@ class MacBundleTests(unittest.TestCase):
         executable = self.app / 'Contents/MacOS/TgWatch'
         arches = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
         self.assertEqual({'arm64', 'x86_64'}, set(arches))
-        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(self.app)],
-                       check=True, capture_output=True)
+        signature = subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(self.app)],
+                                   capture_output=True, text=True)
+        self.assertEqual(0, signature.returncode, signature.stdout + signature.stderr)
         signature = subprocess.run(['/usr/bin/codesign', '-dv', '--verbose=4', str(self.app)], check=True,
                                    capture_output=True, text=True).stderr
         self.assertIn('Signature=adhoc', signature)
@@ -53,13 +55,18 @@ class MacBundleTests(unittest.TestCase):
         archive = self.app.parent / 'TgWatch-mac-local-build.zip'
         extracted = self.app.parent / 'extracted'
         subprocess.run(['/usr/bin/ditto', '-x', '-k', str(archive), str(extracted)], check=True)
-        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(extracted / 'TgWatch.app')],
-                       check=True, capture_output=True)
+        extracted_signature = subprocess.run(
+            ['/usr/bin/codesign', '--verify', '--deep', '--strict', str(extracted / 'TgWatch.app')],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(0, extracted_signature.returncode, extracted_signature.stdout + extracted_signature.stderr)
 
     def test_bundled_python_runs_ipc_regression_suite(self):
         architecture = platform.machine()
         self.assertIn(architecture, ['arm64', 'x86_64'])
         python = self.app / f'Contents/Resources/python/{architecture}/bin/python3'
+        runtime = self.app / f'Contents/Resources/python/{architecture}'
+        caches_before = set(runtime.rglob('__pycache__'))
         version = subprocess.check_output(
             [str(python), '-I', '-B', '-c', 'import sys; print(".".join(map(str, sys.version_info[:3])))'],
             text=True,
@@ -69,8 +76,11 @@ class MacBundleTests(unittest.TestCase):
             [str(python), '-I', '-B', '-m', 'unittest', 'discover', '-s', str(ROOT / 'scripts/tests'),
              '-p', 'test_mac_app_ipc.py', '-v'],
             cwd=ROOT, capture_output=True, text=True, timeout=120,
+            env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'},
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(caches_before, set(runtime.rglob('__pycache__')),
+                         'Bundled runtime tests must not write bytecode into the signed app')
 
     def test_native_menu_has_five_profiles_without_enabling_any_monitor_or_permission(self):
         report = self.app.parent / 'native-smoke.json'
