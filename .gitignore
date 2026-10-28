@@ -25,4 +25,5 @@ __pycache__/
 # Disposable Android smoke output; reports are copied into build reports by CI.
 /legacy-history.csv
 /smoke-logcat.txt
+# Raw device evidence can contain serials, endpoints and private system dumps.
 /device-evidence/
