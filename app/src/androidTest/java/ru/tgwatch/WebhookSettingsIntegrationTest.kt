@@ -360,8 +360,8 @@ class WebhookSettingsIntegrationTest {
     }
 
     @Test fun recipientsKeepPrivateSettingsAndGenerationsIndependentAndOutOfPortableData() {
-        val primary = "https://ntfy.sh/private-topic-legacy-51e"
-        val additional = "https://ntfy.sh/private-topic-extra-74a"
+        val primary = "https://example.org/legacy-receiver"
+        val additional = "https://example.org/second-receiver"
         assertTrue(WebhookSettings.setUrl(ctx, primary))
         assertTrue(WebhookSettings.setEnabled(ctx, true))
         val primaryBefore = WebhookSettings.configuration(ctx)
@@ -387,7 +387,7 @@ class WebhookSettingsIntegrationTest {
             val portable = BackupCodec.encode(BackupManager.snapshot(ctx)).toString(Charsets.UTF_8)
             val diagnostics = LocalDiagnostics.snapshot(ctx).toJson()
             val backupSettings = BackupManager.snapshot(ctx).settings.values.joinToString()
-            listOf(primary, additional, "private-topic-legacy", "private-topic-extra").forEach { secret ->
+            listOf(primary, additional, "legacy-receiver", "second-receiver").forEach { secret ->
                 assertFalse(portable.contains(secret))
                 assertFalse(diagnostics.contains(secret))
                 assertFalse(backupSettings.contains(secret))
