@@ -91,7 +91,7 @@ import Network
             return
         }
         switch state {
-        case .starting: statusText = tr("Finding Python / starting checks…")
+        case .starting: statusText = tr("Starting bundled runtime / checks…")
         case .running: statusText = networkFence.capture() > 0 ? tr("Monitoring public websites") : tr("Waiting for network information…")
         case .stopped: statusText = tr("Monitoring stopped")
         case .missingRuntime, .failed:
@@ -99,7 +99,9 @@ import Network
             defaults.set(false, forKey: "monitoring.enabled")
             model.replace(generation: generation, services: [], networkEpoch: networkFence.capture())
             responseWatches?.resetEvidence()
-            statusText = state == .missingRuntime ? tr("Bundled Python runtime is unavailable") : tr("Checks stopped; retry or open Help")
+            statusText = state == .missingRuntime
+                ? tr("Bundled Python runtime is unavailable")
+                : tr("Checks stopped; retry or open Help")
             if case .missingRuntime = state {
                 message(tr("Bundled Python runtime is unavailable"),
                     tr("Rebuild the app from a trusted source; the matching bundled runtime is missing."))

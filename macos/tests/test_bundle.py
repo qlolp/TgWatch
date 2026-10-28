@@ -52,7 +52,7 @@ class MacBundleTests(unittest.TestCase):
         archive = self.app.parent / 'TgWatch-mac-local-build.zip'
         extracted = self.app.parent / 'extracted'
         subprocess.run(['/usr/bin/ditto', '-x', '-k', str(archive), str(extracted)], check=True)
-        subprocess.run(['/usr/bin/codesign', '--verify', '--strict', str(extracted / 'TgWatch.app')],
+        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(extracted / 'TgWatch.app')],
                        check=True, capture_output=True)
 
     def test_bundled_python_runs_ipc_regression_suite(self):

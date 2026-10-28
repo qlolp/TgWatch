@@ -19,8 +19,19 @@ if [[ -n "$notary_key_file" || -n "$notary_key_id" || -n "$notary_issuer" ]]; th
     echo 'Notarization requires a signing identity and all TGWATCH_MAC_NOTARY_* settings.' >&2
     exit 2
   fi
-  if [[ "$notary_key_file" != /* || ! -f "$notary_key_file" || ! -r "$notary_key_file" ]]; then
+  if [[ "$notary_key_file" != *.p8 || "$notary_key_file" != /* || -L "$notary_key_file" ||
+        ! -f "$notary_key_file" || ! -r "$notary_key_file" ]]; then
     echo 'TGWATCH_MAC_NOTARY_KEY_FILE must name a readable external .p8 key file.' >&2
+    exit 2
+  fi
+  if ! notary_key_directory=$(cd "$(dirname "$notary_key_file")" 2>/dev/null && pwd -P); then
+    echo 'TGWATCH_MAC_NOTARY_KEY_FILE must name a readable external .p8 key file.' >&2
+    exit 2
+  fi
+  repository_directory=$(cd "$root" && pwd -P)
+  if [[ "$notary_key_directory" == "$repository_directory" ||
+        "$notary_key_directory" == "$repository_directory/"* ]]; then
+    echo 'Keep the notary key outside the repository.' >&2
     exit 2
   fi
   notary_configured=true

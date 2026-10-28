@@ -13,6 +13,9 @@ import Darwin
         expect(MacPythonRuntime.candidates(resourcesURL: resources, architecture: "x86_64").map(\.path) ==
                ["/tmp/TgWatch.app/Contents/Resources/python/x86_64/bin/python3"],
                "Intel uses its bundled runtime")
+        expect(MacPythonRuntime.candidates(resourcesURL: resources).map(\.path) ==
+               ["/tmp/TgWatch.app/Contents/Resources/python/\(MacPythonRuntime.processArchitecture)/bin/python3"],
+               "The app process architecture selects its matching bundled interpreter")
         expect(MacPythonRuntime.candidates(resourcesURL: resources, architecture: "unknown").isEmpty,
                "Unsupported architectures have no runtime candidate")
         expect(MacPythonRuntime.find(candidates: [], isCurrent: { true }) == nil, "Missing runtime is explicit")

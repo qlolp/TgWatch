@@ -9,7 +9,7 @@
 "Country unverified" = "Country unverified";
 "Enable notifications to receive the alert" = "Enable notifications to receive the alert";
 "Explicit regional refusal" = "Explicit regional refusal";
-"Finding Python / starting checks…" = "Finding Python / starting checks…";
+"Starting bundled runtime / checks…" = "Starting bundled runtime / checks…";
 "Help" = "Help";
 "Include when monitoring" = "Include when monitoring";
 "Rebuild the app from a trusted source; the matching bundled runtime is missing." = "Rebuild the app from a trusted source; the matching bundled runtime is missing.";

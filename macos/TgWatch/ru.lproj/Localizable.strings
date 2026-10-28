@@ -9,7 +9,7 @@
 "Country unverified" = "Страна не подтверждена";
 "Enable notifications to receive the alert" = "Включите уведомления для получения сигнала";
 "Explicit regional refusal" = "Явный региональный отказ";
-"Finding Python / starting checks…" = "Поиск Python / запуск проверок…";
+"Starting bundled runtime / checks…" = "Запуск встроенной среды / проверок…";
 "Help" = "Справка";
 "Include when monitoring" = "Включать при мониторинге";
 "Rebuild the app from a trusted source; the matching bundled runtime is missing." = "Соберите приложение заново из доверенного источника: встроенная среда для этой архитектуры не найдена.";
