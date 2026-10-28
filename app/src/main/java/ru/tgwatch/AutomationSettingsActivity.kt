@@ -41,6 +41,11 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_RECEIVER = 0x00a7100c
         const val ID_WEBHOOK_ADD_RECEIVER = 0x00a7100d
         const val ID_WEBHOOK_REMOVE_RECEIVER = 0x00a7100e
+        const val ID_WEBHOOK_NTFY = 0x00a7100f
+        const val ID_MQTT_ENABLE = 0x00a71010
+        const val ID_MQTT_STATUS = 0x00a71011
+        const val ID_MQTT_SET = 0x00a71012
+        const val ID_MQTT_TEST = 0x00a71013
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
@@ -71,6 +76,7 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var webhookHealth: TextView
     private lateinit var webhookReceiver: Button
     private lateinit var webhookRemoveReceiver: Button
+    private lateinit var mqtt: MqttSettingsUi
     private var selectedWebhookReceiver = 0
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
@@ -80,6 +86,7 @@ class AutomationSettingsActivity : Activity() {
                     selectedWebhookReceiver),
                 android.os.SystemClock.elapsedRealtime()))
             if (webhookHealth.text.toString() != text) webhookHealth.text = text
+            mqtt.refreshHealth()
             healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
         }
     }
@@ -169,10 +176,13 @@ class AutomationSettingsActivity : Activity() {
         }
         webhookUrlView = text(R.string.webhook_url_unset).apply { id = ID_WEBHOOK_URL }
         button(column, R.string.webhook_set_url).apply { id = ID_WEBHOOK_SET }.setOnClickListener { editWebhookUrl() }
+        button(column, R.string.ntfy_preset).apply { id = ID_WEBHOOK_NTFY }
+            .setOnClickListener { showNtfyPreset(selectedWebhookReceiver) { refresh() } }
         webhookTest = button(column, R.string.webhook_test).apply { id = ID_WEBHOOK_TEST }
         webhookTest.setOnClickListener { sendWebhookTest() }
         webhookDelivery = WebhookDeliverySettingsUi(this, { selectedWebhookReceiver }).apply { attach(column) }
         webhookHealth = text(R.string.webhook_title).apply { id = ID_WEBHOOK_HEALTH }
+        mqtt = MqttSettingsUi(this).apply { attach(column) }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
         // Android 15 uses edge-to-edge; apply fresh padding instead of accumulating insets.
@@ -264,6 +274,7 @@ class AutomationSettingsActivity : Activity() {
             WebhookHealthText.format(WebhookNotifier.health(this, selectedWebhookReceiver),
                 android.os.SystemClock.elapsedRealtime()))
         if (webhookHealth.text.toString() != text) webhookHealth.text = text
+        if (::mqtt.isInitialized) mqtt.refresh()
     }
 
     /** The current address is never prefilled; dialogs are secure windows of their own. */

@@ -222,6 +222,48 @@ Direct Boot, portable backup, platform backup/transfer, diagnostics and logs.
 Before the first unlock the adapter is inactive. The screen displays only the saved
 host; paths/queries may grant posting rights and should be treated as credentials.
 
+### ntfy preset and native MQTT adapters (optional)
+
+The HTTPS webhook does not cover brokers that speak only MQTT, or an ntfy server that needs
+an access token without hand-written query parameters. Two opt-in adapters address that.
+Neither changes a goal's measured status, wakes or starts monitoring, or enables anything by
+itself; both only consume already published measurements, and both are off by default.
+
+**ntfy preset** (Advanced → Automation and webhook → *ntfy preset*) is not a second network
+worker. It composes an ordinary HTTPS webhook address for the selected recipient from a
+server (empty means `https://ntfy.sh`; HTTPS, no path), a topic (1–64 letters, digits, `-`
+or `_`) and an optional `tk_…` access token, which is sent as ntfy's `?auth=` query value.
+It also selects the Text format. Delivery, five-recipient limit, one shared worker, queue,
+ten-second deadline, retry gap and health are exactly those of the recipient. The topic and
+token are credentials inside the saved address: stored only in `webhook-private-v1`, never
+prefilled or displayed after saving (only the host is shown).
+
+**Native MQTT** publishes to at most one broker:
+
+- MQTT 3.1.1 over TLS only (default port 8883), certificate and host name verified against
+  the system trust store; no plain TCP, no WebSocket, no user-installed bypass.
+- Bounded settings: host ≤ 253 ASCII characters, port 1–65535, topic ≤ 128 bytes without
+  `#`, `+`, control characters or a leading `$`, optional username ≤ 64 and password ≤ 128
+  printable ASCII bytes. A password requires a username; a previously stored password-only
+  configuration is treated as unconfigured. The payload is the generic JSON v1 body (under 1 KiB),
+  QoS 1, not retained, with a random per-connection client ID.
+- One short connection per message on one dedicated thread: connect, publish, wait for
+  PUBACK, disconnect. There is no persistent socket, so no keep-alive timer or reconnect loop.
+  Connect/read timeouts are five seconds each and the same ten-second total deadline as the
+  webhook applies; the deadline closes the socket.
+- Reconnect model: after a failed attempt new attempts are refused for 30 seconds, doubling
+  per consecutive failure up to 15 minutes, and reset by success or by saving settings. A
+  refused or failed attempt is reported as a failed delivery. There is **no offline queue**:
+  events are coalesced to the latest measured state per goal (at most four), retried only
+  when a later valid check publishes, and heartbeats are not sent.
+- Event filters are all five events and all goals. Test messages work while disabled.
+
+Broker, topic and credentials are stored only in credential-protected `mqtt-private-v1`,
+excluded from platform backup/transfer, portable backups, diagnostics, logs, public replies
+and saved view state; the screen shows only the host. Before the first unlock the adapter is
+inactive. The coordinator sees only a placeholder address. Existing webhook recipients
+(including the legacy first recipient) are unaffected.
+
 ### Home Assistant package
 
 Copy [tgwatch-events.yaml](examples/home-assistant/tgwatch-events.yaml) into your HA
@@ -243,7 +285,7 @@ adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp`,
 `custom` or `custom2` … `custom5`; use separate entities for separate goals. A target filter in TgWatch
 does not change the receiving package's service-ID validation.
 
-Native MQTT and custom headers remain separate extensions.
+Custom request headers remain a separate extension.
 
 ## Independent targets: API v2
 
