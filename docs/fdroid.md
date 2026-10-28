@@ -4,8 +4,50 @@
 candidate, code1024001, tag `v1.24.1`; its recipe has not been validated for that
 version. The last exact-tag local verification recorded below applies to 1.20.1,
 code1020001, source `4b2aba4d1c87606ed482752cf027c85e5896dece`, and is not evidence
-for 1.24.1. The separate Wear application is not included. Neither candidate has
-been submitted to or accepted by the catalog.
+for 1.24.1. Separate 1.24.1 attempts and their outcomes are recorded in
+[verification-1.24.1.json](distribution/verification-1.24.1.json). The separate
+Wear application is not included. Neither candidate has been submitted to or
+accepted by the catalog.
+
+## Candidate v1.24.1 — validation status
+
+On 28 October 2026, the exact tag resolved to
+`a32d31cc21cf8bbdb56c3f813d4963d74874091b`. `fdroidserver`2.4.5 `readmeta`
+passed. `lint ru.tgwatch` passed in isolated staging with the official
+`Connectivity` category name; that staging was not a full `fdroiddata` checkout.
+The recipe remains disabled in this repository, and both update modes remain
+`None`.
+
+The published phone APK was downloaded from the v1.24.1 GitHub release, its SHA256
+was verified against the release checksum asset, and `apksigner verify` passed.
+It reports `ru.tgwatch`, 1.24.1/code1024001, min26/target36/compile37. Its SHA256 is
+`6dced42b54e878753615f1916c6e3b2d92e01b46ebee5dfe3af75f63e284a50f`.
+
+The first clean independent Gradle and normal `fdroid build --test --stop`
+attempts used Gradle9.4.1 and JDK17. The plugin marker for AGP9.2.1 could not
+be resolved because that environment could not resolve `dl.google.com`. The
+F-Droid build reached source checkout and signing-config cleanup, then stopped
+during Gradle cleanup.
+
+A subsequent independent exact-tag assembly succeeded using the same pinned
+Gradle9.4.1/JDK17 toolchain and a temporary Aliyun Maven mirror init script for
+dependency resolution. `:app:assembleRelease`, `:app:dependencyInventory` and
+`:app:generateReleaseSbom` completed with 50 actionable tasks. CycloneDX 1.6
+validation passed with 22 release runtime artifacts. The unsigned APK SHA256 was
+`914b0057fe029df5a171e6b0453f873ec1fe0fec764c355e2a5b2a105d5f110a`.
+This temporary build output was not retained, so it cannot now support a byte or
+payload comparison.
+
+The normal F-Droid recipe build has not succeeded. Unsigned byte-comparison and
+`apksigcopier compare --unsigned` were not run. The verified published APK and the
+successful independent assembly separately do not establish reproducibility.
+
+To complete validation, rerun the exact source tag with the pinned toolchain and
+working dependency access, retain both unsigned outputs, and follow the commands
+and staging notes in the versioned verification record. Remove `disable` only from
+a temporary staging copy; do not use `--force` or `--skip-scan`. Maintainer review
+is still required. No materials were sent to `fdroiddata`, and no server validation
+or catalog acceptance is claimed.
 
 ## Exact-tag local verification
 
