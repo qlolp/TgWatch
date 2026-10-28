@@ -6,7 +6,7 @@
     <string name="crash_reporting_endpoint_saved">Collector host: %1$s</string>
     <string name="crash_reporting_set_endpoint">Set HTTPS collector</string>
     <string name="crash_reporting_endpoint_hint">https://collector.example/crash-secret-path</string>
-    <string name="crash_reporting_endpoint_message">Enter an HTTPS endpoint for your own authentication-protected collector. The address is stored privately, never included in the report, and is deleted with Remove. Saving an address turns consent off; enable it separately to opt in.</string>
+    <string name="crash_reporting_endpoint_message">Enter an HTTPS endpoint for your own authentication-protected collector (for example, a unique secret path). The address is stored privately, never included in the report, and is deleted with Remove. Saving an address turns consent off; enable it separately to opt in.</string>
     <string name="crash_reporting_endpoint_invalid">Enter an HTTPS URL without login, query or fragment.</string>
     <string name="crash_reporting_endpoint_required">Set a collector endpoint before consenting.</string>
 </resources>

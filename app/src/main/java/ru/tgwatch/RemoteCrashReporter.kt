@@ -4,10 +4,11 @@ import android.content.Context
 import android.os.Build
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** A single bounded, best-effort attempt on an uncaught crash; failures are discarded. */
@@ -19,9 +20,8 @@ internal object RemoteCrashReporter {
 
     @Suppress("TooGenericExceptionCaught")
     fun report(ctx: Context, record: CrashJournal.Record) {
-        val endpoint = runCatching { CrashReportingSettings.endpoint(ctx) }.getOrNull() ?: return
-        if (!runCatching { CrashReportingSettings.enabled(ctx) }.getOrDefault(false) ||
-            !attempted.compareAndSet(false, true)) return
+        val endpoint = runCatching { CrashReportingSettings.activeEndpoint(ctx) }.getOrNull() ?: return
+        if (!attempted.compareAndSet(false, true)) return
 
         val payload = try {
             CrashReportingPolicy.payload(BuildConfig.VERSION_NAME, Build.VERSION.SDK_INT, record.type, record.frames)
@@ -29,18 +29,27 @@ internal object RemoteCrashReporter {
             return
         }
         val connection = AtomicReference<HttpURLConnection?>()
+        var request: FutureTask<Unit>? = null
         try {
-            val request = FutureTask { send(endpoint, payload, connection) }
-            Thread(request, "crash-report").apply {
+            val task = FutureTask<Unit> { send(endpoint, payload, connection) }
+            request = task
+            Thread(task, "crash-report").apply {
                 isDaemon = true
                 start()
             }
-            request.get(DEADLINE_MS, TimeUnit.MILLISECONDS)
+            task.get(DEADLINE_MS, TimeUnit.MILLISECONDS)
         } catch (_: TimeoutException) {
             connection.get()?.disconnect()
-            request.cancel(true)
-        } catch (_: Exception) {
+            request?.cancel(true)
+        } catch (_: InterruptedException) {
+            connection.get()?.disconnect()
+            request?.cancel(true)
+            Thread.currentThread().interrupt()
+        } catch (_: ExecutionException) {
             // Do not log the endpoint, response, or exception text; there is no retry or queue.
+        } catch (_: Exception) {
+            connection.get()?.disconnect()
+            request?.cancel(true)
         }
     }
 
@@ -55,6 +64,7 @@ internal object RemoteCrashReporter {
             connection.useCaches = false
             connection.requestMethod = "POST"
             connection.doOutput = true
+            connection.setRequestProperty("User-Agent", "TgWatch-CrashReport/1")
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             connection.setFixedLengthStreamingMode(payload.size)
             connection.outputStream.use { it.write(payload) }

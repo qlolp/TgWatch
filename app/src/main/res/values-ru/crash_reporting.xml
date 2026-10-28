@@ -6,7 +6,7 @@
     <string name="crash_reporting_endpoint_saved">Хост сборщика: %1$s</string>
     <string name="crash_reporting_set_endpoint">Задать HTTPS-сборщик</string>
     <string name="crash_reporting_endpoint_hint">https://collector.example/crash-secret-path</string>
-    <string name="crash_reporting_endpoint_message">Введите HTTPS-адрес своего сборщика с обязательной аутентификацией. Адрес хранится приватно, не входит в отчёт и удаляется кнопкой «Удалить». После сохранения адреса согласие выключено: включите его отдельно.</string>
+    <string name="crash_reporting_endpoint_message">Введите HTTPS-адрес своего сборщика с обязательной аутентификацией (например, уникальный секретный путь). Адрес хранится приватно, не входит в отчёт и удаляется кнопкой «Удалить». После сохранения адреса согласие выключено: включите его отдельно.</string>
     <string name="crash_reporting_endpoint_invalid">Введите HTTPS-адрес без логина, параметров запроса и фрагмента.</string>
     <string name="crash_reporting_endpoint_required">Сначала задайте адрес сборщика.</string>
 </resources>

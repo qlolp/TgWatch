@@ -41,15 +41,18 @@ class CrashReportingSettingsIntegrationTest {
     @Test fun settingIsOffByDefaultRequiresSeparateConsentAndCanBeDeleted() {
         assertFalse(CrashReportingSettings.enabled(ctx))
         assertNull(CrashReportingSettings.endpoint(ctx))
+        assertNull(CrashReportingSettings.activeEndpoint(ctx))
         assertEquals(CrashReportingSettings.WriteResult.INVALID, CrashReportingSettings.setEnabled(ctx, true))
         assertEquals(CrashReportingSettings.WriteResult.INVALID,
             CrashReportingSettings.setEndpoint(ctx, "http://collector.example/crash"))
 
         assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEndpoint(ctx, endpoint))
         assertEquals(endpoint, CrashReportingSettings.endpoint(ctx))
+        assertNull(CrashReportingSettings.activeEndpoint(ctx))
         assertFalse("Saving a URL never grants consent", CrashReportingSettings.enabled(ctx))
         assertEquals(CrashReportingSettings.WriteResult.SAVED, CrashReportingSettings.setEnabled(ctx, true))
         assertTrue(CrashReportingSettings.enabled(ctx))
+        assertEquals(endpoint, CrashReportingSettings.activeEndpoint(ctx))
         assertFalse("Credentials stay out of device-protected preferences",
             ctx.createDeviceProtectedStorageContext()
                 .getSharedPreferences(CrashReportingSettings.FILE, Context.MODE_PRIVATE).contains("endpoint"))
@@ -66,6 +69,7 @@ class CrashReportingSettingsIntegrationTest {
         assertTrue(CrashReportingSettings.clear(ctx))
         assertFalse(CrashReportingSettings.enabled(ctx))
         assertNull(CrashReportingSettings.endpoint(ctx))
+        assertNull(CrashReportingSettings.activeEndpoint(ctx))
     }
 
     @Test fun endpointReplacementRevokesConsentAndSettingsNeverSaveEndpointInViewState() {
@@ -77,7 +81,8 @@ class CrashReportingSettingsIntegrationTest {
 
         ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                assertTrue(activity.window.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_SECURE != 0)
+                assertTrue((activity.window.attributes.flags and
+                    android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0)
                 assertFalse(activity.findViewById<android.widget.Switch>(
                     AutomationSettingsActivity.ID_CRASH_REPORTING_ENABLE).isSaveEnabled)
                 assertFalse(activity.findViewById<android.widget.TextView>(
@@ -93,8 +98,8 @@ class CrashReportingSettingsIntegrationTest {
             scenario.onActivity { activity ->
                 assertFalse(activity.findViewById<android.widget.TextView>(
                     AutomationSettingsActivity.ID_CRASH_REPORTING_ENDPOINT).text.contains("new-secret"))
-                assertEquals(CrashReportingSettings.endpoint(ctx),
-                    "https://collector.private.example/new-secret")
+                assertEquals("https://collector.private.example/new-secret",
+                    CrashReportingSettings.endpoint(ctx))
                 assertFalse(CrashReportingSettings.enabled(ctx))
             }
         }

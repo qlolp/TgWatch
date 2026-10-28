@@ -141,6 +141,8 @@ stack frames. It has no endpoint, webhook URL, token, IP address, exception
 message, user data, target criteria, target history or timestamp. The collector
 necessarily sees the HTTPS request's source IP at the transport layer; this is
 not part of the JSON payload.
+If the endpoint path itself is the collector's authentication capability, configure
+the collector not to retain that path in access logs.
 
 ## Private HTTPS health failures
 

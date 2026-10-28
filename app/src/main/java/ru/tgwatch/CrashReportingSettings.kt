@@ -27,6 +27,14 @@ object CrashReportingSettings {
     @Synchronized fun enabled(ctx: Context): Boolean =
         unlocked(ctx) && store(ctx).getBoolean(KEY_CONSENT, false) && endpoint(ctx) != null
 
+    /** One synchronized opt-in snapshot prevents mixing an old address with new consent. */
+    @Synchronized fun activeEndpoint(ctx: Context): String? {
+        if (!unlocked(ctx)) return null
+        val preferences = store(ctx)
+        if (!preferences.getBoolean(KEY_CONSENT, false)) return null
+        return CrashReportingPolicy.normalizeEndpoint(preferences.getString(KEY_ENDPOINT, null))
+    }
+
     /** Saving or replacing an endpoint always requires a fresh, separate consent action. */
     @Synchronized fun setEndpoint(ctx: Context, raw: String): WriteResult {
         val endpoint = CrashReportingPolicy.normalizeEndpoint(raw) ?: return WriteResult.INVALID
