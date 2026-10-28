@@ -8,7 +8,7 @@ import android.os.SystemClock
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Что контроллеру нужно от службы: только явные запросы, без доступа к её состоянию. */
+/** Узкий контракт службы: только необходимое состояние и действия, без доступа к остальным полям. */
 internal interface OngoingNotificationHost {
     val isDestroyed: Boolean
     val historySession: Long
