@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal interface OngoingNotificationHost {
     val isDestroyed: Boolean
     val historySession: Long
-    fun currentState(): State
+    fun currentState(): MonitorService.State
     fun acceptsRunningCheck(): Boolean
     fun servicePending(requestCode: Int, action: String): PendingIntent
 }
@@ -58,7 +58,8 @@ internal class OngoingNotificationController(
     }
 
     /** [periodic] — тик раз в 15 с: одинаковое содержимое повторно не отправляем в шторку. */
-    fun post(s: State, periodic: Boolean = false) {
+    @Suppress("TooGenericExceptionCaught") // Notification publication is best-effort across OEM implementations.
+    fun post(s: MonitorService.State, periodic: Boolean = false) {
         if (host.isDestroyed) return
         val view = view(s)
         if (!gate.shouldDraw(view, SystemClock.elapsedRealtime()) && periodic) return
@@ -71,7 +72,7 @@ internal class OngoingNotificationController(
     }
 
     /** Complete presentation key, derived only from the immutable state and cached aggregates. */
-    private fun view(s: State, now: Long = System.currentTimeMillis()): OngoingView =
+    private fun view(s: MonitorService.State, now: Long = System.currentTimeMillis()): OngoingView =
         if (TargetPreferences.definition(context, TargetId.TELEGRAM).enabled)
             OngoingNotification.view(s, stats.peek() ?: EMPTY_STATS, now)
         else if (RegionalPreferences.onlyRegional(context))
