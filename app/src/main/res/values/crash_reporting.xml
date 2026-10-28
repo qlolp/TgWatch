@@ -1,6 +1,6 @@
 <resources>
     <string name="crash_reporting_title">Remote crash reports (optional)</string>
-    <string name="crash_reporting_description">Sends one minimal crash report to your own HTTPS collector only after separate consent. The collector must require authentication. You operate it and control its region, retention and data-processing terms. No report is queued or retried.</string>
+    <string name="crash_reporting_description">Sends at most one minimal crash report per process to your own HTTPS collector only after separate consent. The collector must require authentication. You operate it and control its region, retention and data-processing terms. No report is queued or retried.</string>
     <string name="crash_reporting_enable">I consent to send crash reports</string>
     <string name="crash_reporting_endpoint_unset">No collector configured</string>
     <string name="crash_reporting_endpoint_saved">Collector host: %1$s</string>
