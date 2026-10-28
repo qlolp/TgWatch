@@ -44,6 +44,9 @@ class HttpProbeCondition(val expectedCode: Int? = null, val jsonField: String? =
     val hasBodyCriteria: Boolean get() = bodySubstring != null || hasJsonCriteria
     val hasJsonCriteria: Boolean get() = jsonField != null || jsonConditions.isNotEmpty()
 
+    /** Retains the original single-path API for existing clients of the probe model. */
+    fun pathSegments(): List<String> = jsonField!!.split('.')
+
     fun allJsonConditions(): List<HttpJsonCondition> = buildList {
         if (jsonField != null) add(HttpJsonCondition(jsonField, checkNotNull(expectedValue)))
         addAll(jsonConditions)
