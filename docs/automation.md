@@ -244,8 +244,9 @@ prefilled or displayed after saving (only the host is shown).
   the system trust store; no plain TCP, no WebSocket, no user-installed bypass.
 - Bounded settings: host ≤ 253 ASCII characters, port 1–65535, topic ≤ 128 bytes without
   `#`, `+`, control characters or a leading `$`, optional username ≤ 64 and password ≤ 128
-  printable ASCII bytes. The payload is the generic JSON v1 body (under 1 KiB), QoS 1,
-  not retained, with a random per-connection client ID.
+  printable ASCII bytes. A password requires a username; a previously stored password-only
+  configuration is treated as unconfigured. The payload is the generic JSON v1 body (under 1 KiB),
+  QoS 1, not retained, with a random per-connection client ID.
 - One short connection per message on one dedicated thread: connect, publish, wait for
   PUBACK, disconnect. There is no persistent socket, so no keep-alive timer or reconnect loop.
   Connect/read timeouts are five seconds each and the same ten-second total deadline as the
@@ -284,7 +285,7 @@ adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp`,
 `custom` or `custom2` … `custom5`; use separate entities for separate goals. A target filter in TgWatch
 does not change the receiving package's service-ID validation.
 
-Native MQTT and custom headers remain separate extensions.
+Custom request headers remain a separate extension.
 
 ## Independent targets: API v2
 
