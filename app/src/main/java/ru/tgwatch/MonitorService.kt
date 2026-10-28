@@ -1,7 +1,6 @@
 package ru.tgwatch
 
 import android.app.AlarmManager
-import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -24,7 +23,6 @@ import android.util.Log
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -88,8 +86,6 @@ class MonitorService : Service() {
 
         /** Будильник ставим только на настоящие паузы, а не на мгновенные перепроверки. */
         private const val ALARM_MIN_DELAY_MS = 5_000L
-
-        private val EMPTY_NOTIFICATION_STATS = TimeStats(0, 0, 0, 0, 0, 0, 0, -1)
 
         @Volatile
         var running = false
@@ -252,9 +248,16 @@ class MonitorService : Service() {
     private val checkSchedule = CheckSchedule(offlineBackoff::reset, ::enqueueCheck)
     private val scheduleDiagnostics = ScheduleDiagnostics()
     @Volatile private var stopping = false
-    private val notificationStats = DailyStatsCache()
-    private val notificationGate = RedrawGate()
-    private val statisticsPending = AtomicBoolean()
+    private val ongoing by lazy(LazyThreadSafetyMode.NONE) {
+        OngoingNotificationController(this, { nm }, NOTIFICATION_ID, object : OngoingNotificationHost {
+            override val isDestroyed get() = destroyed
+            override val historySession get() = this@MonitorService.historySession
+            override fun currentState() = state
+            override fun acceptsRunningCheck() = this@MonitorService.acceptsRunningCheck(this@MonitorService)
+            override fun servicePending(requestCode: Int, action: String) =
+                this@MonitorService.servicePending(requestCode, action)
+        })
+    }
 
     private fun acceptsRunningCheck(ctx: Context): Boolean = activeService === this && running &&
         !destroyed && !stopping && RecoveryCoordinator.state == RecoveryState.READY &&
@@ -281,9 +284,9 @@ class MonitorService : Service() {
             slowController?.reconcile()
             targetAlertController?.reconcile()
             regionalMonitor?.tick()
-            postNotification(state, periodic = true)
+            ongoing.post(state, periodic = true)
             StatusWidget.refreshIfChanged(this@MonitorService)
-            scheduleStatisticsRefresh()
+            ongoing.scheduleStatisticsRefresh()
             ensureProgress()
             healthHandler.postDelayed(this, 15_000L)
         }
@@ -427,7 +430,7 @@ class MonitorService : Service() {
                 WebhookNotifier.onPublished(this@MonitorService, TargetWebhookObservation.from(snapshot, report,
                     targetMonitoring?.repository?.currentNetworkRevision ?: 0L,
                     System.currentTimeMillis(), SystemClock.elapsedRealtime()))
-                postNotification(state)
+                ongoing.post(state)
                 broadcastState()
             }
         }
@@ -837,7 +840,7 @@ class MonitorService : Service() {
                         if (Prefs.vibrateOnRecovery(this) && Prefs.alertsAllowed(this)) Vibe.recovery(this)
                     }
                 }
-            }, { refreshNotificationStats(now) })
+            }, { ongoing.refreshStats(now) })
 
         try {
             val maintenance = MaintenanceWindows.isActive(this, TargetId.TELEGRAM, now)
@@ -852,7 +855,7 @@ class MonitorService : Service() {
         targetMonitoring?.onTelegram(newState, p.outcomes)
         NetworkStats.record(this, now, probeNetwork, newState.status.name)
         EgressCountryUi.refreshActive(this)
-        postNotification(newState)
+        ongoing.post(newState)
         broadcastState()
         // Opt-in, credential-protected and asynchronous; never blocks or alters the published state.
         WebhookNotifier.onPublished(this, WebhookObservation("telegram", newState.status.name,
@@ -881,73 +884,20 @@ class MonitorService : Service() {
     // ------------------------------------------------------------ уведомление
 
     private fun goForeground(): Boolean {
-        val view = notificationView(state)
-        val notification = buildNotification(view)
-        notificationGate.shouldDraw(view, SystemClock.elapsedRealtime())
+        val notification = ongoing.buildForForeground()
         return try {
             if (Build.VERSION.SDK_INT >= 34) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            scheduleStatisticsRefresh()
+            ongoing.scheduleStatisticsRefresh()
             true
         } catch (e: Exception) {
             Log.e(TAG, "startForeground failed", e)
             false
         }
     }
-
-    private fun scheduleStatisticsRefresh() {
-        val refreshDue = notificationStats.needsRefresh(History.version, System.currentTimeMillis())
-        if (!acceptsRunningCheck(this) || !refreshDue) return
-        if (!statisticsPending.compareAndSet(false, true)) return
-        val admitted = HistorySessions.queue(this).submit(historySession) {
-            try {
-                if (acceptsRunningCheck(this)) {
-                    refreshNotificationStats()
-                    postNotification(state)
-                }
-            } finally { statisticsPending.set(false) }
-        }
-        if (!admitted) statisticsPending.set(false)
-    }
-
-    private fun refreshNotificationStats(now: Long = System.currentTimeMillis()) {
-        if (!notificationStats.needsRefresh(History.version, now)) return
-        val read = History.readStats(this, now = now)
-        if (read is HistoryRead.Ready) notificationStats.get(History.version, now) { read.value }
-    }
-
-    /** [periodic] — тик раз в 15 с: одинаковое содержимое повторно не отправляем в шторку. */
-    private fun postNotification(s: State, periodic: Boolean = false) {
-        if (destroyed) return
-        val view = notificationView(s)
-        if (!notificationGate.shouldDraw(view, SystemClock.elapsedRealtime()) && periodic) return
-        try {
-            nm.notify(NOTIFICATION_ID, buildNotification(view))
-        } catch (e: Exception) {
-            Log.w(TAG, "notify", e)
-        }
-        if (destroyed) nm.cancel(NOTIFICATION_ID)
-    }
-
-    private fun buildNotification(s: State): Notification = buildNotification(notificationView(s))
-
-    /** Complete presentation key, derived only from the immutable state and cached aggregates. */
-    private fun notificationView(s: State, now: Long = System.currentTimeMillis()): OngoingView =
-        if (TargetPreferences.definition(this, TargetId.TELEGRAM).enabled)
-            OngoingNotification.view(s, currentNotificationStats(), now)
-        else if (RegionalPreferences.onlyRegional(this))
-            OngoingNotification.regional(this, now)
-        else OngoingNotification.targets(TargetId.entries.filter { it != TargetId.TELEGRAM &&
-            Prefs.isEnabled(this) && TargetPreferences.storedDefinition(this, it).enabled }
-            .map { TargetStateStore.current(this, it) }, now, SystemClock.elapsedRealtime())
-
-    private fun buildNotification(view: OngoingView): Notification =
-        OngoingNotification.build(this, view, ::servicePending)
-
-    private fun currentNotificationStats(): TimeStats = notificationStats.peek() ?: EMPTY_NOTIFICATION_STATS
 
     // --------------------------------------------------------------- wake lock
 
