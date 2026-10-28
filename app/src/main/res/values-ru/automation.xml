@@ -2,6 +2,13 @@
 <resources>
     <string name="webhook_targets_current">Цели: %1$d из %2$d</string>
     <string name="webhook_targets_title">Отправлять события и heartbeat этих целей</string>
+    <string name="webhook_receiver_current">Получатель %1$d из %2$d</string>
+    <string name="webhook_receiver_title">Получатель вебхука</string>
+    <string name="webhook_receiver_label">Получатель %1$d</string>
+    <string name="webhook_receiver_add">Добавить получателя</string>
+    <string name="webhook_receiver_remove">Удалить получателя</string>
+    <string name="webhook_receiver_remove_message">Удалить этого получателя и его приватные настройки?</string>
+    <string name="webhook_receiver_limit">Достигнуто максимальное число получателей.</string>
     <string name="automation_title">Автоматизация</string>
     <string name="automation_enable">Разрешить запросы автоматизации</string>
     <string name="automation_description">Разрешить явные запросы CHECK_NOW и GET_STATE с приватным токеном доступа. Проверки работают только при запущенном мониторинге. Любой обладатель токена получает этот доступ; передавайте его только доверенному приложению автоматизации.</string>
@@ -17,7 +24,7 @@
     <string name="automation_storage_error">Не удалось сохранить доступ автоматизации. Повторите попытку.</string>
     <string name="automation_done">Готово</string>
     <string name="webhook_title">Вебхук-оповещение</string>
-    <string name="webhook_description">По желанию при смене опубликованного статуса отправлять одну короткую строку, например «TG Монитор: Telegram недоступен», на ваш HTTPS-адрес (например, тему ntfy.sh). История, диагностика и токены не отправляются; один и тот же статус — не чаще раза в минуту. Любой, кто знает адрес, может публиковать в него, поэтому адрес хранится приватно, не входит в резервные копии и диагностику и используется только после разблокировки устройства. По умолчанию выключено.</string>
+    <string name="webhook_description">По желанию отправляйте смены статуса до пяти независимых получателей HTTPS (например, тем ntfy.sh). У каждого получателя свои адрес, фильтры целей и событий и состояние доставки. История, диагностика и токены не отправляются; для каждого получателя один и тот же статус отправляется не чаще раза в минуту. Адреса хранятся приватно, не входят в резервные копии и диагностику и используются только после разблокировки устройства. По умолчанию выключено.</string>
     <string name="webhook_enable">Отправлять смену статуса на вебхук</string>
     <string name="webhook_url_unset">Адрес вебхука не задан.</string>
     <string name="webhook_url_saved">Адрес вебхука сохранён: %1$s/…</string>

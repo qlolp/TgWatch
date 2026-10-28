@@ -22,7 +22,7 @@ internal data class WebhookHealth(
 
 internal enum class WebhookOutcome { IDLE, SENDING, SENT, FAILED, TIMED_OUT }
 
-/** One active physical request means at most one timer; canceled tasks are removed immediately. */
+/** At most one delivery attempt per receiver means at most one timer per receiver. */
 internal object WebhookDeadlines {
     private val timer = ScheduledThreadPoolExecutor(1) { task ->
         Thread(task, "tg-webhook-deadline").apply { isDaemon = true }

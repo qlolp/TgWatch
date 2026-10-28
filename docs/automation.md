@@ -145,13 +145,17 @@ when finished if it is only needed for setup/testing.
 
 ## Webhook alerts and Home Assistant
 
-**Advanced → Automation and webhook** sends optional status-change events to one
-user-owned HTTPS address. It is off by default. Save an address, choose **Text**
-(the default, suitable for an ntfy topic) or **JSON**, and select event filters.
-Use **Targets** to select Telegram, Matrix, WhatsApp Web and/or Custom HTTPS.
-Existing installations retain all four selections. This only filters delivery: it
-never enables a target or monitoring. An empty selection suppresses automatic events
-and heartbeats; the explicit test button still works. The same one HTTPS address is used.
+**Advanced → Automation and webhook** supports up to five independent recipients,
+each with a user-owned HTTPS address. It is off by default. Existing single-webhook
+settings remain recipient 1 in place, with their saved address, enablement, format,
+and filters unchanged. Add and select recipients in the settings screen; each has
+independent enablement, address, format, target/event filters, configuration
+generation, and delivery health/retry state. Save an address, choose **Text**
+(the default, suitable for an ntfy topic) or **JSON**, and select event filters
+for each recipient. **Targets** selects Telegram, Matrix, WhatsApp Web and/or
+Custom HTTPS goals. These filters only control delivery: they never enable a goal
+or monitoring. Empty target/event filters suppress automatic events and heartbeats;
+the explicit test button still works for the selected recipient.
 **Send test message** also works while delivery is disabled; it never changes the
 measured baseline and is not an observation.
 
@@ -195,17 +199,23 @@ Only HTTPS URLs up to 512 characters without user info or fragment are accepted;
 query strings (for example ntfy options) are allowed. Redirects are not followed.
 The User-Agent is `TgWatch/<installed version> (Android)`. Connect/read timeouts
 are five seconds each, with an independent ten-second total monotonic deadline.
-One physical request is allowed in the whole process. A timeout reports once and
-requests cancellation, but a stuck native/DNS operation keeps the slot until it
-actually returns. There is no backlog of old events: later valid monitor checks
-attempt the latest allowed event. Retries retain a minimum 60-second gap per status;
+One shared network worker serves every recipient. Its queue holds at most four
+additional requests across all recipients, so at most five requests can be admitted
+at once; each recipient can own only one admitted request at a time. Queue saturation
+fails admission instead of creating unbounded work. A timeout reports once and
+requests cancellation, but a stuck native/DNS operation keeps the worker occupied
+until it actually returns. There is no backlog of old events: pending events are
+coalesced per recipient/goal, and later valid monitor checks attempt the latest
+allowed event. Retries retain a minimum 60-second gap per status per recipient;
 NO_NETWORK delivery is best effort and normally cannot leave the device.
 
 The private screen shows sanitized delivery health without the address, response
-body or transport exception. URL, enabled switch, format, event and target filters form one
-configuration generation. Saving any of them isolates old callbacks and rate/health
-history, including after a failed disk commit that changed SharedPreferences memory.
-Changing settings does not free an old physical request or send automatically.
+body or transport exception. URL, enabled switch, format, event and target filters
+form one configuration generation per recipient. Saving any of them isolates that
+recipient's old callbacks and rate/health history, including after a failed disk
+commit that changed SharedPreferences memory. Changing settings does not free an
+old physical request or send automatically. Removing a recipient clears its private
+settings; the primary recipient cannot be removed.
 
 All webhook configuration is in credential-protected `webhook-private-v1`, outside
 Direct Boot, portable backup, platform backup/transfer, diagnostics and logs.
@@ -233,7 +243,7 @@ adapt that service-ID check and the helper/entity names to `matrix`, `whatsapp`,
 `custom` or `custom2` … `custom5`; use separate entities for separate goals. A target filter in TgWatch
 does not change the receiving package's service-ID validation.
 
-Native MQTT, multiple destinations and custom headers remain separate extensions.
+Native MQTT and custom headers remain separate extensions.
 
 ## Independent targets: API v2
 
@@ -252,23 +262,25 @@ API v1 and its exact historical reply fields continue to refer to Telegram.
 When Telegram is disabled while another target keeps the service alive, v1
 reports `running=false` and CHECK returns STOPPED.
 
-Opt-in text/JSON webhooks use the same four `service_id` values. Baselines,
-pending transitions and cooldowns are separate per target, while every target
-shares the existing single physical HTTPS delivery slot. Stale/unmeasured results
-are ignored; settings changes invalidate only the affected goal's pending event.
-The JSON schema remains version 1 with the same eight public fields.
+Opt-in text/JSON webhooks use the supported `service_id` values. Baselines,
+pending transitions and cooldowns are separate per target and per recipient, while
+every recipient shares the same single physical HTTPS worker and bounded queue.
+Stale/unmeasured results are ignored; settings changes invalidate only the affected
+recipient's pending work. The JSON schema remains version 1 with the same eight
+public fields.
 
 ### JSON v2 + heartbeat
 
 Select **JSON v2 + heartbeat** explicitly to send fresh measured status while it
 is stable, including the first OK. Text and JSON v1 remain event-only. No extra
 phone alarm, probe or service is added: a new published measurement is the only
-automatic delivery trigger. Each goal sends a heartbeat at most once per five
-minutes; an admitted v2 event supplies the same freshness and starts that cooldown.
+automatic delivery trigger. Each goal sends a heartbeat at most once per five minutes per recipient/goal; an
+admitted v2 event supplies the same freshness and starts that cooldown.
 Rejected transport submissions do not consume it. A failed admitted request does;
-only a later suitable measurement can retry. Four goals share the existing one
-physical HTTPS request and ten-second deadline. Events have priority, and a
-request that has not returned continues to own its slot after logical timeout.
+only a later suitable measurement can retry. All configured goals and recipients
+share the existing one physical HTTPS worker and bounded queue. Each request keeps
+its ten-second deadline. Events have priority, and a request that has not returned
+continues to own its slot after logical timeout.
 
 The existing event filters also restrict heartbeat statuses: OK follows Recovery,
 DOWN follows Unreachable, PARTIAL follows Partial, and NO_NETWORK follows Network
