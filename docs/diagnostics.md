@@ -115,8 +115,36 @@ are reduced to fixed app worker roles or `other`. Classes must resolve without
 initialization in allowed app/platform namespaces; fabricated method names are
 redacted. Source filenames must match their declaring class; paths and unknown
 names become `redacted`. This validation applies to old journal entries and again
-at the JSON export boundary. The journal is cleared with the event log; nothing
-is uploaded automatically.
+at the JSON export boundary. The journal is cleared with the event log and is not
+uploaded automatically. A separate remote report is sent only when its collector
+and explicit consent are configured as described below.
+
+## Optional remote crash reporting
+
+Remote reports are disabled by default and require both a separately saved HTTPS
+collector address and an explicit consent switch. The collector is operated by
+you; TgWatch has no crash-reporting operator or third-party telemetry SDK. Your
+collector must require authentication. Its region, retention period and any DPA
+or other data-processing terms are your responsibility; the app does not set or
+control them.
+
+After an uncaught crash, at most one best-effort POST is attempted in that
+process. It has a 2.5-second total wait deadline and 1.5-second connect/read
+timeouts. There is no offline queue, retry, startup request or monitoring request;
+failed sends are discarded. Turning consent off disables sending immediately.
+Remove deletes both the saved endpoint and consent. The endpoint is stored in
+credential-protected private preferences, shown only as a host, and excluded
+from backup, diagnostic exports, logs and saved view state. A failed private preference
+commit leaves remote reporting inactive; replacing an endpoint always requires fresh consent.
+
+Schema version 1 is bounded to 8 KiB and contains only the app version, Android
+SDK level, a validated technical crash class and up to 24 sanitized first-party
+stack frames. It has no endpoint, webhook URL, token, IP address, exception
+message, user data, target criteria, target history or timestamp. The collector
+necessarily sees the HTTPS request's source IP at the transport layer; this is
+not part of the JSON payload.
+If the endpoint path itself is the collector's authentication capability, configure
+the collector not to retain that path in access logs.
 
 ## Private HTTPS health failures
 

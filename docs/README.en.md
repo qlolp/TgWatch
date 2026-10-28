@@ -98,8 +98,10 @@ capability token generated in the app. Tokens are not included in backups.
 
 [Local diagnostics](diagnostics.md) can be saved explicitly through Android's
 file picker. The report contains aggregate status and power/scheduling data;
-it excludes raw history, logs and automation credentials. Nothing is uploaded
-automatically.
+it excludes raw history, logs and automation credentials. Optional remote crash
+reports are separately consented, sent only to your own authenticated HTTPS
+collector, and disabled by default. You control its region, retention and data
+processing terms; see [crash-reporting details](diagnostics.md#optional-remote-crash-reporting).
 
 Independent Matrix/WhatsApp/custom HTTPS targets do not change Telegram status.
 Legacy informational EXTRA checks remain diagnostics only and never automatically

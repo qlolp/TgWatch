@@ -46,6 +46,10 @@ class AutomationSettingsActivity : Activity() {
         const val ID_MQTT_STATUS = 0x00a71011
         const val ID_MQTT_SET = 0x00a71012
         const val ID_MQTT_TEST = 0x00a71013
+        const val ID_CRASH_REPORTING_ENABLE = 0x00a71014
+        const val ID_CRASH_REPORTING_ENDPOINT = 0x00a71015
+        const val ID_CRASH_REPORTING_SET = 0x00a71016
+        const val ID_CRASH_REPORTING_INPUT = 0x00a71017
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
@@ -78,6 +82,10 @@ class AutomationSettingsActivity : Activity() {
     private lateinit var webhookRemoveReceiver: Button
     private lateinit var mqtt: MqttSettingsUi
     private var selectedWebhookReceiver = 0
+    private lateinit var crashReportingToggle: Switch
+    private lateinit var crashEndpointView: TextView
+    internal var crashEndpointDialog: AlertDialog? = null
+        private set
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
@@ -183,6 +191,26 @@ class AutomationSettingsActivity : Activity() {
         webhookDelivery = WebhookDeliverySettingsUi(this, { selectedWebhookReceiver }).apply { attach(column) }
         webhookHealth = text(R.string.webhook_title).apply { id = ID_WEBHOOK_HEALTH }
         mqtt = MqttSettingsUi(this).apply { attach(column) }
+        text(R.string.crash_reporting_title, SECTION_TEXT_SP)
+            .setPadding(0, dp(SECTION_MARGIN_DP), 0, dp(TEXT_PADDING_DP))
+        text(R.string.crash_reporting_description)
+        crashReportingToggle = Switch(this).apply {
+            id = ID_CRASH_REPORTING_ENABLE
+            setText(R.string.crash_reporting_enable)
+            minHeight = dp(SWITCH_HEIGHT_DP)
+            isSaveEnabled = false
+            column.addView(this)
+        }
+        crashEndpointView = text(R.string.crash_reporting_endpoint_unset).apply {
+            id = ID_CRASH_REPORTING_ENDPOINT
+        }
+        button(column, R.string.crash_reporting_set_endpoint).apply {
+            id = ID_CRASH_REPORTING_SET
+        }.setOnClickListener {
+            crashEndpointDialog = CrashReportingEndpointDialog(this) { refresh() }.show {
+                crashEndpointDialog = null
+            }
+        }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
         // Android 15 uses edge-to-edge; apply fresh padding instead of accumulating insets.
@@ -214,6 +242,17 @@ class AutomationSettingsActivity : Activity() {
                     WebhookSettings.WriteResult.INVALID ->
                         Toast.makeText(this, R.string.webhook_url_required, Toast.LENGTH_SHORT).show()
                     WebhookSettings.WriteResult.STORAGE_FAILED -> storageError()
+                }
+                refresh()
+            }
+        }
+        crashReportingToggle.setOnCheckedChangeListener { _, enabled ->
+            if (!refreshing) {
+                when (CrashReportingSettings.setEnabled(this, enabled)) {
+                    CrashReportingSettings.WriteResult.SAVED -> Unit
+                    CrashReportingSettings.WriteResult.INVALID ->
+                        Toast.makeText(this, R.string.crash_reporting_endpoint_required, Toast.LENGTH_SHORT).show()
+                    CrashReportingSettings.WriteResult.STORAGE_FAILED -> storageError()
                 }
                 refresh()
             }
@@ -270,6 +309,12 @@ class AutomationSettingsActivity : Activity() {
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
         webhookDelivery.refresh()
+        val crashEndpoint = CrashReportingSettings.endpoint(this)
+        refreshing = true
+        crashReportingToggle.isChecked = CrashReportingSettings.enabled(this)
+        refreshing = false
+        crashEndpointView.text = if (crashEndpoint == null) getString(R.string.crash_reporting_endpoint_unset)
+            else getString(R.string.crash_reporting_endpoint_saved, HttpsUrlPolicy.hostLabel(crashEndpoint))
         val text = AndroidText.resolve(this@AutomationSettingsActivity,
             WebhookHealthText.format(WebhookNotifier.health(this, selectedWebhookReceiver),
                 android.os.SystemClock.elapsedRealtime()))
