@@ -44,7 +44,8 @@ class MacBundleTests(unittest.TestCase):
         executable = self.app / 'Contents/MacOS/TgWatch'
         arches = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
         self.assertEqual({'arm64', 'x86_64'}, set(arches))
-        subprocess.run(['/usr/bin/codesign', '--verify', '--strict', str(self.app)], check=True, capture_output=True)
+        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(self.app)],
+                       check=True, capture_output=True)
         signature = subprocess.run(['/usr/bin/codesign', '-dv', '--verbose=4', str(self.app)], check=True,
                                    capture_output=True, text=True).stderr
         self.assertIn('Signature=adhoc', signature)
