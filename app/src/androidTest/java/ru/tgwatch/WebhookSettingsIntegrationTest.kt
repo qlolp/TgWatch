@@ -31,6 +31,9 @@ class WebhookSettingsIntegrationTest {
         assertFalse("The production monitor must stop before fixture credentials are installed", MonitorService.running)
         previous = store().all.toMap()
         assertTrue(WebhookSettings.clear(ctx))
+        WebhookSettings.receiverIds(ctx).filter { it != 0 }.forEach {
+            assertTrue(WebhookSettings.removeReceiver(ctx, it))
+        }
     }
 
     @After fun restore() {
