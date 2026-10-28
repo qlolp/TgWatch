@@ -130,11 +130,34 @@ class AutomationSettingsActivity : Activity() {
         }
         button(column, R.string.webhook_receiver_add).apply {
             id = ID_WEBHOOK_ADD_RECEIVER
-            setOnClickListener { addWebhookReceiver() }
+            setOnClickListener {
+                if (WebhookSettings.receiverIds(this@AutomationSettingsActivity).size >=
+                    WebhookSettings.MAX_RECEIVERS) {
+                    Toast.makeText(this@AutomationSettingsActivity, R.string.webhook_receiver_limit,
+                        Toast.LENGTH_SHORT).show()
+                } else {
+                    val added = WebhookSettings.addReceiver(this@AutomationSettingsActivity)
+                    if (added == null) storageError() else selectedWebhookReceiver = added
+                }
+                refresh()
+            }
         }
         webhookRemoveReceiver = button(column, R.string.webhook_receiver_remove).apply {
             id = ID_WEBHOOK_REMOVE_RECEIVER
-            setOnClickListener { removeWebhookReceiver() }
+            setOnClickListener {
+                if (selectedWebhookReceiver != 0) {
+                    AlertDialog.Builder(this@AutomationSettingsActivity)
+                        .setTitle(R.string.webhook_receiver_remove)
+                        .setMessage(R.string.webhook_receiver_remove_message)
+                        .setNegativeButton(R.string.dialog_cancel, null)
+                        .setPositiveButton(R.string.dialog_remove) { _, _ ->
+                            if (!WebhookSettings.removeReceiver(this@AutomationSettingsActivity,
+                                    selectedWebhookReceiver)) storageError()
+                            selectedWebhookReceiver = 0
+                            refresh()
+                        }.show()
+                }
+            }
         }
         webhookReceiver.setOnClickListener { chooseWebhookReceiver() }
         webhookToggle = Switch(this).apply {
@@ -289,28 +312,6 @@ class AutomationSettingsActivity : Activity() {
                 dialog.dismiss()
                 refresh()
             }.setNegativeButton(R.string.dialog_cancel, null).show()
-    }
-
-    private fun addWebhookReceiver() {
-        if (WebhookSettings.receiverIds(this).size >= WebhookSettings.MAX_RECEIVERS) {
-            Toast.makeText(this, R.string.webhook_receiver_limit, Toast.LENGTH_SHORT).show()
-        } else {
-            val added = WebhookSettings.addReceiver(this)
-            if (added == null) storageError() else selectedWebhookReceiver = added
-        }
-        refresh()
-    }
-
-    private fun removeWebhookReceiver() {
-        if (selectedWebhookReceiver == 0) return
-        AlertDialog.Builder(this).setTitle(R.string.webhook_receiver_remove)
-            .setMessage(R.string.webhook_receiver_remove_message)
-            .setNegativeButton(R.string.dialog_cancel, null)
-            .setPositiveButton(R.string.dialog_remove) { _, _ ->
-                if (!WebhookSettings.removeReceiver(this, selectedWebhookReceiver)) storageError()
-                selectedWebhookReceiver = 0
-                refresh()
-            }.show()
     }
 
     private fun sendWebhookTest() {

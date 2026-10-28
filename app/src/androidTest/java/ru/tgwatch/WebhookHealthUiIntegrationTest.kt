@@ -18,8 +18,6 @@ class WebhookHealthUiIntegrationTest {
         Prefs.setEnabled(ctx, false)
         MonitorService.stopAndAwait(ctx)
         assertFalse(MonitorService.running)
-        val field = WebhookNotifier::class.java.getDeclaredField("coordinator").apply { isAccessible = true }
-        val previousCoordinator = field.get(WebhookNotifier)
         var now = 0L
         var deadline: (() -> Unit)? = null
         var finish: ((Int) -> Unit)? = null
@@ -27,8 +25,8 @@ class WebhookHealthUiIntegrationTest {
         val coordinator = WebhookCoordinator(Any(), {
             WebhookConfiguration("https://example.org/$secret", false, 0)
         }, { now }, { _, _, done -> finish = done; true }, { _, action -> deadline = action; {} })
+        val previousCoordinator = WebhookNotifier.replaceCoordinatorForTest(0, coordinator)
         try {
-            field.set(WebhookNotifier, coordinator)
             coordinator.sendTest {}
             now = WebhookPolicy.RESULT_DEADLINE_MS
             deadline!!.invoke()
@@ -47,7 +45,7 @@ class WebhookHealthUiIntegrationTest {
             }
         } finally {
             finish?.invoke(204)
-            field.set(WebhookNotifier, previousCoordinator)
+            WebhookNotifier.replaceCoordinatorForTest(0, previousCoordinator)
             Prefs.setEnabled(ctx, previousEnabled)
         }
     }

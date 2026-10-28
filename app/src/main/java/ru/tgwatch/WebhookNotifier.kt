@@ -20,8 +20,9 @@ object WebhookNotifier {
     enum class TestResult { SENT, FAILED, TIMED_OUT, BUSY, NOT_CONFIGURED }
 
     private const val IDLE_THREAD_SECONDS = 30L
+    private const val MAX_QUEUED_DELIVERIES = WebhookSettings.MAX_RECEIVERS - 1
     private val io = ThreadPoolExecutor(1, 1, IDLE_THREAD_SECONDS, TimeUnit.SECONDS,
-        LinkedBlockingQueue(WebhookSettings.MAX_RECEIVERS - 1),
+        LinkedBlockingQueue(MAX_QUEUED_DELIVERIES),
         { r -> Thread(r, "tg-webhook").apply { isDaemon = true } }).apply { allowCoreThreadTimeOut(true) }
     private val transports = Array(WebhookSettings.MAX_RECEIVERS) { WebhookTransport(io) }
     private val coordinators = arrayOfNulls<WebhookCoordinator>(WebhookSettings.MAX_RECEIVERS)
@@ -73,6 +74,14 @@ object WebhookNotifier {
     internal fun health(ctx: Context): WebhookHealth = health(ctx, 0)
 
     internal fun health(ctx: Context, receiverId: Int): WebhookHealth = coordinator(ctx, receiverId).health()
+
+    @Synchronized internal fun replaceCoordinatorForTest(
+        receiverId: Int,
+        replacement: WebhookCoordinator?
+    ): WebhookCoordinator? {
+        require(receiverId in 0 until WebhookSettings.MAX_RECEIVERS)
+        return coordinators[receiverId].also { coordinators[receiverId] = replacement }
+    }
 
     private fun coordinator(ctx: Context, receiverId: Int): WebhookCoordinator = synchronized(this) {
         coordinators[receiverId] ?: ctx.applicationContext.let { app ->

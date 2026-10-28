@@ -81,23 +81,28 @@ object WebhookSettings {
     }
 
     @Synchronized fun addReceiver(ctx: Context): Int? {
-        if (!unlocked(ctx)) return null
-        val current = receiverIds(ctx).toSet()
-        val id = (1 until MAX_RECEIVERS).firstOrNull { it !in current } ?: return null
-        val ids = current + id
-        return if (committed(ctx, id, store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
-                ids.filter { it != 0 }.map { it.toString() }.toSet())) == WriteResult.SAVED) id else null
+        return if (!unlocked(ctx)) null else {
+            val current = receiverIds(ctx).toSet()
+            val id = (1 until MAX_RECEIVERS).firstOrNull { it !in current }
+            if (id == null) null else {
+                val ids = current + id
+                if (committed(id, store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
+                        ids.filter { it != 0 }.map { it.toString() }.toSet())) == WriteResult.SAVED) id else null
+            }
+        }
     }
 
     @Synchronized fun removeReceiver(ctx: Context, receiverId: Int): Boolean {
-        if (receiverId !in 1 until MAX_RECEIVERS || !unlocked(ctx)) return false
-        val current = receiverIds(ctx)
-        if (receiverId !in current) return false
-        val editor = store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
-            (current - receiverId).filter { it != 0 }.map { it.toString() }.toSet())
-        listOf(KEY_ENABLED, KEY_URL, KEY_FORMAT, KEY_EVENTS, KEY_SERVICES)
-            .forEach { editor.remove(key(receiverId, it)) }
-        return committed(ctx, receiverId, editor) == WriteResult.SAVED
+        return if (receiverId !in 1 until MAX_RECEIVERS || !unlocked(ctx)) false else {
+            val current = receiverIds(ctx)
+            if (receiverId !in current) false else {
+                val editor = store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
+                    (current - receiverId).filter { it != 0 }.map { it.toString() }.toSet())
+                listOf(KEY_ENABLED, KEY_URL, KEY_FORMAT, KEY_EVENTS, KEY_SERVICES)
+                    .forEach { editor.remove(key(receiverId, it)) }
+                committed(receiverId, editor) == WriteResult.SAVED
+            }
+        }
     }
 
     /** Selection only controls delivery; it never enables monitoring or changes a target's address. */
@@ -108,7 +113,8 @@ object WebhookSettings {
         receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !WebhookStatuses.services.containsAll(services) -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
-        else -> committed(ctx, receiverId, store(ctx).edit().putStringSet(key(receiverId, KEY_SERVICES), services.toSet()))
+        else -> committed(receiverId,
+            store(ctx).edit().putStringSet(key(receiverId, KEY_SERVICES), services.toSet()))
     }
 
     /** Format and filter form one credential configuration generation; an empty filter is allowed. */
@@ -120,7 +126,7 @@ object WebhookSettings {
         receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !WebhookEventKind.DELIVERY_EVENTS.containsAll(events) -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
-        else -> committed(ctx, receiverId, store(ctx).edit().putString(key(receiverId, KEY_FORMAT), format.name)
+        else -> committed(receiverId, store(ctx).edit().putString(key(receiverId, KEY_FORMAT), format.name)
             .putStringSet(key(receiverId, KEY_EVENTS), events.map { it.name }.toSet()))
     }
 
@@ -138,7 +144,7 @@ object WebhookSettings {
         receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
         value && url(ctx, receiverId) == null -> WriteResult.INVALID
-        else -> committed(ctx, receiverId, store(ctx).edit().putBoolean(key(receiverId, KEY_ENABLED), value))
+        else -> committed(receiverId, store(ctx).edit().putBoolean(key(receiverId, KEY_ENABLED), value))
     }
 
     /** Invalid input changes nothing. */
@@ -151,11 +157,12 @@ object WebhookSettings {
     @Synchronized fun setUrlResult(ctx: Context, raw: String): WriteResult = setUrlResult(ctx, 0, raw)
 
     @Synchronized fun setUrlResult(ctx: Context, receiverId: Int, raw: String): WriteResult {
-        if (receiverId !in 0 until MAX_RECEIVERS) return WriteResult.INVALID
-        val url = WebhookPolicy.normalizeUrl(raw) ?: return WriteResult.INVALID
-        return if (unlocked(ctx)) committed(ctx, receiverId, store(ctx).edit()
-            .putString(key(receiverId, KEY_URL), url))
-            else WriteResult.STORAGE_FAILED
+        val url = WebhookPolicy.normalizeUrl(raw)
+        return when {
+            receiverId !in 0 until MAX_RECEIVERS || url == null -> WriteResult.INVALID
+            !unlocked(ctx) -> WriteResult.STORAGE_FAILED
+            else -> committed(receiverId, store(ctx).edit().putString(key(receiverId, KEY_URL), url))
+        }
     }
 
     /** Removes the address and turns the webhook off. */
@@ -166,11 +173,11 @@ object WebhookSettings {
         val editor = store(ctx).edit()
         listOf(KEY_URL, KEY_ENABLED, KEY_FORMAT, KEY_EVENTS, KEY_SERVICES)
             .forEach { editor.remove(key(receiverId, it)) }
-        return committed(ctx, receiverId, editor) == WriteResult.SAVED
+        return committed(receiverId, editor) == WriteResult.SAVED
     }
 
     /** Even a failed disk commit can replace SharedPreferences' in-memory configuration. */
-    private fun committed(ctx: Context, receiverId: Int, editor: SharedPreferences.Editor): WriteResult {
+    private fun committed(receiverId: Int, editor: SharedPreferences.Editor): WriteResult {
         require(receiverId in 0 until MAX_RECEIVERS)
         generations[receiverId]++
         return if (editor.commit().also { WebhookNotifier.reset(receiverId) }) WriteResult.SAVED
