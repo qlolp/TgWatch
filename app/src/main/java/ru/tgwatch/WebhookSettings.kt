@@ -36,12 +36,14 @@ object WebhookSettings {
     @Synchronized fun url(ctx: Context): String? = url(ctx, 0)
 
     @Synchronized fun url(ctx: Context, receiverId: Int): String? =
-        if (unlocked(ctx)) WebhookPolicy.normalizeUrl(store(ctx).getString(key(receiverId, KEY_URL), null)) else null
+        if (receiverId in 0 until MAX_RECEIVERS && unlocked(ctx))
+            WebhookPolicy.normalizeUrl(store(ctx).getString(key(receiverId, KEY_URL), null)) else null
 
     @Synchronized fun enabled(ctx: Context): Boolean = enabled(ctx, 0)
 
     @Synchronized fun enabled(ctx: Context, receiverId: Int): Boolean =
-        unlocked(ctx) && store(ctx).getBoolean(key(receiverId, KEY_ENABLED), false) &&
+        receiverId in 0 until MAX_RECEIVERS && unlocked(ctx) &&
+            store(ctx).getBoolean(key(receiverId, KEY_ENABLED), false) &&
             url(ctx, receiverId) != null
 
     /** The address to post to only while the switch is on; null otherwise. */
@@ -71,10 +73,12 @@ object WebhookSettings {
     }
 
     /** Receiver IDs contain no endpoint data and are bounded to a small fixed number of credential slots. */
-    @Synchronized internal fun receiverIds(ctx: Context): List<Int> =
-        listOf(0) + if (unlocked(ctx)) store(ctx).getStringSet(KEY_RECEIVER_IDS, emptySet())
+    @Synchronized internal fun receiverIds(ctx: Context): List<Int> {
+        val additional = if (unlocked(ctx)) store(ctx).getStringSet(KEY_RECEIVER_IDS, emptySet())
             .orEmpty().mapNotNull(String::toIntOrNull).filter { it in 1 until MAX_RECEIVERS }.distinct().sorted()
         else emptyList()
+        return listOf(0) + additional
+    }
 
     @Synchronized fun addReceiver(ctx: Context): Int? {
         if (!unlocked(ctx)) return null
@@ -82,7 +86,7 @@ object WebhookSettings {
         val id = (1 until MAX_RECEIVERS).firstOrNull { it !in current } ?: return null
         val ids = current + id
         return if (committed(ctx, id, store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
-                ids.filter { it != 0 }.map(Int::toString).toSet())) == WriteResult.SAVED) id else null
+                ids.filter { it != 0 }.map { it.toString() }.toSet())) == WriteResult.SAVED) id else null
     }
 
     @Synchronized fun removeReceiver(ctx: Context, receiverId: Int): Boolean {
@@ -90,7 +94,7 @@ object WebhookSettings {
         val current = receiverIds(ctx)
         if (receiverId !in current) return false
         val editor = store(ctx).edit().putStringSet(KEY_RECEIVER_IDS,
-            (current - receiverId).filter { it != 0 }.map(Int::toString).toSet())
+            (current - receiverId).filter { it != 0 }.map { it.toString() }.toSet())
         listOf(KEY_ENABLED, KEY_URL, KEY_FORMAT, KEY_EVENTS, KEY_SERVICES)
             .forEach { editor.remove(key(receiverId, it)) }
         return committed(ctx, receiverId, editor) == WriteResult.SAVED
@@ -101,6 +105,7 @@ object WebhookSettings {
         setTargetsResult(ctx, 0, services)
 
     @Synchronized fun setTargetsResult(ctx: Context, receiverId: Int, services: Set<String>): WriteResult = when {
+        receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !WebhookStatuses.services.containsAll(services) -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
         else -> committed(ctx, receiverId, store(ctx).edit().putStringSet(key(receiverId, KEY_SERVICES), services.toSet()))
@@ -112,6 +117,7 @@ object WebhookSettings {
 
     @Synchronized fun setDeliveryResult(ctx: Context, receiverId: Int, format: WebhookFormat,
         events: Set<WebhookEventKind>): WriteResult = when {
+        receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !WebhookEventKind.DELIVERY_EVENTS.containsAll(events) -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
         else -> committed(ctx, receiverId, store(ctx).edit().putString(key(receiverId, KEY_FORMAT), format.name)
@@ -129,6 +135,7 @@ object WebhookSettings {
         setEnabledResult(ctx, 0, value)
 
     @Synchronized fun setEnabledResult(ctx: Context, receiverId: Int, value: Boolean): WriteResult = when {
+        receiverId !in 0 until MAX_RECEIVERS -> WriteResult.INVALID
         !unlocked(ctx) -> WriteResult.STORAGE_FAILED
         value && url(ctx, receiverId) == null -> WriteResult.INVALID
         else -> committed(ctx, receiverId, store(ctx).edit().putBoolean(key(receiverId, KEY_ENABLED), value))

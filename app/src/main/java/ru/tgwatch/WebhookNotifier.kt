@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Opt-in POST of a bounded event payload to a user-owned HTTPS endpoint (for example an ntfy.sh topic).
- * One background thread, at most one request in flight, bounded timeouts, no redirects.
+ * One network thread, bounded per-recipient queue, bounded timeouts, no redirects.
  * No address, body or transport exception is logged.
  */
 object WebhookNotifier {

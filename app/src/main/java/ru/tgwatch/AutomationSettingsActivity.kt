@@ -125,14 +125,6 @@ class AutomationSettingsActivity : Activity() {
         regenerate = button(column, R.string.automation_regenerate)
         text(R.string.webhook_title, SECTION_TEXT_SP).setPadding(0, dp(SECTION_MARGIN_DP), 0, dp(TEXT_PADDING_DP))
         text(R.string.webhook_description)
-        webhookToggle = Switch(this).apply {
-            id = ID_WEBHOOK_ENABLE
-            setText(R.string.webhook_enable)
-            minHeight = dp(SWITCH_HEIGHT_DP)
-            isSaveEnabled = false
-            column.addView(this)
-        }
-        webhookUrlView = text(R.string.webhook_url_unset).apply { id = ID_WEBHOOK_URL }
         webhookReceiver = button(column, R.string.webhook_receiver_current).apply {
             id = ID_WEBHOOK_RECEIVER
         }
@@ -145,6 +137,14 @@ class AutomationSettingsActivity : Activity() {
             setOnClickListener { removeWebhookReceiver() }
         }
         webhookReceiver.setOnClickListener { chooseWebhookReceiver() }
+        webhookToggle = Switch(this).apply {
+            id = ID_WEBHOOK_ENABLE
+            setText(R.string.webhook_enable)
+            minHeight = dp(SWITCH_HEIGHT_DP)
+            isSaveEnabled = false
+            column.addView(this)
+        }
+        webhookUrlView = text(R.string.webhook_url_unset).apply { id = ID_WEBHOOK_URL }
         button(column, R.string.webhook_set_url).apply { id = ID_WEBHOOK_SET }.setOnClickListener { editWebhookUrl() }
         webhookTest = button(column, R.string.webhook_test).apply { id = ID_WEBHOOK_TEST }
         webhookTest.setOnClickListener { sendWebhookTest() }
@@ -292,8 +292,12 @@ class AutomationSettingsActivity : Activity() {
     }
 
     private fun addWebhookReceiver() {
-        val added = WebhookSettings.addReceiver(this)
-        if (added == null) storageError() else selectedWebhookReceiver = added
+        if (WebhookSettings.receiverIds(this).size >= WebhookSettings.MAX_RECEIVERS) {
+            Toast.makeText(this, R.string.webhook_receiver_limit, Toast.LENGTH_SHORT).show()
+        } else {
+            val added = WebhookSettings.addReceiver(this)
+            if (added == null) storageError() else selectedWebhookReceiver = added
+        }
         refresh()
     }
 

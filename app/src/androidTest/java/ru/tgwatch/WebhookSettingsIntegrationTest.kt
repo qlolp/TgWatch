@@ -3,6 +3,7 @@ package ru.tgwatch
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.widget.Button
+import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -336,6 +337,104 @@ class WebhookSettingsIntegrationTest {
         completions.single()(204)
         assertNull(coordinator.health().lastSuccessElapsed)
         assertEquals(WebhookFormat.JSON, WebhookSettings.configuration(ctx).format)
+    }
+
+    @Test fun originalSingleWebhookPreferencesRemainTheLegacyReceiver() {
+        assertTrue(store().edit().putString("url", secret).putBoolean("enabled", true)
+            .putString("format", WebhookFormat.JSON.name)
+            .putStringSet("events", setOf(WebhookEventKind.RECOVERY.name))
+            .putStringSet("services", setOf("matrix")).commit())
+
+        val legacy = WebhookSettings.configuration(ctx)
+
+        assertEquals(0, legacy.receiverId)
+        assertEquals(secret, legacy.url)
+        assertTrue(legacy.enabled)
+        assertEquals(WebhookFormat.JSON, legacy.format)
+        assertEquals(setOf(WebhookEventKind.RECOVERY), legacy.events)
+        assertEquals(setOf("matrix"), legacy.services)
+        assertEquals(listOf(0), WebhookSettings.receiverIds(ctx))
+    }
+
+    @Test fun recipientsKeepPrivateSettingsAndGenerationsIndependentAndOutOfPortableData() {
+        val primary = "https://ntfy.sh/private-topic-legacy-51e"
+        val additional = "https://ntfy.sh/private-topic-extra-74a"
+        assertTrue(WebhookSettings.setUrl(ctx, primary))
+        assertTrue(WebhookSettings.setEnabled(ctx, true))
+        val primaryBefore = WebhookSettings.configuration(ctx)
+        val receiverId = checkNotNull(WebhookSettings.addReceiver(ctx))
+        try {
+            assertEquals(1, receiverId)
+            assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setUrlResult(ctx, receiverId, additional))
+            assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setEnabledResult(ctx, receiverId, true))
+            assertEquals(WebhookSettings.WriteResult.SAVED, WebhookSettings.setDeliveryResult(ctx, receiverId,
+                WebhookFormat.JSON_V2, setOf(WebhookEventKind.UNREACHABLE)))
+            assertEquals(WebhookSettings.WriteResult.SAVED,
+                WebhookSettings.setTargetsResult(ctx, receiverId, setOf("matrix")))
+
+            val configuredPrimary = WebhookSettings.configuration(ctx)
+            val configuredAdditional = WebhookSettings.configuration(ctx, receiverId)
+            assertEquals(primaryBefore, configuredPrimary)
+            assertTrue(configuredAdditional.generation > 0L)
+            assertEquals(additional, configuredAdditional.url)
+            assertEquals(setOf("matrix"), configuredAdditional.services)
+            assertEquals(setOf(WebhookEventKind.UNREACHABLE), configuredAdditional.events)
+            assertEquals(WebhookFormat.JSON_V2, configuredAdditional.format)
+
+            val portable = BackupCodec.encode(BackupManager.snapshot(ctx)).toString(Charsets.UTF_8)
+            val diagnostics = LocalDiagnostics.snapshot(ctx).toJson()
+            val backupSettings = BackupManager.snapshot(ctx).settings.values.joinToString()
+            listOf(primary, additional, "private-topic-legacy", "private-topic-extra").forEach { secret ->
+                assertFalse(portable.contains(secret))
+                assertFalse(diagnostics.contains(secret))
+                assertFalse(backupSettings.contains(secret))
+            }
+        } finally {
+            assertTrue(WebhookSettings.removeReceiver(ctx, receiverId))
+        }
+    }
+
+    @Test fun receiverControlsShowIndependentRecipientWithoutRenderingItsSavedSecret() {
+        val receiverId = checkNotNull(WebhookSettings.addReceiver(ctx))
+        try {
+            assertTrue(WebhookSettings.setUrl(ctx, receiverId, secret))
+            ActivityScenario.launch(AutomationSettingsActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    val receiver = activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_RECEIVER)
+                    assertEquals(activity.getString(R.string.webhook_receiver_current, 1, 2), receiver.text.toString())
+                    assertFalse(activity.findViewById<TextView>(AutomationSettingsActivity.ID_WEBHOOK_URL)
+                        .text.contains(secret))
+                    assertFalse(activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_REMOVE_RECEIVER).isEnabled)
+                    assertTrue(activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_ADD_RECEIVER).isEnabled)
+                }
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    assertEquals(activity.getString(R.string.webhook_receiver_current, 1, 2),
+                        activity.findViewById<Button>(AutomationSettingsActivity.ID_WEBHOOK_RECEIVER).text.toString())
+                }
+            }
+        } finally {
+            assertTrue(WebhookSettings.removeReceiver(ctx, receiverId))
+        }
+    }
+
+    @Test fun receiverSlotsAreBoundedAndRemovalClearsThatCredential() {
+        val ids = mutableListOf<Int>()
+        try {
+            repeat(WebhookSettings.MAX_RECEIVERS - 1) {
+                ids += checkNotNull(WebhookSettings.addReceiver(ctx))
+            }
+            assertNull(WebhookSettings.addReceiver(ctx))
+            val removed = ids.first()
+            assertTrue(WebhookSettings.setUrl(ctx, removed, secret))
+            assertTrue(WebhookSettings.removeReceiver(ctx, removed))
+            assertNull(WebhookSettings.url(ctx, removed))
+            assertFalse(WebhookSettings.receiverIds(ctx).contains(removed))
+        } finally {
+            ids.forEach { id ->
+                if (id in WebhookSettings.receiverIds(ctx)) assertTrue(WebhookSettings.removeReceiver(ctx, id))
+            }
+        }
     }
 
 }
