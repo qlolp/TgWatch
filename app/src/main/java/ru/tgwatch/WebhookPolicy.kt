@@ -61,8 +61,9 @@ object WebhookPolicy {
 }
 
 /**
- * Per-process send decisions. Called for every published status so a post skipped by the rate
- * limit or a failed delivery is retried by a later check. At most one request is in flight.
+ * Per-process, per-recipient send decisions. Called for every published status so a post skipped
+ * by the rate limit or a failed delivery is retried by a later check. Each gate owns at most one
+ * admitted request; independent recipient gates share the notifier's bounded physical queue.
  */
 internal class WebhookGate(private val minGapMs: Long = WebhookPolicy.MIN_GAP_MS,
     private val testGapMs: Long = WebhookPolicy.TEST_GAP_MS) {
