@@ -8,6 +8,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Test
+import ru.tgwatch.probe.HttpProbeCondition
+import ru.tgwatch.probe.HttpRequestHeader
 
 class TargetRunnerTest {
     private class Connection(val bytes: ByteArray, private val code: Int, val knownSize: Boolean = true) :
@@ -48,6 +50,20 @@ class TargetRunnerTest {
             assertEquals(ru.tgwatch.probe.ProbeDetailCode.HTTP_JSON_NOT_CONFIRMED, report.failure)
             assertFalse(report.toString().contains("private-field"))
             assertFalse(report.toString().contains("private-value"))
+        }
+    }
+    @Test fun customBodyCriteriaAndHeadersReachTheProbeRequest() {
+        val request = Connection("service is healthy".toByteArray(), 200)
+        val condition = HttpProbeCondition(expectedCode = 200, bodySubstring = "healthy",
+            headers = listOf(HttpRequestHeader("X-Health-Key", "private-header-value")))
+        Fixture { url -> if (url.host == "custom.example") request else Connection(byteArrayOf(), 200) }.use {
+            val report = it.runner.check(TargetAttempt(TargetId.CUSTOM, 0, 0, 0, 0),
+                TargetDefinition.default(TargetId.CUSTOM).copy(enabled = true), "https://custom.example",
+                condition)
+            assertEquals(TargetStatus.OK, report.status)
+            assertEquals("GET", request.methodUsed)
+            assertEquals("private-header-value", request.getRequestProperty("X-Health-Key"))
+            assertFalse(report.toString().contains("private-header-value"))
         }
     }
 

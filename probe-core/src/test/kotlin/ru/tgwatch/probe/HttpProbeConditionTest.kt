@@ -97,6 +97,34 @@ class HttpProbeConditionTest {
         assertFalse(check(Connection("{\"status\":\"ok\"}".toByteArray(), 500)).confirmed)
         assertTrue(check(Connection("{\"status\":\"\"}".toByteArray()), jsonCondition("")).confirmed)
     }
+    @Test fun bodySubstringAndSeveralJsonConditionsMustAllMatch() {
+        val condition = HttpProbeCondition(bodySubstring = "\"indicator\":\"none\"",
+            jsonConditions = listOf(HttpJsonCondition("status.indicator", "none"),
+                HttpJsonCondition("page.name", "Example")))
+        val healthy = """{"status":{"indicator":"none"},"page":{"name":"Example"}}"""
+        val missingSubstring = """{"status":{"indicator":"none"},"page":{"name":"Example"},"note":"changed"}"""
+        val wrongJson = """{"status":{"indicator":"none"},"page":{"name":"Other"}}"""
+        assertTrue(check(Connection(healthy.toByteArray()), condition).confirmed)
+        assertFalse(check(Connection(missingSubstring.toByteArray()), condition.copy(bodySubstring = "not present"))
+            .confirmed)
+        assertFalse(check(Connection(wrongJson.toByteArray()), condition).confirmed)
+    }
+
+    @Test fun bodyOnlyAndRequestHeadersUseOneGetAndNeverExposeValues() {
+        val body = Connection("service healthy".toByteArray())
+        val condition = HttpProbeCondition(bodySubstring = "healthy",
+            headers = listOf(HttpRequestHeader("Authorization", "******")))
+        val endpoint = endpoint(condition)
+        assertTrue(check(body, condition).confirmed)
+        assertEquals("GET", body.usedMethod)
+        assertEquals("******", body.getRequestProperty("Authorization"))
+        for (secret in listOf("private-token", "healthy", "Authorization", "fixture.invalid"))
+            assertFalse(endpoint.toString().contains(secret))
+        val headerOnly = Connection(byteArrayOf(), 204)
+        assertTrue(check(headerOnly, HttpProbeCondition(headers = listOf(HttpRequestHeader("X-Health", "private"))))
+            .confirmed)
+        assertEquals("HEAD", headerOnly.usedMethod)
+    }
     @Test fun wholeObjectRejectsNestedDuplicatesTrailingDataAndExcessiveDepth() {
         for (text in listOf("{\"status\":\"ok\",\"status\":\"ok\"}",
             "{\"status\":\"ok\",\"unused\":{\"x\":1,\"x\":2}}",
@@ -157,6 +185,34 @@ class HttpProbeConditionTest {
         val value = HttpProbeCondition(jsonField = "private-field", expectedValue = "private-token")
         assertFalse(value.toString().contains("private-field"))
         assertFalse(value.toString().contains("private-token"))
+    }
+    @Test fun conditionListsAreBoundedCaseInsensitiveAndImmutable() {
+        val tooManyJson = List(4) { HttpJsonCondition("status", "ok") }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(jsonField = "status", expectedValue = "ok", jsonConditions = tooManyJson)
+        }
+        assertEquals(4, HttpProbeCondition(jsonConditions = tooManyJson).allJsonConditions().size)
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(bodySubstring = "x".repeat(257))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(headers = listOf(HttpRequestHeader("X-Key", "one"),
+                HttpRequestHeader("x-key", "two")))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(headers = listOf(HttpRequestHeader("X-Key", "bad\r\nInjected: true")))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(headers = listOf(HttpRequestHeader("Accept-Encoding", "gzip")))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            HttpProbeCondition(headers = List(9) { HttpRequestHeader("X-Key-$it", "value") })
+        }
+        val mutable = mutableListOf(HttpJsonCondition("status", "ok"))
+        val condition = HttpProbeCondition(jsonConditions = mutable)
+        mutable.clear()
+        assertEquals(1, condition.jsonConditions.size)
+        assertThrows(UnsupportedOperationException::class.java) { (condition.jsonConditions as MutableList).clear() }
     }
     @Test fun cancellationDisconnectsButPhysicalSlotStaysOwnedUntilBodyReturns() {
         val started = CountDownLatch(1)
