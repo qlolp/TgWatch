@@ -117,7 +117,8 @@ editable. A successful status-page JSON match still proves only the HTTP/JSON
 criteria, not message delivery.
 
 Body or JSON criteria use one GET (`Accept: application/json` when JSON is checked)
-with identity encoding, strict UTF-8 and at most 32 KiB. JSON validation is complete,
+with identity encoding, strict UTF-8 and at most 32 KiB. The body is read once and
+reused for the substring and every JSON condition. JSON validation is complete,
 with depth at most 10 and nested duplicate-key rejection. Missing/nonstring fields,
 truncated, oversized, compressed or malformed responses fail confirmation.
 Unknown-length responses that reach the cap are rejected; a complete, known-length
