@@ -96,3 +96,33 @@ class MqttTransportTest {
         server.close()
     }
 }
+
+class MqttTlsCleanupTest {
+    private val endpoint = MqttEndpoint("127.0.0.1", 1, "t", null, null)
+
+    private class Tracking : Socket() {
+        @Volatile var closed = false
+        override fun connect(address: java.net.SocketAddress?, timeout: Int) = Unit
+        override fun close() {
+            closed = true
+            super.close()
+        }
+    }
+
+    private fun failsWith(error: Throwable, expected: Class<out Throwable>) {
+        val socket = Tracking()
+        try {
+            MqttTransport.openTls(endpoint, socket) { throw error }
+            throw AssertionError("expected failure")
+        } catch (e: Throwable) {
+            assertTrue(expected.isInstance(e))
+        }
+        assertTrue("Socket must be closed after ${expected.simpleName}", socket.closed)
+    }
+
+    @Test fun socketIsClosedOnIoRuntimeAndSecurityFailures() {
+        failsWith(java.io.IOException(), java.io.IOException::class.java)
+        failsWith(IllegalStateException(), IllegalStateException::class.java)
+        failsWith(SecurityException(), SecurityException::class.java)
+    }
+}

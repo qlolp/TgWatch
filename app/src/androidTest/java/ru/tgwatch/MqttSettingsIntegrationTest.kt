@@ -18,14 +18,39 @@ class MqttSettingsIntegrationTest {
     private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val secrets = listOf("broker.secret-host.example", "secret/topic-7f3a", "secret-user", "secret-password")
     private var previousWebhook: String? = null
+    private var previous: Map<String, *>? = null
+
+    private fun store() = ctx.getSharedPreferences(MqttSettings.FILE, Context.MODE_PRIVATE)
 
     @Before fun prepare() {
         previousWebhook = WebhookSettings.url(ctx)
+        previous = store().all.toMap()
         assertTrue(MqttSettings.clear(ctx))
     }
 
+    /** Restores the complete previous private snapshot so a device's real settings survive the test. */
     @After fun restore() {
-        MqttSettings.clear(ctx)
+        val saved = previous ?: return
+        synchronized(MqttSettings) {
+            assertTrue("Fixture settings must advance the configuration generation", MqttSettings.clear(ctx))
+            val edit = store().edit().clear()
+            saved.forEach { (key, value) ->
+                when (value) {
+                    is String -> edit.putString(key, value)
+                    is Boolean -> edit.putBoolean(key, value)
+                    is Int -> edit.putInt(key, value)
+                    else -> error("Unsupported fixture preference")
+                }
+            }
+            assertTrue("Original MQTT preferences must be restored", edit.commit())
+        }
+        MqttNotifier.reset()
+    }
+
+    @Test fun passwordWithoutUsernameIsRejected() {
+        assertEquals(WebhookSettings.WriteResult.INVALID,
+            MqttSettings.setEndpointResult(ctx, secrets[0], "", secrets[1], "", secrets[3]))
+        assertNull(MqttSettings.endpoint(ctx))
     }
 
     @Test fun offByDefaultValidatedPrivateAndOutsideBackupDiagnosticsAndPrefs() {

@@ -67,6 +67,8 @@ object MqttSettings {
         return when {
             validHost == null || validPort == null || validTopic == null || validUser == null ||
                 validPassword == null -> WebhookSettings.WriteResult.INVALID
+            // CONNECT cannot carry a password without a username; never store a configuration that is ignored.
+            validUser.isEmpty() && validPassword.isNotEmpty() -> WebhookSettings.WriteResult.INVALID
             !unlocked(ctx) -> WebhookSettings.WriteResult.STORAGE_FAILED
             else -> committed(store(ctx).edit().putString(KEY_HOST, validHost).putInt(KEY_PORT, validPort)
                 .putString(KEY_TOPIC, validTopic).putString(KEY_USERNAME, validUser)

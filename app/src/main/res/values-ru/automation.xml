@@ -52,13 +52,13 @@
     <string name="mqtt_unset">Брокер MQTT не задан.</string>
     <string name="mqtt_saved">Брокер MQTT сохранён: %1$s</string>
     <string name="mqtt_set">Задать брокер MQTT</string>
-    <string name="mqtt_message">Только TLS. Тема не может содержать # и +. Сохранённые значения не показываются; введите их заново для замены. Имя пользователя и пароль необязательны.</string>
+    <string name="mqtt_message">Только TLS. Тема не может содержать # и +. Сохранённые значения не показываются; введите их заново для замены. Имя пользователя и пароль необязательны; пароль требует имени пользователя.</string>
     <string name="mqtt_host_hint">Имя хоста брокера</string>
     <string name="mqtt_port_hint">Порт (по умолчанию 8883)</string>
     <string name="mqtt_topic_hint">Тема</string>
     <string name="mqtt_username_hint">Имя пользователя (необязательно)</string>
     <string name="mqtt_password_hint">Пароль (необязательно)</string>
-    <string name="mqtt_invalid">Введите корректные имя хоста, порт, тему без # и + и печатаемые учётные данные в пределах лимитов.</string>
+    <string name="mqtt_invalid">Введите корректные имя хоста, порт, тему без # и + и печатаемые учётные данные в пределах лимитов (пароль требует имени пользователя).</string>
     <string name="mqtt_required">Сначала задайте корректный брокер MQTT.</string>
     <string name="mqtt_test">Отправить тестовое сообщение MQTT</string>
 </resources>

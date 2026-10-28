@@ -108,19 +108,21 @@ internal class MqttTransport(
         }
 
         /** TLS only, certificate chain and hostname verified against the system trust store. */
-        fun openTls(endpoint: MqttEndpoint): Socket {
-            val plain = Socket()
+        fun openTls(endpoint: MqttEndpoint, plain: Socket = Socket(),
+            factory: () -> SSLSocketFactory = { SSLSocketFactory.getDefault() as SSLSocketFactory }): Socket {
+            var secured = false
             try {
                 plain.connect(InetSocketAddress(endpoint.host, endpoint.port), WebhookPolicy.TIMEOUT_MS)
                 plain.soTimeout = WebhookPolicy.TIMEOUT_MS
-                val tls = (SSLSocketFactory.getDefault() as SSLSocketFactory)
+                val tls = factory()
                     .createSocket(plain, endpoint.host, endpoint.port, true) as SSLSocket
                 tls.sslParameters = tls.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
                 tls.startHandshake()
+                secured = true
                 return tls
-            } catch (e: IOException) {
-                close(plain)
-                throw e
+            } finally {
+                // Any failure, including SecurityException or other runtime errors, must not leak the socket.
+                if (!secured) close(plain)
             }
         }
     }

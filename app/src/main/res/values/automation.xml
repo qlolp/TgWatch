@@ -52,13 +52,13 @@
     <string name="mqtt_unset">MQTT broker is not set.</string>
     <string name="mqtt_saved">MQTT broker saved: %1$s</string>
     <string name="mqtt_set">Set MQTT broker</string>
-    <string name="mqtt_message">TLS only. The topic cannot contain # or +. Saved values are not shown; enter them again to replace them. Username and password are optional.</string>
+    <string name="mqtt_message">TLS only. The topic cannot contain # or +. Saved values are not shown; enter them again to replace them. Username and password are optional; a password requires a username.</string>
     <string name="mqtt_host_hint">Broker host name</string>
     <string name="mqtt_port_hint">Port (default 8883)</string>
     <string name="mqtt_topic_hint">Topic</string>
     <string name="mqtt_username_hint">Username (optional)</string>
     <string name="mqtt_password_hint">Password (optional)</string>
-    <string name="mqtt_invalid">Enter a valid host name, port, topic without # or +, and printable credentials within the limits.</string>
+    <string name="mqtt_invalid">Enter a valid host name, port, topic without # or +, and printable credentials within the limits (a password needs a username).</string>
     <string name="mqtt_required">Set a valid MQTT broker first.</string>
     <string name="mqtt_test">Send MQTT test message</string>
 </resources>
