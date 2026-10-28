@@ -122,6 +122,7 @@ if [[ "$notary_configured" == true ]]; then
     echo 'Apple notary submission failed; no notarized build was produced.' >&2
     exit 1
   fi
+  # Only an actual Accepted result may reach stapling, assessment and artifact labeling.
   if ! grep -Eq '"status"[[:space:]]*:[[:space:]]*"Accepted"' "$stage/notary-result.json"; then
     echo 'Apple notary service did not return Accepted; no stapling was performed.' >&2
     exit 1
