@@ -10,7 +10,7 @@ xcrun swiftc -swift-version 5 -module-cache-path "$checks/module-cache" \
 xcrun swiftc -swift-version 5 -module-cache-path "$checks/module-cache" \
   macos/TgWatch/RegionalMenuModel.swift macos/TgWatch/RegionalEngineProcess.swift \
   macos/tests/RegionalEngineTests.swift -o "$checks/process-tests"
-"$checks/process-tests"
+TGWATCH_TEST_PYTHON="$(command -v python3)" "$checks/process-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$checks/module-cache" \
   macos/TgWatch/RegionalMenuModel.swift macos/TgWatch/MacPublicResponseWatch.swift \
   macos/tests/MacPublicResponseWatchTests.swift -o "$checks/watch-tests"

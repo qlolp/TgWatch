@@ -12,7 +12,7 @@
 "Finding Python / starting checks…" = "Finding Python / starting checks…";
 "Help" = "Help";
 "Include when monitoring" = "Include when monitoring";
-"Install a compatible Python from python.org or Homebrew, then choose Start monitoring. The app does not install runtimes or developer tools automatically." = "Install a compatible Python from python.org or Homebrew, then choose Start monitoring. The app does not install runtimes or developer tools automatically.";
+"Rebuild the app from a trusted source; the matching bundled runtime is missing." = "Rebuild the app from a trusted source; the matching bundled runtime is missing.";
 "Launch at login" = "Launch at login";
 "Launch at login unavailable" = "Launch at login unavailable";
 "Login approval required…" = "Login approval required…";
@@ -27,8 +27,7 @@
 "Open in browser" = "Open in browser";
 "Public sites · account features unverified" = "Public sites · account features unverified";
 "Public website responds" = "Public website responds";
-"Python 3.10+ is required" = "Python 3.10+ is required";
-"Python download page" = "Python download page";
+"Bundled Python runtime is unavailable" = "Bundled Python runtime is unavailable";
 "Quit TgWatch" = "Quit TgWatch";
 "Requests limited" = "Requests limited";
 "Sign-in required" = "Sign-in required";

@@ -1,5 +1,6 @@
 """Inspect a real signed app and launch its native menu through macOS LaunchServices, with no opt-in changes."""
 import json
+import platform
 from pathlib import Path
 import plistlib
 import subprocess
@@ -34,6 +35,12 @@ class MacBundleTests(unittest.TestCase):
         self.assertEqual((ROOT / 'scripts/regional-services.py').read_bytes(), engine.read_bytes())
         for language in ['ru', 'en']:
             self.assertTrue((self.app / ('Contents/Resources/' + language + '.lproj/Localizable.strings')).exists())
+        runtimes = self.app / 'Contents/Resources/python'
+        for architecture in ['arm64', 'x86_64']:
+            python = runtimes / architecture / 'bin/python3'
+            self.assertTrue(python.is_file(), f'Missing bundled Python for {architecture}')
+            python_arches = subprocess.check_output(['/usr/bin/lipo', '-archs', str(python)], text=True).split()
+            self.assertEqual({architecture}, set(python_arches))
         executable = self.app / 'Contents/MacOS/TgWatch'
         arches = subprocess.check_output(['/usr/bin/lipo', '-archs', str(executable)], text=True).split()
         self.assertEqual({'arm64', 'x86_64'}, set(arches))
@@ -47,6 +54,22 @@ class MacBundleTests(unittest.TestCase):
         subprocess.run(['/usr/bin/ditto', '-x', '-k', str(archive), str(extracted)], check=True)
         subprocess.run(['/usr/bin/codesign', '--verify', '--strict', str(extracted / 'TgWatch.app')],
                        check=True, capture_output=True)
+
+    def test_bundled_python_runs_ipc_regression_suite(self):
+        architecture = platform.machine()
+        self.assertIn(architecture, ['arm64', 'x86_64'])
+        python = self.app / f'Contents/Resources/python/{architecture}/bin/python3'
+        version = subprocess.check_output(
+            [str(python), '-I', '-B', '-c', 'import sys; print(".".join(map(str, sys.version_info[:3])))'],
+            text=True,
+        ).strip()
+        self.assertEqual('3.11.18', version)
+        result = subprocess.run(
+            [str(python), '-I', '-B', '-m', 'unittest', 'discover', '-s', str(ROOT / 'scripts/tests'),
+             '-p', 'test_mac_app_ipc.py', '-v'],
+            cwd=ROOT, capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_native_menu_has_five_profiles_without_enabling_any_monitor_or_permission(self):
         report = self.app.parent / 'native-smoke.json'

@@ -12,7 +12,7 @@
 "Finding Python / starting checks…" = "Поиск Python / запуск проверок…";
 "Help" = "Справка";
 "Include when monitoring" = "Включать при мониторинге";
-"Install a compatible Python from python.org or Homebrew, then choose Start monitoring. The app does not install runtimes or developer tools automatically." = "Установите совместимый Python с python.org или через Homebrew, затем нажмите «Начать мониторинг». Приложение не устанавливает Python или инструменты разработчика автоматически.";
+"Rebuild the app from a trusted source; the matching bundled runtime is missing." = "Соберите приложение заново из доверенного источника: встроенная среда для этой архитектуры не найдена.";
 "Launch at login" = "Запускать при входе";
 "Launch at login unavailable" = "Автозапуск недоступен";
 "Login approval required…" = "Требуется разрешение автозапуска…";
@@ -27,8 +27,7 @@
 "Open in browser" = "Открыть в браузере";
 "Public sites · account features unverified" = "Публичные сайты · функции аккаунта не проверены";
 "Public website responds" = "Публичный сайт отвечает";
-"Python 3.10+ is required" = "Необходим Python 3.10+";
-"Python download page" = "Сайт загрузки Python";
+"Bundled Python runtime is unavailable" = "Встроенная среда Python недоступна";
 "Quit TgWatch" = "Выйти из TgWatch";
 "Requests limited" = "Частота запросов ограничена";
 "Sign-in required" = "Требуется вход";

@@ -99,11 +99,10 @@ import Network
             defaults.set(false, forKey: "monitoring.enabled")
             model.replace(generation: generation, services: [], networkEpoch: networkFence.capture())
             responseWatches?.resetEvidence()
-            statusText = state == .missingRuntime ? tr("Python 3.10+ is required") : tr("Checks stopped; retry or open Help")
+            statusText = state == .missingRuntime ? tr("Bundled Python runtime is unavailable") : tr("Checks stopped; retry or open Help")
             if case .missingRuntime = state {
-                message(tr("Python 3.10+ is required"),
-                    tr("Install a compatible Python from python.org or Homebrew, then choose Start monitoring. The app does not install runtimes or developer tools automatically."),
-                    openPython: true)
+                message(tr("Bundled Python runtime is unavailable"),
+                    tr("Rebuild the app from a trusted source; the matching bundled runtime is missing."))
             }
         }
         rebuildMenu()
@@ -240,13 +239,10 @@ import Network
     @objc private func openSettings() { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app")) }
     @objc private func openHelp() { NSWorkspace.shared.open(URL(string: "https://github.com/qlolp/TgWatch/blob/main/docs/macos.md")!) }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
-    private func message(_ title: String, _ detail: String, openPython: Bool = false) {
+    private func message(_ title: String, _ detail: String) {
         let alert = NSAlert(); alert.messageText = title; alert.informativeText = detail
         alert.addButton(withTitle: tr("OK"))
-        if openPython { alert.addButton(withTitle: tr("Python download page")) }
-        if alert.runModal() == .alertSecondButtonReturn {
-            NSWorkspace.shared.open(URL(string: "https://www.python.org/downloads/macos/")!)
-        }
+        alert.runModal()
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard engine != nil else { return .terminateNow }
