@@ -276,6 +276,22 @@ class MonitorReliabilityIntegrationTest {
         assertNotNull(awaitNotification(EventNotifications.OUTAGE_ID))
     }
 
+    @Test fun settingsFenceBumpAfterBeginCheckRetainsStateHistoryAndPreferences() {
+        val service = service()
+        val previous = seedOutage()
+        val history = History.snapshot(ctx)
+        val preferences = Prefs.sp(ctx).all.toMap()
+        val schedule = CheckSchedule({}, {})
+        field("checkSchedule").set(service, schedule)
+        val revision = schedule.begin()
+        (field("primaryChecks").get(service) as PrimaryCheckController).beginCheck()
+        TargetPreferences.fence.bump(TargetId.TELEGRAM)
+        publish(service, MonitorService.Status.OK, revision)
+        assertEquals(previous, MonitorService.state)
+        assertEquals(history, History.snapshot(ctx))
+        assertEquals(preferences, Prefs.sp(ctx).all)
+    }
+
     @Test fun quittingWorkerRejectsBeforeChargingManualAdmission() {
         val service = service()
         val workerThread = HandlerThread("quitting-check-fixture").apply { start() }
