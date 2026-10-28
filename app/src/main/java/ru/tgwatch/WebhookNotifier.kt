@@ -71,9 +71,8 @@ object WebhookNotifier {
         current.forEach { it.forget(id.wire) }
     }
 
-    internal fun health(ctx: Context): WebhookHealth = health(ctx, 0)
-
-    internal fun health(ctx: Context, receiverId: Int): WebhookHealth = coordinator(ctx, receiverId).health()
+    internal fun health(ctx: Context, receiverId: Int = 0): WebhookHealth =
+        coordinator(ctx, receiverId).health()
 
     @Synchronized internal fun replaceCoordinatorForTest(
         receiverId: Int,
@@ -139,7 +138,7 @@ internal class WebhookCoordinator(
     }
 
     fun reset() = synchronized(configurationLock) {
-        configurationFence.changed(configuration())
+        configurationFence.reset()
         invalidate()
     }
 

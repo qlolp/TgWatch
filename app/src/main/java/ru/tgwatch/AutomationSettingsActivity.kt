@@ -370,8 +370,9 @@ class AutomationSettingsActivity : Activity() {
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }
+
+private fun Activity.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
 private fun Activity.storageError() =
     Toast.makeText(this, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()

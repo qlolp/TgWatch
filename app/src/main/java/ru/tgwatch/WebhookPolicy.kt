@@ -12,6 +12,7 @@ internal data class WebhookConfiguration(val url: String?, val enabled: Boolean,
 /** Compare one complete credential configuration; transports keep their own physical identity. */
 internal class WebhookConfigurationFence {
     private var installed: WebhookConfiguration? = null
+    fun reset() { installed = null }
     fun changed(current: WebhookConfiguration): Boolean {
         val changed = current != installed
         installed = current
