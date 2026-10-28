@@ -43,10 +43,6 @@ object MqttSettings {
             else MqttEndpoint(host, port, topic, username, password).takeIf { credentialsUsable(username, password) }
     }
 
-    /** CONNECT cannot carry a password without a username, so such a stored pair is not a configuration. */
-    private fun credentialsUsable(username: String?, password: String?): Boolean =
-        username != null || password == null
-
     @Synchronized fun enabled(ctx: Context): Boolean =
         unlocked(ctx) && store(ctx).getBoolean(KEY_ENABLED, false) && endpoint(ctx) != null
 
@@ -101,3 +97,7 @@ object MqttSettings {
             else WebhookSettings.WriteResult.STORAGE_FAILED
     }
 }
+
+/** CONNECT cannot carry a password without a username, so such a stored pair is not a configuration. */
+private fun credentialsUsable(username: String?, password: String?): Boolean =
+    username != null || password == null
