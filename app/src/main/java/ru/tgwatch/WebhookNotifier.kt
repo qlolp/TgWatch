@@ -20,46 +20,68 @@ object WebhookNotifier {
     enum class TestResult { SENT, FAILED, TIMED_OUT, BUSY, NOT_CONFIGURED }
 
     private const val IDLE_THREAD_SECONDS = 30L
-    @Volatile private var coordinator: WebhookCoordinator? = null
-    private val io = ThreadPoolExecutor(1, 1, IDLE_THREAD_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue(1),
+    private val io = ThreadPoolExecutor(1, 1, IDLE_THREAD_SECONDS, TimeUnit.SECONDS,
+        LinkedBlockingQueue(WebhookSettings.MAX_RECEIVERS - 1),
         { r -> Thread(r, "tg-webhook").apply { isDaemon = true } }).apply { allowCoreThreadTimeOut(true) }
-    private val transport = WebhookTransport(io)
+    private val transports = Array(WebhookSettings.MAX_RECEIVERS) { WebhookTransport(io) }
+    private val coordinators = arrayOfNulls<WebhookCoordinator>(WebhookSettings.MAX_RECEIVERS)
     @Volatile private var userAgent: String? = null
 
     /** Called by the monitor for every published result; returns immediately. */
     // The monitor worker must never fail because of this optional adapter.
     @Suppress("TooGenericExceptionCaught")
     fun onPublished(ctx: Context, observation: WebhookObservation) {
-        try {
-            coordinator(ctx).onPublished(observation)
-        } catch (e: RuntimeException) {
-            // Optional delivery must never interrupt the monitor; log the class, never the address.
-            Log.w("TgWatch", "webhook publish: ${e.javaClass.simpleName}")
+        for (id in 0 until WebhookSettings.MAX_RECEIVERS) {
+            try {
+                coordinator(ctx, id).onPublished(observation)
+            } catch (e: RuntimeException) {
+                // Optional delivery must never interrupt the monitor; log the class, never the address.
+                Log.w("TgWatch", "webhook publish: ${e.javaClass.simpleName}")
+            }
         }
     }
 
     /** Explicit user test from the settings screen, even while the switch is off; [done] runs on the main thread. */
     fun sendTest(ctx: Context, done: (TestResult) -> Unit) {
+        sendTest(ctx, 0, done)
+    }
+
+    fun sendTest(ctx: Context, receiverId: Int, done: (TestResult) -> Unit) {
+        require(receiverId in 0 until WebhookSettings.MAX_RECEIVERS)
         val app = ctx.applicationContext
         val main = Handler(Looper.getMainLooper())
-        coordinator(app).sendTest { result ->
+        coordinator(app, receiverId).sendTest { result ->
             if (Looper.myLooper() == main.looper) done(result) else main.post { done(result) }
         }
     }
 
     /** Address or switch changed: the next change is reported regardless of earlier posts. */
-    fun reset() { coordinator?.reset() }
-    fun forget(id: TargetId) { coordinator?.forget(id.wire) }
+    fun reset() {
+        val current = synchronized(this) { coordinators.filterNotNull().toList() }
+        current.forEach(WebhookCoordinator::reset)
+    }
+    fun reset(receiverId: Int) {
+        require(receiverId in 0 until WebhookSettings.MAX_RECEIVERS)
+        val current = synchronized(this) { coordinators[receiverId] }
+        current?.reset()
+    }
+    fun forget(id: TargetId) {
+        val current = synchronized(this) { coordinators.filterNotNull().toList() }
+        current.forEach { it.forget(id.wire) }
+    }
 
-    internal fun health(ctx: Context): WebhookHealth = coordinator(ctx).health()
+    internal fun health(ctx: Context): WebhookHealth = health(ctx, 0)
 
-    private fun coordinator(ctx: Context): WebhookCoordinator = coordinator ?: synchronized(this) {
-        coordinator ?: ctx.applicationContext.let { app ->
-            WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(app) },
+    internal fun health(ctx: Context, receiverId: Int): WebhookHealth = coordinator(ctx, receiverId).health()
+
+    private fun coordinator(ctx: Context, receiverId: Int): WebhookCoordinator = synchronized(this) {
+        coordinators[receiverId] ?: ctx.applicationContext.let { app ->
+            val transport = transports[receiverId]
+            WebhookCoordinator(WebhookSettings, { WebhookSettings.configuration(app, receiverId) },
                 SystemClock::elapsedRealtime,
                 { url, body, finished -> transport.submit(url, body.resolved(app), userAgent(app), finished) },
-                cancelTransport = transport::cancel)
-        }.also { coordinator = it }
+                cancelTransport = transport::cancel).also { coordinators[receiverId] = it }
+        }
     }
 
     private fun userAgent(ctx: Context): String = userAgent ?: WebhookPolicy.userAgent(try {

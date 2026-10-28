@@ -2,6 +2,13 @@
 <resources>
     <string name="webhook_targets_current">Targets: %1$d of %2$d</string>
     <string name="webhook_targets_title">Send events and heartbeats for these targets</string>
+    <string name="webhook_receiver_current">Recipient %1$d of %2$d</string>
+    <string name="webhook_receiver_title">Webhook recipient</string>
+    <string name="webhook_receiver_label">Recipient %1$d</string>
+    <string name="webhook_receiver_add">Add recipient</string>
+    <string name="webhook_receiver_remove">Remove recipient</string>
+    <string name="webhook_receiver_remove_message">Remove this recipient and its private settings?</string>
+    <string name="webhook_receiver_limit">The maximum number of recipients is already configured.</string>
     <string name="automation_title">Automation</string>
     <string name="automation_enable">Allow automation requests</string>
     <string name="automation_description">Allow explicit CHECK_NOW and GET_STATE requests with a private access token. Checks only work while monitoring is running. Anyone holding the token can use this access; share it only with a trusted automation app.</string>
@@ -17,7 +24,7 @@
     <string name="automation_storage_error">Could not save automation access. Try again.</string>
     <string name="automation_done">Done</string>
     <string name="webhook_title">Webhook alert</string>
-    <string name="webhook_description">Optionally post one short line, such as “TG Monitor: Telegram is unreachable”, to your own HTTPS address (for example an ntfy.sh topic) when the published status changes. History, diagnostics and tokens are never sent; the same status is posted at most once a minute. Anyone who knows the address can post to it, so it is stored privately, excluded from backups and diagnostics, and used only after the device is unlocked. Off by default.</string>
+    <string name="webhook_description">Optionally post status changes to independent HTTPS recipients (for example ntfy.sh topics). Each recipient has its own address, target and event filters, and delivery state. History, diagnostics and tokens are never sent; the same status is posted at most once a minute. Addresses are stored privately, excluded from backups and diagnostics, and used only after the device is unlocked. Off by default.</string>
     <string name="webhook_enable">Send status changes to webhook</string>
     <string name="webhook_url_unset">Webhook address is not set.</string>
     <string name="webhook_url_saved">Webhook address saved: %1$s/…</string>

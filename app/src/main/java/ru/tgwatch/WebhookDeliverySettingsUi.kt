@@ -9,7 +9,7 @@ import android.widget.Toast
 import android.widget.TextView
 
 /** Delivery choices live beside the credential URL; none enter saved view state or backup. */
-internal class WebhookDeliverySettingsUi(private val activity: Activity) {
+internal class WebhookDeliverySettingsUi(private val activity: Activity, private val receiverId: () -> Int = { 0 }) {
     private val format = Button(activity)
     private val filters = Button(activity)
     private val targets = Button(activity)
@@ -38,7 +38,7 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
     }
 
     fun refresh() {
-        val current = WebhookSettings.configuration(activity)
+        val current = WebhookSettings.configuration(activity, receiverId())
         format.text = activity.getString(R.string.webhook_format_current,
             activity.getString(formatLabel(current.format)))
         filters.text = activity.getString(R.string.webhook_filters_current, current.events.size, events.size)
@@ -49,7 +49,7 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
 
     fun chooseTargets(): AlertDialog {
         val goals = TargetSlots.visible(activity)
-        val current = WebhookSettings.configuration(activity)
+        val current = WebhookSettings.configuration(activity, receiverId())
         val selected = BooleanArray(goals.size) { goals[it].wire in current.services }
         return secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_targets_title)
             .setMultiChoiceItems(goals.map { TargetNames.label(activity, it) }.toTypedArray(),
@@ -57,7 +57,7 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
                 selected[index] = checked
             }.setNegativeButton(R.string.dialog_cancel, null)
             .setPositiveButton(R.string.dialog_save) { _, _ ->
-                if (WebhookSettings.setTargetsResult(activity,
+                if (WebhookSettings.setTargetsResult(activity, receiverId(),
                         goals.filterIndexed { index, _ -> selected[index] }.map { it.wire }.toSet()) !=
                     WebhookSettings.WriteResult.SAVED)
                     Toast.makeText(activity, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()
@@ -66,30 +66,31 @@ internal class WebhookDeliverySettingsUi(private val activity: Activity) {
     }
 
     fun chooseFormat(): AlertDialog {
-        val current = WebhookSettings.configuration(activity)
+        val current = WebhookSettings.configuration(activity, receiverId())
         val options = WebhookFormat.entries.map { activity.getString(formatLabel(it)) }.toTypedArray()
         return secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_format_title)
             .setSingleChoiceItems(options, current.format.ordinal) { dialog, choice ->
-                save(WebhookFormat.entries[choice], WebhookSettings.configuration(activity).events)
+                save(WebhookFormat.entries[choice], WebhookSettings.configuration(activity, receiverId()).events)
                 dialog.dismiss()
             }.setNegativeButton(R.string.dialog_cancel, null).create())
     }
 
     private fun chooseFilters() {
-        val current = WebhookSettings.configuration(activity)
+        val current = WebhookSettings.configuration(activity, receiverId())
         val selected = BooleanArray(events.size) { events[it] in current.events }
         secure(AlertDialog.Builder(activity).setTitle(R.string.webhook_filters_title)
             .setMultiChoiceItems(eventLabels.map(activity::getString).toTypedArray(), selected) { _, index, checked ->
                 selected[index] = checked
             }.setNegativeButton(R.string.dialog_cancel, null)
             .setPositiveButton(R.string.dialog_save) { _, _ ->
-                save(WebhookSettings.configuration(activity).format,
+                save(WebhookSettings.configuration(activity, receiverId()).format,
                     events.filterIndexed { index, _ -> selected[index] }.toSet())
             }.create())
     }
 
     private fun save(format: WebhookFormat, events: Set<WebhookEventKind>) {
-        if (WebhookSettings.setDeliveryResult(activity, format, events) != WebhookSettings.WriteResult.SAVED)
+        if (WebhookSettings.setDeliveryResult(activity, receiverId(), format, events) !=
+            WebhookSettings.WriteResult.SAVED)
             Toast.makeText(activity, R.string.automation_storage_error, Toast.LENGTH_SHORT).show()
         refresh()
     }

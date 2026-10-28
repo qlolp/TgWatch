@@ -4,7 +4,7 @@ package ru.tgwatch
 internal data class WebhookConfiguration(val url: String?, val enabled: Boolean, val generation: Long,
     val format: WebhookFormat = WebhookFormat.TEXT,
     val events: Set<WebhookEventKind> = WebhookEventKind.DELIVERY_EVENTS,
-    val services: Set<String> = WebhookStatuses.services) {
+    val services: Set<String> = WebhookStatuses.services, val receiverId: Int = 0) {
     fun admits(captured: WebhookConfiguration, observation: WebhookObservation): Boolean =
         captured == this && observation.serviceId in services
 }

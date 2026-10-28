@@ -38,6 +38,9 @@ class AutomationSettingsActivity : Activity() {
         const val ID_WEBHOOK_FORMAT = 0x00a71009
         const val ID_WEBHOOK_FILTERS = 0x00a7100a
         const val ID_WEBHOOK_TARGETS = 0x00a7100b
+        const val ID_WEBHOOK_RECEIVER = 0x00a7100c
+        const val ID_WEBHOOK_ADD_RECEIVER = 0x00a7100d
+        const val ID_WEBHOOK_REMOVE_RECEIVER = 0x00a7100e
         private const val HEALTH_REFRESH_MS = 5_000L
         private const val SECTION_TEXT_SP = 20f
         private const val SECTION_MARGIN_DP = 24
@@ -66,11 +69,15 @@ class AutomationSettingsActivity : Activity() {
     private var refreshing = false
     private lateinit var webhookDelivery: WebhookDeliverySettingsUi
     private lateinit var webhookHealth: TextView
+    private lateinit var webhookReceiver: Button
+    private lateinit var webhookRemoveReceiver: Button
+    private var selectedWebhookReceiver = 0
     private val healthHandler = Handler(Looper.getMainLooper())
     private val healthRefresh = object : Runnable {
         override fun run() {
             val text = AndroidText.resolve(this@AutomationSettingsActivity,
-                WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity),
+                WebhookHealthText.format(WebhookNotifier.health(this@AutomationSettingsActivity,
+                    selectedWebhookReceiver),
                 android.os.SystemClock.elapsedRealtime()))
             if (webhookHealth.text.toString() != text) webhookHealth.text = text
             healthHandler.postDelayed(this, HEALTH_REFRESH_MS)
@@ -126,10 +133,22 @@ class AutomationSettingsActivity : Activity() {
             column.addView(this)
         }
         webhookUrlView = text(R.string.webhook_url_unset).apply { id = ID_WEBHOOK_URL }
+        webhookReceiver = button(column, R.string.webhook_receiver_current).apply {
+            id = ID_WEBHOOK_RECEIVER
+        }
+        button(column, R.string.webhook_receiver_add).apply {
+            id = ID_WEBHOOK_ADD_RECEIVER
+            setOnClickListener { addWebhookReceiver() }
+        }
+        webhookRemoveReceiver = button(column, R.string.webhook_receiver_remove).apply {
+            id = ID_WEBHOOK_REMOVE_RECEIVER
+            setOnClickListener { removeWebhookReceiver() }
+        }
+        webhookReceiver.setOnClickListener { chooseWebhookReceiver() }
         button(column, R.string.webhook_set_url).apply { id = ID_WEBHOOK_SET }.setOnClickListener { editWebhookUrl() }
         webhookTest = button(column, R.string.webhook_test).apply { id = ID_WEBHOOK_TEST }
         webhookTest.setOnClickListener { sendWebhookTest() }
-        webhookDelivery = WebhookDeliverySettingsUi(this).apply { attach(column) }
+        webhookDelivery = WebhookDeliverySettingsUi(this, { selectedWebhookReceiver }).apply { attach(column) }
         webhookHealth = text(R.string.webhook_title).apply { id = ID_WEBHOOK_HEALTH }
         button(column, R.string.automation_done).setOnClickListener { finish() }
         val scroll = ScrollView(this).apply { addView(column); isSaveEnabled = false }
@@ -157,7 +176,7 @@ class AutomationSettingsActivity : Activity() {
         }
         webhookToggle.setOnCheckedChangeListener { _, enabled ->
             if (!refreshing) {
-                when (WebhookSettings.setEnabledResult(this, enabled)) {
+                when (WebhookSettings.setEnabledResult(this, selectedWebhookReceiver, enabled)) {
                     WebhookSettings.WriteResult.SAVED -> Unit
                     WebhookSettings.WriteResult.INVALID ->
                         Toast.makeText(this, R.string.webhook_url_required, Toast.LENGTH_SHORT).show()
@@ -204,17 +223,23 @@ class AutomationSettingsActivity : Activity() {
             else getString(R.string.automation_token_hidden, AutomationPolicy.TOKEN_LENGTH)
         copy.isEnabled = token != null
         regenerate.isEnabled = token != null
-        val webhook = WebhookSettings.url(this)
+        if (selectedWebhookReceiver !in WebhookSettings.receiverIds(this))
+            selectedWebhookReceiver = 0
+        val webhook = WebhookSettings.url(this, selectedWebhookReceiver)
         refreshing = true
-        webhookToggle.isChecked = WebhookSettings.enabled(this)
+        webhookToggle.isChecked = WebhookSettings.enabled(this, selectedWebhookReceiver)
         refreshing = false
+        webhookReceiver.text = getString(R.string.webhook_receiver_current,
+            selectedWebhookReceiver + 1, WebhookSettings.receiverIds(this).size)
+        webhookRemoveReceiver.isEnabled = selectedWebhookReceiver != 0
         // Host only: the path of an ntfy topic URL is the secret.
         webhookUrlView.text = if (webhook == null) getString(R.string.webhook_url_unset)
             else getString(R.string.webhook_url_saved, HttpsUrlPolicy.hostLabel(webhook))
         webhookTest.isEnabled = webhook != null
         webhookDelivery.refresh()
         val text = AndroidText.resolve(this@AutomationSettingsActivity,
-            WebhookHealthText.format(WebhookNotifier.health(this), android.os.SystemClock.elapsedRealtime()))
+            WebhookHealthText.format(WebhookNotifier.health(this, selectedWebhookReceiver),
+                android.os.SystemClock.elapsedRealtime()))
         if (webhookHealth.text.toString() != text) webhookHealth.text = text
     }
 
@@ -238,11 +263,11 @@ class AutomationSettingsActivity : Activity() {
             .setMessage(R.string.webhook_url_message).setView(frame)
             .setNegativeButton(R.string.dialog_cancel, null)
             .setNeutralButton(R.string.dialog_remove) { _, _ ->
-                if (!WebhookSettings.clear(this)) storageError()
+                if (!WebhookSettings.clear(this, selectedWebhookReceiver)) storageError()
                 refresh()
             }
             .setPositiveButton(R.string.dialog_save) { _, _ ->
-                when (WebhookSettings.setUrlResult(this, input.text.toString())) {
+                when (WebhookSettings.setUrlResult(this, selectedWebhookReceiver, input.text.toString())) {
                     WebhookSettings.WriteResult.SAVED -> Unit
                     WebhookSettings.WriteResult.INVALID ->
                         Toast.makeText(this, R.string.webhook_url_invalid, Toast.LENGTH_LONG).show()
@@ -254,9 +279,39 @@ class AutomationSettingsActivity : Activity() {
         dialog.show()
     }
 
+    private fun chooseWebhookReceiver() {
+        val ids = WebhookSettings.receiverIds(this)
+        val labels = ids.map { getString(R.string.webhook_receiver_label, it + 1) }.toTypedArray()
+        val selected = ids.indexOf(selectedWebhookReceiver).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle(R.string.webhook_receiver_title)
+            .setSingleChoiceItems(labels, selected) { dialog, index ->
+                selectedWebhookReceiver = ids[index]
+                dialog.dismiss()
+                refresh()
+            }.setNegativeButton(R.string.dialog_cancel, null).show()
+    }
+
+    private fun addWebhookReceiver() {
+        val added = WebhookSettings.addReceiver(this)
+        if (added == null) storageError() else selectedWebhookReceiver = added
+        refresh()
+    }
+
+    private fun removeWebhookReceiver() {
+        if (selectedWebhookReceiver == 0) return
+        AlertDialog.Builder(this).setTitle(R.string.webhook_receiver_remove)
+            .setMessage(R.string.webhook_receiver_remove_message)
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .setPositiveButton(R.string.dialog_remove) { _, _ ->
+                if (!WebhookSettings.removeReceiver(this, selectedWebhookReceiver)) storageError()
+                selectedWebhookReceiver = 0
+                refresh()
+            }.show()
+    }
+
     private fun sendWebhookTest() {
         webhookTest.isEnabled = false
-        WebhookNotifier.sendTest(this) { result ->
+        WebhookNotifier.sendTest(this, selectedWebhookReceiver) { result ->
             if (!isDestroyed) {
                 val message = if (result == WebhookNotifier.TestResult.TIMED_OUT)
                     this@AutomationSettingsActivity.renderString(
