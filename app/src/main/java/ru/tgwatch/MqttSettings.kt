@@ -39,9 +39,13 @@ object MqttSettings {
             MqttPolicy.MAX_USERNAME_BYTES)?.ifEmpty { null }
         val password = MqttPolicy.normalizeSecret(saved.getString(KEY_PASSWORD, null),
             MqttPolicy.MAX_PASSWORD_BYTES)?.ifEmpty { null }
-        return if (host == null || port == null || topic == null || (username == null && password != null)) null
-            else MqttEndpoint(host, port, topic, username, password)
+        return if (host == null || port == null || topic == null) null
+            else MqttEndpoint(host, port, topic, username, password).takeIf { credentialsUsable(username, password) }
     }
+
+    /** CONNECT cannot carry a password without a username, so such a stored pair is not a configuration. */
+    private fun credentialsUsable(username: String?, password: String?): Boolean =
+        username != null || password == null
 
     @Synchronized fun enabled(ctx: Context): Boolean =
         unlocked(ctx) && store(ctx).getBoolean(KEY_ENABLED, false) && endpoint(ctx) != null

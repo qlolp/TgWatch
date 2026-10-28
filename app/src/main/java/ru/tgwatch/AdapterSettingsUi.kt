@@ -131,7 +131,10 @@ internal class MqttSettingsUi(private val activity: Activity) {
         val user = activity.secretField(R.string.mqtt_username_hint, MqttPolicy.MAX_USERNAME_BYTES)
         val password = activity.secretField(R.string.mqtt_password_hint, MqttPolicy.MAX_PASSWORD_BYTES, password = true)
         activity.secureDialog(R.string.mqtt_set, R.string.mqtt_message, listOf(host, port, topic, user, password),
-            R.string.dialog_remove to { if (!MqttSettings.clear(activity)) storageError(); refresh() }) {
+            R.string.dialog_remove to {
+                if (!MqttSettings.clear(activity)) storageError()
+                refresh()
+            }) {
             when (MqttSettings.setEndpointResult(activity, host.text.toString(), port.text.toString(),
                 topic.text.toString(), user.text.toString(), password.text.toString())) {
                 WebhookSettings.WriteResult.SAVED -> Unit

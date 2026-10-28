@@ -12,8 +12,9 @@ internal object NtfyPreset {
     const val DEFAULT_SERVER = "https://ntfy.sh"
     const val MAX_TOPIC_LENGTH = 64
     const val MAX_TOKEN_LENGTH = 64
+    private const val TOKEN_PREFIX_LENGTH = 3
     private val topicPattern = Regex("[A-Za-z0-9_-]{1,$MAX_TOPIC_LENGTH}")
-    private val tokenPattern = Regex("tk_[A-Za-z0-9]{1,${MAX_TOKEN_LENGTH - 3}}")
+    private val tokenPattern = Regex("tk_[A-Za-z0-9]{1,${MAX_TOKEN_LENGTH - TOKEN_PREFIX_LENGTH}}")
 
     /** Null when any part is invalid. A blank server means ntfy.sh; a blank token means anonymous access. */
     fun url(server: String?, topic: String?, token: String?): String? {
