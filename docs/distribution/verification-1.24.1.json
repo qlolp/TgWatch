@@ -42,33 +42,43 @@
       "context": "Isolated staging metadata with the official Connectivity category name from fdroiddata config/categories.yml at commit 5d2099db6488d9e2c5f74a9882e32138f5760616 (file blob 1d3c1cf337ccd482097c04179f4017a5c559e4dc); not a full fdroiddata checkout."
     },
     "independentBuild": {
-      "status": "blocked",
-      "command": "bash ./gradlew :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon",
-      "reason": "Gradle 9.4.1 started, but the Android Gradle Plugin 9.2.1 marker could not be resolved because this environment could not resolve dl.google.com. No independent unsigned APK was produced."
+      "status": "passed",
+      "command": "gradle --no-daemon --max-workers=2 -I <temporary-aliyun-mirror.init.gradle> :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom",
+      "exitCode": 0,
+      "actionableTasks": 50,
+      "context": "A later exact-tag assembly used the pinned Gradle/JDK toolchain and a temporary Aliyun Maven mirror after the original dl.google.com resolution failure.",
+      "unsignedApkSha256": "914b0057fe029df5a171e6b0453f873ec1fe0fec764c355e2a5b2a105d5f110a",
+      "artifactRetained": false,
+      "sbom": {
+        "format": "CycloneDX 1.6",
+        "validated": true,
+        "releaseRuntimeArtifacts": 22
+      }
     },
     "fdroidBuild": {
       "status": "blocked",
       "command": "fdroid build --test --stop ru.tgwatch:1024001",
       "staging": "Temporary candidate metadata had only its disable field removed, used a local mirror of the exact tag, and ran without --force or --skip-scan. The recipe checkout and signing-config cleanup completed.",
       "scannerReached": false,
-      "reason": "Build stopped during Gradle project cleanup when the Android Gradle Plugin 9.2.1 marker could not be resolved because this environment could not resolve dl.google.com."
+      "reason": "Build stopped during Gradle project cleanup when the Android Gradle Plugin 9.2.1 marker could not be resolved because this environment could not resolve dl.google.com. The later independent mirror-based assembly does not constitute a successful F-Droid recipe build."
     },
     "unsignedComparison": {
       "status": "notRun",
-      "reason": "The independent and F-Droid unsigned APKs were not produced."
+      "reason": "The F-Droid unsigned APK was not produced, and the successful independent build output was not retained."
     },
     "productionPayloadComparison": {
       "status": "notRun",
       "tool": "apksigcopier 1.1.1",
       "commandTemplate": "apksigcopier compare --unsigned TgWatch.apk independent-unsigned.apk",
-      "reason": "No independent unsigned APK was produced; the published APK was verified but not compared to a source build."
+      "reason": "The independent unsigned APK was produced and hashed but not retained; the published APK was verified but not compared to a source build."
     }
   },
   "retry": {
-    "blocker": "Provide DNS/network access to dl.google.com and retry the exact-tag builds.",
+    "blocker": "Complete the normal F-Droid recipe build with working dependency access and retain a fresh independent unsigned APK for both comparisons.",
     "independentBuild": [
       "git checkout --detach v1.24.1",
-      "bash ./gradlew :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon"
+      "bash ./gradlew :app:assembleRelease :app:dependencyInventory :app:generateReleaseSbom --no-daemon",
+      "Retain app/build/outputs/apk/release/app-release-unsigned.apk for comparison."
     ],
     "fdroidBuild": [
       "In an isolated fdroiddata staging checkout, copy the recipe and remove only its disable field in the temporary copy.",
