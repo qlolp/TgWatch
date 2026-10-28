@@ -24,7 +24,7 @@
     <string name="automation_storage_error">Could not save automation access. Try again.</string>
     <string name="automation_done">Done</string>
     <string name="webhook_title">Webhook alert</string>
-    <string name="webhook_description">Optionally post status changes to independent HTTPS recipients (for example ntfy.sh topics). Each recipient has its own address, target and event filters, and delivery state. History, diagnostics and tokens are never sent; the same status is posted at most once a minute. Addresses are stored privately, excluded from backups and diagnostics, and used only after the device is unlocked. Off by default.</string>
+    <string name="webhook_description">Optionally post status changes to up to five independent HTTPS recipients (for example ntfy.sh topics). Each recipient has its own address, target and event filters, and delivery state. History, diagnostics and tokens are never sent; the same status is posted at most once a minute per recipient. Addresses are stored privately, excluded from backups and diagnostics, and used only after the device is unlocked. Off by default.</string>
     <string name="webhook_enable">Send status changes to webhook</string>
     <string name="webhook_url_unset">Webhook address is not set.</string>
     <string name="webhook_url_saved">Webhook address saved: %1$s/…</string>
