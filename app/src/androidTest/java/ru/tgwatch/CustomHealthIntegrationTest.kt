@@ -171,9 +171,10 @@ class CustomHealthIntegrationTest {
         }
     }
     @Test fun settingsEditorStoresBodyMultipleJsonChecksAndHeadersPrivately() {
+        val headerValue = "test-header-value"
         val saved = HttpProbeCondition(jsonField = "status", expectedValue = "ok", bodySubstring = "service online",
             jsonConditions = listOf(HttpJsonCondition("nested.ready", "yes")),
-            headers = listOf(HttpRequestHeader("Authorization", "******")))
+            headers = listOf(HttpRequestHeader("Authorization", headerValue)))
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
                 val dialog = TargetSettingsDialog.show(activity, id)
@@ -183,18 +184,19 @@ class CustomHealthIntegrationTest {
                 dialog.findViewById<EditText>(R.id.targetHealthValue2Input).setText("yes")
                 dialog.findViewById<EditText>(R.id.targetHealthBodyInput).setText("service online")
                 dialog.findViewById<EditText>(R.id.targetHealthHeadersInput)
-                    .setText("Authorization: ******")
+                    .setText("Authorization: $headerValue")
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             }
             awaitSettings()
             assertEquals(PrivateProbeConfig(address, saved), TargetPreferences.configuration(ctx, id))
             val credential = credentials.getString(id.wire, "").orEmpty()
-            for (secret in listOf("service online", "nested.ready", "Authorization", "private-token"))
+            val privateValues = listOf("service online", "nested.ready", "Authorization", headerValue)
+            for (secret in privateValues)
                 assertTrue(credential.contains(secret))
             for (value in listOf(BackupCodec.encode(BackupManager.snapshot(ctx)).toString(Charsets.UTF_8),
                 TargetBackupCodec.encode(BackupManager.snapshotTargets(ctx)).toString(Charsets.UTF_8),
                 LocalDiagnostics.snapshot(ctx).toJson())) {
-                for (secret in listOf("service online", "nested.ready", "Authorization", "private-token"))
+                for (secret in privateValues)
                     assertFalse(value.contains(secret))
             }
         }

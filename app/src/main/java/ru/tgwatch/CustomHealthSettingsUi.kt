@@ -22,17 +22,10 @@ internal class CustomHealthSettingsUi(activity: Activity, private val content: L
     private val field = input(content, R.id.targetHealthFieldInput, R.string.target_health_field, FIELD_CHARS)
     private val value = input(content, R.id.targetHealthValueInput, R.string.target_health_value, VALUE_CHARS,
         InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-    private val additionalJson = (2..MAX_JSON_CONDITIONS).map { slot ->
-        val fieldId = when (slot) {
-            2 -> R.id.targetHealthField2Input
-            3 -> R.id.targetHealthField3Input
-            else -> R.id.targetHealthField4Input
-        }
-        val valueId = when (slot) {
-            2 -> R.id.targetHealthValue2Input
-            3 -> R.id.targetHealthValue3Input
-            else -> R.id.targetHealthValue4Input
-        }
+    private val additionalJson = listOf(
+        R.id.targetHealthField2Input to R.id.targetHealthValue2Input,
+        R.id.targetHealthField3Input to R.id.targetHealthValue3Input,
+        R.id.targetHealthField4Input to R.id.targetHealthValue4Input).map { (fieldId, valueId) ->
         content.addView(TextView(activity).apply { setText(R.string.target_health_more_condition) })
         input(content, fieldId, R.string.target_health_field, FIELD_CHARS) to
             input(content, valueId, R.string.target_health_value, VALUE_CHARS,
@@ -52,32 +45,50 @@ internal class CustomHealthSettingsUi(activity: Activity, private val content: L
 
     init { content.addView(TextView(activity).apply { setText(R.string.target_health_help) }) }
 
-    fun selection(): HealthCriteriaEdit? {
+    fun selection(): HealthCriteriaEdit? =
+        if (clear.isChecked) HealthCriteriaEdit(true, null) else buildSelection()
+
+    private fun buildSelection(): HealthCriteriaEdit? = parseCode().takeIf { it.first }?.let { (_, status) ->
+        parseJsonConditions()?.let { json ->
+            parseHeaders()?.let { parsedHeaders ->
+                val body = bodySubstring.text.toString().takeIf { it.isNotEmpty() }
+                createCriteria(status, json, parsedHeaders, body)
+            }
+        }
+    }
+
+    private fun parseCode(): Pair<Boolean, Int?> {
         val rawCode = code.text.toString()
         val status = rawCode.takeIf { it.isNotEmpty() }?.toIntOrNull()
-        if (clear.isChecked) return HealthCriteriaEdit(true, null)
-        if (rawCode.isNotEmpty() && (status == null || status !in FIRST_CODE..LAST_CODE)) {
-            code.error = code.context.getString(R.string.target_health_invalid_code)
-            return null
-        }
+        val valid = rawCode.isEmpty() || status in FIRST_CODE..LAST_CODE
+        if (!valid) code.error = code.context.getString(R.string.target_health_invalid_code)
+        return valid to status
+    }
+
+    private fun parseJsonConditions(): List<HttpJsonCondition>? {
         val fields = listOf(field to value) + additionalJson
         val json = mutableListOf<HttpJsonCondition>()
+        var valid = true
         for ((pathInput, valueInput) in fields) {
             val path = pathInput.text.toString()
             val expected = valueInput.text.toString()
             if (path.isEmpty() && expected.isEmpty()) continue
             if (path.isEmpty()) {
                 pathInput.error = pathInput.context.getString(R.string.target_health_invalid_field)
-                return null
-            }
-            try { json += HttpJsonCondition(path, expected) } catch (_: IllegalArgumentException) {
-                pathInput.error = pathInput.context.getString(R.string.target_health_invalid_condition)
-                return null
+                valid = false
+            } else {
+                try { json += HttpJsonCondition(path, expected) } catch (_: IllegalArgumentException) {
+                    pathInput.error = pathInput.context.getString(R.string.target_health_invalid_condition)
+                    valid = false
+                }
             }
         }
-        val parsedHeaders = parseHeaders() ?: return null
-        val body = bodySubstring.text.toString().takeIf { it.isNotEmpty() }
-        if (rawCode.isEmpty() && json.isEmpty() && parsedHeaders.isEmpty() && body == null)
+        return json.takeIf { valid }
+    }
+
+    private fun createCriteria(status: Int?, json: List<HttpJsonCondition>,
+        parsedHeaders: List<HttpRequestHeader>, body: String?): HealthCriteriaEdit? {
+        if (listOf(status, body).all { it == null } && json.isEmpty() && parsedHeaders.isEmpty())
             return HealthCriteriaEdit(false, null)
         val first = json.firstOrNull()
         val remaining = if (first == null) json else json.drop(1)
@@ -136,9 +147,12 @@ internal class CustomHealthSettingsUi(activity: Activity, private val content: L
         const val FIELD_CHARS = 64
         const val VALUE_CHARS = 256
         const val BODY_CHARS = 256
-        const val HEADER_TEXT_CHARS = 8 * (64 + 256 + 2)
+        const val HEADER_LINES = 8
+        const val HEADER_NAME_CHARS = 64
+        const val HEADER_VALUE_CHARS = 256
+        const val HEADER_TEXT_CHARS = HEADER_LINES * (HEADER_NAME_CHARS + HEADER_VALUE_CHARS + 2)
         const val MAX_JSON_CONDITIONS = 4
-        const val MAX_HEADERS = 8
+        const val MAX_HEADERS = HEADER_LINES
         const val FIRST_CODE = 200
         const val LAST_CODE = 599
 
