@@ -15,12 +15,40 @@
     "reason": "No Developer ID identity or explicit notary credentials available."
   },
   "fdroid": {
-    "status": "pendingExactTag",
+    "status": "passed",
     "recipeDisabled": true,
     "catalogSubmitted": false,
     "catalogAccepted": false,
     "workflow": "fdroid-verify.yml",
     "checks": {
+      "independentBuild": {
+        "status": "passed",
+        "sha256": "e3cb78d1448ecf7dd019bdafd2e6cb2e7b606d2643bc38a9f1a87bdeb0ed357c"
+      },
+      "readmeta": {
+        "status": "passed"
+      },
+      "lint": {
+        "status": "passed"
+      },
+      "normalRecipeBuild": {
+        "status": "passed",
+        "scannerBypassed": false,
+        "sha256": "e3cb78d1448ecf7dd019bdafd2e6cb2e7b606d2643bc38a9f1a87bdeb0ed357c"
+      },
+      "unsignedComparison": {
+        "status": "passed"
+      },
+      "productionPayloadComparison": {
+        "status": "passed",
+        "publishedSha256": "263cabc45c8c1cc0f462d623395b7545ed0d4e188fe3c999849973680f1b23a1"
+      }
+    },
+    "tag": "v1.25.1",
+    "sourceRevision": "b7df1b4564b859fd0862b25498009e10cc367056",
+    "verifierRevision": "27f7837518295fc3fa3caf5d209d285126f6c04d",
+    "workflowRun": "https://github.com/qlolp/TgWatch/actions/runs/40830515811",
+    "preTagMetadata": {
       "readmeta": {
         "status": "passed",
         "context": "Local pre-tag candidate metadata, fdroidserver2.4.5; not an exact-tag build."
@@ -28,13 +56,21 @@
       "lint": {
         "status": "passed",
         "context": "Isolated staging with official categories and11 referenced icons at pinned fdroiddata commit5d2099db6488d9e2c5f74a9882e32138f5760616; not a full fdroiddata checkout."
-      },
-      "normalRecipeBuild": {
-        "status": "pendingExactTag"
-      },
-      "productionPayloadComparison": {
-        "status": "pendingExactTag"
       }
-    }
+    },
+    "scannerReached": true,
+    "unsignedOutputsRetained": true,
+    "publishedCertificateSha256": "ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1",
+    "toolchain": {
+      "fdroidserver": "2.4.5",
+      "apksigcopier": "1.1.1",
+      "gradle": "9.4.1",
+      "androidGradlePlugin": "9.2.1",
+      "kotlin": "2.4.21",
+      "jdk": "17",
+      "python": "3.12",
+      "androidBuildTools": "37.0.0"
+    },
+    "context": "Isolated normal recipe validation with pinned official categories and11 icons; not catalog server validation or acceptance."
   }
 }

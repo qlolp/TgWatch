@@ -40,8 +40,10 @@ PUBACK, независимым подписчиком и отказом при �
 
 Остаются внешние проверки: физическая OEM/battery-матрица (доступный ADB не ответил),
 Developer ID/notarization (нет действующего сертификата и настроенных credentials),
-точный тег F-Droid и review каталога. Для F-Droid добавлен отдельный ручной сценарий,
-который сохраняет unsigned APK и настоящее evidence и не отправляет материалы в каталог.
+review каталога F-Droid. [Exact-tag проверка1.25.1](https://github.com/qlolp/TgWatch/actions/runs/40830515811)
+прошла с normal source scan, retained unsigned APK, byte equality и совпадением payload
+с подписанным APK. [Отчёт](distribution/verification-1.25.1.json) фиксирует source/verifier revisions.
+Рецепт остаётся отключённым до review; материалы в каталог не отправлялись.
 
 ## Состояние направлений
 
