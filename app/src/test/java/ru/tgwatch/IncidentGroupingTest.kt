@@ -28,14 +28,13 @@ class IncidentGroupingTest {
         assertTrue(policy.outage(TargetId.TELEGRAM, 200, enabled = true).postIndividual)
     }
 
-    @Test fun recoveryUpdatesGroupAndLastRecoveryCancelsWithoutResurrectingSingles() {
+    @Test fun recoveryCancelsGroupBelowTwoTargetsWithoutResurrectingSingles() {
         val policy = IncidentGrouping()
         policy.outage(TargetId.TELEGRAM, 100, enabled = true)
         policy.outage(TargetId.MATRIX, 200, enabled = true)
-        assertEquals(listOf(TargetId.MATRIX), policy.clear(TargetId.TELEGRAM).let {
-            assertTrue(it.cancelGroup)
-            listOf(TargetId.MATRIX)
-        })
+        val remaining = policy.clear(TargetId.TELEGRAM)
+        assertTrue(remaining.cancelGroup)
+        assertNull(remaining.group)
         assertTrue(policy.clear(TargetId.MATRIX).cancelGroup)
         assertTrue(policy.outage(TargetId.MATRIX, 300, enabled = true).postIndividual)
     }

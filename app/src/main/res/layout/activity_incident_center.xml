@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/incidentCenterRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:fitsSystemWindows="true"
+    android:background="@color/bg">
+    <TextView style="@style/CardTitle" android:text="@string/incident_center_title" />
+    <TextView style="@style/Body" android:text="@string/incident_center_hint" />
+    <TextView style="@style/CardTitle" android:layout_marginTop="8dp"
+        android:text="@string/observation_coverage_title" />
+    <TextView android:id="@+id/incidentCenterCoverage" style="@style/Body"
+        android:text="@string/history_loading" />
+    <Button android:id="@+id/incidentCenterPeriod" style="@style/ButtonText"
+        android:text="@string/period_day" />
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <ListView android:id="@+id/incidentCenterList" android:layout_width="match_parent"
+            android:layout_height="match_parent" android:divider="@android:color/transparent"
+            android:dividerHeight="12dp" />
+        <TextView android:id="@+id/incidentCenterEmpty" style="@style/Body"
+            android:text="@string/history_loading" android:accessibilityLiveRegion="polite" />
+    </FrameLayout>
+    <Button android:id="@+id/incidentCenterCompare" style="@style/ButtonText"
+        android:text="@string/regional_compare_title" />
+    <Button android:id="@+id/incidentCenterDone" style="@style/ButtonText"
+        android:text="@string/automation_done" />
+</LinearLayout>

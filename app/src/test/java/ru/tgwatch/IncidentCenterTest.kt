@@ -9,9 +9,9 @@ class IncidentCenterTest {
 
     @Test fun timelineCombinesTargetsAndRegionalFactsWithoutPrivateEndpointText() {
         val rows = listOf(
-            RegionalJournalEntry(RegionalEventKind.NETWORK, 250, "scope", RegionalRoute.VPN),
-            RegionalJournalEntry(RegionalEventKind.COUNTRY, 260, "scope", RegionalRoute.DIRECT, country = "DE"),
-            RegionalJournalEntry(RegionalEventKind.PUBLIC, 270, "scope", RegionalRoute.DIRECT,
+            RegionalJournalEntry(RegionalEventKind.NETWORK, 250, "scope", RegionalRoute.WIFI),
+            RegionalJournalEntry(RegionalEventKind.COUNTRY, 260, "scope", RegionalRoute.WIFI, country = "DE"),
+            RegionalJournalEntry(RegionalEventKind.PUBLIC, 270, "scope", RegionalRoute.WIFI,
                 service = RegionalService.YOUTUBE, status = RegionalStatus.REGION_RESTRICTED),
         )
         val value = IncidentCenter.build(mapOf(TargetId.TELEGRAM to listOf(episode)), rows,

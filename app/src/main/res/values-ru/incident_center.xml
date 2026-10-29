@@ -1,0 +1,18 @@
+<resources>
+    <string name="incident_center_title">Центр инцидентов</string>
+    <string name="incident_center_hint">Общая лента наблюдений за целями, сетью, страной выхода и публичными сайтами. Совпадение по времени не доказывает причину. Проверьте гипотезу новой проверкой или A/B-сравнением.</string>
+    <string name="incident_center_empty">За этот период нет наблюдаемых инцидентов и региональных событий.</string>
+    <string name="incident_center_target_details">Инциденты цели</string>
+    <string name="incident_center_check_queued">Новая проверка поставлена в очередь</string>
+    <string name="incident_center_check_unavailable">Сначала запустите мониторинг и включите эту цель</string>
+    <string name="incident_center_network">Изменился контекст подключения: %1$s\n%2$s</string>
+    <string name="incident_center_country">Наблюдаемая страна выхода: %1$s\n%2$s</string>
+    <string name="incident_center_geo">%1$s сообщил о региональном ограничении\n%2$s</string>
+    <string name="observation_coverage_title">Полнота наблюдений</string>
+    <string name="observation_coverage_line">%1$s: наблюдено %2$s · без данных %3$s</string>
+    <string name="incident_details">Подробнее</string>
+    <string name="group_incident_alerts">Группировать связанные оповещения</string>
+    <string name="group_incident_alerts_hint">По умолчанию выключено. Если несколько целей откажут в течение двух минут, отдельные карточки заменяются одной сводной. Истории, webhook и MQTT остаются раздельными.</string>
+    <string name="incident_alert_group_title">Несколько целей требуют внимания</string>
+    <string name="incident_alert_group_text">Целей: %1$d — %2$s\nОткройте центр инцидентов для просмотра ленты. Общая причина этим не доказывается.</string>
+</resources>
