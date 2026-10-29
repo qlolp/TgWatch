@@ -55,10 +55,11 @@ if [[ "$api_level" -ge 33 ]]; then
   # instrumentation needs the exact current APKs, while -r preserves app data.
   adb install -r app/build/outputs/apk/debug/app-debug.apk
   adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+  permission_status=0
+  permission_log=app/build/reports/androidTests/notification-permission-cycle.txt
   adb shell am force-stop ru.tgwatch
   adb shell pm revoke ru.tgwatch android.permission.POST_NOTIFICATIONS
   adb shell pm set-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
-  permission_log=app/build/reports/androidTests/notification-permission-cycle.txt
   adb shell am instrument -w -r -e class \
     'ru.tgwatch.EventNotificationTest#disabledAppNotificationsReportNoSummaryDelivery,ru.tgwatch.OnboardingFlowTest#permanentlyDeniedNotificationActionReturnsFromSettings' \
     ru.tgwatch.test/androidx.test.runner.AndroidJUnitRunner > "$permission_log" || permission_status=$?
@@ -176,7 +177,7 @@ disabled = value(['locksettings', 'get-disabled', '--user', '0'])
 disabled = disabled if disabled in ('true', 'false') else 'unknown'
 def boolean(arguments):
     result = value(arguments)
-    return result.stdout.strip() if result.returncode == 0 else ''
+    return result if result in ('true', 'false') else 'unknown'
 emulation = boolean(['getprop', 'persist.sys.emulate_fbe'])
 on_disk = boolean(['cat', '/data/property/persist.sys.emulate_fbe']) if storage != 'native' else 'unknown'
 installed = value(['pm', 'path', 'ru.tgwatch']).startswith('package:')
