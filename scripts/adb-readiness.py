@@ -20,8 +20,9 @@ def positive_number(text):
     return value
 
 
-def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None):
-    deadline = time.monotonic() + timeout
+def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None, *,
+                 clock=time.monotonic, pause=time.sleep, runner=subprocess.run):
+    deadline = clock() + timeout
     reconnect_errors = (
         re.compile(r"\b(?:adb:\s*)?unable to connect\b"),
         re.compile(r"\bno devices(?:/emulators)? found\b"),
@@ -39,16 +40,18 @@ def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None
     seen = {"unauthorized": False}
 
     def call(arguments):
-        remaining = deadline - time.monotonic()
+        remaining = deadline - clock()
         if remaining <= 0:
             return None
         try:
-            result = subprocess.run(command + arguments, capture_output=True, text=True,
+            result = runner(command + arguments, capture_output=True, text=True,
                                     timeout=min(command_timeout, remaining))
         except subprocess.TimeoutExpired:
             return None
         except OSError as error:
             raise ReadinessError("ADB executable could not be started") from error
+        if clock() >= deadline:
+            return None
         message = (result.stdout + result.stderr).lower()
         if any(value in message for value in refused_errors):
             raise ReadinessError("ADB refused root access")
@@ -60,7 +63,7 @@ def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None
             raise ReadinessError(f"ADB command failed without a reconnect error (exit {result.returncode})")
         return result
 
-    while time.monotonic() < deadline:
+    while clock() < deadline:
         rooted = call(["root"])
         # root restarts adbd; even its successful exit is not device readiness.
         connected = call(["wait-for-device"])
@@ -82,9 +85,9 @@ def ensure_ready(command, timeout, command_timeout, interval, after_boot_id=None
                         confirmed = call(["shell", "cat", "/proc/sys/kernel/random/boot_id"])
                         if confirmed is not None and confirmed.returncode == 0 and confirmed.stdout.strip() == current_boot:
                             return
-        remaining = deadline - time.monotonic()
+        remaining = deadline - clock()
         if remaining > 0:
-            time.sleep(min(interval, remaining))
+            pause(min(interval, remaining))
     if seen["unauthorized"]:
         raise ReadinessError("ADB device stayed unauthorized until the deadline")
     raise ReadinessError("ADB root and boot readiness did not complete within the deadline")

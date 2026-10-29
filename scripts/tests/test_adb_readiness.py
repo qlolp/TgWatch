@@ -1,4 +1,5 @@
 """Exercise the readiness CLI through a real, disposable fake adb process."""
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -106,17 +107,10 @@ class AdbReadinessTests(unittest.TestCase):
         self.assertGreaterEqual(calls.count(['root']), 2)
         self.assertGreaterEqual(calls.count(['shell', 'cat', '/proc/sys/kernel/random/boot_id']), 2)
 
-    def test_same_ready_boot_never_satisfies_a_requested_reboot(self):
-        result, calls, _ = self.run_fixture('ready', after_boot='old-boot', timeout=.4)
+    def test_same_ready_boot_is_rejected_through_the_real_cli(self):
+        result, _, _ = self.run_fixture('ready', after_boot='old-boot', timeout=2)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('ADB readiness failed', result.stderr)
-        self.assertIn(['shell', 'cat', '/proc/sys/kernel/random/boot_id'], calls)
-
-    def test_empty_boot_identity_is_not_a_fresh_boot(self):
-        result, calls, _ = self.run_fixture('empty_boot_id', after_boot='old-boot', timeout=.4)
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn('ADB readiness failed', result.stderr)
-        self.assertIn(['shell', 'cat', '/proc/sys/kernel/random/boot_id'], calls)
 
     def test_root_and_completion_checks_must_belong_to_the_same_new_boot(self):
         result, calls, _ = self.run_fixture('unstable_boot_id', after_boot='old-boot')
@@ -186,6 +180,83 @@ class AdbReadinessTests(unittest.TestCase):
             result, calls, _ = self.run_fixture("ready", timeout=timeout)
             self.assertNotEqual(0, result.returncode)
             self.assertEqual([], calls)
+
+
+class ControlledReadinessTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("adb_readiness", SCRIPT)
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.elapsed = 0.0
+        self.calls = []
+        self.boots = ["new-boot"]
+        self.command_cost = .05
+        self.hang = False
+        self.exhaust_on = None
+
+    def pause(self, seconds):
+        self.elapsed += seconds
+
+    def runner(self, command, *, capture_output, text, timeout):
+        self.calls.append((command, timeout, self.elapsed))
+        if self.hang or self.command_cost > timeout:
+            self.elapsed += timeout
+            raise subprocess.TimeoutExpired(command, timeout)
+        self.elapsed += self.command_cost
+        args = command[1:]
+        if args == self.exhaust_on:
+            self.elapsed = 1.0
+        if args == ["shell", "cat", "/proc/sys/kernel/random/boot_id"]:
+            output = self.boots.pop(0) if len(self.boots) > 1 else self.boots[0]
+        elif args == ["shell", "id", "-u"]:
+            output = "0"
+        elif args == ["shell", "getprop", "sys.boot_completed"]:
+            output = "1"
+        else:
+            output = ""
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    def ready(self, *, after_boot="old-boot", timeout=1):
+        return self.module.ensure_ready(["adb"], timeout, .2, .1, after_boot,
+            clock=lambda: self.elapsed, pause=self.pause, runner=self.runner)
+
+    def test_old_and_empty_boot_cannot_satisfy_reboot(self):
+        for identity in ("old-boot", ""):
+            with self.subTest(identity=identity):
+                self.setUp()
+                self.boots = [identity]
+                with self.assertRaises(self.module.ReadinessError):
+                    self.ready()
+                self.assertTrue(any("boot_id" in command[-1] for command, _, _ in self.calls))
+                self.assertFalse(any(command[-2:] == ["id", "-u"] for command, _, _ in self.calls))
+                self.assertAlmostEqual(1, self.elapsed)
+
+    def test_new_boot_must_be_stable_across_uid_and_completion(self):
+        self.boots = ["first-new", "second-new", "second-new", "second-new"]
+        self.ready()
+        self.assertEqual(2, sum(command == ["adb", "root"] for command, _, _ in self.calls))
+        self.assertEqual(4, sum(command[-1].endswith("boot_id") for command, _, _ in self.calls))
+
+    def test_old_boot_may_transition_to_new_boot_before_deadline(self):
+        self.boots = ["old-boot", "new-boot", "new-boot"]
+        self.ready()
+        self.assertEqual(2, sum(command == ["adb", "root"] for command, _, _ in self.calls))
+
+    def test_hanging_commands_share_overall_budget_and_per_command_cap(self):
+        self.hang = True
+        with self.assertRaises(self.module.ReadinessError):
+            self.ready(timeout=.45)
+        self.assertAlmostEqual(.45, self.elapsed)
+        self.assertTrue(self.calls)
+        for _, budget, started in self.calls:
+            self.assertLessEqual(budget, .2)
+            self.assertLessEqual(started + budget, .45 + 1e-9)
+
+    def test_final_success_at_expired_deadline_is_rejected(self):
+        self.exhaust_on = ["shell", "getprop", "sys.boot_completed"]
+        with self.assertRaises(self.module.ReadinessError):
+            self.ready(after_boot=None)
+        self.assertAlmostEqual(1, self.elapsed)
 
 
 if __name__ == "__main__":
