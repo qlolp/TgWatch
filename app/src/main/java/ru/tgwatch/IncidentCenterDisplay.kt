@@ -6,7 +6,7 @@ internal data class IncidentCenterKey(
     val ids: List<TargetId>,
     val versions: Map<TargetId, Long>,
     val endpointRevisions: Map<TargetId, Long>,
-    val generation: Long?,
+    val generation: String?,
     val regionalGeneration: Long,
     val minute: Long,
     val days: Int,
@@ -46,7 +46,7 @@ internal object IncidentCenterLoader {
     }
 
     private fun describe(ctx: Context, event: IncidentCenter.Event): String {
-        val at = AndroidText.resolve(ctx, absoluteTimeText(event.at))
+        val at = AndroidText.resolve(ctx, absoluteTimeText(event.at, java.util.TimeZone.getDefault()))
         return when (event.kind) {
             IncidentCenter.Kind.OUTAGE -> AndroidText.resolve(ctx, IncidentPresentation.describe(
                 checkNotNull(event.episode), targetId = checkNotNull(event.targetId)))

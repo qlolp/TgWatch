@@ -15,7 +15,7 @@ class IncidentCenterTest {
                 service = RegionalService.YOUTUBE, status = RegionalStatus.REGION_RESTRICTED),
         )
         val value = IncidentCenter.build(mapOf(TargetId.TELEGRAM to listOf(episode)), rows,
-            mapOf(TargetId.TELEGRAM to stats), 0, 100)
+            mapOf(TargetId.TELEGRAM to stats), 0, 300)
         assertEquals(listOf(IncidentCenter.Kind.GEO_BLOCK, IncidentCenter.Kind.COUNTRY,
             IncidentCenter.Kind.NETWORK, IncidentCenter.Kind.OUTAGE), value.events.map { it.kind })
         assertEquals(TargetId.TELEGRAM, value.events.last().targetId)
