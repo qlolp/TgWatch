@@ -83,6 +83,7 @@ class MainActivity : Activity() {
     private var colorAnimator: ValueAnimator? = null
     private var shownLog: List<String>? = null
     private lateinit var historyUi: MainHistoryUi
+    private lateinit var changeSummaryUi: MainChangeSummaryUi
     private var historyDays = 1
     private lateinit var csvExport: TargetCsvExportUi
     private lateinit var btnPeriod: Button
@@ -103,6 +104,9 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         historyUi = MainHistoryUi(this) { text ->
             shareText(this@MainActivity.renderString(R.string.copy_main_tg_monitor_summary), text)
+        }
+        changeSummaryUi = MainChangeSummaryUi(this) { text ->
+            shareText(getString(R.string.change_summary_title), text)
         }
         applySystemBarInsets()
         findViewById<Button>(R.id.btnLatency).setOnClickListener { LatencyActivity.open(this, targetUi.selected) }
@@ -362,6 +366,7 @@ class MainActivity : Activity() {
         super.onResume()
         backupUi.resume()
         historyUi.resume()
+        changeSummaryUi.resume()
         if (Prefs.isEnabled(this) && !MonitorService.running) startMonitor()
         WatchdogReceiver.schedule(this)
         EgressCountryUi.refreshActive(this)
@@ -371,6 +376,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         historyUi.pause()
+        changeSummaryUi.pause()
         ui.removeCallbacks(ticker)
         super.onPause()
     }
@@ -378,6 +384,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         targetUi.close()
         historyUi.close()
+        changeSummaryUi.close()
         backupUi.close()
         colorAnimator?.cancel()
         super.onDestroy()
@@ -520,6 +527,7 @@ class MainActivity : Activity() {
         }
         EgressCountryUi.render(tvEgress, this)
         historyUi.refresh(historyDays, now)
+        changeSummaryUi.refresh(now)
         if (tvDiagnostics.visibility == View.VISIBLE && targetUi.selected == TargetId.TELEGRAM) {
             tvDiagnostics.text = s.diagnostics.ifEmpty { this@MainActivity.renderString(
                 R.string.copy_main_diagnostics_will_appear_after) } +
