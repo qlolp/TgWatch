@@ -17,8 +17,9 @@ class IncidentCenterPerformanceIntegrationTest {
             Observation(at, at + 1, if (index % 997 == 0) "TG_DOWN" else "OK", 20)
         }
         val started = SystemClock.elapsedRealtime()
-        val episodes = OutageEpisodes.derive(rows, from, now)
-        val stats = Timeline.stats(rows, from, now)
+        val checks = PreparedChecks(rows, rows.last().clockEpoch)
+        val episodes = OutageEpisodes.derivePrepared(checks, from, now)
+        val stats = Timeline.stats(checks, from, now)
         assertEquals(65_000, stats.checks)
         repeat(5) {
             val byTarget = TargetId.entries.associateWith { id ->
