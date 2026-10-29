@@ -228,7 +228,8 @@ fi
 if [[ "$api_level" -le 29 ]]; then
   for iteration in 1 2 3; do
     echo "::notice title=Android incident regression::API $api_level, iteration $iteration of 3"
-    bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace \
+    rm -rf app/build/outputs/androidTest-results/connected
+    bash ./gradlew :app:connectedDebugAndroidTest --rerun :app:assembleDebug --no-daemon --stacktrace \
       -Pandroid.testInstrumentationRunnerArguments.class='ru.tgwatch.HistoryPersistenceIntegrationTest#nextRecordKeepsBothMemoryAndDiskWithinTheRowLimit,ru.tgwatch.IncidentCenterPerformanceIntegrationTest'
     destination="app/build/reports/androidTests/regression-$iteration"
     rm -rf "$destination"
