@@ -24,7 +24,7 @@ internal object TargetLegacySettingsUi {
         check(activity, R.id.swNotifySlow, Prefs.notifyFor(activity, "SLOW"))
     }
 
-    fun profileLabel(ctx: Context): String = ctx.getString(R.string.target_telegram_profile,
+    fun profileLabel(ctx: Context): String = ctx.renderString(R.string.target_telegram_profile,
         Prefs.profile(ctx)?.title ?: ctx.getString(R.string.target_custom_interval))
 
     private fun check(activity: Activity, id: Int, selected: Boolean) {
