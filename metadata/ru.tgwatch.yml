@@ -12,7 +12,8 @@ Summary: Private reachability monitor for Telegram, Matrix and HTTPS services
 # Store text is maintained in fastlane/metadata/android/{en-US,ru-RU}; keep this summary in sync.
 Description: |-
   TgWatch checks Telegram, optional independent Matrix, WhatsApp Web and custom
-  HTTPS services with separate 7/30/90-day history retention and alerts. Optional
+  HTTPS services with separate 7/30/90-day history retention and alerts. A shared
+  incident center shows observation completeness and a bounded local timeline. Optional
   regional profiles provide a local seven-day journal, connection comparisons and
   a one-shot recovery watch. It supports English and Russian, encrypted portable
   backups, latency trends, configurable widgets and explicit redacted status
@@ -24,10 +25,10 @@ RepoType: git
 Repo: https://github.com/qlolp/TgWatch.git
 
 Builds:
-  - versionName: 1.26.0
-    versionCode: 1026000
-    disable: Pending F-Droid maintainer review; recipe tracks source 1.26.0; not submitted
-    commit: v1.26.0
+  - versionName: 1.27.0
+    versionCode: 1027000
+    disable: Pending F-Droid maintainer review; recipe tracks source 1.27.0; not submitted
+    commit: v1.27.0
     subdir: app
     gradle:
       - "yes"
