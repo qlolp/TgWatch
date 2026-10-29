@@ -1,0 +1,1 @@
+Shared incident center for targets, network and regional events, with target details, fresh checks and A/B comparison. Observation completeness is separate from service availability. Optional related-alert grouping is off by default; histories, webhooks and MQTT remain separate.
