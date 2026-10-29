@@ -131,3 +131,26 @@ tasks.register<Test>("historyRetentionHeapTest") {
         includeTestsMatching("ru.tgwatch.HistoryPreparationAllocationTest")
     }
 }
+
+// Ordinary unit tests stay offline. This fork requires the disposable TLS/auth broker fixture.
+tasks.withType<Test>().configureEach {
+    if (name != "mqttTlsIntegrationTest") exclude("**/MqttTlsIntegrationTest*")
+}
+tasks.register<Test>("mqttTlsIntegrationTest") {
+    group = "verification"
+    description = "Exercise production MQTT TLS against an actual authenticated Mosquitto broker"
+    dependsOn("compileDebugUnitTestSources")
+    val unit = tasks.named<Test>("testDebugUnitTest").get()
+    testClassesDirs = unit.testClassesDirs
+    classpath = unit.classpath
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    filter { includeTestsMatching("ru.tgwatch.MqttTlsIntegrationTest") }
+    doFirst {
+        val fixture = providers.environmentVariable("TGWATCH_MQTT_FIXTURE").orNull
+        require(!fixture.isNullOrBlank()) { "Run scripts/test-mqtt-tls.sh to create the real TLS broker fixture" }
+        systemProperty("javax.net.ssl.trustStore", file("$fixture/truststore.jks").absolutePath)
+        systemProperty("javax.net.ssl.trustStorePassword", "fixture-password")
+        systemProperty("javax.net.ssl.trustStoreType", "JKS")
+    }
+}
