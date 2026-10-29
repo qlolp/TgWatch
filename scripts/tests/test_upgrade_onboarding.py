@@ -179,6 +179,36 @@ class UpgradeOnboardingTests(unittest.TestCase):
         self.assertEqual(1, len(taps))
         self.assertTrue(any(int(call[4]) < int(call[6]) for call in swipes))
 
+    def test_clipped_start_button_is_scrolled_into_safe_viewport_before_one_tap(self):
+        for clipped in ('[164,0][304,30]', '[164,600][304,640]'):
+            with self.subTest(clipped=clipped):
+                module = self.load()
+                now, taps, swipes, running = [0.0], [], [], [False]
+                top_clipped = clipped == '[164,0][304,30]'
+                def command(args):
+                    if args[:4] == ['shell', 'dumpsys', 'activity', 'services']:
+                        return 'isForeground=true' if running[0] else ''
+                    if args[:3] == ['shell', '-T', 'cat']:
+                        if args[-1].endswith('tgwatch.xml'):
+                            return '<map><boolean name="enabled" value="false" /></map>'
+                        correct_drag = swipes and ((int(swipes[-1][4]) < int(swipes[-1][6])) == top_clipped)
+                        bounds = '[164,280][304,340]' if correct_drag else clipped
+                        return ('<hierarchy><node package="ru.tgwatch" resource-id="ru.tgwatch:id/mainScroll" '
+                                'bounds="[0,0][320,640]" scrollable="true" />'
+                                '<node package="ru.tgwatch" resource-id="ru.tgwatch:id/btnToggle" '
+                                'enabled="true" clickable="true" bounds="' + bounds + '" /></hierarchy>')
+                    if args[:3] == ['shell', 'input', 'swipe']:
+                        swipes.append(args)
+                    if args[:3] == ['shell', 'input', 'tap']:
+                        taps.append(args)
+                        # Accessibility includes the clipped control, but the system bar eats this tap.
+                        running[0] = 80 <= int(args[-1]) <= 560
+                    return ''
+                module.prepare(command, 6, lambda: now[0], lambda delay: now.__setitem__(0, now[0] + delay))
+                self.assertEqual(1, len(taps))
+                self.assertEqual('310', taps[0][-1])
+                self.assertEqual(1, len(swipes))
+
     def test_bounds_reject_missing_negative_or_empty_coordinates(self):
         module = self.load()
         for bounds in ['', '[-1,0][20,30]', '[10,10][10,20]', '[0,20][10,10]']:
