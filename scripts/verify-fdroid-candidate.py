@@ -89,7 +89,7 @@ def verify(tag, output):
                  '"build/ru.tgwatch").gotorevision(' + repr(tag) + ')'], cwd=fdroid)
             run(['fdroid', 'build', '--test', '--stop', f'ru.tgwatch:{code}'], cwd=fdroid)
             recipe_apk = output / 'recipe-unsigned.apk'
-            shutil.copy2(fdroid / f'unsigned/ru.tgwatch_{code}.apk', recipe_apk)
+            shutil.copy2(fdroid / f'tmp/ru.tgwatch_{code}.apk', recipe_apk)
             report['checks']['normalRecipeBuild'] = {'status': 'passed', 'scannerBypassed': False,
                                                      'sha256': sha256(recipe_apk)}
             if sha256(unsigned) != sha256(recipe_apk):

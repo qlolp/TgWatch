@@ -41,22 +41,22 @@
 ### Task 3: Localized profile label
 **Files:** `TargetLegacySettingsUi.kt`, native text/settings integration tests.
 **Interfaces:** profileLabel(Context):String resolves TextValue through existing Context.renderString; no preference changes.
-- [ ] Add native RU/EN tests for3 profiles and custom; run native old formatter and observe actual TextValue leak RED.
+- [x] Add native RU/EN tests for3 profiles and custom; run native old formatter and observe actual TextValue leak RED.
 - [ ] Apply resolver, run native regression and existing large-font/settings checks; expected GREEN; commit.
 
 ### Task 4: Actual TLS MQTT gate
 **Files:** `MqttTlsIntegrationTest.kt`(new), broker fixture shell/Python helper, app Gradle task and build-apk workflow job.
 **Interfaces:** production MqttTransport.openTls/submit unchanged; isolated test JVM uses temporary trust store; CI exposes job mqtt-tls and machine-readable actual-test report.
-- [ ] Write real-broker tests and run without fixture to fail; create pinned Mosquitto TLS/auth fixture and independent subscriber. Prove valid publish and wrong CA/name/password outcomes.
-- [ ] Add dedicated Gradle Test task, keep normal unit suite offline, make mqtt-tls a release prerequisite and verify nonzero cases/zero skips.
+- [x] Write real-broker tests and run without fixture to fail; create pinned Mosquitto TLS/auth fixture and independent subscriber. Prove valid publish and wrong CA/name/password outcomes.
+- [x] Add dedicated Gradle Test task, keep normal unit suite offline, make mqtt-tls a release prerequisite and verify nonzero cases/zero skips.
 - [ ] Run actual CI broker plus full CI; expected GREEN; commit.
 
 ### Task 5: Protection and external validation
 **Files:** current validation docs/evidence, disabled F-Droid recipe; repository settings snapshot (private build evidence).
 **Interfaces:** consumes available CI context/app IDs; records protection readback and explicit platform evidence/status without secrets.
-- [ ] Read current protection, device and signing availability. Execute available checks; preserve absent hardware/cert as concrete blockers.
+- [x] Read current protection, device and signing availability. Execute available checks; preserve absent hardware/cert as concrete blockers.
 - [ ] Prepare current-version F-Droid recipe staging/readmeta/lint/build with scanner intact and pinned tools; keep actual output, do not claim acceptance. Exact-tag evidence runs once the release tag exists.
-- [ ] After candidate CI contexts exist, configure strict PR/CI protection with0 human approvals, enforce admins, no force/delete; verify readback. Commit accurate docs.
+- [x] After candidate CI contexts exist, configure strict PR/CI protection with0 human approvals, enforce admins, no force/delete; verify readback. Commit accurate docs.
 
 ### Task 6: Final review, release and cleanup
 **Files:** version.properties, Mac metadata, CHANGELOG, release1.25.1 notes, store metadata, current roadmap/evidence.
