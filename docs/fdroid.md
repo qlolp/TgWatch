@@ -4,16 +4,26 @@
 code1025001, tag `v1.25.1`. No catalog submission or acceptance is implied.
 The Wear application is separate and is not included in this recipe.
 
-## Current candidate 1.25.1
+## Current candidate 1.25.1 — exact-tag verification passed
 
-Local pre-tag `readmeta` and `lint ru.tgwatch` passed with fdroidserver2.4.5
-in isolated staging with the pinned official category definitions and their11 icons.
-This validates metadata only; it is not an exact-tag build. See
-[verification-1.25.1.json](distribution/verification-1.25.1.json).
+On29October2026, the [actual verification run](https://github.com/qlolp/TgWatch/actions/runs/40830515811)
+passed for tag `v1.25.1`, source `b7df1b4564b859fd0862b25498009e10cc367056`.
+The verifier revision was `27f7837518295fc3fa3caf5d209d285126f6c04d`, which reuses
+the shared SDK37-compatible, fail-closed production-certificate guard.
 
-The recipe stays disabled and both update modes stay `None`. Exact-tag validation
-requires the published tag; historical 1.20.1 or 1.24.1 results do not establish
-reproducibility for this candidate.
+Normal `readmeta`, `lint` and `fdroid build --test --stop` passed. Source scanning
+ran; neither `--force` nor `--skip-scan` was used. Independent and recipe unsigned
+APKs were retained and are byte-identical, SHA256
+`e3cb78d1448ecf7dd019bdafd2e6cb2e7b606d2643bc38a9f1a87bdeb0ed357c`.
+Both passed apksigcopier1.1.1 `compare --unsigned` against the published signed APK,
+SHA256 `263cabc45c8c1cc0f462d623395b7545ed0d4e188fe3c999849973680f1b23a1`.
+The production certificate remains unchanged.
+
+[verification-1.25.1.json](distribution/verification-1.25.1.json) records the exact
+source, verifier, toolchain, retained outputs and distinct checks. Earlier local
+pre-tag metadata checks are recorded separately. This was isolated normal recipe
+validation, not F-Droid server validation. The recipe stays disabled for maintainer
+review; both update modes remain `None`. Nothing was submitted to the catalog.
 
 The manual [F-Droid verification workflow](../.github/workflows/fdroid-verify.yml)
 uses a dedicated hash-locked fdroidserver2.4.5/apksigcopier1.1.1 environment. It
@@ -27,7 +37,7 @@ uploads its actual evidence even on failure and never submits to the catalog.
 gh workflow run fdroid-verify.yml --ref main -f tag=v1.25.1
 ```
 
-A workflow definition is not proof of a successful build. Inspect the exact run's
+Inspect the exact run's
 `evidence.json`, retained APKs and source revision before making that claim.
 The previous version's distinct outcomes remain in
 [verification-1.24.1.json](distribution/verification-1.24.1.json).
