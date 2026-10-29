@@ -10,7 +10,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class IncidentCenterPerformanceIntegrationTest {
     @Test fun sixtyFiveThousandRowsStayBoundedAcrossRepeatedCenterPreparation() {
-        val now = 65_000_000L
+        val now = 100_000_000L
         val from = now - 86_400_000L
         val rows = List(65_000) { index ->
             val at = now - 65_000L + index
