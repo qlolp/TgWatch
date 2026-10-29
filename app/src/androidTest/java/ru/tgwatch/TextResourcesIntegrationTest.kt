@@ -88,4 +88,27 @@ class TextResourcesIntegrationTest {
         assertEquals("Short", AndroidText.resolve(context("en"), AlarmPattern.SHORT.title))
         assertEquals("Короткий", AndroidText.resolve(context("ru"), AlarmPattern.SHORT.title))
     }
+    @Test fun telegramProfileButtonResolvesAllProfilesAndCustomInBothLocales() {
+        val en = context("en")
+        val ru = context("ru")
+        val savedProfile = Prefs.profile(en)
+        val savedInterval = Prefs.intervalSec(en)
+        try {
+            for ((profile, english, russian) in listOf(
+                Triple(PowerProfile.ECONOMY, "Economy", "Экономичный"),
+                Triple(PowerProfile.BALANCED, "Balanced", "Обычный"),
+                Triple(PowerProfile.FREQUENT, "Frequent", "Частый"))) {
+                Prefs.setProfile(en, profile)
+                assertEquals("Telegram — profile: $english", TargetLegacySettingsUi.profileLabel(en))
+                assertEquals("Telegram — профиль: $russian", TargetLegacySettingsUi.profileLabel(ru))
+            }
+            Prefs.setIntervalSec(en, 45)
+            assertEquals("Telegram — profile: Custom interval", TargetLegacySettingsUi.profileLabel(en))
+            assertEquals("Telegram — профиль: Свой интервал", TargetLegacySettingsUi.profileLabel(ru))
+        } finally {
+            if (savedProfile == null) Prefs.setIntervalSec(en, savedInterval)
+            else Prefs.setProfile(en, savedProfile)
+        }
+    }
+
 }
