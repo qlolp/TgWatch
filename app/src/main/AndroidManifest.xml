@@ -6,12 +6,12 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Вибрация при потере связи -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Постоянная работа в фоне со значком в строке состояния -->
+    <!-- Постоянная работа в фоне с значком в строке состояния -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Точный будильник: будит телефон к следующей проверке при выключенном экране -->
+    <!-- Точный будильник: будит телефон к следующей проверке -->
     <uses-permission
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
@@ -75,6 +75,9 @@
         <activity
             android:name=".IncidentActivity"
             android:exported="false" />
+        <activity
+            android:name=".IncidentCenterActivity"
+            android:exported="false" />
         <receiver
             android:name=".AutomationReceiver"
             android:directBootAware="false"
@@ -113,31 +116,6 @@
             android:directBootAware="true"
             android:exported="false" />
 
-        <receiver
-            android:name=".StatusWidget"
-            android:directBootAware="true"
-            android:exported="true"
-            android:label="@string/widget_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_status_info" />
-        </receiver>
-
-        <!-- «Заглушить на час» из тревожного уведомления: только собственный PendingIntent -->
-        <receiver
-            android:name=".AlertActionReceiver"
-            android:directBootAware="true"
-            android:exported="false" />
-
-        <!-- Нажатие на виджет: только собственный PendingIntent, не другие приложения -->
-        <receiver
-            android:name=".WidgetClickReceiver"
-            android:directBootAware="true"
-            android:exported="false" />
-
         <!-- Системные broadcast доставляются и неэкспортированному получателю -->
         <receiver
             android:name=".BootReceiver"
@@ -149,7 +127,6 @@
                 <action android:name="android.intent.action.USER_UNLOCKED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <!-- Xiaomi / некоторые OEM будят иначе, чем обычный BOOT_COMPLETED -->
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                 <!-- Сводка за день привязана к местному времени -->
                 <action android:name="android.intent.action.TIME_SET" />
@@ -157,5 +134,4 @@
             </intent-filter>
         </receiver>
     </application>
-
 </manifest>

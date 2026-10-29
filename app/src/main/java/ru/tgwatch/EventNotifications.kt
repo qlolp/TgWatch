@@ -35,6 +35,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     private val partialId get() = TargetEventNotifications.id(targetId, "partial")
     private val recoveryId get() = TargetEventNotifications.id(targetId, "recovery")
     private val slowId get() = TargetEventNotifications.id(targetId, "slow")
+    private val incidentAlerts = IncidentAlertCoordinator.get(ctx, manager)
     init {
         manager.createNotificationChannel(NotificationChannel(SILENT_CHANNEL, ctx.renderString(
             R.string.copy_event_notifications_silent_events),
@@ -72,7 +73,11 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         }
     }
     fun clearRecovery() { manager.cancel(recoveryId) }
-    fun clearOutage() { manager.cancel(outageId); manager.cancel(partialId) }
+    fun clearOutage() {
+        incidentAlerts.clear(targetId)
+        manager.cancel(outageId)
+        manager.cancel(partialId)
+    }
     fun recovered(event: RecoveryEvent, sound: Boolean, allowed: Boolean) {
         clearOutage()
         if (blocked(recoveryChannel)) { clearRecovery(); return }
@@ -85,17 +90,21 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     fun outage(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery()
         manager.cancel(partialId)
-        if (blocked(outageChannel)) { manager.cancel(outageId); return }
-        manager.notify(outageId, notification(ctx.renderString(
-            R.string.copy_event_notifications_telegram_is_unreachable),
-            reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
+        if (blocked(outageChannel)) { clearOutage(); return }
+        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed) {
+            manager.notify(outageId, notification(ctx.renderString(
+                R.string.copy_event_notifications_telegram_is_unreachable),
+                reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
+        }
     }
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(outageId)
-        if (blocked(partialChannel)) { manager.cancel(partialId); return }
-        manager.notify(partialId,notification(ctx.renderString(
-            R.string.copy_event_notifications_telegram_is_partially_reachable),reason,sound && allowed,
-            R.drawable.ic_stat_offline,partialChannel))
+        if (blocked(partialChannel)) { clearOutage(); return }
+        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed) {
+            manager.notify(partialId,notification(ctx.renderString(
+                R.string.copy_event_notifications_telegram_is_partially_reachable),reason,sound && allowed,
+                R.drawable.ic_stat_offline,partialChannel))
+        }
     }
     /** Silent: Telegram works, only slowly. Outage alerts replace it. */
     fun slow(latencyMs: Long) {
