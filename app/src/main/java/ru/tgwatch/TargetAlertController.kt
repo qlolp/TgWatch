@@ -86,6 +86,7 @@ internal class TargetAlertController(private val ctx: Context, private val manag
         slow.forget(id)
         val existing = notifications[id]
         if (existing == null) {
+            IncidentAlertCoordinator.get(ctx, manager).clear(id)
             manager.cancel(TargetEventNotifications.id(id, "outage"))
             manager.cancel(TargetEventNotifications.id(id, "partial"))
         } else existing.clearOutage()

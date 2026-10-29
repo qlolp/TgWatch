@@ -23,6 +23,15 @@ class IncidentCenterTest {
         assertNull(value.events.single { it.kind == IncidentCenter.Kind.OUTAGE }.route)
     }
 
+    @Test fun episodesOutsideTheWindowAreExcludedButOverlapsRemain() {
+        val old = episode.copy(startedAt = 10, endedAt = 20)
+        val overlapping = episode.copy(startedAt = 90, endedAt = 120)
+        val future = episode.copy(startedAt = 301, endedAt = 320)
+        val value = IncidentCenter.build(mapOf(TargetId.TELEGRAM to listOf(old, overlapping, future)),
+            emptyList(), mapOf(TargetId.TELEGRAM to stats), 100, 300)
+        assertEquals(listOf(overlapping), value.events.map { it.episode })
+    }
+
     @Test fun latestEventsAreBoundedAndCoverageKeepsEveryTarget() {
         val episodes = (0 until 250).map { episode.copy(startedAt = it.toLong(), endedAt = it.toLong() + 1) }
         val targets = TargetId.entries.associateWith { stats }

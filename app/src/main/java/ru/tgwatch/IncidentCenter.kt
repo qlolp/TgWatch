@@ -30,7 +30,7 @@ internal object IncidentCenter {
         require(from >= 0L && until >= from)
         val events = mutableListOf<Event>()
         episodes.forEach { (id, rows) ->
-            rows.forEach { episode ->
+            rows.asSequence().filter { it.overlaps(from, until) }.forEach { episode ->
                 events += Event(episode.startedAt, episode.endedAt, Kind.OUTAGE, targetId = id, episode = episode)
             }
         }
@@ -54,4 +54,6 @@ internal object IncidentCenter {
         }.sortedBy { it.id.ordinal }
         return Snapshot(sorted, coverage)
     }
+
+    private fun OutageEpisode.overlaps(from: Long, until: Long) = endedAt >= from && startedAt <= until
 }
