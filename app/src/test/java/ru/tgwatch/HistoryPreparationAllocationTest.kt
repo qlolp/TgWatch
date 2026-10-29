@@ -44,6 +44,10 @@ class HistoryPreparationAllocationTest {
         repeat(1000) { assertSame(stats, warmStats(now + 100 + it, 1)) }
         val statsHitPerCall = (bytes() - before) / 1000
         println("HOST_65K retainedBytes=$uncachedPerCall preparedHitBytes=$cachedPerCall statsHitBytes=$statsHitPerCall")
+        assertTrue("Canonical 65k retention allocated $uncachedPerCall bytes", uncachedPerCall < 4 * 1024 * 1024)
+        assertEquals(65_000, first.rows.size)
+        assertEquals(rows.first(), first.rows.first())
+        assertEquals(rows.last(), first.rows.last())
         assertTrue("Preparation hit must avoid row-sized allocation", cachedPerCall < 1024)
         assertTrue("Warm stats lookup must avoid row-sized allocation", statsHitPerCall < 1024)
     }

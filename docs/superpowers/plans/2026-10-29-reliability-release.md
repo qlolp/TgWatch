@@ -25,11 +25,11 @@
 - Branch protection must require available validations while allowing the single owner to use PRs; no admin bypass or publication-key rotation (task5/6).
 
 ### Task 1: History retention allocation
-**Files:** `HistoryRetention.kt`(new), `Timeline.kt`, `HistoryRetentionTest.kt`(new), `HistoryPreparationAllocationTest.kt`, Gradle isolated history heap task if needed.
+**Files:** `HistoryRetention.kt`(new), `Timeline.kt`, `TimelineRetentionTest.kt`(new), `HistoryPreparationAllocationTest.kt`, Gradle isolated history heap task if needed.
 **Interfaces:** consumes immutable Observation and cutoff/limit; produces same List<Observation> as retained contract. Timeline.retained delegates without API changes.
-- [ ] Write literal tests for duplicate/meta/epoch/cap/immutability and canonical65k allocation<4MiB; run old code and observe allocation assertion RED.
-- [ ] Replace per-row boxed-key map/sorted copies in retention with bounded sorted/grouped traversal and primitive comparator. Run semantic/allocation suite; expected GREEN, print measured bytes.
-- [ ] Keep original Android65k integration test; add/run isolated heap validation and all relevant JVM tests; commit with evidence.
+- [x] Write literal tests for duplicate/meta/epoch/cap/immutability and canonical65k allocation<4MiB; run old code and observe allocation assertion RED.
+- [x] Replace per-row boxed-key map/sorted copies in retention with bounded sorted/grouped traversal and primitive comparator. Run semantic/allocation suite; expected GREEN, print measured bytes.
+- [x] Keep original Android65k integration test; add/run isolated heap validation and all relevant JVM tests; commit with evidence.
 
 ### Task 2: Deterministic ADB timing
 **Files:** `scripts/adb-readiness.py`, `scripts/tests/test_adb_readiness.py`, direct-boot tests only if the same investigated boundary requires it.

@@ -115,3 +115,19 @@ tasks.register<Test>("targetBackupHeapTest") {
     systemProperty("tgwatch.backup.heap.limit", 128L * 1024 * 1024)
     filter { includeTestsMatching("ru.tgwatch.TargetBackupCodecTest.maximumBackupFits128MiB") }
 }
+
+// Canonical 65k retention must remain cheap even when the history cache is invalidated.
+tasks.register<Test>("historyRetentionHeapTest") {
+    group = "verification"
+    description = "Verify bounded 65k history retention in a 64 MiB JVM"
+    dependsOn("compileDebugUnitTestSources")
+    val unit = tasks.named<Test>("testDebugUnitTest").get()
+    testClassesDirs = unit.testClassesDirs
+    classpath = unit.classpath
+    maxHeapSize = "64m"
+    maxParallelForks = 1
+    filter {
+        includeTestsMatching("ru.tgwatch.TimelineRetentionTest")
+        includeTestsMatching("ru.tgwatch.HistoryPreparationAllocationTest")
+    }
+}
