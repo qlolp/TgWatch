@@ -223,6 +223,20 @@ if [[ "$api_level" -eq 35 ]]; then
   await_observation 0
   check_crashes
 fi
+# Capture the real main screen before additional regressions change foreground state.
+adb shell dumpsys deviceidle whitelist +ru.tgwatch
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
+adb shell input keyevent 82
+adb shell am start -W -n ru.tgwatch/.MainActivity
+for attempt in $(seq 1 10); do
+  if adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch; then break; fi
+  sleep 1
+done
+adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
+adb shell dumpsys window | grep -F mCurrentFocus
+adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
+rm -rf "$legacy_dir"
 # API26/29: repeat the sensitive 65k persistence case and the new bounded-center
 # preparation on the same real emulator. Each iteration must produce fresh JUnit evidence.
 if [[ "$api_level" -le 29 ]]; then
@@ -237,18 +251,3 @@ if [[ "$api_level" -le 29 ]]; then
     python3 scripts/report-android-tests.py "$destination"
   done
 fi
-# After all assertions, capture the real main screen for documentation.
-adb shell dumpsys deviceidle whitelist +ru.tgwatch
-adb shell input keyevent KEYCODE_WAKEUP
-adb shell wm dismiss-keyguard
-adb shell input keyevent 82
-adb shell am force-stop ru.tgwatch
-adb shell am start -W -n ru.tgwatch/.MainActivity
-for attempt in $(seq 1 30); do
-  if adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch; then break; fi
-  sleep 1
-done
-adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.png
-adb shell dumpsys window | grep -F mCurrentFocus
-adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
-rm -rf "$legacy_dir"
