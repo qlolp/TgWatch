@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -37,8 +38,10 @@ class FdroidCandidateTests(unittest.TestCase):
         self.comparisons = []
         spec = importlib.util.spec_from_file_location('fdroid_candidate', SCRIPT)
         self.module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.module)
+        with patch.object(sys, "path", [str(SCRIPT.parent), *sys.path]):
+            spec.loader.exec_module(self.module)
         self.module.ROOT = self.source
+        self.signer_output = "Signer #1 certificate SHA-256 digest: " + self.module.CERTIFICATE + "\n"
 
     def run_command(self, arguments, *, cwd, timeout=1800):
         self.commands.append(arguments)
@@ -77,7 +80,7 @@ class FdroidCandidateTests(unittest.TestCase):
         if arguments[:2] == ['git', 'rev-parse']:
             return '1' * 40 + '\n'
         if arguments[:2] == ['apksigner', 'verify']:
-            return 'Signer #1 certificate SHA-256 digest: ' + self.module.CERTIFICATE + '\n'
+            return self.signer_output
         self.fail(f'Unexpected output command: {arguments}')
 
     def verify(self):
@@ -100,6 +103,17 @@ class FdroidCandidateTests(unittest.TestCase):
         self.assertFalse(report['catalogSubmitted'])
         self.assertFalse(report['checks']['normalRecipeBuild']['scannerBypassed'])
         self.assertTrue(self.metadata['Builds'][0]['disable'])
+
+    def test_sdk37_scheme_labeled_signer_is_verified_before_payload_comparison(self):
+        self.signer_output = 'V3.0 Signer: certificate SHA-256 digest: ' + self.module.CERTIFICATE + '\n'
+        self.verify()
+        self.assertEqual(['independent-unsigned.apk', 'recipe-unsigned.apk'], self.comparisons)
+
+    def test_unknown_additional_signer_fails_closed_before_payload_comparison(self):
+        self.signer_output += 'Unexpected signer certificate SHA-256 digest: ' + '0' * 64 + '\n'
+        with self.assertRaisesRegex(ValueError, 'signing identity'):
+            self.verify()
+        self.assertEqual([], self.comparisons)
 
     def test_different_recipe_bytes_fail_and_keep_both_unsigned_outputs(self):
         self.recipe_bytes = b'different-recipe-canary'

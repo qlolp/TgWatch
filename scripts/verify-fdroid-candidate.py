@@ -13,11 +13,12 @@ import urllib.request
 
 import yaml
 
+from apk_verification import PRODUCTION_CERTIFICATE as CERTIFICATE, verify_certificate_report
+
 ROOT = Path(__file__).resolve().parents[1]
 CATEGORIES_URL = ('https://gitlab.com/fdroid/fdroiddata/-/raw/'
                   '5d2099db6488d9e2c5f74a9882e32138f5760616/config/categories.yml')
 CATEGORIES_SHA = 'edf68d8d70073fe52a52c6a33f490399ce9dc884acff3a761a3a1e34acf9d541'
-CERTIFICATE = 'ab74727a44f59684045e7db4c820be309f886433a18a3c06f3439417f3acbef1'
 
 
 def run(arguments, *, cwd, timeout=1800):
@@ -102,9 +103,7 @@ def verify(tag, output):
             if len(checksum) != 2 or checksum[1] != 'TgWatch.apk' or checksum[0] != sha256(published):
                 raise ValueError('Published APK checksum mismatch')
             signer = subprocess.check_output(['apksigner', 'verify', '--print-certs', str(published)], text=True)
-            certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-f]+)$', signer, re.M)
-            if certificates != [CERTIFICATE]:
-                raise ValueError('Unexpected production signer')
+            verify_certificate_report(signer)
             for apk in (unsigned, recipe_apk):
                 run(['apksigcopier', 'compare', '--unsigned', str(published), str(apk)], cwd=stage)
             report['checks']['productionPayloadComparison'] = {'status': 'passed', 'publishedSha256': sha256(published)}
