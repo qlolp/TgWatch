@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Вибрация при потере связи -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Постоянная работа в фоне с значком в строке состояния -->
+    <!-- Постоянная работа в фоне со значком в строке состояния -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -107,12 +107,27 @@
 
         <!-- Виджет со статусом на рабочем столе -->
         <receiver
-            android:name=".WatchdogReceiver"
+            android:name=".StatusWidget"
+            android:directBootAware="true"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_status_info" />
+        </receiver>
+
+        <!-- «Заглушить на час» из тревожного уведомления: только собственный PendingIntent -->
+        <receiver
+            android:name=".AlertActionReceiver"
             android:directBootAware="true"
             android:exported="false" />
 
+        <!-- Нажатие на виджет: только собственный PendingIntent, не другие приложения -->
         <receiver
-            android:name=".DailySummaryReceiver"
+            android:name=".WidgetClickReceiver"
             android:directBootAware="true"
             android:exported="false" />
 
