@@ -25,8 +25,9 @@ CI запускает ту же unittest-suite через `python3 scripts/repor
 код отказа сохраняется, ошибки получают ограниченные annotations GitHub,
 а отсутствие обнаруженных тестов не считается успехом.
 
-`version.properties` задаёт SemVer `1.24.1`; код `1024001` вычисляется одинаково локально и
-в CI. Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
+SemVer берётся из [version.properties](version.properties); Android-код вычисляется
+одинаково локально и в CI (`major × 1000000 + minor × 1000 + patch`).
+Minor/patch ограничены 0–999; переполнение и неверный формат отклоняются.
 `assembleRelease` без signing environment создаёт unsigned APK для проверки
 сборки. Production build использует `TGWATCH_KEYSTORE_PATH`, `TGWATCH_KEYSTORE_PASSWORD`,
 `TGWATCH_KEY_ALIAS`, `TGWATCH_KEY_PASSWORD`; не передавайте секреты в аргументах команд.
@@ -105,7 +106,7 @@ OEM background restrictions и живой Telegram ответ требуют о�
 - `NetworkProbe`/`ProbeBatch`/`MtProto` — bounded HTTP/unauthenticated req_pq_multi/resPQ, Android Network binding, shared deadlines и cancellation с закрытием socket/connection. Полная TL validation сохранена; не добавляйте account/RPC или TLS bypass.
 - `Timeline`/`HistoryStorage`/`History` — interval observations, clock epochs, unknown gaps, per-status counts и exact latency totals. Полностью наблюдённый TG_DOWN для MTTR продолжается через PARTIAL до свежего OK; offline/gaps/clipping/clock change разрывают покрытие. Устаревшая последняя эпоха не должна оживлять старую статистику. Zero-width UNKNOWN с latency=-1 — явные epoch metadata, не checks; positive-width UNKNOWN остаётся реальной проверкой. После failed write dirty snapshot должен сохраняться целиком до возврата к append.
 - `CsvImport` — strict current/legacy UTC history. Positive-width UNKNOWN rows пропускаются, чтобы generated gaps не увеличивали checks; явные zero-width epoch metadata принимаются только в текущих семи колонках. Archived epochs не становятся текущими после удаления UNKNOWN.
-- `BackupSnapshot`/`BackupCodec` — legacy typed snapshot и strict JSON private journal; `TargetBackupCodec`/`TargetPortableBackup` — новые TGWB v3-копии независимых целей. Обычный экспорт пишет v3, отдельный Telegram-only экспорт — совместимый v2; чтение прежних TGWB v1/v2 и TGWBKUP1 сохраняется. Приватные адреса исключаются из обоих новых экспортов. Версии portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
+- `BackupSnapshot`/`BackupCodec` — legacy typed snapshot и strict JSON private journal; `TargetBackupCodec`/`TargetPortableBackup` — TGWB-копии независимых целей. Обычный экспорт пишет JSON v4 либо v5 при добавленных HTTPS 2–5 внутри контейнера TGWB byte 0x03; Telegram-only экспорт остаётся совместимым v2. Чтение поддерживаемых прежних форматов сохраняется. Приватные адреса исключаются из обоих новых экспортов. Версии portable envelope и JSON payload не смешиваются. Подробнее: [backup](docs/backup.md).
 - `BackupManager`/`RestoreTransaction`/`TgWatchApplication` — validation before changes, stop-and-await monitoring, durable journal и replay до компонентов. Оба старых private journals мигрируют. Cache меняется после durable write; monitoring после restore/import остаётся остановленным, transient status/last OK не переносятся.
 - `Prefs`/`QuietHours`/`EventPreferences` — minute boundaries с legacy hour fallback и independent outage/PARTIAL/recovery notify/sound. Отсутствующие legacy flags имеют прежний fallback; PARTIAL остаётся opt-in. `LastSuccessStore` сохраняет только published OK; Android channel overrides принадлежат устройству.
 - `ExtraProbes`/`HttpsUrlPolicy` — opt-in informational probes в группе `EXTRA`, которую `ProbeReport.classify` игнорирует; они не должны влиять на статус, latency, reason и тревоги и используют отдельный трёхпоточный bounded executor. `WebhookPolicy`/`WebhookGate` — чистая логика payload и rate limit; `WebhookSettings` хранит адрес как секрет (как `AutomationSettings`). `WebhookCoordinator` связывает URL/generation с admission/completion; `WebhookNotifier` сохраняет не больше одного физического запроса, включая смену настроек.
@@ -126,7 +127,7 @@ OEM background restrictions и живой Telegram ответ требуют о�
 UNKNOWN не доказывает отсутствие интернета или блокировку; VPN не доказывает работоспособность
 туннеля. Append sync выполняется при смене статуса и на следующей записи после 60 с с прошлого
 sync. Unsynced append не гарантируется при power loss; stop/replace/compaction отдельно сохраняют
-историю. Семидневное хранение, observation bounds и Direct Boot сохраняются.
+историю. Выбранные пределы хранения, observation bounds и Direct Boot сохраняются.
 
 ## Два аудита зависимостей
 
@@ -185,6 +186,13 @@ Release policy сохраняет published tags/assets. Уже существу
 draft, incomplete/different assets, другой commit или conflicting orphan tag требуют явного разбора.
 Более старый code не заменяет latest. Не обходите это удалением тега или перезаписью assets.
 CI должен проверить production certificate и upgrade реального 1.10.47 до публикации.
+
+## Сопровождение репозитория
+
+Пользовательские инструкции собраны в [указателе](docs/README.md); текущие приоритеты —
+в [roadmap](docs/development-roadmap.md). Правила удаления только влитых веток, их SHA-архив
+и границы исторических workflows описаны в [сопровождении](docs/maintenance/README.md).
+Перед коммитом проверяйте `git status`; локальные копии и сырые device reports сохраняйте вне checkout.
 
 ## Как предложить изменение
 

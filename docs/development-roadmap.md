@@ -2,6 +2,11 @@
 
 ## Текущее состояние
 
+Проверено 29 октября 2026 года: опубликован [1.25.0](releases/1.25.0.md), исходники релиза —
+[`ce8f178`](https://github.com/qlolp/TgWatch/commit/ce8f1789dc1110eeff27e8bae7011cde268c7b70).
+[Релизный CI](https://github.com/qlolp/TgWatch/actions/runs/40803849297) завершился успешно
+со всеми восемью заданиями, включая подпись и обновления с 1.10.47 и 1.24.1.
+
 Проект включает независимые цели Telegram, Matrix, WhatsApp Web и до пяти HTTPS;
 их обзор без общего cross-service процента, отдельные истории с хранением 7/30/90 дней
 и rollup-агрегатами, наблюдаемость покрытия и инцидентов, региональные профили с
@@ -15,7 +20,28 @@
 GitHub Releases; локальная сборка не означает публикацию. Подготовка F-Droid
 отделена от принятия каталогом.
 
-## Следующие шаги
+## Приоритеты после 1.25.0
+
+1. **Память истории и устойчивость CI.** На том же SHA первый [push CI](https://github.com/qlolp/TgWatch/actions/runs/40743114973)
+   упал на API29 с `OutOfMemoryError` в `HistoryPersistenceIntegrationTest.nextRecordKeepsBothMemoryAndDiskWithinTheRowLimit`,
+   а полный релизный прогон прошёл. Исследовать heap и число одновременно удерживаемых снимков
+   при 65 000 строках, затем закрепить границы памяти регрессией; не снимать тест и не поднимать лимиты вслепую.
+   Локальные CLI-тесты ADB также зависят от скорости запуска Python: при общем лимите 0,4 с
+   fixture может закончить ожидание до чтения boot_id. Отделить проверку политики времени
+   от скорости реальных subprocess, сохранив отдельную проверку настоящего deadline.
+2. **Реальные проверки внешних интеграций.** Заполнить OEM/battery-матрицу и проверить
+   настоящий TLS MQTT broker, подтверждение QoS1 и разрыв соединения. Тесты протокола и эмулятор
+   подтверждают свои сценарии; реальные устройства и сервисы требуют отдельного evidence.
+3. **Распространение.** Проверить текущий тег для F-Droid; пройти Developer ID, Apple notarization,
+   stapling и Gatekeeper при наличии Apple credentials. Историческую сборку 1.24.1 учитывать отдельно.
+4. **Работа с репозиторием.** Включить правила для `main` с обязательным CI и review,
+   поддерживать [архив завершённых веток](maintenance/README.md) и один актуальный roadmap.
+   Убирать старые номера версии из вводных инструкций в пользу `version.properties` и Releases.
+5. **Полировка интерфейса.** Исправить отображение `TextValue(...)` в кнопке профиля
+   (`TargetLegacySettingsUi.profileLabel`), затем проверить RU/EN и крупный шрифт.
+   Планировщик и ограниченные сетевые пулы сохранять при дальнейшем разделении `MonitorService`.
+
+## Состояние направлений
 
 | Этап | Отслеживание и граница готовности |
 | --- | --- |
@@ -23,9 +49,9 @@ GitHub Releases; локальная сборка не означает публ�
 | Реальные Android/OEM и батарея | [#75](https://github.com/qlolp/TgWatch/issues/75): заполнить матрицу Pixel, Samsung и Xiaomi/HyperOS, измерить p50/p95 задержки и суточный расход. Эмулятор и локальная сборка не закрывают этот пункт. |
 | F-Droid | [#73](https://github.com/qlolp/TgWatch/issues/73): историческая независимая exact-tag сборка относится только к 1.24.1. Recipe build, byte/payload comparisons, maintainer review и upstream submission остаются; принятие каталогом не заявляется. |
 | macOS-дистрибутив | [#76](https://github.com/qlolp/TgWatch/issues/76): bundled Python и signing/notarization pipeline подготовлены; реальная Developer ID подпись, Apple notarization, stapling и Gatekeeper-проверка требуют credentials и остаются внешними. |
-| Интеграции доставки | [#78](https://github.com/qlolp/TgWatch/issues/78), [#74](https://github.com/qlolp/TgWatch/issues/74): до пяти независимых webhook-получателей, ntfy preset и native MQTT/TLS реализованы в кандидате 1.25.0; реальный broker не проверен. |
-| Custom HTTPS | [#77](https://github.com/qlolp/TgWatch/issues/77): дополнительные body/JSON/header-критерии реализованы в кандидате 1.25.0; приватность и прежние транспортные лимиты сохранены. |
-| Remote crash reporting | [#72](https://github.com/qlolp/TgWatch/issues/72): opt-in отправка на HTTPS collector пользователя после отдельного согласия реализована в кандидате 1.25.0; локальный журнал остаётся вариантом по умолчанию. |
+| Интеграции доставки | [#78](https://github.com/qlolp/TgWatch/issues/78), [#74](https://github.com/qlolp/TgWatch/issues/74): до пяти независимых webhook-получателей, ntfy preset и native MQTT/TLS включены в опубликованный 1.25.0; реальный broker не проверен. |
+| Custom HTTPS | [#77](https://github.com/qlolp/TgWatch/issues/77): дополнительные body/JSON/header-критерии включены в опубликованный 1.25.0; приватность и прежние транспортные лимиты сохранены. |
+| Remote crash reporting | [#72](https://github.com/qlolp/TgWatch/issues/72): opt-in отправка на HTTPS collector пользователя после отдельного согласия включена в опубликованный 1.25.0; локальный журнал остаётся вариантом по умолчанию. |
 
 Ниже сохранены исторические причины решений. Реализованные функции заменили прежние
 ограничения: мультисервис уже реализован, webhook поддерживает JSON, а отсутствие

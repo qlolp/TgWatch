@@ -6,8 +6,11 @@ TgWatch monitors Telegram reachability locally on Android 8.0 and later. It need
 no Telegram account, phone number or access to messages. The interface supports
 English and Russian; Android 13+ also provides a per-app language setting.
 
-Version 1.24.1 updates the Android build to SDK 37, AGP 9.2.1 and Gradle 9.4.1,
-retaining Android 8.0+ and targetSdk 36. See the [1.24.1 notes](releases/1.24.1.md).
+Release [1.25.0](releases/1.25.0.md) adds private HTTP/body/JSON/header health criteria,
+up to five independent webhook recipients, ntfy and native MQTT over TLS, opt-in crash
+report delivery to your own HTTPS collector and bundled Python in the Mac app.
+Android 8.0+ and targetSdk 36 remain supported; builds use SDK 37.
+See the [documentation index](README.md) and [current roadmap](development-roadmap.md).
 
 Optional independent targets cover Matrix, WhatsApp Web and up to five custom HTTPS
 services, each with its own history, intervals and alerts. Version 1.24.0 adds the extra
@@ -24,8 +27,11 @@ An opt-in, one-shot watch can notify after two fresh public responses at least
 Public-site access and country information do not certify account features or an
 IP-only restriction. Regional records remain outside portable backups and diagnostics.
 See the [regional-services guide](regional-services.md), [native Mac app](macos.md)
-and [release notes](releases/1.23.0.md). Mac builds require macOS13+ and Python3.10+;
-local universal builds are ad-hoc signed, without Developer ID or notarization.
+and [release notes](releases/1.23.0.md). The Mac app requires macOS13+ and bundles
+pinned Python runtimes for Intel and Apple Silicon; a separate Python installation
+is not required. Default local builds are ad-hoc signed. Developer ID signing and
+notarization are supported when Apple credentials are explicitly configured; their
+availability in the builder does not certify a distributed build.
 
 ## Reading the status
 
@@ -44,8 +50,8 @@ session, or prove that messages can be delivered. A system VPN affects the probe
 Telegram's own configured proxy does not.
 
 Each of the five production DCs has IPv4 and IPv6 probes. Either address family
-can establish the MTProto signal. A bounded pool admits all thirteen primary
-requests; optional informational checks retain their separate workers.
+can establish the MTProto signal. Bounded primary workers share deadlines and
+cancellation; optional informational checks retain their separate workers.
 
 ## Monitoring and history
 
@@ -85,8 +91,9 @@ The encrypted portable backup contains settings, history and the event log. New
 exports use AES-256-GCM and PBKDF2-HMAC-SHA256 with 600,000 iterations. Keep the
 password: there is no recovery service. Restoring replaces data and leaves
 monitoring stopped. Current all-target exports use the TGWB v3 container with
-JSON payload version 4, including the selected history retention; JSON v3 remains
-readable. A separate Telegram-only v2 export supports older installations;
+JSON payload version 4 normally, or version 5 when optional custom HTTPS slots
+`custom2`–`custom5` are present. Both use container byte `0x03` and include the selected
+history retention; JSON v3 remains readable. A separate Telegram-only v2 export supports older installations;
 private addresses are excluded from both new export formats. Older supported
 backups remain readable. CSV export/import is also supported.
 See [backup formats](backup.md).
@@ -147,7 +154,8 @@ separate `TgWatch-wear` prefix; every unified release includes both apps' six fi
 Development APKs use a different signing key and cannot replace a production
 installation. Do not uninstall an existing app before exporting its data.
 
-The source version is `1.24.0` (Android code `1024000`), phone target API36, Wear target API35.
+The source version is defined in [version.properties](../version.properties); Android
+versionCode is derived from it. The phone targets API36 and Wear targets API35.
 A short first-run guide explains what is checked and asks for notifications and battery
 access; on Android 12+ the screens use Material You colors. See [1.18.0](releases/1.18.0.md).
 Version 1.17.2 is built with Gradle 8.14.6, AGP 8.13.2 and Kotlin 2.4.21, and a check whose network changed
@@ -161,7 +169,7 @@ Published versions and signed APKs are recorded on
 [GitHub Releases](https://github.com/qlolp/TgWatch/releases/latest). The release workflow
 checks dependency audits, production certificate continuity and a real upgrade.
 
-Use JDK17, Android SDK36 (phone), SDK35 (Wear) and the checked-in Gradle wrapper:
+Use JDK17, Android SDK37 (phone), SDK35 (Wear) and the checked-in Gradle wrapper:
 
 ```sh
 bash ./gradlew :probe-core:test :app:testDebugUnitTest :app:detekt :app:lintDebug :app:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug

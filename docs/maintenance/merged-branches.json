@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "verified_at": "2026-10-29",
+  "integrated_main": "ce8f1789dc1110eeff27e8bae7011cde268c7b70",
+  "branches": [
+    {
+      "name": "claude/project-thread-s0ejzl",
+      "sha": "daa445464e8a618a29f3612b548e4cebafb5e788"
+    },
+    {
+      "name": "copilot/add-multiple-independent-webhook-receivers",
+      "sha": "2b4a23c0bc3c8a06d7dc2838798ae585959db5a3"
+    },
+    {
+      "name": "copilot/check-and-submit-f-droid-candidate",
+      "sha": "4ac598133443191abe329031aadea9cea07acfcd"
+    },
+    {
+      "name": "copilot/check-foreground-monitoring-battery",
+      "sha": "05a5d06d959ea569b7125988887a57b3facf6708"
+    },
+    {
+      "name": "copilot/current-roadmap",
+      "sha": "577a1fb380b8dc9dd8cee492cfbe6e9b32a58a6a"
+    },
+    {
+      "name": "copilot/custom-https",
+      "sha": "f799db7fa0a66190c5de459377396dcb44ec1298"
+    },
+    {
+      "name": "copilot/evaluate-mqtt-ntfy-adapter",
+      "sha": "d87dafd27609848996971c5d75ec059f2a7fbb37"
+    },
+    {
+      "name": "copilot/extract-ongoing-notification-presentation",
+      "sha": "349fea59fddf50d0b4374f1a33c6ae57ea33ed91"
+    },
+    {
+      "name": "copilot/issue-72-opt-in-remote-crash-reporting",
+      "sha": "2594adb343839d1d4e27d15f160df5c3a16b3432"
+    },
+    {
+      "name": "copilot/monitorservice",
+      "sha": "d6879f7c1bbb2e98f71fe7d6e494afb2d31f029b"
+    },
+    {
+      "name": "copilot/prepare-macos-app-with-bundled-python",
+      "sha": "4891cfc22e530b44c8d4a353d3c3ebed92874e9a"
+    },
+    {
+      "name": "integration/1.25.0",
+      "sha": "d73b42777d1262a7d2406304fbfe82a0a79de5a8"
+    }
+  ],
+  "preserved_unmerged": [
+    {
+      "name": "copilot/dispatch-validated-1-25-0-release-workflow",
+      "sha": "995ab4cf7a1c1608ed2fad4bd68d11dd5ecdcf63"
+    }
+  ]
+}
