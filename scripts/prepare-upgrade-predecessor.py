@@ -57,9 +57,18 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                 node.get('clickable') == 'true', center(node.get('bounds'))))
                 for name in fixed if (node := nodes.get('ru.tgwatch:id/' + name)) is not None)
             control_state += ';scrollable=' + str(any(n.get('scrollable') == 'true' for n in nodes.values()))
+            scroll = nodes.get('ru.tgwatch:id/mainScroll')
             def tap(name):
                 node = nodes.get('ru.tgwatch:id/' + name)
                 point = center(node.get('bounds')) if node is not None else None
+                if point and name == 'btnToggle' and scroll is not None:
+                    viewport = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', scroll.get('bounds', ''))
+                    if viewport and center(scroll.get('bounds')):
+                        _, top, _, bottom = map(int, viewport.groups())
+                        inset = (bottom - top) // 8
+                        # A clipped node may be "clickable" while its center lies under a system bar.
+                        if not top + inset <= point[1] <= bottom - inset:
+                            return False
                 if point and node.get('enabled') == 'true' and node.get('clickable') == 'true':
                     command(['shell', 'input', 'tap', *map(str, point)])
                     return True
@@ -72,7 +81,6 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                                for n in prefs.findall('boolean'))
                 if disabled:
                     started = tap('btnToggle')
-                    scroll = nodes.get('ru.tgwatch:id/mainScroll')
                     if not started and scroll is not None:
                         if any('ru.tgwatch:id/' + name in nodes for name in ('btnAdvanced', 'tvVersion')):
                             rewinding = True
@@ -81,6 +89,10 @@ def prepare(command, timeout=30, clock=time.monotonic, pause=time.sleep):
                         match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', scroll.get('bounds', ''))
                         if match and center(scroll.get('bounds')):
                             left, top, right, bottom = map(int, match.groups())
+                            toggle = nodes.get('ru.tgwatch:id/btnToggle')
+                            point = center(toggle.get('bounds')) if toggle is not None else None
+                            if point:
+                                rewinding = point[1] < (top + bottom) // 2
                             x = str((left + right) // 2)
                             # Overlapping, slow steps keep every row observable instead of flinging past it.
                             start, end = top + (bottom - top) * 3 // 4, top + (bottom - top) // 4

@@ -1,13 +1,36 @@
 # F-Droid packaging candidate
 
-`metadata/ru.tgwatch.yml` currently points to the disabled phone-only 1.24.1
-candidate, code1024001, tag `v1.24.1`; its recipe has not been validated for that
-version. The last exact-tag local verification recorded below applies to 1.20.1,
-code1020001, source `4b2aba4d1c87606ed482752cf027c85e5896dece`, and is not evidence
-for 1.24.1. Separate 1.24.1 attempts and their outcomes are recorded in
-[verification-1.24.1.json](distribution/verification-1.24.1.json). The separate
-Wear application is not included. Neither candidate has been submitted to or
-accepted by the catalog.
+`metadata/ru.tgwatch.yml` points to the disabled phone-only 1.25.1 candidate,
+code1025001, tag `v1.25.1`. No catalog submission or acceptance is implied.
+The Wear application is separate and is not included in this recipe.
+
+## Current candidate 1.25.1
+
+Local pre-tag `readmeta` and `lint ru.tgwatch` passed with fdroidserver2.4.5
+in isolated staging with the pinned official category definitions and their11 icons.
+This validates metadata only; it is not an exact-tag build. See
+[verification-1.25.1.json](distribution/verification-1.25.1.json).
+
+The recipe stays disabled and both update modes stay `None`. Exact-tag validation
+requires the published tag; historical 1.20.1 or 1.24.1 results do not establish
+reproducibility for this candidate.
+
+The manual [F-Droid verification workflow](../.github/workflows/fdroid-verify.yml)
+uses a dedicated hash-locked fdroidserver2.4.5/apksigcopier1.1.1 environment. It
+retains independent and normal recipe unsigned outputs, checks byte equality,
+then compares both payloads with the signed published APK. Normal scanning stays
+enabled; only the temporary staging recipe has its `disable` field removed.
+Official category definitions are pinned by commit and checksum. The workflow
+uploads its actual evidence even on failure and never submits to the catalog.
+
+```sh
+gh workflow run fdroid-verify.yml --ref main -f tag=v1.25.1
+```
+
+A workflow definition is not proof of a successful build. Inspect the exact run's
+`evidence.json`, retained APKs and source revision before making that claim.
+The previous version's distinct outcomes remain in
+[verification-1.24.1.json](distribution/verification-1.24.1.json).
 
 ## Candidate v1.24.1 — validation status
 

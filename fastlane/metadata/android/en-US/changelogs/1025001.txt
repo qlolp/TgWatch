@@ -1,0 +1,1 @@
+Lower memory use when retaining large histories. Correct localized Telegram profile labels. Stricter ADB reboot deadlines and a real TLS MQTT broker gate in CI. Existing signing key and in-place updates are preserved.

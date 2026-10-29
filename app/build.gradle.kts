@@ -115,3 +115,42 @@ tasks.register<Test>("targetBackupHeapTest") {
     systemProperty("tgwatch.backup.heap.limit", 128L * 1024 * 1024)
     filter { includeTestsMatching("ru.tgwatch.TargetBackupCodecTest.maximumBackupFits128MiB") }
 }
+
+// Canonical 65k retention must remain cheap even when the history cache is invalidated.
+tasks.register<Test>("historyRetentionHeapTest") {
+    group = "verification"
+    description = "Verify bounded 65k history retention in a 64 MiB JVM"
+    dependsOn("compileDebugUnitTestSources")
+    val unit = tasks.named<Test>("testDebugUnitTest").get()
+    testClassesDirs = unit.testClassesDirs
+    classpath = unit.classpath
+    maxHeapSize = "64m"
+    maxParallelForks = 1
+    filter {
+        includeTestsMatching("ru.tgwatch.TimelineRetentionTest")
+        includeTestsMatching("ru.tgwatch.HistoryPreparationAllocationTest")
+    }
+}
+
+// Ordinary unit tests stay offline. This fork requires the disposable TLS/auth broker fixture.
+tasks.withType<Test>().configureEach {
+    if (name != "mqttTlsIntegrationTest") exclude("**/MqttTlsIntegrationTest*")
+}
+tasks.register<Test>("mqttTlsIntegrationTest") {
+    group = "verification"
+    description = "Exercise production MQTT TLS against an actual authenticated Mosquitto broker"
+    dependsOn("compileDebugUnitTestSources")
+    val unit = tasks.named<Test>("testDebugUnitTest").get()
+    testClassesDirs = unit.testClassesDirs
+    classpath = unit.classpath
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    filter { includeTestsMatching("ru.tgwatch.MqttTlsIntegrationTest") }
+    doFirst {
+        val fixture = providers.environmentVariable("TGWATCH_MQTT_FIXTURE").orNull
+        require(!fixture.isNullOrBlank()) { "Run scripts/test-mqtt-tls.sh to create the real TLS broker fixture" }
+        systemProperty("javax.net.ssl.trustStore", file("$fixture/truststore.jks").absolutePath)
+        systemProperty("javax.net.ssl.trustStorePassword", "fixture-password")
+        systemProperty("javax.net.ssl.trustStoreType", "JKS")
+    }
+}

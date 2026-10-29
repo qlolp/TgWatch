@@ -1,0 +1,46 @@
+name: F-Droid exact-tag verification
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published release tag (for example v1.25.1)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  fdroid:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Install pinned Android SDKs
+        run: bash scripts/ensure-android-sdk.sh
+      - name: Install locked F-Droid tools in a dedicated environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tgwatch-fdroid-tools"
+          "$RUNNER_TEMP/tgwatch-fdroid-tools/bin/python" scripts/lock-requirements.py --check scripts/requirements-fdroid.txt scripts/requirements-fdroid.lock
+          "$RUNNER_TEMP/tgwatch-fdroid-tools/bin/python" -m pip install --require-hashes -r scripts/requirements-fdroid.lock
+          echo "$RUNNER_TEMP/tgwatch-fdroid-tools/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/build-tools/37.0.0" >> "$GITHUB_PATH"
+      - name: Normal recipe, independent build and published payload comparison
+        env:
+          TGWATCH_FDROID_TAG: ${{ inputs.tag }}
+          GRADLE_USER_HOME: ${{ runner.temp }}/tgwatch-fdroid-gradle
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify-fdroid-candidate.py --tag "$TGWATCH_FDROID_TAG" --out build/fdroid-exact-tag
+      - name: Keep actual evidence and unsigned outputs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fdroid-exact-tag-${{ github.run_id }}
+          path: build/fdroid-exact-tag/
+          if-no-files-found: error

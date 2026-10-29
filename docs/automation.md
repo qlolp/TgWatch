@@ -363,3 +363,14 @@ shared clocks. Existing JSON v1 users can keep the
 [event-only example](examples/home-assistant/tgwatch-events.yaml), which never
 claims continuous availability. Executable fixtures render the v2 package's Jinja
 templates/actions and exercise expiry/replay; they do not run a full HA server.
+
+## Real MQTT TLS integration verification
+
+`bash scripts/test-mqtt-tls.sh` runs the dedicated host-JVM broker tests. It needs
+Docker, OpenSSL, keytool and the pinned Android/Gradle toolchain. The script uses
+a digest-pinned Mosquitto2.0.22 container bound to localhost, disposable credentials,
+a CA trusted only by the test JVM, and an independent subscriber. The mandatory
+`mqtt-tls` CI job verifies PUBACK, the exact received canary, rejected CA/hostname
+and bad-password CONNACK. Normal unit tests stay offline. No broker credentials,
+CA or keys are added to the application, and fixture files/containers are removed
+on exit. Actual JUnit and sanitized broker evidence are kept as CI artifacts.
