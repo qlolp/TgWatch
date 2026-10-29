@@ -49,8 +49,17 @@ for port in 8883 8884; do
   ca=trusted; [[ "$port" == 8884 ]] && ca=untrusted
   ready=false
   for attempt in {1..20}; do
-    if docker exec "$container" mosquitto_pub -h localhost -p "$port" --cafile "/fixture/$ca-ca.crt" \
-      -u canary -P fixture-password -t tgwatch/ci/readiness -m ready -q 1 -W 2; then ready=true; break; fi
+    if python3 - "$container" "$port" "$ca" <<'READY'
+import subprocess, sys
+try:
+    result = subprocess.run(['docker', 'exec', sys.argv[1], 'mosquitto_pub', '-h', 'localhost',
+        '-p', sys.argv[2], '--cafile', '/fixture/' + sys.argv[3] + '-ca.crt', '-u', 'canary',
+        '-P', 'fixture-password', '-t', 'tgwatch/ci/readiness', '-m', 'ready', '-q', '1'], timeout=3)
+except subprocess.TimeoutExpired:
+    raise SystemExit(1)
+raise SystemExit(result.returncode)
+READY
+    then ready=true; break; fi
     sleep .5
   done
   [[ "$ready" == true ]] || { echo 'TLS fixture did not become ready' >&2; exit 1; }
