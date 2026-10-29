@@ -14,16 +14,19 @@ internal class IncidentGrouping {
     private var firstAt = 0L
 
     fun outage(id: TargetId, at: Long, enabled: Boolean): Decision {
-        if (!enabled) {
+        if (enabled) {
+            if (active.isNotEmpty() && (at < firstAt || at - firstAt > WINDOW_MS)) reset()
+            if (active.isEmpty()) firstAt = at
+            active[id] = at
+        } else {
             clear(id)
-            return Decision(postIndividual = true)
         }
-        if (active.isNotEmpty() && (at < firstAt || at - firstAt > WINDOW_MS)) reset()
-        if (active.isEmpty()) firstAt = at
-        active[id] = at
         val members = active.keys.sortedBy { it.ordinal }
-        if (members.size < 2) return Decision(postIndividual = true)
-        return Decision(postIndividual = false, cancelIndividuals = members, group = members)
+        return if (enabled && members.size >= 2) {
+            Decision(postIndividual = false, cancelIndividuals = members, group = members)
+        } else {
+            Decision(postIndividual = true)
+        }
     }
 
     fun clear(id: TargetId): Update {

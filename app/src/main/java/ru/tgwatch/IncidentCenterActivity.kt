@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit
 class IncidentCenterActivity : Activity() {
     companion object {
         private const val DAYS = "history_days"
+        private const val DAY = 1
+        private const val WEEK = 7
         private const val MINUTE_MS = 60_000L
         private const val TICK_MS = 1000L
         fun open(ctx: Context, days: Int = 1) {
@@ -50,7 +52,7 @@ class IncidentCenterActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_incident_center)
         ScreenInsets.apply(this, findViewById(R.id.incidentCenterRoot))
-        days = if ((savedInstanceState?.getInt(DAYS) ?: intent.getIntExtra(DAYS, 1)) == 7) 7 else 1
+        days = if ((savedInstanceState?.getInt(DAYS) ?: intent.getIntExtra(DAYS, DAY)) == WEEK) WEEK else DAY
         val app = applicationContext
         loader = LatestRequestLoader(worker, Executor { ui.post(it) },
             { key -> IncidentCenterLoader.load(app, key) }, ::show)
@@ -64,7 +66,7 @@ class IncidentCenterActivity : Activity() {
         period = findViewById(R.id.incidentCenterPeriod)
         updatePeriod()
         period.setOnClickListener {
-            days = if (days == 1) 7 else 1
+            days = if (days == DAY) WEEK else DAY
             updatePeriod()
             loader.invalidate()
             requested = null

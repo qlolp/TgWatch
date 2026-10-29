@@ -22,13 +22,15 @@ internal data class IncidentCenterDisplay(
 
 internal object IncidentCenterLoader {
     private const val MINUTE_MS = 60_000L
+    private const val DAY = 1
+    private const val WEEK = 7
 
     fun key(ctx: Context, days: Int, now: Long): IncidentCenterKey {
         val ids = TargetId.entries.filter { TargetPreferences.definition(ctx, it).enabled }
         return IncidentCenterKey(ids, ids.associateWith(TargetHistoryPresentation::version),
             ids.associateWith { TargetPreferences.endpointRevision(ctx, it) },
             TargetPersistence.active?.generationId, RegionalRepository.generation(ctx), now / MINUTE_MS,
-            days.coerceIn(1, 7))
+            days.coerceIn(DAY, WEEK))
     }
 
     fun load(ctx: Context, key: IncidentCenterKey): IncidentCenterDisplay {
