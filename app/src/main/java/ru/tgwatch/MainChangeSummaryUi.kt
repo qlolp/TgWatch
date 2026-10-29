@@ -26,6 +26,7 @@ internal class MainChangeSummaryUi(private val activity: Activity, share: (Strin
         { key: ChangeSummaryDisplayKey -> ChangeSummaryLoader.load(app, key) }, ::show)
 
     init {
+        IncidentCenterMainUi.bind(activity)
         shareButton.isEnabled = false
         shareButton.setOnClickListener {
             val text = summary.text?.toString().orEmpty()

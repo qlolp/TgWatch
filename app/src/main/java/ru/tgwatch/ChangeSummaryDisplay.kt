@@ -32,12 +32,15 @@ internal object ChangeSummaryLoader {
         val country = ChangeSummary.countryChanges(journal, from, now)
         val network = ChangeSummary.networkChanges(journal, from, now)
         val geo = ChangeSummary.geoBlocks(journal, from, now)
+        val stats = key.ids.associateWith { id ->
+            (TargetHistories.stats(ctx, id, 1, now) as? HistoryRead.Ready)?.value
+        }
         val targets = key.ids.map { id ->
-            val stats = (TargetHistories.stats(ctx, id, 1, now) as? HistoryRead.Ready)?.value
+            val value = stats[id]
             val status = TargetStateStore.current(ctx, id).status
-            if (stats == null) ChangeSummary.TargetFact(id, status, 0)
-            else ChangeSummary.TargetFact(id, status, stats.outageCount, stats.lastOutageOngoing,
-                stats.lastOutageMs)
+            if (value == null) ChangeSummary.TargetFact(id, status, 0)
+            else ChangeSummary.TargetFact(id, status, value.outageCount, value.lastOutageOngoing,
+                value.lastOutageMs)
         }
         // Coincidence uses the primary Telegram episode list; other targets stay in the status lines.
         val outages = if (TargetId.TELEGRAM in key.ids) {
@@ -45,9 +48,13 @@ internal object ChangeSummaryLoader {
                 ?.filter { it.startedAt in from..now }.orEmpty()
         } else emptyList()
         val narrative = ChangeSummary.text(ChangeSummary.Input(now, targets, country, network, geo, outages))
-        val resolved = narrative?.let {
+        val coverage = key.ids.mapNotNull { id -> stats[id]?.let { value ->
+            IncidentCenter.TargetCoverage(id, ObservationCoverage.from(value, ChangeSummary.WINDOW_MS))
+        } }
+        val gaps = ObservationCoverageText.gaps(ctx, coverage).ifBlank { null }
+        val resolved = listOfNotNull(narrative?.let {
             AndroidText.resolve(ctx, textLines(listOf(it.title, it.body)))
-        }
-        return ChangeSummaryDisplay(key, resolved)
+        } ?: gaps?.let { ctx.getString(R.string.change_summary_title) }, gaps).joinToString("\n")
+        return ChangeSummaryDisplay(key, resolved.ifBlank { null })
     }
 }
