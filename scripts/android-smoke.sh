@@ -179,9 +179,9 @@ def boolean(arguments):
     result = value(arguments)
     return result if result in ('true', 'false') else 'unknown'
 emulation = boolean(['getprop', 'persist.sys.emulate_fbe'])
-on_disk = boolean(['cat', '/data/property/persist.sys.emulate_fbe']) if storage != 'native' else 'unknown'
+on_disk = boolean(['cat', '/data/property/persist.sys.emulate_fbe']) if storage == 'emulated' else 'unknown'
 installed = value(['pm', 'path', 'ru.tgwatch']).startswith('package:')
-print(f'::notice title=PIN reboot state::FBE={storage}, users={",".join(states) or "unknown"}, '
+print(f'::notice title=PIN reboot state::FBE={storage}, states={",".join(states) or "unknown"}, '
       f'lockscreen_disabled={disabled}, FBE_property={emulation}, FBE_disk={on_disk}, app_installed={installed}')
 PY_BOOT_STATE
 adb shell dumpsys user | grep -q RUNNING_LOCKED
@@ -222,6 +222,19 @@ if [[ "$api_level" -eq 35 ]]; then
   fi
   await_observation 0
   check_crashes
+fi
+# API26/29: repeat the sensitive 65k persistence case and the new bounded-center
+# preparation on the same real emulator. Each iteration must produce fresh JUnit evidence.
+if [[ "$api_level" -le 29 ]]; then
+  for iteration in 1 2 3; do
+    echo "::notice title=Android incident regression::API $api_level, iteration $iteration of 3"
+    bash ./gradlew :app:connectedDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace \
+      -Pandroid.testInstrumentationRunnerArguments.class='ru.tgwatch.HistoryPersistenceIntegrationTest#nextRecordKeepsBothMemoryAndDiskWithinTheRowLimit,ru.tgwatch.IncidentCenterPerformanceIntegrationTest'
+    destination="app/build/outputs/androidTest-results/regression-$iteration"
+    rm -rf "$destination"
+    cp -a app/build/outputs/androidTest-results/connected "$destination"
+    python3 scripts/report-android-tests.py "$destination"
+  done
 fi
 # After all assertions, capture the real main screen for documentation.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
