@@ -11,24 +11,26 @@ import org.junit.runner.RunWith
 class IncidentCenterPerformanceIntegrationTest {
     @Test fun sixtyFiveThousandRowsStayBoundedAcrossRepeatedCenterPreparation() {
         val now = 65_000_000L
+        val from = now - 86_400_000L
         val rows = List(65_000) { index ->
             val at = now - 65_000L + index
             Observation(at, at + 1, if (index % 997 == 0) "TG_DOWN" else "OK", 20)
         }
         val started = SystemClock.elapsedRealtime()
+        val episodes = OutageEpisodes.derive(rows, from, now)
+        val stats = Timeline.stats(rows, from, now)
+        assertEquals(65_000, stats.checks)
         repeat(5) {
-            val episodes = TargetId.entries.associateWith { id ->
-                OutageEpisodes.derive(rows, now - 86_400_000L, now).map {
-                    it.copy(clockEpoch = id.ordinal.toLong())
-                }
+            val byTarget = TargetId.entries.associateWith { id ->
+                episodes.map { it.copy(clockEpoch = id.ordinal.toLong()) }
             }
-            val stats = TargetId.entries.associateWith { Timeline.stats(rows, now - 86_400_000L, now) }
-            val snapshot = IncidentCenter.build(episodes, emptyList(), stats, now - 86_400_000L, now)
+            val allStats = TargetId.entries.associateWith { stats }
+            val snapshot = IncidentCenter.build(byTarget, emptyList(), allStats, from, now)
             assertTrue(snapshot.events.size <= IncidentCenter.MAX_EVENTS)
             assertEquals(TargetId.entries.size, snapshot.coverage.size)
         }
         val elapsed = SystemClock.elapsedRealtime() - started
-        println("ANDROID_INCIDENT_CENTER_65K fiveIterationsMs=$elapsed")
+        println("ANDROID_INCIDENT_CENTER_65K preparationAndFiveBuildsMs=$elapsed")
         assertTrue("Incident-center preparation took $elapsed ms", elapsed < 20_000L)
     }
 }
