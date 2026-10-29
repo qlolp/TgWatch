@@ -10,12 +10,13 @@ data class ObservationCoverage(
     val complete: Boolean get() = observedMs > 0L && unknownMs == 0L
 
     companion object {
+        private const val PERCENT = 100.0
         fun from(stats: TimeStats, windowMs: Long): ObservationCoverage {
             require(windowMs >= 0L)
             val assessed = listOf(stats.okMs, stats.downMs, stats.partialMs)
                 .fold(0L, ::saturatingAdd)
             val observed = saturatingAdd(assessed, stats.offlineMs)
-            val percent = if (windowMs == 0L) null else observed.coerceIn(0L, windowMs) * 100.0 / windowMs
+            val percent = if (windowMs == 0L) null else observed.coerceIn(0L, windowMs) * PERCENT / windowMs
             return ObservationCoverage(observed, stats.unknownMs.coerceAtLeast(0L), windowMs, percent)
         }
 
