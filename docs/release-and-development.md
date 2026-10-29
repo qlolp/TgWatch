@@ -72,3 +72,13 @@ debug-ключом ранее опубликованного APK.
 наблюдения, настройки и появление новых записей. В отдельном сценарии проверяется обновление
 последнего стабильного опубликованного предшественника с проверенными checksum и версией APK.
 Данные очищаются только между независимыми сценариями. Закрытый ключ остаётся в Secrets.
+
+## Reliability gates from 1.25.1
+
+`historyRetentionHeapTest` exercises65k rows in a separate64MiB JVM, while the
+original device integration row-limit test stays in the Android matrix. Host
+allocation measurements are not a claim about device heap use. `mqtt-tls` uses
+an actual isolated TLS/authenticated broker and an independent subscriber and is
+a publication prerequisite alongside build, Android and Wear checks. F-Droid
+exact-tag verification is a separate manual read-only workflow; its existence
+does not establish reproducibility or catalog acceptance.

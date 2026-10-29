@@ -1,0 +1,40 @@
+{
+  "candidate": "1.25.1",
+  "date": "2026-10-29",
+  "physicalAndroid": {
+    "status": "blocked",
+    "reason": "Local adb devices inventory timed out after20s; device availability and OEM/battery measurements unconfirmed."
+  },
+  "appleNotarization": {
+    "status": "blocked",
+    "validDeveloperIdIdentities": 0,
+    "configuredSigningIdentity": false,
+    "configuredNotaryKey": false,
+    "configuredNotaryKeyId": false,
+    "configuredNotaryIssuer": false,
+    "reason": "No Developer ID identity or explicit notary credentials available."
+  },
+  "fdroid": {
+    "status": "pendingExactTag",
+    "recipeDisabled": true,
+    "catalogSubmitted": false,
+    "catalogAccepted": false,
+    "workflow": "fdroid-verify.yml",
+    "checks": {
+      "readmeta": {
+        "status": "passed",
+        "context": "Local pre-tag candidate metadata, fdroidserver2.4.5; not an exact-tag build."
+      },
+      "lint": {
+        "status": "passed",
+        "context": "Isolated staging with official categories and11 referenced icons at pinned fdroiddata commit5d2099db6488d9e2c5f74a9882e32138f5760616; not a full fdroiddata checkout."
+      },
+      "normalRecipeBuild": {
+        "status": "pendingExactTag"
+      },
+      "productionPayloadComparison": {
+        "status": "pendingExactTag"
+      }
+    }
+  }
+}

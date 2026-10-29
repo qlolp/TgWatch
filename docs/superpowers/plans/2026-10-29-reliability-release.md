@@ -34,9 +34,9 @@
 ### Task 2: Deterministic ADB timing
 **Files:** `scripts/adb-readiness.py`, `scripts/tests/test_adb_readiness.py`, direct-boot tests only if the same investigated boundary requires it.
 **Interfaces:** ensure_ready keeps positional API, optional keyword clock/pause/runner default to real monotonic/sleep/subprocess; CLI inputs unchanged.
-- [ ] Write controlled-clock tests of old/empty/new/changing boot, per-command and overall deadlines. Show RED for unavailable injection, retain actual CLI tests.
-- [ ] Inject dependencies at subprocess boundary; move sub-second policy assertions to deterministic time, keep real CLI rejection and hung-process deadline. Mutation ignoring boot-id must fail tests.
-- [ ] Run full Python suite, expected zero failures; commit.
+- [x] Write controlled-clock tests of old/empty/new/changing boot, per-command and overall deadlines. Show RED for unavailable injection, retain actual CLI tests.
+- [x] Inject dependencies at subprocess boundary; move sub-second policy assertions to deterministic time, keep real CLI rejection and hung-process deadline. Mutation ignoring boot-id must fail tests.
+- [x] Run full Python suite, expected zero failures; commit.
 
 ### Task 3: Localized profile label
 **Files:** `TargetLegacySettingsUi.kt`, native text/settings integration tests.
