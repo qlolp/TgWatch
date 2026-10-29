@@ -2,16 +2,16 @@
 
 ## Сверка 29 октября 2026 года
 
-На момент сверки `main` и опубликованный `v1.25.0` указывают на
-[`ce8f178`](https://github.com/qlolp/TgWatch/commit/ce8f1789dc1110eeff27e8bae7011cde268c7b70).
-[Релизный workflow](https://github.com/qlolp/TgWatch/actions/runs/40803849297) прошёл все восемь заданий;
-[Mac CI](https://github.com/qlolp/TgWatch/actions/runs/40743115631) — Intel и Apple Silicon.
-Обновления проверены с production APK 1.10.47 и 1.24.1 с прежним сертификатом.
+На момент сверки вершина `main` —
+[`5baeb0e`](https://github.com/qlolp/TgWatch/commit/5baeb0e) (после 1.25.1 и F-Droid SDK37 verifier).
+Опубликованный `v1.25.1` и [exact-tag F-Droid проверка](https://github.com/qlolp/TgWatch/actions/runs/40830515811)
+зафиксированы в [roadmap](../development-roadmap.md) и [verification-1.25.1.json](../distribution/verification-1.25.1.json).
+Исходники 1.26.0 (сводка смены) готовятся отдельной веткой до слияния и тега.
 
-Перед этим [push CI того же SHA](https://github.com/qlolp/TgWatch/actions/runs/40743114973) упал
-на API29: `HistoryPersistenceIntegrationTest.nextRecordKeepsBothMemoryAndDiskWithinTheRowLimit`
-получил `OutOfMemoryError`. Успешный последующий прогон не устанавливает причину первого
-падения; исследование пиков памяти остаётся в [приоритетах](../development-roadmap.md).
+Исторически перед 1.25.0 [push CI](https://github.com/qlolp/TgWatch/actions/runs/40743114973) упал
+на API29 с `OutOfMemoryError` при лимите строк истории; последующий успешный прогон
+не устанавливает причину. Измерения выделений для канонизации вошли в 1.25.1;
+физическая OEM/battery-матрица остаётся внешней.
 
 ## Где находится актуальная информация
 
@@ -26,6 +26,8 @@
 [merged-branches.json](merged-branches.json) сохраняет имена и полные SHA веток,
 чьи вершины уже входят в зафиксированный `main`. Поэтому удаление такого указателя
 не удаляет коммиты: они остаются достижимы из `main` и могут быть использованы для восстановления ветки.
+Сверка 29 октября: `integrated_main` указывает на `5baeb0e`; remote-указатели из манифеста
+уже сняты (GONE) — это ожидаемо после архивации, коммиты остаются в истории `main`.
 
 Перед удалением нужно заново проверить текущую вершину remote и её вхождение в `main`.
 Удаление выполняется с compare-and-delete lease по сохранённому SHA; новая работа в ветке

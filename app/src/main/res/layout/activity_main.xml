@@ -263,6 +263,24 @@
             <TextView android:id="@+id/tvMonitorHealth" style="@style/Body" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/changeSummaryCard"
+            style="@style/Card"
+            android:visibility="gone">
+            <TextView style="@style/CardTitle" android:text="@string/change_summary_title" />
+            <TextView
+                android:id="@+id/tvChangeSummary"
+                style="@style/Body"
+                android:layout_marginTop="8dp"
+                android:text="@string/change_summary_empty" />
+            <Button
+                android:id="@+id/btnShareChangeSummary"
+                style="@style/ButtonText"
+                android:layout_marginStart="-12dp"
+                android:layout_marginTop="4dp"
+                android:text="@string/share_change_summary" />
+        </LinearLayout>
+
         <LinearLayout style="@style/Card">
 
             <TextView

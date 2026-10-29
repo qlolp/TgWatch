@@ -31,6 +31,9 @@
     <string name="period_week">Период: неделя</string>
     <string name="history_empty">Пока нет данных — подожди несколько проверок.</string>
     <string name="share_summary">Поделиться сводкой</string>
+    <string name="change_summary_title">Что изменилось</string>
+    <string name="change_summary_empty">За сутки заметных изменений нет.</string>
+    <string name="share_change_summary">Поделиться сводкой смены</string>
     <string name="save_csv">Сохранить CSV</string>
     <string name="import_csv">Импортировать CSV</string>
     <string name="encrypted_backup">Зашифрованный бэкап</string>

@@ -31,6 +31,9 @@
     <string name="period_week">Period: week</string>
     <string name="history_empty">No data yet — wait for a few checks.</string>
     <string name="share_summary">Share summary</string>
+    <string name="change_summary_title">What changed</string>
+    <string name="change_summary_empty">No notable changes in the last 24 hours.</string>
+    <string name="share_change_summary">Share what changed</string>
     <string name="save_csv">Save CSV</string>
     <string name="import_csv">Import CSV</string>
     <string name="encrypted_backup">Encrypted backup</string>
