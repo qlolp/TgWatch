@@ -6,8 +6,11 @@ TgWatch monitors Telegram reachability locally on Android 8.0 and later. It need
 no Telegram account, phone number or access to messages. The interface supports
 English and Russian; Android 13+ also provides a per-app language setting.
 
-Version 1.24.1 updates the Android build to SDK 37, AGP 9.2.1 and Gradle 9.4.1,
-retaining Android 8.0+ and targetSdk 36. See the [1.24.1 notes](releases/1.24.1.md).
+Release [1.25.0](releases/1.25.0.md) adds private HTTP/body/JSON/header health criteria,
+up to five independent webhook recipients, ntfy and native MQTT over TLS, opt-in crash
+report delivery to your own HTTPS collector and bundled Python in the Mac app.
+Android 8.0+ and targetSdk 36 remain supported; builds use SDK 37.
+See the [documentation index](README.md) and [current roadmap](development-roadmap.md).
 
 Optional independent targets cover Matrix, WhatsApp Web and up to five custom HTTPS
 services, each with its own history, intervals and alerts. Version 1.24.0 adds the extra
@@ -24,8 +27,11 @@ An opt-in, one-shot watch can notify after two fresh public responses at least
 Public-site access and country information do not certify account features or an
 IP-only restriction. Regional records remain outside portable backups and diagnostics.
 See the [regional-services guide](regional-services.md), [native Mac app](macos.md)
-and [release notes](releases/1.23.0.md). Mac builds require macOS13+ and Python3.10+;
-local universal builds are ad-hoc signed, without Developer ID or notarization.
+and [release notes](releases/1.23.0.md). The Mac app requires macOS13+ and bundles
+pinned Python runtimes for Intel and Apple Silicon; a separate Python installation
+is not required. Default local builds are ad-hoc signed. Developer ID signing and
+notarization are supported when Apple credentials are explicitly configured; their
+availability in the builder does not certify a distributed build.
 
 ## Reading the status
 
@@ -44,8 +50,8 @@ session, or prove that messages can be delivered. A system VPN affects the probe
 Telegram's own configured proxy does not.
 
 Each of the five production DCs has IPv4 and IPv6 probes. Either address family
-can establish the MTProto signal. A bounded pool admits all thirteen primary
-requests; optional informational checks retain their separate workers.
+can establish the MTProto signal. Bounded primary workers share deadlines and
+cancellation; optional informational checks retain their separate workers.
 
 ## Monitoring and history
 
