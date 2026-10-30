@@ -82,3 +82,18 @@ an actual isolated TLS/authenticated broker and an independent subscriber and is
 a publication prerequisite alongside build, Android and Wear checks. F-Droid
 exact-tag verification is a separate manual read-only workflow; its existence
 does not establish reproducibility or catalog acceptance.
+
+## Candidate 1.27.0 — incident evidence and provenance boundary
+
+The incident-center JVM and Android checks include a bounded 65k-row preparation
+case. On API 26/29 the existing smoke script repeats the history row-limit and
+center-preparation tests three times and stores each JUnit result under
+`app/build/reports/androidTests/regression-*`; these are emulator checks, not
+physical-device performance or OEM power evidence.
+
+Release-file Artifact Attestations are not active in this candidate. The intended
+workflow must verify the published checksum files before attesting exactly the
+release assets, use a commit-pinned `actions/attest-build-provenance`, and grant
+only the required `id-token: write` and `attestations: write` permissions. The
+current GitHub connection rejected workflow edits with 403 insufficient scope,
+so no workflow was committed or run and no provenance success is claimed.

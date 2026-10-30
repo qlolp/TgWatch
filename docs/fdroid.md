@@ -1,10 +1,11 @@
 # F-Droid packaging candidate
 
 `metadata/ru.tgwatch.yml` tracks the disabled phone-only source candidate
-(`version.properties`); currently 1.26.0 / code1026000 / tag `v1.26.0`.
+(`version.properties`); currently 1.27.0 / code1027000 / tag `v1.27.0`.
 No catalog submission or acceptance is implied. The Wear application is separate
 and is not included in this recipe. The last published exact-tag verification
-remains 1.25.1 below until a 1.26.0 tag is published and re-verified.
+remains 1.25.1 below. No exact-tag verification for 1.26.0 or the 1.27.0 candidate
+is claimed; a future tag requires its own separate verification run.
 
 ## Last verified published candidate 1.25.1 — exact-tag verification passed
 

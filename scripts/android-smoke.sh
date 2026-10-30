@@ -55,11 +55,11 @@ if [[ "$api_level" -ge 33 ]]; then
   # instrumentation needs the exact current APKs, while -r preserves app data.
   adb install -r app/build/outputs/apk/debug/app-debug.apk
   adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+  permission_status=0
   permission_log=app/build/reports/androidTests/notification-permission-cycle.txt
   adb shell am force-stop ru.tgwatch
   adb shell pm revoke ru.tgwatch android.permission.POST_NOTIFICATIONS
   adb shell pm set-permission-flags ru.tgwatch android.permission.POST_NOTIFICATIONS user-set user-fixed
-  permission_status=0
   adb shell am instrument -w -r -e class \
     'ru.tgwatch.EventNotificationTest#disabledAppNotificationsReportNoSummaryDelivery,ru.tgwatch.OnboardingFlowTest#permanentlyDeniedNotificationActionReturnsFromSettings' \
     ru.tgwatch.test/androidx.test.runner.AndroidJUnitRunner > "$permission_log" || permission_status=$?
@@ -223,7 +223,7 @@ if [[ "$api_level" -eq 35 ]]; then
   await_observation 0
   check_crashes
 fi
-# After all assertions, capture the real main screen for documentation.
+# Capture the real main screen before additional regressions change foreground state.
 adb shell dumpsys deviceidle whitelist +ru.tgwatch
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
@@ -237,3 +237,17 @@ adb exec-out screencap -p > app/build/reports/androidTests/ui-screenshots/main.p
 adb shell dumpsys window | grep -F mCurrentFocus
 adb shell dumpsys window | grep -F mCurrentFocus | grep -Fq ru.tgwatch
 rm -rf "$legacy_dir"
+# API26/29: repeat the sensitive 65k persistence case and the new bounded-center
+# preparation on the same real emulator. Each iteration must produce fresh JUnit evidence.
+if [[ "$api_level" -le 29 ]]; then
+  for iteration in 1 2 3; do
+    echo "::notice title=Android incident regression::API $api_level, iteration $iteration of 3"
+    rm -rf app/build/outputs/androidTest-results/connected
+    bash ./gradlew :app:connectedDebugAndroidTest --rerun :app:assembleDebug --no-daemon --stacktrace \
+      -Pandroid.testInstrumentationRunnerArguments.class='ru.tgwatch.HistoryPersistenceIntegrationTest#nextRecordKeepsBothMemoryAndDiskWithinTheRowLimit,ru.tgwatch.IncidentCenterPerformanceIntegrationTest'
+    destination="app/build/reports/androidTests/regression-$iteration"
+    rm -rf "$destination"
+    cp -a app/build/outputs/androidTest-results/connected "$destination"
+    python3 scripts/report-android-tests.py "$destination"
+  done
+fi

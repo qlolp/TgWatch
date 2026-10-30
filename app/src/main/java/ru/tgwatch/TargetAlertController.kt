@@ -84,8 +84,12 @@ internal class TargetAlertController(private val ctx: Context, private val manag
     @Synchronized fun forget(id: TargetId) {
         latest.remove(id)
         slow.forget(id)
-        manager.cancel(TargetEventNotifications.id(id, "outage"))
-        manager.cancel(TargetEventNotifications.id(id, "partial"))
+        val existing = notifications[id]
+        if (existing == null) {
+            IncidentAlertCoordinator.get(ctx, manager).clear(id)
+            manager.cancel(TargetEventNotifications.id(id, "outage"))
+            manager.cancel(TargetEventNotifications.id(id, "partial"))
+        } else existing.clearOutage()
         manager.cancel(TargetEventNotifications.id(id, "recovery"))
     }
 

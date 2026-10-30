@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <Switch android:id="@+id/swGroupIncidents"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:layout_marginTop="8dp"
+        android:text="@string/group_incident_alerts"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
+    <TextView style="@style/Body"
+        android:text="@string/group_incident_alerts_hint"
+        android:textSize="12sp" />
+</LinearLayout>

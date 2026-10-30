@@ -75,6 +75,10 @@
         <activity
             android:name=".IncidentActivity"
             android:exported="false" />
+        <activity
+            android:name=".IncidentCenterActivity"
+            android:label="@string/incident_center_title"
+            android:exported="false" />
         <receiver
             android:name=".AutomationReceiver"
             android:directBootAware="false"

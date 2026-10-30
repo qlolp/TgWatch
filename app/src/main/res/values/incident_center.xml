@@ -1,0 +1,18 @@
+<resources>
+    <string name="incident_center_title">Incident center</string>
+    <string name="incident_center_hint">A shared timeline of observed target, network, exit-country and public-site events. Events close in time do not establish causation. Use a fresh check or an A/B comparison to test a hypothesis.</string>
+    <string name="incident_center_empty">No observed incidents or regional events in this period.</string>
+    <string name="incident_center_target_details">Target incidents</string>
+    <string name="incident_center_check_queued">Fresh check queued</string>
+    <string name="incident_center_check_unavailable">Start monitoring and enable this target first</string>
+    <string name="incident_center_network">Connection context changed: %1$s\n%2$s</string>
+    <string name="incident_center_country">Exit country observed: %1$s\n%2$s</string>
+    <string name="incident_center_geo">%1$s reported a regional restriction\n%2$s</string>
+    <string name="observation_coverage_title">Observation completeness</string>
+    <string name="observation_coverage_line">%1$s: %2$s observed · %3$s without data</string>
+    <string name="incident_details">Details</string>
+    <string name="group_incident_alerts">Group related incident alerts</string>
+    <string name="group_incident_alerts_hint">Off by default. When several targets fail within two minutes, individual outage cards are replaced by one summary. Histories, webhooks and MQTT remain separate.</string>
+    <string name="incident_alert_group_title">Several targets need attention</string>
+    <string name="incident_alert_group_text">%1$d targets: %2$s\nOpen the incident center for the timeline. This does not establish a common cause.</string>
+</resources>
