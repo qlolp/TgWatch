@@ -59,3 +59,59 @@ final class MonitorLifecycleTests: XCTestCase {
         XCTAssertFalse(session.monitoring)
     }
 }
+
+private actor SlowCancellationTransport: ProbeTransport {
+    var calls = 0
+    func check(_ endpoint: ProbeEndpoint, deadline: ContinuousClock.Instant) async throws -> Bool {
+        calls += 1
+        do { try await Task.sleep(for: .seconds(30)) } catch {
+            // Model a real resource teardown that completes after Task.cancel returns.
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { continuation.resume() }
+            }
+            throw CancellationError()
+        }
+        return false
+    }
+    func count() -> Int { calls }
+}
+extension MonitorLifecycleTests {
+    @MainActor func testNetworkRestartWaitsForOldTransportCleanup() async throws {
+        let transport = SlowCancellationTransport()
+        let engine = ProbeEngine(transport: transport, endpoints: [.init(name: "test", address: "unused", group: .web)])
+        let model = MonitorSession(runner: engine)
+        model.setMonitoring(true); model.setActive(true)
+        try await Task.sleep(for: .milliseconds(20))
+        model.networkChanged(unavailable: false)
+        // Same coarse path properties again must still invalidate the epoch.
+        model.networkChanged(unavailable: false)
+        try await Task.sleep(for: .milliseconds(120))
+        let calls = await transport.count(); XCTAssertEqual(calls, 2)
+        XCTAssertTrue(model.checking)
+        model.setActive(false)
+        try await Task.sleep(for: .milliseconds(80))
+    }
+}
+private final class AdjustableClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var wallValue = Date()
+    private var instantValue = ContinuousClock.now
+    func wall() -> Date { lock.lock(); defer { lock.unlock() }; return wallValue }
+    func instant() -> ContinuousClock.Instant { lock.lock(); defer { lock.unlock() }; return instantValue }
+    func advance(wall: Double, monotonic: Double) {
+        lock.lock(); defer { lock.unlock() }
+        wallValue = wallValue.addingTimeInterval(wall); instantValue = instantValue.advanced(by: .seconds(monotonic))
+    }
+}
+extension MonitorLifecycleTests {
+    @MainActor func testWallClockRollbackCannotReviveStaleStatus() async throws {
+        let clock = AdjustableClock(), runner = SuspendedRunner()
+        let model = MonitorSession(runner: runner, now: { clock.wall() }, instant: { clock.instant() })
+        model.setActive(true); model.checkNow()
+        try await Task.sleep(for: .milliseconds(10)); await runner.finish()
+        try await Task.sleep(for: .milliseconds(10))
+        XCTAssertTrue(model.isFresh())
+        clock.advance(wall: 300, monotonic: 300); XCTAssertFalse(model.isFresh())
+        clock.advance(wall: -240, monotonic: 1); XCTAssertFalse(model.isFresh())
+    }
+}

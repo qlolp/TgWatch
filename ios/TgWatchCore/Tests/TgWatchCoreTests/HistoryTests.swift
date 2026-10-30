@@ -1,7 +1,7 @@
 import XCTest
 @testable import TgWatchCore
 final class HistoryTests: XCTestCase {
-    let now = Date(timeIntervalSince1970: 2_000_000)
+    let now = Date()
     func testFreshnessGapsAndEpochsDoNotInventUptime() {
         let entries = [HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-300), status: .ok),
                        HistoryEntry(epoch: 2, observedAt: now.addingTimeInterval(-10), status: .down)]
@@ -18,6 +18,14 @@ final class HistoryTests: XCTestCase {
         let intervals = HistoryCoverage.intervals(entries: entries, now: now.addingTimeInterval(-10))
         XCTAssertTrue(intervals.allSatisfy { $0.to >= $0.from })
         XCTAssertFalse(intervals.contains { $0.status == .ok })
+    }
+    func testExpiredHistoryIsPrunedOnLoadWithoutNewMeasurement() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let old = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-8*86400), status: .ok)
+        try JSONEncoder().encode([old]).write(to: file)
+        let values = try await HistoryStore(url: file).load()
+        XCTAssertTrue(values.isEmpty)
     }
     func testAtomicPersistenceAndRetention() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

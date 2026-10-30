@@ -50,9 +50,9 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Se
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
 }
 public enum TCPProbe {
-    public static func check(endpoint: String, nonce: Data, deadline: ContinuousClock.Instant) async throws -> Bool {
+    public static func check(endpoint: String, port: UInt16 = 443, nonce: Data, deadline: ContinuousClock.Instant) async throws -> Bool {
         let request = try MTProtoCodec.makeRequest(nonce: nonce)
-        let operation = TCPRequest(endpoint: endpoint, nonce: nonce, request: request)
+        let operation = TCPRequest(endpoint: endpoint, port: port, nonce: nonce, request: request)
         return try await withTaskCancellationHandler(operation: {
             try Task.checkCancellation()
             return try await withCheckedThrowingContinuation { operation.start($0, deadline: deadline) }
@@ -67,8 +67,8 @@ private final class TCPRequest: @unchecked Sendable {
     private var continuation: CheckedContinuation<Bool, Error>?
     private var cancelled = false
     private var sent = false
-    init(endpoint: String, nonce: Data, request: Data) {
-        connection = NWConnection(host: NWEndpoint.Host(endpoint), port: 443, using: .tcp)
+    init(endpoint: String, port: UInt16, nonce: Data, request: Data) {
+        connection = NWConnection(host: NWEndpoint.Host(endpoint), port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
         self.nonce = nonce; self.request = request
     }
     func start(_ continuation: CheckedContinuation<Bool, Error>, deadline: ContinuousClock.Instant) {

@@ -8,9 +8,9 @@ struct MonitorView: View {
                 if controller.fixtureMode { Text("TEST FIXTURE — no live measurements").foregroundStyle(.orange) }
                 Section {
                     Text("foregroundExplanation").accessibilityIdentifier("foregroundExplanation")
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
                         let snapshot = controller.session.snapshot
-                        let fresh = snapshot.map { context.date >= $0.finishedAt && context.date.timeIntervalSince($0.finishedAt) <= 120 } ?? false
+                        let fresh = controller.session.isFresh()
                         Text(LocalizedStringKey(fresh ? "status.\(snapshot!.status.rawValue)" : "noFreshData"))
                             .font(.title2).accessibilityIdentifier("status")
                         if let snapshot {

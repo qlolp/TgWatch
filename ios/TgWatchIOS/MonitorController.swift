@@ -9,7 +9,6 @@ import TgWatchCore
     let session: MonitorSession
     private let store: HistoryStore
     private let path = NWPathMonitor()
-    private var pathSignature: String?
     private var writeTask: Task<Void, Never>?
     init() {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
@@ -28,11 +27,11 @@ import TgWatchCore
         session.onChange = { [weak self] in self?.objectWillChange.send() }
         session.onObservation = { [weak self] value in self?.save(value) }
         path.pathUpdateHandler = { [weak self] value in
-            let signature = "\(value.status)-\(value.isExpensive)-\(value.isConstrained)-\(value.availableInterfaces.map { $0.name }.sorted())"
             let unavailable = value.status == .unsatisfied
             Task { @MainActor [weak self] in
-                guard let self, self.pathSignature != signature else { return }
-                self.pathSignature = signature; self.session.networkChanged(unavailable: unavailable)
+                guard let self else { return }
+                // Every delivered path update may change routing, even with identical interface names.
+                self.session.networkChanged(unavailable: unavailable)
             }
         }
         if !isFixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.ios.path")) }

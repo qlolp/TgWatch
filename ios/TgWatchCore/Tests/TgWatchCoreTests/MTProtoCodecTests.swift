@@ -3,8 +3,9 @@ import XCTest
 final class MTProtoCodecTests: XCTestCase {
     let nonce = Data(0..<16)
     // Literal resPQ from JVM MtProtoFixtures at 8932ef0. No parser computes expectations.
-    let hex = "000000000000000001000000000000004000000063241605000102030405060708090a0b0c0d0e0f28292a2b2c2d2e2f30313233343536370817ed48941a08f98100000015c4b51c01000000216be86c022bb4c3"
-    var valid: Data { Data(stride(from: 0, to: hex.count, by: 2).map { i in
+    static let hex = "000000000000000001000000000000004000000063241605000102030405060708090a0b0c0d0e0f28292a2b2c2d2e2f30313233343536370817ed48941a08f98100000015c4b51c01000000216be86c022bb4c3"
+    var valid: Data { Self.responseBytes }
+    static var responseBytes: Data { Data(stride(from: 0, to: hex.count, by: 2).map { i in
         let a = hex.index(hex.startIndex, offsetBy: i); let b = hex.index(a, offsetBy: 2)
         return UInt8(hex[a..<b], radix: 16)!
     }) }
@@ -21,6 +22,18 @@ final class MTProtoCodecTests: XCTestCase {
         }
         XCTAssertFalse(MTProtoCodec.validateResponse(valid, nonce: nonce.dropLast()))
         XCTAssertFalse(MTProtoCodec.validateResponse(Data(repeating: 0, count: 4097), nonce: nonce))
+    }
+    func testMaximumFingerprintVectorAndTrailingData() {
+        // JVM fixture: four-byte pq + canonical padding + 503 fingerprints = 4096 bytes.
+        var max = Data(valid.prefix(56))
+        max.append(contentsOf: [4,1,1,1,1,0,0,0,21,196,181,28,247,1,0,0])
+        max.append(Data(repeating: 1, count: 503*8))
+        max[16] = 236; max[17] = 15
+        XCTAssertEqual(max.count, 4096)
+        XCTAssertTrue(MTProtoCodec.validateResponse(max, nonce: nonce))
+        max.append(0); XCTAssertFalse(MTProtoCodec.validateResponse(max, nonce: nonce))
+        var trailing = valid + Data(repeating: 0, count: 4); trailing[16] = 68
+        XCTAssertFalse(MTProtoCodec.validateResponse(trailing, nonce: nonce))
     }
     func testRequestIsUnauthenticatedAndRequiresNonce() throws {
         let request = try MTProtoCodec.makeRequest(nonce: nonce, now: Date(timeIntervalSince1970: 1))
