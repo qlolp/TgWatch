@@ -7,7 +7,7 @@ struct HistoryView: View {
         List {
             Text("historyExplanation")
             if controller.historyUnavailable { Text("historyUnavailable").foregroundStyle(.red) }
-            if controller.history.isEmpty { Text("historyEmpty") }
+            if controller.history.isEmpty { Text("historyEmpty").accessibilityIdentifier("historyEmpty") }
             ForEach(controller.history.reversed()) { entry in
                 VStack(alignment: .leading) {
                     Text(LocalizedStringKey("status.\(entry.status.rawValue)"))
@@ -17,7 +17,7 @@ struct HistoryView: View {
             }
             Button("clearHistory", role: .destructive) { confirming = true }.accessibilityIdentifier("clearHistory")
         }.navigationTitle("history")
-            .confirmationDialog("clearHistoryQuestion", isPresented: $confirming, titleVisibility: .visible) {
+            .alert("clearHistoryQuestion", isPresented: $confirming) {
                 Button("clearHistory", role: .destructive, action: controller.clearHistory)
                 Button("cancel", role: .cancel) {}
             }

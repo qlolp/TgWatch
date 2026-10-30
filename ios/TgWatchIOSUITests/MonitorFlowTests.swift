@@ -16,8 +16,13 @@ final class MonitorFlowTests: XCTestCase {
         let historyScreenshot = XCTAttachment(screenshot: app.screenshot())
         historyScreenshot.name = "History fixture"; historyScreenshot.lifetime = .keepAlways; add(historyScreenshot)
         app.buttons["clearHistory"].tap()
-        app.buttons["Cancel"].tap()
+        app.alerts.buttons["Cancel"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "historyEntry").firstMatch.exists)
+        app.buttons["clearHistory"].tap()
+        let confirmScreenshot = XCTAttachment(screenshot: app.screenshot())
+        confirmScreenshot.name = "Explicit delete confirmation"; confirmScreenshot.lifetime = .keepAlways; add(confirmScreenshot)
+        app.alerts.buttons["Delete history"].tap()
+        XCTAssertTrue(app.staticTexts["historyEmpty"].waitForExistence(timeout: 5))
     }
     func testCancelDoesNotProduceHealthyStatus() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "slow"]
