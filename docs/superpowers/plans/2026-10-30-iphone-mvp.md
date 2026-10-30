@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift, SwiftPM, SwiftUI, Foundation, Network.framework, XCTest/XCUITest, Xcode; без новых third-party runtime dependencies.
 
-**Spec:** [Предлагаемый дизайн](../specs/2026-10-30-iphone-mvp-design.md). **Не утверждён пользователем; этот документ — заказанный план, а не разрешение запускать реализацию/Apple account mutations.**
+**Spec:** [Предлагаемый дизайн](../specs/2026-10-30-iphone-mvp-design.md). **MVP и draft PR утверждены пользователем 2026-10-30. Apple account mutations не разрешены. iPhone 15, iOS 27.2 со слов владельца; Personal Team, без платной membership. Совместимость с установленным Xcode ещё не проверена.**
 
 ## Global Constraints
 
