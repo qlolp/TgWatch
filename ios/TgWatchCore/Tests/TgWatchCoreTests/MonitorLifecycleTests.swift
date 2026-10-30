@@ -81,11 +81,14 @@ extension MonitorLifecycleTests {
         let engine = ProbeEngine(transport: transport, endpoints: [.init(name: "test", address: "unused", group: .web)])
         let model = MonitorSession(runner: engine)
         model.setMonitoring(true); model.setActive(true)
-        try await Task.sleep(for: .milliseconds(20))
+        let firstDeadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await transport.count() < 1 && ContinuousClock.now < firstDeadline { try await Task.sleep(for: .milliseconds(5)) }
+        let initialCalls = await transport.count(); XCTAssertEqual(initialCalls, 1)
         model.networkChanged(unavailable: false)
         // Same coarse path properties again must still invalidate the epoch.
         model.networkChanged(unavailable: false)
-        try await Task.sleep(for: .milliseconds(120))
+        let restartDeadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await transport.count() < 2 && ContinuousClock.now < restartDeadline { try await Task.sleep(for: .milliseconds(5)) }
         let calls = await transport.count(); XCTAssertEqual(calls, 2)
         XCTAssertTrue(model.checking)
         model.setActive(false)

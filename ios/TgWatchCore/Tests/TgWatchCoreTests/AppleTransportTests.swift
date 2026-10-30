@@ -38,16 +38,16 @@ private final class TCPFixtureServer: @unchecked Sendable {
     let listener: NWListener
     let queue = DispatchQueue(label: "tcp-fixture")
     var connections: [NWConnection] = []
+    private var waiting = true // Accessed only on listener queue.
     init() throws { listener = try NWListener(using: .tcp, on: .any) }
     func start(mode: Mode) async throws -> UInt16 {
         try await withCheckedThrowingContinuation { continuation in
-            var waiting = true
             listener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    if waiting { waiting = false; continuation.resume(returning: self.listener.port!.rawValue) }
+                    if self.waiting { self.waiting = false; continuation.resume(returning: self.listener.port!.rawValue) }
                 case .failed(let error):
-                    if waiting { waiting = false; continuation.resume(throwing: error) }
+                    if self.waiting { self.waiting = false; continuation.resume(throwing: error) }
                 default: break
                 }
             }
