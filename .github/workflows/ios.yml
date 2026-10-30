@@ -1,0 +1,56 @@
+name: iPhone simulator
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'scripts/test-ios.sh'
+      - '.github/workflows/ios.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'scripts/test-ios.sh'
+      - '.github/workflows/ios.yml'
+permissions:
+  contents: read
+concurrency:
+  group: tgwatch-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select an already installed iPhone simulator
+        run: |
+          test -d "$DEVELOPER_DIR"
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/simulators.json"
+          python3 - <<'PY'
+          import json, os
+          with open(os.environ['RUNNER_TEMP'] + '/simulators.json') as f:
+              devices = json.load(f)['devices']
+          candidates = [(runtime, device) for runtime, items in devices.items()
+                        if 'iOS' in runtime for device in items if 'iPhone' in device['name']]
+          if not candidates:
+              raise SystemExit('No installed iPhone runtime; no download/provisioning attempted')
+          runtime, device = sorted(candidates, key=lambda item: (item[0], item[1]['name']))[-1]
+          print('Simulator:', runtime, device['name'])
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('SIMULATOR_UDID=' + device['udid'] + '\n')
+          PY
+      - name: Core tests, simulator UI tests and Release build without signing
+        run: bash scripts/test-ios.sh "$SIMULATOR_UDID" "$RUNNER_TEMP/ios-results"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: iphone-simulator-results
+          path: |
+            ${{ runner.temp }}/ios-results/toolchain.txt
+            ${{ runner.temp }}/ios-results/*.log
+            ${{ runner.temp }}/ios-results/tests.xcresult
+          if-no-files-found: warn
