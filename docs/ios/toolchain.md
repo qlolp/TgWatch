@@ -22,3 +22,14 @@ Before a device test, collect locally: `sw_vers`, `xcode-select -p`, `xcodebuild
 `xcodebuild -showsdks`, `xcrun simctl list devices available`, `xcrun devicectl list devices`, `df -h`.
 Keep UDIDs, account identities and team identifiers out of public logs. If license acceptance,
 Xcode/runtime installation or account provisioning is required, obtain approval for that specific action.
+
+## First Apple execution evidence
+
+At `f52b460711e6242f69017bb1356066a39f0c38fd`, CI run
+[41057543958](https://github.com/qlolp/TgWatch/actions/runs/41057543958) used Xcode 26.6 (17F113),
+iOS 26.5 Simulator / iPhone Air. All 24 macOS package tests passed, including real loopback TCP
+fragmentation, oversize rejection and cancellation. The Debug iOS app compiled and launched.
+Two UI scenarios passed (cancel, Russian offline); history navigation failed because its list row
+was not visible after evidence expanded. The next change moves History to a persistent navigation
+bar item and adds a largest-Dynamic-Type reachability test and screenshots. The PR records the
+latest exact-head outcome; this earlier run is not a green Simulator gate or physical iPhone proof.

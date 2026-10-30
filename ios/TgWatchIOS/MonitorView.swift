@@ -37,11 +37,15 @@ struct MonitorView: View {
                     }
                 }
                 Section {
-                    NavigationLink("history") { HistoryView(controller: controller) }.accessibilityIdentifier("history")
                     if controller.historyUnavailable { Text("historyUnavailable").foregroundStyle(.red) }
                 }
             }
             .navigationTitle("TgWatch")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink("history") { HistoryView(controller: controller) }.accessibilityIdentifier("history")
+                }
+            }
         }
     }
     private func evidenceRow(_ name: String, confirmed: Bool) -> some View {

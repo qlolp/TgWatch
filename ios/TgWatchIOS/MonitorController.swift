@@ -64,7 +64,7 @@ import TgWatchCore
 private struct FixtureRunner: ProbeRunner {
     let mode: String
     func check(epoch: UInt64) async throws -> ProbeSnapshot {
-        try await Task.sleep(for: mode == "slow" ? .seconds(30) : .milliseconds(50))
+        try await Task.sleep(for: mode == "slow" ? .seconds(300) : .milliseconds(50))
         let evidence = mode == "offline" ? ProbeEvidence(pathUnavailable: true) : ProbeEvidence(mtprotoConfirmed: true, webConfirmed: true, primaryMeasurementsComplete: true)
         return .init(epoch: epoch, startedAt: Date(), finishedAt: Date(), evidence: evidence)
     }
