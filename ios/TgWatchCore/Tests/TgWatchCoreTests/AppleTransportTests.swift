@@ -2,15 +2,28 @@
 import Foundation
 import XCTest
 @testable import TgWatchCore
+private final class RequestRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String] = []
+    func record(_ value: String) { lock.lock(); values.append(value); lock.unlock() }
+    func reset() { lock.lock(); values.removeAll(); lock.unlock() }
+    func snapshot() -> [String] { lock.lock(); defer { lock.unlock() }; return values }
+}
 private final class FixtureURLProtocol: URLProtocol, @unchecked Sendable {
+    private static let recorder = RequestRecorder()
+    static func resetRequests() { recorder.reset() }
+    static var requests: [String] { recorder.snapshot() }
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        let path = request.url!.path
+        let path = request.url!.path, method = request.httpMethod ?? ""
+        Self.recorder.record("\(method) \(path)")
         if path == "/tls" { client?.urlProtocol(self, didFailWithError: URLError(.serverCertificateUntrusted)); return }
-        let code = path == "/fallback" && request.httpMethod == "HEAD" ? 405 : (path == "/redirect" ? 302 : 200)
+        let fallback = ["/fallback", "/not-implemented"].contains(path) && method == "HEAD"
+        let code = fallback ? (path == "/fallback" ? 405 : 501) : (path == "/redirect" ? 302 : (path == "/server-error" ? 500 : 200))
+        let headers = path == "/redirect" ? ["Location": "https://fixture.invalid/ok"] : nil
         let size = path == "/oversized" ? 65537 : 1
-        let response = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: "HTTP/1.1", headerFields: nil)!
+        let response = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(repeating: 65, count: size))
         client?.urlProtocolDidFinishLoading(self)
@@ -28,6 +41,23 @@ final class AppleTransportTests: XCTestCase {
         let large = try await probe.check(url: URL(string: "https://fixture.invalid/oversized")!, deadline: .now.advanced(by: .seconds(2)))
         XCTAssertFalse(large)
         do { _ = try await probe.check(url: URL(string: "https://fixture.invalid/tls")!, deadline: .now.advanced(by: .seconds(2))); XCTFail("TLS must fail") } catch {}
+    }
+    func testHTTPMethodFallbackAndRedirectSequence() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [FixtureURLProtocol.self]
+        let probe = HTTPProbe(configuration: config)
+        let cases = [
+            ("ok", true, ["HEAD /ok"]),
+            ("fallback", true, ["HEAD /fallback", "GET /fallback"]),
+            ("not-implemented", true, ["HEAD /not-implemented", "GET /not-implemented"]),
+            ("redirect", true, ["HEAD /redirect"]),
+            ("server-error", false, ["HEAD /server-error"])
+        ]
+        for (path, expected, requests) in cases {
+            FixtureURLProtocol.resetRequests()
+            let result = try await probe.check(url: URL(string: "https://fixture.invalid/\(path)")!, deadline: .now.advanced(by: .seconds(2)))
+            XCTAssertEqual(result, expected, path)
+            XCTAssertEqual(FixtureURLProtocol.requests, requests, path)
+        }
     }
 }
 #endif

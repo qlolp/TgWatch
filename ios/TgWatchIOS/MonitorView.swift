@@ -30,8 +30,8 @@ struct MonitorView: View {
                 if let evidence = controller.session.snapshot?.evidence {
                     Section("evidence") {
                         evidenceRow("MTProto", confirmed: evidence.mtprotoConfirmed)
-                        evidenceRow("Telegram web", confirmed: evidence.webConfirmed)
-                        evidenceRow("Control", confirmed: evidence.controlConfirmed)
+                        evidenceRow("telegramWeb", confirmed: evidence.webConfirmed)
+                        evidenceRow("controlEndpoint", confirmed: evidence.controlConfirmed)
                         Text(evidence.primaryMeasurementsComplete ? "measurementsComplete" : "measurementsIncomplete")
                         Text("reachabilityOnly").font(.footnote)
                     }
@@ -48,7 +48,7 @@ struct MonitorView: View {
             }
         }
     }
-    private func evidenceRow(_ name: String, confirmed: Bool) -> some View {
+    private func evidenceRow(_ name: LocalizedStringKey, confirmed: Bool) -> some View {
         VStack(alignment: .leading) { Text(name); Text(confirmed ? "confirmed" : "unconfirmed").foregroundStyle(.secondary) }
     }
 }

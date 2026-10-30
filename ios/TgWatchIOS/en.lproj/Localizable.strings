@@ -5,6 +5,8 @@
 "cancel" = "Cancel";
 "monitorWhileOpen" = "Check every minute while open";
 "evidence" = "Evidence";
+"telegramWeb" = "Telegram Web";
+"controlEndpoint" = "Control endpoint";
 "confirmed" = "Response confirmed";
 "unconfirmed" = "Not confirmed";
 "measurementsComplete" = "Primary measurements complete";

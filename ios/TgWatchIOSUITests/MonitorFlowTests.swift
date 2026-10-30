@@ -49,5 +49,12 @@ final class MonitorFlowTests: XCTestCase {
         let predicate = NSPredicate(format: "label CONTAINS %@", "Нет подключения")
         expectation(for: predicate, evaluatedWith: app.staticTexts["status"])
         waitForExpectations(timeout: 3)
+        for label in ["Telegram Web", "Контрольный адрес"] {
+            for _ in 0..<4 {
+                if app.staticTexts[label].exists { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(app.staticTexts[label].exists, label)
+        }
     }
 }
