@@ -10,6 +10,27 @@ import android.widget.TextView
 
 @RunWith(AndroidJUnit4::class)
 class IncidentCenterUiTest {
+    @Test fun incidentCenterEntryRemainsVisibleWithoutChangeSummary() {
+        val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = Prefs.sp(ctx)
+        val previous = prefs.all["onboarding_seen"] as? Boolean
+        assertTrue(prefs.edit().putBoolean("onboarding_seen", true).commit())
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.findViewById<android.view.View>(R.id.changeSummaryCard).visibility = android.view.View.GONE
+                    val button = activity.findViewById<Button>(R.id.btnIncidentCenter)
+                    assertTrue(button.isShown)
+                    assertTrue(button.hasOnClickListeners())
+                }
+            }
+        } finally {
+            val edit = prefs.edit()
+            if (previous == null) edit.remove("onboarding_seen") else edit.putBoolean("onboarding_seen", previous)
+            assertTrue(edit.commit())
+        }
+    }
+
     @Test fun centerProvidesCoverageTimelinePeriodAndSafeComparisonAction() {
         ActivityScenario.launch(IncidentCenterActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->

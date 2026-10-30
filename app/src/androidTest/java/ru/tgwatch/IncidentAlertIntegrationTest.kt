@@ -86,6 +86,43 @@ class IncidentAlertIntegrationTest {
         awaitNotification(TargetEventNotifications.id(TargetId.WHATSAPP, "outage"))
     }
 
+    @Test fun windowResetCancelsPostedSummary() {
+        IncidentAlertPreferences.setEnabled(ctx, true)
+        for (next in listOf(99L, 100 + IncidentGrouping.WINDOW_MS + 1)) {
+            IncidentAlertCoordinator.resetForTests()
+            val coordinator = IncidentAlertCoordinator.get(ctx, manager)
+            coordinator.outage(TargetId.TELEGRAM, 100, false) { }
+            coordinator.outage(TargetId.MATRIX, 200, false) { }
+            awaitNotification(IncidentAlertCoordinator.GROUP_ID)
+            var individual = false
+            coordinator.outage(TargetId.WHATSAPP, next, false) { individual = true }
+            assertTrue(individual)
+            awaitAbsent(IncidentAlertCoordinator.GROUP_ID)
+        }
+    }
+
+    @Test fun partialGroupUsesEnabledPartialChannelWhenOutageChannelIsBlocked() {
+        val suffix = java.util.UUID.randomUUID().toString()
+        val outage = "test_incident_outage_$suffix"
+        val partial = "test_incident_partial_$suffix"
+        val recovery = "test_incident_recovery_$suffix"
+        manager.createNotificationChannel(android.app.NotificationChannel(outage,
+            "Blocked outage fixture", NotificationManager.IMPORTANCE_NONE))
+        try {
+            IncidentAlertPreferences.setEnabled(ctx, true)
+            EventNotifications(ctx, manager, outage, partial, recovery).partial("Telegram", true, true)
+            EventNotifications(ctx, manager, outage, partial, recovery, TargetId.MATRIX)
+                .partial("Matrix", true, true)
+            val group = awaitNotification(IncidentAlertCoordinator.GROUP_ID)
+            assertEquals(NotificationManager.IMPORTANCE_NONE, manager.getNotificationChannel(outage).importance)
+            assertEquals(partial, group.channelId)
+            awaitAbsent(TargetEventNotifications.id(TargetId.TELEGRAM, "partial"))
+            awaitAbsent(TargetEventNotifications.id(TargetId.MATRIX, "partial"))
+        } finally {
+            listOf(outage, partial, recovery).forEach { manager.deleteNotificationChannel(it) }
+        }
+    }
+
     private fun notification(id: Int): Notification? = manager.activeNotifications.firstOrNull { it.id == id }
         ?.notification
     private fun awaitNotification(id: Int): Notification {

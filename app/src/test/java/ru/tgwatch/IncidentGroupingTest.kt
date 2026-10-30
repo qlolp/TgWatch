@@ -47,6 +47,31 @@ class IncidentGroupingTest {
         assertTrue(policy.outage(TargetId.WHATSAPP, 900, enabled = true).postIndividual)
     }
 
+    @Test fun expiredOrRolledBackGroupIsCancelledBeforeStartingNewSequence() {
+        for (next in listOf(99L, 100 + IncidentGrouping.WINDOW_MS + 1)) {
+            val policy = IncidentGrouping()
+            policy.outage(TargetId.TELEGRAM, 100, true)
+            policy.outage(TargetId.MATRIX, 200, true)
+            val decision = policy.outage(TargetId.WHATSAPP, next, true)
+            assertTrue(decision.cancelGroup)
+            assertTrue(decision.postIndividual)
+            assertNull(decision.group)
+            assertNull(policy.clear(TargetId.TELEGRAM).group)
+        }
+    }
+
+    @Test fun exactWindowBoundaryKeepsGroupAndDisabledPresentationCancelsIt() {
+        val policy = IncidentGrouping()
+        policy.outage(TargetId.TELEGRAM, 100, true)
+        val boundary = policy.outage(TargetId.MATRIX, 100 + IncidentGrouping.WINDOW_MS, true)
+        assertEquals(2, boundary.group?.size)
+        assertFalse(boundary.cancelGroup)
+        val disabled = policy.outage(TargetId.WHATSAPP, 200, false)
+        assertTrue(disabled.cancelGroup)
+        assertTrue(disabled.postIndividual)
+        assertTrue(policy.outage(TargetId.MATRIX, 300, true).postIndividual)
+    }
+
     @Test fun optingOutCancelsExistingGroup() {
         val policy = IncidentGrouping()
         policy.outage(TargetId.TELEGRAM, 100, enabled = true)

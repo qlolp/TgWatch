@@ -11,8 +11,9 @@ internal object IncidentCenterMainUi {
     fun bind(activity: Activity) {
         val inflater = LayoutInflater.from(activity)
         val summary = activity.findViewById<ViewGroup>(R.id.changeSummaryCard)
-        val details = inflater.inflate(R.layout.incident_center_main_controls, summary, false)
-        summary.addView(details)
+        val parent = summary.parent as ViewGroup
+        val details = inflater.inflate(R.layout.incident_center_main_controls, parent, false)
+        parent.addView(details, parent.indexOfChild(summary) + 1)
         details.findViewById<Button>(R.id.btnIncidentCenter).setOnClickListener {
             IncidentCenterActivity.open(activity)
         }

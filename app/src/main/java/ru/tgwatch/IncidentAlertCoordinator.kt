@@ -11,15 +11,23 @@ internal class IncidentAlertCoordinator private constructor(private val ctx: Con
     private val manager: NotificationManager) {
     private val policy = IncidentGrouping()
 
-    @Synchronized fun outage(id: TargetId, at: Long, audible: Boolean, individual: () -> Unit) {
-        val decision = policy.outage(id, at, IncidentAlertPreferences.enabled(ctx))
-        decision.cancelIndividuals.forEach {
-            manager.cancel(TargetEventNotifications.id(it, "outage"))
-            manager.cancel(TargetEventNotifications.id(it, "partial"))
-        }
+    @Synchronized fun outage(id: TargetId, at: Long, audible: Boolean,
+        sourceChannel: String = EventNotifications.SOUND_CHANNEL, individual: () -> Unit) {
+        val channel = if (audible) sourceChannel else EventNotifications.SILENT_CHANNEL
+        // Keep individual presentation unless its replacement channel can actually deliver.
+        val decision = policy.outage(id, at, IncidentAlertPreferences.enabled(ctx) && canPost(channel))
+        if (decision.cancelGroup) manager.cancel(GROUP_ID)
         when {
-            decision.group != null -> postGroup(decision.group, audible)
-            decision.postIndividual -> individual()
+            decision.group != null && postGroup(decision.group, channel) -> {
+                decision.cancelIndividuals.forEach {
+                    manager.cancel(TargetEventNotifications.id(it, "outage"))
+                    manager.cancel(TargetEventNotifications.id(it, "partial"))
+                }
+            }
+            else -> {
+                if (decision.group != null) policy.reset()
+                individual()
+            }
         }
     }
 
@@ -32,15 +40,16 @@ internal class IncidentAlertCoordinator private constructor(private val ctx: Con
 
     private fun apply(update: IncidentGrouping.Update) {
         if (update.cancelGroup) manager.cancel(GROUP_ID)
-        update.group?.let { postGroup(it, audible = false) }
+        update.group?.let { postGroup(it, EventNotifications.SILENT_CHANNEL) }
     }
 
-    private fun postGroup(ids: List<TargetId>, audible: Boolean) {
-        val channel = if (audible) EventNotifications.SOUND_CHANNEL else EventNotifications.SILENT_CHANNEL
-        if (!manager.areNotificationsEnabled() ||
-            manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE) {
+    private fun canPost(channel: String): Boolean = manager.areNotificationsEnabled() &&
+        manager.getNotificationChannel(channel)?.let { it.importance != NotificationManager.IMPORTANCE_NONE } == true
+
+    private fun postGroup(ids: List<TargetId>, channel: String): Boolean {
+        if (!canPost(channel)) {
             manager.cancel(GROUP_ID)
-            return
+            return false
         }
         val labels = ids.joinToString { TargetNames.label(ctx, it) }
         val text = ctx.getString(R.string.incident_alert_group_text, ids.size, labels)
@@ -53,6 +62,7 @@ internal class IncidentAlertCoordinator private constructor(private val ctx: Con
             .setContentIntent(open).setAutoCancel(true).setCategory(Notification.CATEGORY_STATUS)
             .setOnlyAlertOnce(true).build()
         manager.notify(GROUP_ID, notification)
+        return true
     }
 
     companion object {

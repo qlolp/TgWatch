@@ -91,7 +91,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
         clearRecovery()
         manager.cancel(partialId)
         if (blocked(outageChannel)) { clearOutage(); return }
-        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed) {
+        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed, outageChannel) {
             manager.notify(outageId, notification(ctx.renderString(
                 R.string.copy_event_notifications_telegram_is_unreachable),
                 reason, sound && allowed, R.drawable.ic_stat_fail,outageChannel))
@@ -100,7 +100,7 @@ class EventNotifications(private val ctx: Context, private val manager: Notifica
     fun partial(reason: String, sound: Boolean, allowed: Boolean) {
         clearRecovery(); manager.cancel(outageId)
         if (blocked(partialChannel)) { clearOutage(); return }
-        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed) {
+        incidentAlerts.outage(targetId, System.currentTimeMillis(), sound && allowed, partialChannel) {
             manager.notify(partialId,notification(ctx.renderString(
                 R.string.copy_event_notifications_telegram_is_partially_reachable),reason,sound && allowed,
                 R.drawable.ic_stat_offline,partialChannel))

@@ -4,6 +4,7 @@ package ru.tgwatch
 internal class IncidentGrouping {
     data class Decision(
         val postIndividual: Boolean,
+        val cancelGroup: Boolean = false,
         val cancelIndividuals: List<TargetId> = emptyList(),
         val group: List<TargetId>? = null,
     )
@@ -14,18 +15,22 @@ internal class IncidentGrouping {
     private var firstAt = 0L
 
     fun outage(id: TargetId, at: Long, enabled: Boolean): Decision {
+        var cancelGroup = false
         if (enabled) {
-            if (active.isNotEmpty() && (at < firstAt || at - firstAt > WINDOW_MS)) reset()
+            if (active.isNotEmpty() && (at < firstAt || at - firstAt > WINDOW_MS)) {
+                cancelGroup = active.size >= 2
+                reset()
+            }
             if (active.isEmpty()) firstAt = at
             active[id] = at
         } else {
-            clear(id)
+            cancelGroup = setEnabled(false).cancelGroup
         }
         val members = active.keys.sortedBy { it.ordinal }
         return if (enabled && members.size >= 2) {
-            Decision(postIndividual = false, cancelIndividuals = members, group = members)
+            Decision(postIndividual = false, cancelGroup = cancelGroup, cancelIndividuals = members, group = members)
         } else {
-            Decision(postIndividual = true)
+            Decision(postIndividual = true, cancelGroup = cancelGroup)
         }
     }
 
