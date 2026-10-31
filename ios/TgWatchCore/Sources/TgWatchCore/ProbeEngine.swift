@@ -27,16 +27,17 @@ public actor ProbeEngine: ProbeRunner {
     private let transport: any ProbeTransport
     private let endpoints: [ProbeEndpoint]
     private let budget: Duration
+    private let attemptBudget: Duration
     private var busy = false
-    public init(transport: any ProbeTransport, endpoints: [ProbeEndpoint] = ProbeEndpoint.defaults, budget: Duration = .seconds(6)) {
-        self.transport = transport; self.endpoints = endpoints; self.budget = budget
+    public init(transport: any ProbeTransport, endpoints: [ProbeEndpoint] = ProbeEndpoint.defaults, budget: Duration = .seconds(18), attemptBudget: Duration = .seconds(3)) {
+        self.transport = transport; self.endpoints = endpoints; self.budget = budget; self.attemptBudget = attemptBudget
     }
     public func check(epoch: UInt64) async throws -> ProbeSnapshot {
         guard !busy else { throw Failure.busy }
         busy = true; defer { busy = false }
         try Task.checkCancellation()
         let start = Date(), deadline = ContinuousClock.now.advanced(by: budget)
-        let transport = self.transport, endpoints = self.endpoints
+        let transport = self.transport, endpoints = self.endpoints, attemptBudget = self.attemptBudget
         let results: [Int: Bool] = await withTaskGroup(of: (Int, Bool?).self) { group in
             // Timer participates in the group but is not a connection.
             group.addTask { try? await Task.sleep(until: deadline, clock: .continuous); return (-1, nil) }
@@ -44,8 +45,18 @@ public actor ProbeEngine: ProbeRunner {
                 let endpoint = endpoints[index]
                 group.addTask {
                     guard !Task.isCancelled, ContinuousClock.now < deadline else { return (index, nil) }
-                    do { return (index, try await transport.check(endpoint, deadline: deadline)) }
-                    catch is CancellationError { return (index, nil) }
+                    // Give every endpoint its own bounded attempt. A silent early DC must not
+                    // consume the entire batch and leave later primary endpoints unattempted.
+                    let attemptDeadline = min(deadline, ContinuousClock.now.advanced(by: attemptBudget))
+                    do {
+                        let result = try await transport.check(endpoint, deadline: attemptDeadline)
+                        return (index, !Task.isCancelled && ContinuousClock.now < deadline ? result : nil)
+                    }
+                    catch is CancellationError {
+                        // HTTP streaming uses CancellationError at its deadline. Only a local
+                        // attempt timeout counts as negative; external/global cancellation is unknown.
+                        return (index, !Task.isCancelled && ContinuousClock.now >= attemptDeadline && ContinuousClock.now < deadline ? false : nil)
+                    }
                     catch { return (index, ContinuousClock.now < deadline && !Task.isCancelled ? false : nil) }
                 }
             }

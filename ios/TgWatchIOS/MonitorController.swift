@@ -19,7 +19,7 @@ import TgWatchCore
     private let store: HistoryStore
     private let path = NWPathMonitor()
     private var writeTask: Task<Void, Never>?
-    init() {
+    override init() {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
         preferenceFile = directory.appendingPathComponent("notification-preference.json")
         var isFixture = false

@@ -43,3 +43,47 @@ final class ProbeEngineTests: XCTestCase {
         _ = try await first.value
     }
 }
+
+private actor SilentPrimaryTransport: ProbeTransport {
+    private var calls = 0
+    func check(_ endpoint: ProbeEndpoint, deadline: ContinuousClock.Instant) async throws -> Bool {
+        calls += 1
+        if endpoint.group == .control { return true }
+        try await Task.sleep(until: deadline, clock: .continuous)
+        throw URLError(.timedOut)
+    }
+    func count() -> Int { calls }
+}
+extension ProbeEngineTests {
+    func testSilentPrimaryEndpointsFinishBeforeBatchDeadlineAndConfirmLoss() async throws {
+        let transport = SilentPrimaryTransport()
+        let engine = ProbeEngine(transport: transport, budget: .seconds(2), attemptBudget: .milliseconds(30))
+        var policy = ConnectionAlertPolicy()
+        let first = try await engine.check(epoch: 4)
+        XCTAssertEqual(first.status, .down); XCTAssertTrue(first.evidence.controlConfirmed)
+        XCTAssertTrue(first.evidence.primaryMeasurementsComplete)
+        XCTAssertNil(policy.observe(first.status, at: first.finishedAt, epoch: first.epoch))
+        let second = try await engine.check(epoch: 4)
+        XCTAssertEqual(policy.observe(second.status, at: second.finishedAt, epoch: second.epoch), .telegramLost)
+        let count = await transport.count(); XCTAssertEqual(count, ProbeEndpoint.defaults.count * 2)
+    }
+}
+
+private struct LateNegativeTransport: ProbeTransport {
+    func check(_ endpoint: ProbeEndpoint, deadline: ContinuousClock.Instant) async throws -> Bool {
+        if endpoint.group == .control { return true }
+        // Models a socket timeout racing cancellation; deliberately returns rather than throws.
+        try? await Task.sleep(until: deadline.advanced(by: .milliseconds(5)), clock: .continuous)
+        return false
+    }
+}
+extension ProbeEngineTests {
+    func testLateNegativeReturnCannotCompleteGlobalDeadlineAsOutage() async throws {
+        let endpoints = [ProbeEndpoint(name: "control", address: "unused", group: .control),
+                         ProbeEndpoint(name: "primary", address: "unused", group: .mtproto)]
+        let engine = ProbeEngine(transport: LateNegativeTransport(), endpoints: endpoints, budget: .milliseconds(20))
+        let result = try await engine.check(epoch: 1)
+        XCTAssertTrue(result.evidence.controlConfirmed)
+        XCTAssertFalse(result.evidence.primaryMeasurementsComplete); XCTAssertEqual(result.status, .unknown)
+    }
+}
