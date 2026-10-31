@@ -36,7 +36,15 @@ final class MonitorFlowTests: XCTestCase {
         for _ in 0..<8 { if app.buttons["serviceInterval"].isHittable { break }; app.swipeUp() }
         app.buttons["serviceInterval"].tap(); app.buttons["300 seconds"].tap()
         for _ in 0..<8 { if app.switches["serviceAutomatic"].isHittable { break }; app.swipeUp() }
-        app.switches["serviceAutomatic"].tap()
+        let automatic=app.switches["serviceAutomatic"]
+        XCTAssertEqual(automatic.value as? String,"0")
+        // SwiftUI exposes the full labelled row as Switch. Tap the trailing
+        // control, then prove the setting actually changed before terminating.
+        automatic.coordinate(withNormalizedOffset:CGVector(dx:0.95,dy:0.5)).tap()
+        let enabled=NSPredicate(format:"value == %@","1")
+        expectation(for:enabled,evaluatedWith:automatic)
+        waitForExpectations(timeout:3)
+        XCTAssertFalse(app.staticTexts["serviceSettingsFailure"].exists)
         app.terminate(); app.launch(); openServices(app)
         XCTAssertTrue(app.segmentedControls["serviceTarget"].buttons["WhatsApp Web"].isSelected)
         for _ in 0..<8 { if app.switches["serviceAutomatic"].isHittable { break }; app.swipeUp() }
