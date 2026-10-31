@@ -3,10 +3,11 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public let id: UUID
     public let schemaVersion: Int
     public let epoch: UInt64
+    public let sessionID: UUID?
     public let observedAt: Date
     public let status: ProbeStatus
-    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus) {
-        id = UUID(); schemaVersion = 1; self.epoch = epoch; self.observedAt = observedAt; self.status = status
+    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, sessionID: UUID? = nil) {
+        id = UUID(); schemaVersion = 1; self.epoch = epoch; self.observedAt = observedAt; self.status = status; self.sessionID = sessionID
     }
 }
 public actor HistoryStore {

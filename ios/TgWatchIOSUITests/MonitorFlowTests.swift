@@ -12,6 +12,10 @@ final class MonitorFlowTests: XCTestCase {
         let monitorScreenshot = XCTAttachment(screenshot: app.screenshot())
         monitorScreenshot.name = "Monitor fixture"; monitorScreenshot.lifetime = .keepAlways; add(monitorScreenshot)
         app.buttons["history"].tap()
+        for _ in 0..<8 {
+            if app.descendants(matching: .any).matching(identifier: "historyEntry").firstMatch.exists { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "historyEntry").firstMatch.waitForExistence(timeout: 3))
         let historyScreenshot = XCTAttachment(screenshot: app.screenshot())
         historyScreenshot.name = "History fixture"; historyScreenshot.lifetime = .keepAlways; add(historyScreenshot)
@@ -23,6 +27,23 @@ final class MonitorFlowTests: XCTestCase {
         confirmScreenshot.name = "Explicit delete confirmation"; confirmScreenshot.lifetime = .keepAlways; add(confirmScreenshot)
         app.alerts.buttons["Delete history"].tap()
         XCTAssertTrue(app.staticTexts["historyEmpty"].waitForExistence(timeout: 5))
+    }
+    func testQuietDayIncidentCenterStaysReachable() {
+        let app = XCUIApplication(); app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]
+        app.launch(); app.buttons["history"].tap(); app.buttons["incidents"].tap()
+        XCTAssertTrue(app.staticTexts["noIncidents"].waitForExistence(timeout: 3))
+    }
+    func testIncidentHistoryAndWindowControls() {
+        let app = XCUIApplication(); app.launchArguments = ["--fixture", "history", "-AppleLanguages", "(en)"]
+        app.launch(); app.buttons["history"].tap()
+        XCTAssertTrue(app.buttons["exportHistory"].exists)
+        XCTAssertTrue(app.segmentedControls["historyWindow"].exists)
+        app.segmentedControls["historyWindow"].buttons["7 days"].tap()
+        app.buttons["incidents"].tap()
+        XCTAssertTrue(app.staticTexts["Recovery confirmed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Single observation — unconfirmed"].exists)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Incident recovery and unconfirmed network loss"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     func testCountryAndPermissionFixture() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]

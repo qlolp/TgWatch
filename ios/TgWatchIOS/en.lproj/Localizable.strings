@@ -46,3 +46,22 @@
 "alert.networkLost" = "No network — Telegram reachability unknown";
 "alert.recovered" = "Telegram connection restored";
 "alert.observed" = "Confirmed by two checks. Last observation:";
+
+"historyWindow" = "History window";
+"history24h" = "24 hours";
+"history7d" = "7 days";
+"incidents" = "Incidents";
+"sampledCoverage" = "Observation coverage";
+"coverageExplanation" = "Coverage requires consecutive checks in the same session, no more than two minutes apart. Unobserved time is unknown, not uptime. Durations: hours:minutes:seconds.";
+"observations" = "Observations";
+"observationLimit %lld" = "Showing up to 200 of %lld observations. CSV includes the entire selected window.";
+"exportHistory" = "Export CSV";
+"historyExportFailed" = "Could not export history. Existing observations are unchanged.";
+"incidentExplanation" = "Latest 200 episodes in this window. Two consecutive failures confirm loss; two consecutive successful checks confirm recovery. A gap, session change or clock rollback cannot prove recovery. No ongoing status is inferred.";
+"noIncidents" = "No loss observations in this window. This does not prove uninterrupted availability.";
+"incidentConfirmed" = "Loss confirmed by consecutive checks";
+"incidentUnconfirmed" = "Single observation — unconfirmed";
+"firstObserved" = "First observed";
+"lastFailure" = "Last loss observation";
+"incidentRecovered" = "Recovery confirmed";
+"recoveryNotObserved" = "Recovery not observed within this episode";

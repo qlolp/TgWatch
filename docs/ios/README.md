@@ -31,7 +31,7 @@ downloads runtimes, signs into an account or uses `-allowProvisioningUpdates`.
 The isolated iOS workflow proposes macos-26/Xcode 26.6, based on the published runner inventory.
 This does not establish compatibility with the owner's reported iOS 27.2.
 
-UI fixtures are enabled only in DEBUG with `--fixture ok|offline|slow`; they use isolated ephemeral
+UI fixtures are enabled only in DEBUG with `--fixture ok|offline|slow|history`; they use isolated ephemeral
 history, disable live path observation and display a visible fixture banner. Release cannot select them.
 Tests must never depend on a currently reachable public Telegram endpoint.
 
@@ -51,3 +51,5 @@ APIs. Reassess required-reason declarations whenever these APIs are introduced. 
 See [toolchain and verification](toolchain.md) and [device procedure](device-testing.md).
 
 See [Android parity and alert acceptance](android-parity.md) for country privacy, notification semantics, platform limits and remaining work.
+
+History now includes 24h/7d sampled coverage, confirmed/unconfirmed incident episodes and explicit CSV export. Legacy records without a session UUID remain visible but do not prove continuity across launches. See [history contract](history-plan.md).

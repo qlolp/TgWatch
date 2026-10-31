@@ -14,6 +14,7 @@ import TgWatchCore
     private let delivery = AlertDelivery(scheduler: AppleAlertScheduler())
     private var notificationsAllowed = false
     private let preferenceFile: URL
+    private let historySessionID = UUID()
     let fixtureMode: Bool
     let session: MonitorSession
     private let store: HistoryStore
@@ -62,7 +63,17 @@ import TgWatchCore
             }
         }
         if !isFixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.ios.path")) }
-        Task { await reload() }
+        Task {
+            #if DEBUG
+            if isFixture, ProcessInfo.processInfo.arguments.contains("history") {
+                let base = Date().addingTimeInterval(-180)
+                for (index,status) in [ProbeStatus.down,.down,.ok,.ok,.noNetwork].enumerated() {
+                    try? await store.append(HistoryEntry(epoch:1,observedAt:base.addingTimeInterval(Double(index)*30),status:status,sessionID:historySessionID))
+                }
+            }
+            #endif
+            await reload()
+        }
     }
     func setActive(_ active: Bool) {
         session.setActive(active); country.setActive(active)
@@ -132,10 +143,11 @@ import TgWatchCore
         }
     }
     private func save(_ snapshot: ProbeSnapshot) {
+        let sessionID = historySessionID
         let previous = writeTask
         writeTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status)) }
+            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, sessionID: sessionID)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
         }
