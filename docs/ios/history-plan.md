@@ -1,0 +1,11 @@
+# iPhone history and incidents — implementation slice
+
+Base a12eca4; authorized continuation of PR100. Follow actual Android IncidentCenter/OutageEpisodes and TargetCsv concepts, adapted to foreground-only iOS. Implement Telegram history first, before multiplying targets. No widget entitlements, new providers, signing, merge or Android changes.
+
+1. Add optional session UUID to schema1 observations (old JSON remains readable). Controller supplies one UUID per process; legacy records cannot prove continuity. Preserve corrupt/unknown schema files.
+2. Pure HistoryReport for 24h/7d: coverage only between consecutive, same-session/same-epoch observations separated by <=120s. Missing leading/trailing time, long gaps, old sessions, UNKNOWN and wall rollback are unknown. Keep arrival order; after rollback only latest monotonic segment contributes to statistics. Distinguish healthy/partial/Telegram-down/no-network/unknown durations; never show uncovered time as uptime.
+3. Incidents: contiguous same-kind DOWN/NO_NETWORK observations; at least two distinct observations to label confirmed. Recovery requires two consecutive OK observations in the same continuity segment; intervening UNKNOWN/PARTIAL reset the success streak, and a new negative episode owns its own recovery. Otherwise say recovery not observed, never ongoing/healthy. No causal claims. Bound displayed incidents to 200, observations to 200 with explicit count; full retained selection export allowed.
+4. CSV export of selected raw observations: fixed target telegram, UTC date, status, epoch, session, in-current-statistics flag. No URL/IP/response bodies. Explicit user ShareLink; no automatic sends/uploads. No Android backup/import compatibility claim.
+5. UI: 24h/7d picker, duration/coverage summary, incident list reachable on quiet days, raw observations, share and existing explicit delete. RU/EN, Dynamic Type. Test core boundaries/migration/export and fixture UI; fresh independent review; same PR and exact-head CI.
+
+Limits: retention remains seven days/10000 records; no 30/90-day rollup yet. A brief single negative stays labelled unconfirmed. Selected intervals are sampled coverage, not continuous packet surveillance. No device acceptance inferred from CI.

@@ -1,0 +1,1 @@
+Ported literal resPQ from probe-core MtProtoFixtures.kt and mutations from MtProtoValidationTest.kt, origin 8932ef05a8ffb1af985a7a16e0ae5a8171eda1e1. Expected acceptance is independent of Swift parser.
