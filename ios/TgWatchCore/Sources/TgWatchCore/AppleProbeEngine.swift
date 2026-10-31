@@ -72,7 +72,7 @@ private final class TCPRequest: @unchecked Sendable {
         self.nonce = nonce; self.request = request
     }
     func start(_ continuation: CheckedContinuation<Bool, Error>, deadline: ContinuousClock.Instant) {
-        queue.async {
+        queue.async { [self] in
             self.continuation = continuation
             guard !self.cancelled else { self.finish(.failure(CancellationError())); return }
             let remaining = ContinuousClock.now.duration(to: deadline)

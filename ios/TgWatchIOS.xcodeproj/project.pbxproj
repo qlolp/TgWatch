@@ -1,48 +1,457 @@
 // !$*UTF8*$!
-{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
-56E37A5146930C161A715EA6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TgWatchApp.swift; sourceTree = "<group>"; };
-983F0F46AB46428C5B0DB268 = { isa = PBXBuildFile; fileRef = 56E37A5146930C161A715EA6; };
-8085ACBDAA0C6AA823116375 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorController.swift; sourceTree = "<group>"; };
-19BEB30B3630D8ECA62FE26D = { isa = PBXBuildFile; fileRef = 8085ACBDAA0C6AA823116375; };
-F30CDB58647C550F45A6333C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorView.swift; sourceTree = "<group>"; };
-7DD049EBA46A7A78599CAA9D = { isa = PBXBuildFile; fileRef = F30CDB58647C550F45A6333C; };
-85F80855CCDBAAC7FFC06E2C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
-7DF3B0A0A5761723E9E5AF4C = { isa = PBXBuildFile; fileRef = 85F80855CCDBAAC7FFC06E2C; };
-6D123AE8AB04EEE632CC6C18 = { isa = PBXFileReference; lastKnownFileType = text.xml; path = "PrivacyInfo.xcprivacy"; sourceTree = "<group>"; };
-414D458A4445833FCC3E9669 = { isa = PBXBuildFile; fileRef = 6D123AE8AB04EEE632CC6C18; };
-9B48742E5B43ED2EF7D9652E = { isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/Localizable.strings"; sourceTree = "<group>"; };
-0110863C083207ED3792378B = { isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = "ru.lproj/Localizable.strings"; sourceTree = "<group>"; };
-A3CACB75505CC02B52B47594 = { isa = PBXVariantGroup; children = (9B48742E5B43ED2EF7D9652E,0110863C083207ED3792378B,); name = Localizable.strings; sourceTree = "<group>"; };
-961AF94FF63CC06BD9BF9A7F = { isa = PBXBuildFile; fileRef = A3CACB75505CC02B52B47594; };
-E17E80AD8E2103CF3FC3FD96 = { isa = PBXGroup; path = TgWatchIOS; sourceTree = "<group>"; children = (56E37A5146930C161A715EA6,8085ACBDAA0C6AA823116375,F30CDB58647C550F45A6333C,85F80855CCDBAAC7FFC06E2C,6D123AE8AB04EEE632CC6C18,A3CACB75505CC02B52B47594,); };
-9619E170DD2B21FD548B4ACC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorFlowTests.swift; sourceTree = "<group>"; };
-D53A1E78D52CD91FE23E510B = { isa = PBXBuildFile; fileRef = 9619E170DD2B21FD548B4ACC; };
-B16F46D5F0DDFEAA3985B262 = { isa = PBXGroup; path = TgWatchIOSUITests; sourceTree = "<group>"; children = (9619E170DD2B21FD548B4ACC,); };
-AE0042EC290704DA7E641B97 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = TgWatchIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-E7F08BCC397888750F5CB9BD = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = TgWatchIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (AE0042EC290704DA7E641B97,E7F08BCC397888750F5CB9BD,); };
-C8D2DC745BFC63C0D67231CE = { isa = PBXGroup; sourceTree = "<group>"; children = (E17E80AD8E2103CF3FC3FD96,B16F46D5F0DDFEAA3985B262,0A3E27B8CA818264D75C8D81,); };
-BC4A71180870F7945155FBB0 = { isa = XCLocalSwiftPackageReference; relativePath = TgWatchCore; };
-8473FB7C391915EE75DAD5DA = { isa = XCSwiftPackageProductDependency; package = BC4A71180870F7945155FBB0; productName = TgWatchCore; };
-DFF24E7A1C76B5E442974323 = { isa = PBXBuildFile; productRef = 8473FB7C391915EE75DAD5DA; };
-878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (983F0F46AB46428C5B0DB268,19BEB30B3630D8ECA62FE26D,7DD049EBA46A7A78599CAA9D,7DF3B0A0A5761723E9E5AF4C,); runOnlyForDeploymentPostprocessing = 0; };
-41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (414D458A4445833FCC3E9669,961AF94FF63CC06BD9BF9A7F,); runOnlyForDeploymentPostprocessing = 0; };
-E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (DFF24E7A1C76B5E442974323,); runOnlyForDeploymentPostprocessing = 0; };
-798B65A4B63A4D08FDD4C755 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (D53A1E78D52CD91FE23E510B,); runOnlyForDeploymentPostprocessing = 0; };
-497639E2F38DB3F946CE62A2 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-14F0309E5479D955E2A2D11E = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-73EBF6644258C120893E685D = { isa = XCBuildConfiguration; name = Debug; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; CLANG_ENABLE_MODULES = YES; ONLY_ACTIVE_ARCH = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; }; };
-0B0C687DF8B6B8DC790B519C = { isa = XCBuildConfiguration; name = Release; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; CLANG_ENABLE_MODULES = YES; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; };
-76F8DEC3DFE0BDB465198890 = { isa = XCConfigurationList; buildConfigurations = (73EBF6644258C120893E685D,0B0C687DF8B6B8DC790B519C,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-B00CCDD09424E369308D67FA = { isa = XCBuildConfiguration; name = Debug; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = TgWatch; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; TARGETED_DEVICE_FAMILY = 1; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; CODE_SIGN_STYLE = Automatic; ONLY_ACTIVE_ARCH = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; }; };
-1B104479E55E37CF8A63CBDF = { isa = XCBuildConfiguration; name = Release; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = TgWatch; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"; TARGETED_DEVICE_FAMILY = 1; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; CODE_SIGN_STYLE = Automatic; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; };
-06CB67C35A91E16DBD17B949 = { isa = XCConfigurationList; buildConfigurations = (B00CCDD09424E369308D67FA,1B104479E55E37CF8A63CBDF,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-DD3F495F7D6A5AA1C1769021 = { isa = XCBuildConfiguration; name = Debug; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios.uitests; GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = 1; TEST_TARGET_NAME = TgWatchIOS; CODE_SIGN_STYLE = Automatic; ONLY_ACTIVE_ARCH = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; }; };
-E670BC2FFE794172EBC92AE3 = { isa = XCBuildConfiguration; name = Release; buildSettings = { SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios.uitests; GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = 1; TEST_TARGET_NAME = TgWatchIOS; CODE_SIGN_STYLE = Automatic; SWIFT_OPTIMIZATION_LEVEL = "-O"; }; };
-5FA394EFD07597E96CACD8E1 = { isa = XCConfigurationList; buildConfigurations = (DD3F495F7D6A5AA1C1769021,E670BC2FFE794172EBC92AE3,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-A172CEDCAE47474B615C54D5 = { isa = PBXNativeTarget; name = TgWatchIOS; productName = TgWatchIOS; productType = "com.apple.product-type.application"; productReference = AE0042EC290704DA7E641B97; buildConfigurationList = 06CB67C35A91E16DBD17B949; buildPhases = (878A52FC5FF6A57D50B7B870,E2AA269EB967A8853A258BFA,41D311A605520FC7B8B9A980,); buildRules = (); dependencies = (); packageProductDependencies = (8473FB7C391915EE75DAD5DA,); };
-1241936D4DD3AAD68FE7BFBD = { isa = PBXContainerItemProxy; containerPortal = 244210E48437B6556980A702; proxyType = 1; remoteGlobalIDString = A172CEDCAE47474B615C54D5; remoteInfo = TgWatchIOS; };
-8CE3E71EF8635D2BF27913BB = { isa = PBXTargetDependency; target = A172CEDCAE47474B615C54D5; targetProxy = 1241936D4DD3AAD68FE7BFBD; };
-9F86D081884C7D659A2FEAA0 = { isa = PBXNativeTarget; name = TgWatchIOSUITests; productName = TgWatchIOSUITests; productType = "com.apple.product-type.bundle.ui-testing"; productReference = E7F08BCC397888750F5CB9BD; buildConfigurationList = 5FA394EFD07597E96CACD8E1; buildPhases = (798B65A4B63A4D08FDD4C755,497639E2F38DB3F946CE62A2,14F0309E5479D955E2A2D11E,); buildRules = (); dependencies = (8CE3E71EF8635D2BF27913BB,); };
-244210E48437B6556980A702 = { isa = PBXProject; attributes = { LastUpgradeCheck = 1600; TargetAttributes = { 9F86D081884C7D659A2FEAA0 = { TestTargetID = A172CEDCAE47474B615C54D5; }; }; }; buildConfigurationList = 76F8DEC3DFE0BDB465198890; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en,ru,Base); mainGroup = C8D2DC745BFC63C0D67231CE; productRefGroup = 0A3E27B8CA818264D75C8D81; projectDirPath = ""; projectRoot = ""; packageReferences = (BC4A71180870F7945155FBB0,); targets = (A172CEDCAE47474B615C54D5,9F86D081884C7D659A2FEAA0,); };
-}; rootObject = 244210E48437B6556980A702; }
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		19BEB30B3630D8ECA62FE26D /* MonitorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8085ACBDAA0C6AA823116375 /* MonitorController.swift */; };
+		414D458A4445833FCC3E9669 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6D123AE8AB04EEE632CC6C18 /* PrivacyInfo.xcprivacy */; };
+		7DD049EBA46A7A78599CAA9D /* MonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30CDB58647C550F45A6333C /* MonitorView.swift */; };
+		7DF3B0A0A5761723E9E5AF4C /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F80855CCDBAAC7FFC06E2C /* HistoryView.swift */; };
+		961AF94FF63CC06BD9BF9A7F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A3CACB75505CC02B52B47594 /* Localizable.strings */; };
+		983F0F46AB46428C5B0DB268 /* TgWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E37A5146930C161A715EA6 /* TgWatchApp.swift */; };
+		D53A1E78D52CD91FE23E510B /* MonitorFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9619E170DD2B21FD548B4ACC /* MonitorFlowTests.swift */; };
+		DFF24E7A1C76B5E442974323 /* TgWatchCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8473FB7C391915EE75DAD5DA /* TgWatchCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1241936D4DD3AAD68FE7BFBD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 244210E48437B6556980A702 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A172CEDCAE47474B615C54D5;
+			remoteInfo = TgWatchIOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0110863C083207ED3792378B /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		56E37A5146930C161A715EA6 /* TgWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TgWatchApp.swift; sourceTree = "<group>"; };
+		6D123AE8AB04EEE632CC6C18 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8085ACBDAA0C6AA823116375 /* MonitorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorController.swift; sourceTree = "<group>"; };
+		85F80855CCDBAAC7FFC06E2C /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		9619E170DD2B21FD548B4ACC /* MonitorFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorFlowTests.swift; sourceTree = "<group>"; };
+		9B48742E5B43ED2EF7D9652E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		AE0042EC290704DA7E641B97 /* TgWatchIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = TgWatchIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E7F08BCC397888750F5CB9BD /* TgWatchIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = TgWatchIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F30CDB58647C550F45A6333C /* MonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		497639E2F38DB3F946CE62A2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E2AA269EB967A8853A258BFA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DFF24E7A1C76B5E442974323 /* TgWatchCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0A3E27B8CA818264D75C8D81 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AE0042EC290704DA7E641B97 /* TgWatchIOS.app */,
+				E7F08BCC397888750F5CB9BD /* TgWatchIOSUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B16F46D5F0DDFEAA3985B262 /* TgWatchIOSUITests */ = {
+			isa = PBXGroup;
+			children = (
+				9619E170DD2B21FD548B4ACC /* MonitorFlowTests.swift */,
+			);
+			path = TgWatchIOSUITests;
+			sourceTree = "<group>";
+		};
+		C8D2DC745BFC63C0D67231CE = {
+			isa = PBXGroup;
+			children = (
+				E17E80AD8E2103CF3FC3FD96 /* TgWatchIOS */,
+				B16F46D5F0DDFEAA3985B262 /* TgWatchIOSUITests */,
+				0A3E27B8CA818264D75C8D81 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E17E80AD8E2103CF3FC3FD96 /* TgWatchIOS */ = {
+			isa = PBXGroup;
+			children = (
+				56E37A5146930C161A715EA6 /* TgWatchApp.swift */,
+				8085ACBDAA0C6AA823116375 /* MonitorController.swift */,
+				F30CDB58647C550F45A6333C /* MonitorView.swift */,
+				85F80855CCDBAAC7FFC06E2C /* HistoryView.swift */,
+				6D123AE8AB04EEE632CC6C18 /* PrivacyInfo.xcprivacy */,
+				A3CACB75505CC02B52B47594 /* Localizable.strings */,
+			);
+			path = TgWatchIOS;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9F86D081884C7D659A2FEAA0 /* TgWatchIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5FA394EFD07597E96CACD8E1 /* Build configuration list for PBXNativeTarget "TgWatchIOSUITests" */;
+			buildPhases = (
+				798B65A4B63A4D08FDD4C755 /* Sources */,
+				497639E2F38DB3F946CE62A2 /* Frameworks */,
+				14F0309E5479D955E2A2D11E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8CE3E71EF8635D2BF27913BB /* PBXTargetDependency */,
+			);
+			name = TgWatchIOSUITests;
+			productName = TgWatchIOSUITests;
+			productReference = E7F08BCC397888750F5CB9BD /* TgWatchIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A172CEDCAE47474B615C54D5 /* TgWatchIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 06CB67C35A91E16DBD17B949 /* Build configuration list for PBXNativeTarget "TgWatchIOS" */;
+			buildPhases = (
+				878A52FC5FF6A57D50B7B870 /* Sources */,
+				E2AA269EB967A8853A258BFA /* Frameworks */,
+				41D311A605520FC7B8B9A980 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TgWatchIOS;
+			packageProductDependencies = (
+				8473FB7C391915EE75DAD5DA /* TgWatchCore */,
+			);
+			productName = TgWatchIOS;
+			productReference = AE0042EC290704DA7E641B97 /* TgWatchIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		244210E48437B6556980A702 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2720;
+				TargetAttributes = {
+					9F86D081884C7D659A2FEAA0 = {
+						TestTargetID = A172CEDCAE47474B615C54D5;
+					};
+				};
+			};
+			buildConfigurationList = 76F8DEC3DFE0BDB465198890 /* Build configuration list for PBXProject "TgWatchIOS" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				ru,
+				Base,
+			);
+			mainGroup = C8D2DC745BFC63C0D67231CE;
+			packageReferences = (
+				BC4A71180870F7945155FBB0 /* XCLocalSwiftPackageReference "TgWatchCore" */,
+			);
+			productRefGroup = 0A3E27B8CA818264D75C8D81 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A172CEDCAE47474B615C54D5 /* TgWatchIOS */,
+				9F86D081884C7D659A2FEAA0 /* TgWatchIOSUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		14F0309E5479D955E2A2D11E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		41D311A605520FC7B8B9A980 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				414D458A4445833FCC3E9669 /* PrivacyInfo.xcprivacy in Resources */,
+				961AF94FF63CC06BD9BF9A7F /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		798B65A4B63A4D08FDD4C755 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D53A1E78D52CD91FE23E510B /* MonitorFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		878A52FC5FF6A57D50B7B870 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				983F0F46AB46428C5B0DB268 /* TgWatchApp.swift in Sources */,
+				19BEB30B3630D8ECA62FE26D /* MonitorController.swift in Sources */,
+				7DD049EBA46A7A78599CAA9D /* MonitorView.swift in Sources */,
+				7DF3B0A0A5761723E9E5AF4C /* HistoryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8CE3E71EF8635D2BF27913BB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A172CEDCAE47474B615C54D5 /* TgWatchIOS */;
+			targetProxy = 1241936D4DD3AAD68FE7BFBD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		A3CACB75505CC02B52B47594 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				9B48742E5B43ED2EF7D9652E /* en */,
+				0110863C083207ED3792378B /* ru */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		0B0C687DF8B6B8DC790B519C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEVELOPMENT_TEAM = 4HRZFZ4M6Y;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1B104479E55E37CF8A63CBDF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TgWatch;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		73EBF6644258C120893E685D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEVELOPMENT_TEAM = 4HRZFZ4M6Y;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B00CCDD09424E369308D67FA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TgWatch;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		DD3F495F7D6A5AA1C1769021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TgWatchIOS;
+			};
+			name = Debug;
+		};
+		E670BC2FFE794172EBC92AE3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ru.tgwatch.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TgWatchIOS;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		06CB67C35A91E16DBD17B949 /* Build configuration list for PBXNativeTarget "TgWatchIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B00CCDD09424E369308D67FA /* Debug */,
+				1B104479E55E37CF8A63CBDF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5FA394EFD07597E96CACD8E1 /* Build configuration list for PBXNativeTarget "TgWatchIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DD3F495F7D6A5AA1C1769021 /* Debug */,
+				E670BC2FFE794172EBC92AE3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		76F8DEC3DFE0BDB465198890 /* Build configuration list for PBXProject "TgWatchIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				73EBF6644258C120893E685D /* Debug */,
+				0B0C687DF8B6B8DC790B519C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		BC4A71180870F7945155FBB0 /* XCLocalSwiftPackageReference "TgWatchCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = TgWatchCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8473FB7C391915EE75DAD5DA /* TgWatchCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC4A71180870F7945155FBB0 /* XCLocalSwiftPackageReference "TgWatchCore" */;
+			productName = TgWatchCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 244210E48437B6556980A702 /* Project object */;
+}
