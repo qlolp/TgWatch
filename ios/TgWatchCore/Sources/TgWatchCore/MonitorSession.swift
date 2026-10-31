@@ -9,7 +9,7 @@ import Foundation
     public var onChange: (() -> Void)?
     public var onObservation: ((ProbeSnapshot) -> Void)?
     private let runner: any ProbeRunner
-    private let interval: Duration
+    private var interval: Duration
     private let now: @Sendable () -> Date
     private let instant: @Sendable () -> ContinuousClock.Instant
     private var receivedWall: Date?
@@ -31,7 +31,13 @@ import Foundation
         return age >= .zero && age <= .seconds(120) && abs(now().timeIntervalSince(receivedWall) - seconds) <= 5
     }
     public func checkNow() {
-        guard active, batch == nil else { return }
+        guard active else { return }
+        if batch != nil {
+            // A canceled request still owns transport teardown. Retain one explicit
+            // replacement request instead of dropping a tap on the now-visible button.
+            if !checking { pendingCheck = true; checking = true; onChange?() }
+            return
+        }
         if snapshot != nil && !isFresh() { epoch &+= 1; snapshot = nil }
         if pathUnavailable {
             let time = now()
@@ -63,6 +69,10 @@ import Foundation
     public func setActive(_ value: Bool) {
         guard value != active else { return }
         active = value; invalidate()
+    }
+    public func setInterval(_ value: Duration) {
+        guard value >= .seconds(1), value != interval else { return }
+        interval=value; invalidate()
     }
     public func setMonitoring(_ value: Bool) { monitoring = value; restartLoop(); onChange?() }
     public func networkChanged(unavailable: Bool) { pathUnavailable = unavailable; invalidate() }

@@ -1,9 +1,11 @@
 import Foundation
 public enum ProbeStatus: String, Codable, Sendable { case ok, partial, down, noNetwork, unknown }
 public struct ProbeEvidence: Codable, Equatable, Sendable {
+    public var service: ServiceEvidence?
     public var mtprotoConfirmed, webConfirmed, controlConfirmed, pathUnavailable, primaryMeasurementsComplete: Bool
     public init(mtprotoConfirmed: Bool = false, webConfirmed: Bool = false, controlConfirmed: Bool = false,
-                pathUnavailable: Bool = false, primaryMeasurementsComplete: Bool = false) {
+                pathUnavailable: Bool = false, primaryMeasurementsComplete: Bool = false, service: ServiceEvidence? = nil) {
+        self.service = service
         self.mtprotoConfirmed = mtprotoConfirmed; self.webConfirmed = webConfirmed
         self.controlConfirmed = controlConfirmed; self.pathUnavailable = pathUnavailable
         self.primaryMeasurementsComplete = primaryMeasurementsComplete
@@ -11,6 +13,7 @@ public struct ProbeEvidence: Codable, Equatable, Sendable {
 }
 public func classify(_ evidence: ProbeEvidence) -> ProbeStatus {
     if evidence.pathUnavailable { return .noNetwork }
+    if let service = evidence.service { return service.status }
     if evidence.mtprotoConfirmed && evidence.webConfirmed { return .ok }
     if evidence.mtprotoConfirmed || evidence.webConfirmed { return .partial }
     if evidence.primaryMeasurementsComplete && evidence.controlConfirmed { return .down }

@@ -49,6 +49,69 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Se
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
 }
+private struct ServiceHTTPResponse: Sendable {
+    let code: Int
+    let body: Data
+    let complete: Bool
+}
+public struct AppleServiceTransport: ServiceTransport, @unchecked Sendable {
+    private let configuration: URLSessionConfiguration
+    private let matrixURL, whatsappURL, controlURL: URL
+    public init() {
+        configuration = .ephemeral; matrixURL=ServiceTarget.matrix.endpoint!; whatsappURL=ServiceTarget.whatsapp.endpoint!
+        controlURL=URL(string:"https://www.gstatic.com/generate_204")!
+    }
+    init(configuration: URLSessionConfiguration, matrixURL: URL = ServiceTarget.matrix.endpoint!,
+         whatsappURL: URL = ServiceTarget.whatsapp.endpoint!, controlURL: URL = URL(string:"https://www.gstatic.com/generate_204")!) {
+        self.configuration=configuration.copy() as! URLSessionConfiguration
+        self.matrixURL=matrixURL; self.whatsappURL=whatsappURL; self.controlURL=controlURL
+    }
+    public func probe(target: ServiceTarget, deadline: ContinuousClock.Instant) async throws -> ServiceEvidence {
+        guard target != .telegram else { return .init(target:target,outcome:.unknown) }
+        let response=try await request(url:target == .matrix ? matrixURL : whatsappURL,matrix:target == .matrix,deadline:deadline)
+        return .init(target:target,outcome:ServicePolicy.evaluate(target:target,code:response.code,body:response.body,complete:response.complete),httpCode:response.code)
+    }
+    public func control(deadline: ContinuousClock.Instant) async throws -> Bool {
+        let response=try await request(url:controlURL,matrix:false,deadline:deadline)
+        return (100...499).contains(response.code)
+    }
+    private func request(url: URL, matrix: Bool, deadline: ContinuousClock.Instant) async throws -> ServiceHTTPResponse {
+        try await withThrowingTaskGroup(of:ServiceHTTPResponse.self) { group in
+            group.addTask { try await Task.sleep(until:deadline,clock:.continuous); throw URLError(.timedOut) }
+            group.addTask {
+                let config=self.configuration.copy() as! URLSessionConfiguration
+                config.httpCookieStorage=nil; config.urlCache=nil; config.httpShouldSetCookies=false
+                let session=URLSession(configuration:config,delegate:NoRedirects(),delegateQueue:nil)
+                defer { session.invalidateAndCancel() }
+                for method in matrix ? ["GET"] : ["HEAD","GET"] {
+                    try Task.checkCancellation()
+                    let remaining=ContinuousClock.now.duration(to:deadline)
+                    guard remaining > .zero else { throw URLError(.timedOut) }
+                    var request=URLRequest(url:url); request.httpMethod=method; request.cachePolicy = .reloadIgnoringLocalCacheData
+                    request.timeoutInterval=min(3,Double(remaining.components.seconds)+Double(remaining.components.attoseconds)/1e18)
+                    if matrix { request.setValue("application/json",forHTTPHeaderField:"Accept"); request.setValue("identity",forHTTPHeaderField:"Accept-Encoding") }
+                    let (stream,response)=try await session.bytes(for:request)
+                    guard let http=response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+                    if method == "HEAD" && [405,501].contains(http.statusCode) { continue }
+                    guard matrix && (200...299).contains(http.statusCode) else { return .init(code:http.statusCode,body:Data(),complete:true) }
+                    var bytes=Data()
+                    for try await byte in stream {
+                        try Task.checkCancellation()
+                        guard bytes.count < ServicePolicy.maxBytes else { return .init(code:http.statusCode,body:bytes,complete:false) }
+                        bytes.append(byte)
+                    }
+                    return .init(code:http.statusCode,body:bytes,complete:true)
+                }
+                throw URLError(.badServerResponse)
+            }
+            defer { group.cancelAll() }
+            guard let result=try await group.next() else { throw CancellationError() }
+            try Task.checkCancellation()
+            guard ContinuousClock.now < deadline else { throw URLError(.timedOut) }
+            return result
+        }
+    }
+}
 public struct CloudflareCountryLookup: CountryLookup, @unchecked Sendable {
     private let configuration: URLSessionConfiguration
     private let endpoint: URL

@@ -31,7 +31,42 @@ private final class FixtureURLProtocol: URLProtocol, @unchecked Sendable {
     }
     override func stopLoading() {}
 }
+private final class ServiceURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let path=request.url!.path
+        if path == "/tls" { client?.urlProtocol(self,didFailWithError:URLError(.serverCertificateUntrusted)); return }
+        if path == "/timeout" { client?.urlProtocol(self,didFailWithError:URLError(.timedOut)); return }
+        let fallback=path == "/fallback" && request.httpMethod == "HEAD"
+        let code=fallback ? 405 : path == "/redirect" ? 302 : path == "/rate" ? 429 : 200
+        let headers=path == "/redirect" ? ["Location":"https://fixture.invalid/valid"] : nil
+        let response=HTTPURLResponse(url:request.url!,statusCode:code,httpVersion:"HTTP/1.1",headerFields:headers)!
+        client?.urlProtocol(self,didReceive:response,cacheStoragePolicy:.notAllowed)
+        let body=path == "/large" ? Data(repeating:65,count:65537) : Data((path == "/html" ? "<html>Login</html>" : "{\"versions\":[\"v1.11\"]}").utf8)
+        client?.urlProtocol(self,didLoad:body); client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
 final class AppleTransportTests: XCTestCase {
+    func testPublicServiceTransportSemanticsAndBounds() async throws {
+        let config=URLSessionConfiguration.ephemeral; config.protocolClasses=[ServiceURLProtocol.self]
+        for (path,expected): (String,ServiceOutcome) in [("valid",.matrixVersions),("html",.invalidPayload),("large",.invalidPayload),("redirect",.httpError),("rate",.httpError)] {
+            let probe=AppleServiceTransport(configuration:config,matrixURL:URL(string:"https://fixture.invalid/\(path)")!)
+            let result=try await probe.probe(target:.matrix,deadline:.now.advanced(by:.seconds(1)))
+            XCTAssertEqual(result.outcome,expected,path)
+        }
+        for path in ["redirect","rate","fallback"] {
+            let probe=AppleServiceTransport(configuration:config,whatsappURL:URL(string:"https://fixture.invalid/\(path)")!)
+            let result=try await probe.probe(target:.whatsapp,deadline:.now.advanced(by:.seconds(1)))
+            XCTAssertEqual(result.outcome,.httpResponse)
+            XCTAssertEqual(result.httpCode,path == "fallback" ? 200 : path == "rate" ? 429 : 302)
+        }
+        for path in ["tls","timeout"] {
+            let probe=AppleServiceTransport(configuration:config,matrixURL:URL(string:"https://fixture.invalid/\(path)")!)
+            do { _ = try await probe.probe(target:.matrix,deadline:.now.advanced(by:.seconds(1))); XCTFail(path) } catch {}
+        }
+    }
     func testCountryTransportRejectsRedirectErrorsAndOversize() async throws {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [FixtureURLProtocol.self]
         for path in ["country", "redirect", "server-error", "oversized", "ok"] {

@@ -12,17 +12,19 @@ public struct HistoryReport: Sendable {
     public let observations: [HistoryEntry]
     public let incidents: [HistoryIncident]
     public let from, until: Date
+    public let target: ServiceTarget
     private let durations: [ProbeStatus: TimeInterval]
     private let currentIDs: Set<UUID>
     public var coveredSeconds: TimeInterval { durations.filter { $0.key != .unknown }.values.reduce(0,+) }
     public func seconds(_ status: ProbeStatus) -> TimeInterval { durations[status, default: 0] }
-    public init(entries: [HistoryEntry], from: Date, until: Date) {
+    public init(entries: [HistoryEntry], from: Date, until: Date, target: ServiceTarget = .telegram) {
+        self.target = target
         self.from = from; self.until = until
         guard from.timeIntervalSince1970.isFinite, until.timeIntervalSince1970.isFinite, until >= from else {
             observations = []; incidents = []; durations = [:]; currentIDs = []; return
         }
         var seen = Set<UUID>()
-        let unique = entries.suffix(10_000).filter { $0.observedAt.timeIntervalSince1970.isFinite && seen.insert($0.id).inserted }
+        let unique = entries.suffix(10_000).filter { $0.targetID == target && $0.observedAt.timeIntervalSince1970.isFinite && seen.insert($0.id).inserted }
         observations = unique.filter { $0.observedAt >= from && $0.observedAt <= until }
         var segment: [HistoryEntry] = []
         for row in unique {
@@ -75,7 +77,7 @@ public struct HistoryReport: Sendable {
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime,.withFractionalSeconds]
         let header = "target_id,observed_at_utc,status,epoch,session_id,in_current_statistics\n"
         return header + observations.map {
-            "telegram,\(formatter.string(from:$0.observedAt)),\($0.status.rawValue),\($0.epoch),\($0.sessionID?.uuidString ?? ""),\(currentIDs.contains($0.id))\n"
+            "\($0.targetID.rawValue),\(formatter.string(from:$0.observedAt)),\($0.status.rawValue),\($0.epoch),\($0.sessionID?.uuidString ?? ""),\(currentIDs.contains($0.id))\n"
         }.joined()
     }
 }

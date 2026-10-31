@@ -2,6 +2,8 @@
 { archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
 A11111111111111111111111 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 A22222222222222222222222 = { isa = PBXBuildFile; fileRef = A11111111111111111111111; };
+A33333333333333333333333 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceView.swift; sourceTree = "<group>"; };
+A44444444444444444444444 = { isa = PBXBuildFile; fileRef = A33333333333333333333333; };
 56E37A5146930C161A715EA6 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TgWatchApp.swift; sourceTree = "<group>"; };
 983F0F46AB46428C5B0DB268 = { isa = PBXBuildFile; fileRef = 56E37A5146930C161A715EA6; };
 8085ACBDAA0C6AA823116375 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorController.swift; sourceTree = "<group>"; };
@@ -16,7 +18,7 @@ F30CDB58647C550F45A6333C = { isa = PBXFileReference; lastKnownFileType = sourcec
 0110863C083207ED3792378B = { isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = "ru.lproj/Localizable.strings"; sourceTree = "<group>"; };
 A3CACB75505CC02B52B47594 = { isa = PBXVariantGroup; children = (9B48742E5B43ED2EF7D9652E,0110863C083207ED3792378B,); name = Localizable.strings; sourceTree = "<group>"; };
 961AF94FF63CC06BD9BF9A7F = { isa = PBXBuildFile; fileRef = A3CACB75505CC02B52B47594; };
-E17E80AD8E2103CF3FC3FD96 = { isa = PBXGroup; path = TgWatchIOS; sourceTree = "<group>"; children = (A11111111111111111111111,56E37A5146930C161A715EA6,8085ACBDAA0C6AA823116375,F30CDB58647C550F45A6333C,85F80855CCDBAAC7FFC06E2C,6D123AE8AB04EEE632CC6C18,A3CACB75505CC02B52B47594,); };
+E17E80AD8E2103CF3FC3FD96 = { isa = PBXGroup; path = TgWatchIOS; sourceTree = "<group>"; children = (A33333333333333333333333,A11111111111111111111111,56E37A5146930C161A715EA6,8085ACBDAA0C6AA823116375,F30CDB58647C550F45A6333C,85F80855CCDBAAC7FFC06E2C,6D123AE8AB04EEE632CC6C18,A3CACB75505CC02B52B47594,); };
 9619E170DD2B21FD548B4ACC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorFlowTests.swift; sourceTree = "<group>"; };
 D53A1E78D52CD91FE23E510B = { isa = PBXBuildFile; fileRef = 9619E170DD2B21FD548B4ACC; };
 B16F46D5F0DDFEAA3985B262 = { isa = PBXGroup; path = TgWatchIOSUITests; sourceTree = "<group>"; children = (9619E170DD2B21FD548B4ACC,); };
@@ -27,7 +29,7 @@ C8D2DC745BFC63C0D67231CE = { isa = PBXGroup; sourceTree = "<group>"; children = 
 BC4A71180870F7945155FBB0 = { isa = XCLocalSwiftPackageReference; relativePath = TgWatchCore; };
 8473FB7C391915EE75DAD5DA = { isa = XCSwiftPackageProductDependency; package = BC4A71180870F7945155FBB0; productName = TgWatchCore; };
 DFF24E7A1C76B5E442974323 = { isa = PBXBuildFile; productRef = 8473FB7C391915EE75DAD5DA; };
-878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (983F0F46AB46428C5B0DB268,19BEB30B3630D8ECA62FE26D,7DD049EBA46A7A78599CAA9D,7DF3B0A0A5761723E9E5AF4C,); runOnlyForDeploymentPostprocessing = 0; };
+878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A44444444444444444444444,983F0F46AB46428C5B0DB268,19BEB30B3630D8ECA62FE26D,7DD049EBA46A7A78599CAA9D,7DF3B0A0A5761723E9E5AF4C,); runOnlyForDeploymentPostprocessing = 0; };
 41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A22222222222222222222222,414D458A4445833FCC3E9669,961AF94FF63CC06BD9BF9A7F,); runOnlyForDeploymentPostprocessing = 0; };
 E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (DFF24E7A1C76B5E442974323,); runOnlyForDeploymentPostprocessing = 0; };
 798B65A4B63A4D08FDD4C755 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (D53A1E78D52CD91FE23E510B,); runOnlyForDeploymentPostprocessing = 0; };

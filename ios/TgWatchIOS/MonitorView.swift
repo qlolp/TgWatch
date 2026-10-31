@@ -44,6 +44,9 @@ struct MonitorView: View {
                         Text("foregroundExplanation").font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("foregroundExplanation")
                     }.card()
                     countryCard
+                    NavigationLink { ServiceView(controller:controller) } label: {
+                        Label("serviceChecks", systemImage:"network").frame(maxWidth:.infinity,alignment:.leading)
+                    }.accessibilityIdentifier("serviceChecks").card()
                     VStack(alignment: .leading, spacing: 12) {
                         Label("connectionAlerts", systemImage: "bell.badge").font(.headline)
                         Text(LocalizedStringKey(controller.notificationPermission)).font(.subheadline).accessibilityIdentifier("notificationPermission")

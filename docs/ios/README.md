@@ -31,13 +31,13 @@ downloads runtimes, signs into an account or uses `-allowProvisioningUpdates`.
 The isolated iOS workflow proposes macos-26/Xcode 26.6, based on the published runner inventory.
 This does not establish compatibility with the owner's reported iOS 27.2.
 
-UI fixtures are enabled only in DEBUG with `--fixture ok|offline|slow|history`; they use isolated ephemeral
+UI fixtures are enabled only in DEBUG with `--fixture ok|offline|slow|history|services-slow`; they use isolated ephemeral
 history, disable live path observation and display a visible fixture banner. Release cannot select them.
 Tests must never depend on a currently reachable public Telegram endpoint.
 
 ## Data and privacy
 
-History schema 1 is local to iOS: 7 days / 10,000 entries, 8 MiB decode ceiling, atomic replacement.
+History schemas 1 (legacy Telegram) and 2 (typed targets) are local to iOS: 7 days / 10,000 entries, 8 MiB decode ceiling, atomic replacement.
 A corrupted file remains untouched until explicit Delete history. Failed writes keep bounded dirty entries
 in memory for retry; the UI reports storage failure. No Android backup import is claimed.
 Results expire after 120 seconds. History entries are observations, not fabricated coverage while suspended.
@@ -53,3 +53,5 @@ See [toolchain and verification](toolchain.md) and [device procedure](device-tes
 See [Android parity and alert acceptance](android-parity.md) for country privacy, notification semantics, platform limits and remaining work.
 
 History now includes 24h/7d sampled coverage, confirmed/unconfirmed incident episodes and explicit CSV export. Legacy records without a session UUID remain visible but do not prove continuity across launches. See [history contract](history-plan.md).
+
+[Public Matrix and WhatsApp targets](services-plan.md) have separate visible-screen checks and per-target history. Their response criteria do not prove account access, delivery or regional availability. Telegram alone drives notifications.

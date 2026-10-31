@@ -4,10 +4,14 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public let schemaVersion: Int
     public let epoch: UInt64
     public let sessionID: UUID?
+    public let target: ServiceTarget?
+    public let service: ServiceEvidence?
+    public var targetID: ServiceTarget { target ?? .telegram }
     public let observedAt: Date
     public let status: ProbeStatus
-    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, sessionID: UUID? = nil) {
-        id = UUID(); schemaVersion = 1; self.epoch = epoch; self.observedAt = observedAt; self.status = status; self.sessionID = sessionID
+    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, sessionID: UUID? = nil, target: ServiceTarget? = nil, service: ServiceEvidence? = nil) {
+        self.target = target; self.service = service
+        id = UUID(); schemaVersion = target == nil ? 1 : 2; self.epoch = epoch; self.observedAt = observedAt; self.status = status; self.sessionID = sessionID
     }
 }
 public actor HistoryStore {
@@ -24,7 +28,10 @@ public actor HistoryStore {
         let data = try handle.read(upToCount: 8*1024*1024+1) ?? Data()
         guard data.count <= 8*1024*1024 else { throw Failure.oversized }
         let decoded = try JSONDecoder().decode([HistoryEntry].self, from: data)
-        guard decoded.allSatisfy({ $0.schemaVersion == 1 && $0.observedAt.timeIntervalSince1970.isFinite }) else { throw Failure.unsupportedSchema }
+        guard decoded.allSatisfy({ entry in
+            let schemaOK = entry.schemaVersion == 1 ? entry.target == nil && entry.service == nil : entry.schemaVersion == 2 && entry.target != nil
+            return schemaOK && entry.observedAt.timeIntervalSince1970.isFinite && (entry.service == nil || entry.service?.target == entry.targetID)
+        }) else { throw Failure.unsupportedSchema }
         entries = prune(decoded, at: now()); return entries!
     }
     public func append(_ entry: HistoryEntry) throws {

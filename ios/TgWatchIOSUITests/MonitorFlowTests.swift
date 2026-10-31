@@ -28,6 +28,28 @@ final class MonitorFlowTests: XCTestCase {
         app.alerts.buttons["Delete history"].tap()
         XCTAssertTrue(app.staticTexts["historyEmpty"].waitForExistence(timeout: 5))
     }
+    func testAdditionalServiceCheckHasOwnHistory() {
+        let app=XCUIApplication(); app.launchArguments=["--fixture","ok","-AppleLanguages","(en)"]
+        app.launch()
+        for _ in 0..<6 { if app.buttons["serviceChecks"].isHittable { break }; app.swipeUp() }
+        app.buttons["serviceChecks"].tap(); app.buttons["checkService"].tap()
+        XCTAssertTrue(app.staticTexts["Matrix versions response confirmed"].waitForExistence(timeout:5))
+        app.buttons["serviceHistory"].tap()
+        XCTAssertTrue(app.buttons["exportHistory"].isEnabled)
+        let shot=XCTAttachment(screenshot:app.screenshot()); shot.name="Matrix selected history"; shot.lifetime = .keepAlways; add(shot)
+    }
+    func testSwitchingServiceCancelsOldRequest() {
+        let app=XCUIApplication(); app.launchArguments=["--fixture","services-slow","-AppleLanguages","(en)"]
+        app.launch()
+        for _ in 0..<6 { if app.buttons["serviceChecks"].isHittable { break }; app.swipeUp() }
+        app.buttons["serviceChecks"].tap(); app.buttons["checkService"].tap()
+        XCTAssertTrue(app.buttons["cancelService"].waitForExistence(timeout:3))
+        app.segmentedControls["serviceTarget"].buttons["WhatsApp Web"].tap()
+        XCTAssertTrue(app.buttons["checkService"].waitForExistence(timeout:3)); app.buttons["checkService"].tap()
+        XCTAssertTrue(app.staticTexts["HTTP 401"].waitForExistence(timeout:5))
+        XCTAssertFalse(app.staticTexts["Matrix versions response confirmed"].exists)
+        let shot=XCTAttachment(screenshot:app.screenshot()); shot.name="WhatsApp response is not account access"; shot.lifetime = .keepAlways; add(shot)
+    }
     func testQuietDayIncidentCenterStaysReachable() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]
         app.launch(); app.buttons["history"].tap(); app.buttons["incidents"].tap()

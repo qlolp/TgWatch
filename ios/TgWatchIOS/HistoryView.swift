@@ -5,14 +5,21 @@ struct HistoryView: View {
     @ObservedObject var controller: MonitorController
     @State private var confirming = false
     @State private var days = 1
+    @State private var target: ServiceTarget
     @State private var exporting = false
     @State private var exportFailed = false
     @State private var document = HistoryCSVDocument()
+    init(controller: MonitorController, target: ServiceTarget = .telegram) {
+        self.controller=controller; _target=State(initialValue:target)
+    }
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            let report = HistoryReport(entries: controller.history, from: context.date.addingTimeInterval(-Double(days)*86400), until: context.date)
+            let report = HistoryReport(entries: controller.history, from: context.date.addingTimeInterval(-Double(days)*86400), until: context.date, target:target)
             List {
                 Section {
+                    Picker("historyTarget", selection:$target) {
+                        ForEach(ServiceTarget.allCases,id:\.rawValue) { Text($0.name).tag($0) }
+                    }.accessibilityIdentifier("historyTarget")
                     Picker("historyWindow", selection: $days) {
                         Text("history24h").tag(1); Text("history7d").tag(7)
                     }.pickerStyle(.segmented).accessibilityIdentifier("historyWindow")
@@ -28,7 +35,7 @@ struct HistoryView: View {
                     Text("coverageExplanation").font(.footnote)
                     ForEach([ProbeStatus.ok,.partial,.down,.noNetwork,.unknown], id: \.rawValue) { status in
                         LabeledContent { Text(durationText(report.seconds(status))).monospacedDigit() }
-                            label: { Text(LocalizedStringKey("status." + status.rawValue)) }
+                            label: { Text(LocalizedStringKey(report.target.statusKey(status))) }
                     }
                 }
                 Section("observations") {
@@ -36,7 +43,8 @@ struct HistoryView: View {
                     if report.observations.isEmpty { Text("historyEmpty").accessibilityIdentifier("historyEmpty") }
                     ForEach(report.observations.suffix(200).reversed()) { entry in
                         VStack(alignment: .leading) {
-                            Text(LocalizedStringKey("status.\(entry.status.rawValue)"))
+                            Text(LocalizedStringKey(report.target.statusKey(entry.status)))
+                            if let service=entry.service { Text(LocalizedStringKey("serviceOutcome."+service.outcome.rawValue)).font(.caption) }
                             Text(entry.observedAt.formatted(date: .abbreviated, time: .standard)).font(.caption)
                         }.accessibilityElement(children: .combine).accessibilityIdentifier("historyEntry")
                     }
@@ -60,7 +68,7 @@ struct HistoryView: View {
                 Button("cancel", role: .cancel) {}
             }
             .fileExporter(isPresented: $exporting, document: document, contentType: .commaSeparatedText,
-                          defaultFilename: "tgwatch-telegram-history") { result in
+                          defaultFilename: "tgwatch-\(target.rawValue)-history") { result in
                 if case .failure = result { exportFailed = true } else { exportFailed = false }
             }
     }
@@ -69,16 +77,17 @@ private struct IncidentHistoryView: View {
     let report: HistoryReport
     var body: some View {
         List {
-            Text("incidentExplanation").font(.footnote)
+            Text(report.target.name).font(.headline)
+            Text(LocalizedStringKey(report.target == .telegram ? "incidentExplanation" : "serviceIncidentExplanation")).font(.footnote)
             if report.incidents.isEmpty { Text("noIncidents").accessibilityIdentifier("noIncidents") }
             ForEach(report.incidents.reversed()) { incident in
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(LocalizedStringKey("status." + incident.status.rawValue)).font(.headline)
-                    Text(incident.confirmed ? "incidentConfirmed" : "incidentUnconfirmed")
+                    Text(LocalizedStringKey(report.target.statusKey(incident.status))).font(.headline)
+                    Text(LocalizedStringKey(report.target == .telegram ? (incident.confirmed ? "incidentConfirmed" : "incidentUnconfirmed") : (incident.confirmed ? "serviceIncidentConfirmed" : "serviceIncidentUnconfirmed")))
                     LabeledContent("firstObserved", value: incident.startedAt.formatted(date: .abbreviated, time: .standard))
-                    LabeledContent("lastFailure", value: incident.lastObservedAt.formatted(date: .abbreviated, time: .standard))
+                    LabeledContent(LocalizedStringKey(report.target == .telegram ? "lastFailure" : "serviceLastFailure"), value: incident.lastObservedAt.formatted(date: .abbreviated, time: .standard))
                     if let recovery = incident.recoveredAt {
-                        Text("incidentRecovered").foregroundStyle(.green)
+                        Text(LocalizedStringKey(report.target == .telegram ? "incidentRecovered" : "serviceIncidentRecovered")).foregroundStyle(.green)
                         Text(recovery.formatted(date: .abbreviated, time: .standard))
                     } else { Text("recoveryNotObserved").foregroundStyle(.secondary) }
                 }.accessibilityIdentifier("incidentEntry")

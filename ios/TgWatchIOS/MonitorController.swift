@@ -10,6 +10,7 @@ import TgWatchCore
     @Published var notificationPermission = "permission.unknown"
     @Published var notificationFailure = false
     let country: CountrySession
+    let services: SelectedServices
     private var alertPolicy = ConnectionAlertPolicy()
     private let delivery = AlertDelivery(scheduler: AppleAlertScheduler())
     private var notificationsAllowed = false
@@ -24,12 +25,14 @@ import TgWatchCore
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
         preferenceFile = directory.appendingPathComponent("notification-preference.json")
         var isFixture = false
+        var serviceTransport: any ServiceTransport = AppleServiceTransport()
         var countryProvider: any CountryLookup = CloudflareCountryLookup()
         var runner: any ProbeRunner = ProbeEngine(transport: AppleProbeTransport())
         var file = directory.appendingPathComponent("history-v1.json")
         #if DEBUG
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--fixture"), ProcessInfo.processInfo.arguments.count > index + 1 {
             isFixture = true
+            serviceTransport = FixtureServiceTransport(mode: ProcessInfo.processInfo.arguments[index+1])
             countryProvider = CountryFixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
             runner = FixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
             file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("fixture.json")
@@ -37,6 +40,7 @@ import TgWatchCore
         #endif
         fixtureMode = isFixture
         country = CountrySession(provider: countryProvider)
+        services = SelectedServices(transport: serviceTransport)
         session = MonitorSession(runner: runner, interval: .seconds(30)); store = HistoryStore(url: file)
         super.init()
         if !isFixture, let handle = try? FileHandle(forReadingFrom: preferenceFile) {
@@ -46,6 +50,8 @@ import TgWatchCore
             alertsEnabled = (try? JSONDecoder().decode(Bool.self, from: data)) ?? false
             }
         }
+        services.onChange = { [weak self] in self?.objectWillChange.send() }
+        services.onObservation = { [weak self] target, value in self?.save(value,target:target) }
         country.onChange = { [weak self] in self?.objectWillChange.send() }
         UNUserNotificationCenter.current().delegate = self
         delivery.onSubmitted = { [weak self] event in self?.alertPolicy.confirmSubmission(event) }
@@ -60,6 +66,7 @@ import TgWatchCore
                 self.delivery.invalidate()
                 self.session.networkChanged(unavailable: unavailable)
                 self.country.networkChanged(unavailable: unavailable)
+                self.services.networkChanged(unavailable: unavailable)
             }
         }
         if !isFixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.ios.path")) }
@@ -76,7 +83,7 @@ import TgWatchCore
         }
     }
     func setActive(_ active: Bool) {
-        session.setActive(active); country.setActive(active)
+        session.setActive(active); country.setActive(active); services.setActive(active)
         if !active {
             alertPolicy.reset()
             delivery.invalidate()
@@ -128,7 +135,7 @@ import TgWatchCore
         }
     }
     func clockChanged() {
-        delivery.invalidate(); alertPolicy.reset(); session.clockChanged()
+        delivery.invalidate(); alertPolicy.reset(); session.clockChanged(); services.clockChanged()
         country.networkChanged(unavailable: country.unavailable)
     }
     func setMonitoring(_ enabled: Bool) {
@@ -142,12 +149,12 @@ import TgWatchCore
             completionHandler(self?.delivery.canPresent(id: id) == true ? [.banner, .list, .sound] : [])
         }
     }
-    private func save(_ snapshot: ProbeSnapshot) {
+    private func save(_ snapshot: ProbeSnapshot, target: ServiceTarget = .telegram) {
         let sessionID = historySessionID
         let previous = writeTask
         writeTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, sessionID: sessionID)) }
+            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, sessionID: sessionID, target: target == .telegram ? nil : target, service: snapshot.evidence.service)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
         }
@@ -167,6 +174,14 @@ import TgWatchCore
     deinit { path.cancel() }
 }
 #if DEBUG
+private struct FixtureServiceTransport: ServiceTransport {
+    let mode: String
+    func probe(target: ServiceTarget, deadline: ContinuousClock.Instant) async throws -> ServiceEvidence {
+        try await Task.sleep(for: mode == "services-slow" && target == .matrix ? .seconds(300) : .milliseconds(50))
+        return .init(target:target,outcome:target == .matrix ? .matrixVersions : .httpResponse,httpCode:target == .matrix ? 200 : 401)
+    }
+    func control(deadline: ContinuousClock.Instant) async throws -> Bool { true }
+}
 private struct CountryFixtureRunner: CountryLookup {
     let mode: String
     func country() async throws -> String? {
