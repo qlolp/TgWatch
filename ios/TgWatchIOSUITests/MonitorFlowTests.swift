@@ -24,6 +24,22 @@ final class MonitorFlowTests: XCTestCase {
         app.alerts.buttons["Delete history"].tap()
         XCTAssertTrue(app.staticTexts["historyEmpty"].waitForExistence(timeout: 5))
     }
+    func testCountryAndPermissionFixture() {
+        let app = XCUIApplication(); app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]
+        app.launch()
+        for _ in 0..<6 {
+            if app.staticTexts["countryName"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertEqual(app.staticTexts["countryName"].label, "Germany")
+        for _ in 0..<6 {
+            if app.staticTexts["notificationPermission"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["notificationPermission"].label.contains("not sent"))
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Country and alert controls"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
     func testCancelDoesNotProduceHealthyStatus() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "slow"]
         app.launch(); app.buttons["checkNow"].tap(); app.buttons["cancelCheck"].tap()
@@ -50,7 +66,7 @@ final class MonitorFlowTests: XCTestCase {
         expectation(for: predicate, evaluatedWith: app.staticTexts["status"])
         waitForExpectations(timeout: 3)
         for label in ["Telegram Web", "Контрольный адрес"] {
-            for _ in 0..<4 {
+            for _ in 0..<8 {
                 if app.staticTexts[label].exists { break }
                 app.swipeUp()
             }

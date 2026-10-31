@@ -1,7 +1,7 @@
 # TgWatch iPhone MVP
 
 Native SwiftUI foreground Telegram reachability monitor. Minimum deployment target iOS 17;
-no Telegram account, message access, backend, APNs, background timer or notification permission.
+no Telegram account, message access, backend, APNs or background timer. Optional local notification permission supports confirmed foreground loss/recovery alerts.
 MTProto greeting is unauthenticated reachability evidence, not proof of service identity or message delivery.
 Web HTTP 100–499 is an endpoint response, not account availability. Partial/incomplete measurements
 remain distinct from a confirmed negative result. A network transition invalidates outstanding results.
@@ -49,3 +49,5 @@ APIs. Reassess required-reason declarations whenever these APIs are introduced. 
 [required-reason API guidance](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
 See [toolchain and verification](toolchain.md) and [device procedure](device-testing.md).
+
+See [Android parity and alert acceptance](android-parity.md) for country privacy, notification semantics, platform limits and remaining work.

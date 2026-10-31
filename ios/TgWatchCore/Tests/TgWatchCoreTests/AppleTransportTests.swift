@@ -23,14 +23,28 @@ private final class FixtureURLProtocol: URLProtocol, @unchecked Sendable {
         let code = fallback ? (path == "/fallback" ? 405 : 501) : (path == "/redirect" ? 302 : (path == "/server-error" ? 500 : 200))
         let headers = path == "/redirect" ? ["Location": "https://fixture.invalid/ok"] : nil
         let size = path == "/oversized" ? 65537 : 1
+        let body = path == "/country" ? Data("ip=203.0.113.7\nloc=DE\n".utf8) : Data(repeating: 65, count: size)
         let response = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(repeating: 65, count: size))
+        client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
     }
     override func stopLoading() {}
 }
 final class AppleTransportTests: XCTestCase {
+    func testCountryTransportRejectsRedirectErrorsAndOversize() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [FixtureURLProtocol.self]
+        for path in ["country", "redirect", "server-error", "oversized", "ok"] {
+            FixtureURLProtocol.resetRequests()
+            let probe = CloudflareCountryLookup(configuration: config, endpoint: URL(string: "https://fixture.invalid/\(path)")!)
+            let country = try await probe.country()
+            XCTAssertEqual(country, path == "country" ? "DE" : nil, path)
+            XCTAssertEqual(FixtureURLProtocol.requests, ["GET /\(path)"])
+        }
+        let probe = CloudflareCountryLookup(configuration: config, endpoint: URL(string: "https://fixture.invalid/tls")!)
+        do { _ = try await probe.country(); XCTFail("untrusted TLS must fail") } catch {}
+    }
+
     func testBoundedHTTPAndTrustFailures() async throws {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [FixtureURLProtocol.self]
         let probe = HTTPProbe(configuration: config)

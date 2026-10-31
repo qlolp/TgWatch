@@ -49,6 +49,41 @@ private final class NoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Se
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
 }
+public struct CloudflareCountryLookup: CountryLookup, @unchecked Sendable {
+    private let configuration: URLSessionConfiguration
+    private let endpoint: URL
+    public init() { configuration = .ephemeral; endpoint = EgressCountry.endpoint }
+    // Internal transport seam: callers cannot configure production destinations.
+    init(configuration: URLSessionConfiguration, endpoint: URL) {
+        self.configuration = configuration.copy() as! URLSessionConfiguration; self.endpoint = endpoint
+    }
+    public func country() async throws -> String? {
+        try await withThrowingTaskGroup(of: String?.self) { group in
+            group.addTask { try await Task.sleep(for: .seconds(3)); throw URLError(.timedOut) }
+            group.addTask {
+                let configuration = self.configuration.copy() as! URLSessionConfiguration
+                configuration.httpCookieStorage = nil; configuration.urlCache = nil
+                configuration.httpShouldSetCookies = false
+                let session = URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+                defer { session.invalidateAndCancel() }
+                var request = URLRequest(url: self.endpoint)
+                request.httpMethod = "GET"; request.timeoutInterval = 3
+                request.cachePolicy = .reloadIgnoringLocalCacheData
+                let (stream, response) = try await session.bytes(for: request)
+                guard let response = response as? HTTPURLResponse, (200...299).contains(response.statusCode) else { return nil }
+                var bytes = Data()
+                for try await byte in stream {
+                    try Task.checkCancellation()
+                    guard bytes.count < EgressCountry.maxBytes else { return nil }
+                    bytes.append(byte)
+                }
+                return EgressCountry.parse(bytes)
+            }
+            defer { group.cancelAll() }
+            return try await group.next() ?? nil
+        }
+    }
+}
 public enum TCPProbe {
     public static func check(endpoint: String, port: UInt16 = 443, nonce: Data, deadline: ContinuousClock.Instant) async throws -> Bool {
         let request = try MTProtoCodec.makeRequest(nonce: nonce)

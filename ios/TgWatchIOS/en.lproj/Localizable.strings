@@ -3,7 +3,7 @@
 "checkNow" = "Check now";
 "checking" = "Checking…";
 "cancel" = "Cancel";
-"monitorWhileOpen" = "Check every minute while open";
+"monitorWhileOpen" = "Check every 30 seconds while open";
 "evidence" = "Evidence";
 "telegramWeb" = "Telegram Web";
 "controlEndpoint" = "Control endpoint";
@@ -23,3 +23,26 @@
 "status.down" = "Telegram probes failed; control responded";
 "status.noNetwork" = "No connection";
 "status.unknown" = "Unknown";
+
+"connectionOverview" = "Telegram connection";
+"egressCountry" = "Internet exit country";
+"countryVerified" = "Last checked country";
+"countryStale" = "Outdated — refresh to verify";
+"countryChecking" = "Checking country…";
+"countryUnknown" = "Country unknown";
+"refreshCountry" = "Refresh country";
+"countryPrivacy" = "Cloudflare estimates the country of this HTTPS connection and sees its source IP. Only the country is retained. This is not GPS or proof of Telegram routing.";
+"connectionAlerts" = "Connection alerts";
+"alertsWhileOpen" = "Notify while app is open";
+"allowNotifications" = "Request notification permission";
+"alertLimits" = "Two consecutive checks confirm loss or recovery. Unknown and partial results do not confirm recovery. Requires this app to stay open; no monitoring while locked or in the background. Focus and system settings may silence alerts.";
+"notificationFailure" = "Could not save alert settings or schedule an alert. Retry permission and check system settings.";
+"permission.unknown" = "Permission not granted yet";
+"permission.allowed" = "System permission granted";
+"permission.quiet" = "System permits quiet delivery only";
+"permission.denied" = "Notifications denied — enable in iOS Settings";
+"permission.fixture" = "Test fixture — notifications are not sent";
+"alert.telegramLost" = "Telegram connection lost";
+"alert.networkLost" = "No network — Telegram reachability unknown";
+"alert.recovered" = "Telegram connection restored";
+"alert.observed" = "Confirmed by two checks. Last observation:";
