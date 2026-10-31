@@ -36,12 +36,17 @@ public protocol ServiceTransport: Sendable {
     public private(set) var intervalSeconds = 60
     public let session: MonitorSession
     public var onChange: (() -> Void)?
+    public var onSettingsChange: ((ServiceSettings) -> Void)?
+    public var settings: ServiceSettings { .init(target:target,intervalSeconds:intervalSeconds,automatic:session.monitoring) }
     public var onObservation: ((ServiceTarget,ProbeSnapshot) -> Void)?
     private let runner: ServiceRunner
     private var active=false, visible=false
-    public init(transport: any ServiceTransport) {
-        runner=ServiceRunner(transport:transport)
-        session=MonitorSession(runner:runner,interval:.seconds(60))
+    public init(transport: any ServiceTransport, settings: ServiceSettings = .defaults) {
+        let safe=settings.isValid ? settings : .defaults
+        target=safe.target; intervalSeconds=safe.intervalSeconds
+        runner=ServiceRunner(transport:transport); runner.target=safe.target
+        session=MonitorSession(runner:runner,interval:.seconds(safe.intervalSeconds))
+        session.setMonitoring(safe.automatic) // Inactive and hidden: restoration never starts network work.
         session.onChange = { [weak self] in self?.onChange?() }
         session.onObservation = { [weak self] value in
             guard let self else { return }
@@ -50,11 +55,20 @@ public protocol ServiceTransport: Sendable {
     }
     public func select(_ target: ServiceTarget) {
         guard target != .telegram && target != self.target else { return }
-        self.target=target; runner.target=target; session.clockChanged(); onChange?()
+        self.target=target; runner.target=target; session.clockChanged(); onChange?(); onSettingsChange?(settings)
     }
     public func setInterval(_ seconds: Int) {
         guard [60,120,300].contains(seconds), seconds != intervalSeconds else { return }
-        intervalSeconds=seconds; session.setInterval(.seconds(seconds)); onChange?()
+        intervalSeconds=seconds; session.setInterval(.seconds(seconds)); onChange?(); onSettingsChange?(settings)
+    }
+    public func setAutomatic(_ enabled: Bool) {
+        guard enabled != session.monitoring else { return }
+        session.setMonitoring(enabled); onSettingsChange?(settings)
+    }
+    public func resetSettings() {
+        target = .matrix; intervalSeconds=60; runner.target = .matrix
+        session.setMonitoring(false); session.setInterval(.seconds(60)); session.clockChanged()
+        onChange?(); onSettingsChange?(settings)
     }
     public func setVisible(_ value: Bool) { visible=value; session.setActive(active && visible) }
     public func setActive(_ value: Bool) { active=value; session.setActive(active && visible) }

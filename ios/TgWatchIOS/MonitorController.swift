@@ -9,12 +9,14 @@ import TgWatchCore
     @Published var alertsEnabled = false
     @Published var notificationPermission = "permission.unknown"
     @Published var notificationFailure = false
+    @Published var serviceSettingsUnavailable = false
     let country: CountrySession
     let services: SelectedServices
     private var alertPolicy = ConnectionAlertPolicy()
     private let delivery = AlertDelivery(scheduler: AppleAlertScheduler())
     private var notificationsAllowed = false
     private let preferenceFile: URL
+    private let serviceSettingsStore: ServiceSettingsStore
     private let historySessionID = UUID()
     let fixtureMode: Bool
     let session: MonitorSession
@@ -24,6 +26,7 @@ import TgWatchCore
     override init() {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
         preferenceFile = directory.appendingPathComponent("notification-preference.json")
+        var serviceSettingsFile=directory.appendingPathComponent("service-settings-v1.json")
         var isFixture = false
         var serviceTransport: any ServiceTransport = AppleServiceTransport()
         var countryProvider: any CountryLookup = CloudflareCountryLookup()
@@ -35,20 +38,42 @@ import TgWatchCore
             serviceTransport = FixtureServiceTransport(mode: ProcessInfo.processInfo.arguments[index+1])
             countryProvider = CountryFixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
             runner = FixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
-            file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("fixture.json")
+            var fixtureID=UUID()
+            if let key=ProcessInfo.processInfo.arguments.firstIndex(of:"--fixture-store"),
+               ProcessInfo.processInfo.arguments.count > key+1,
+               let supplied=UUID(uuidString:ProcessInfo.processInfo.arguments[key+1]) { fixtureID=supplied }
+            let fixtureFolder=FileManager.default.temporaryDirectory.appendingPathComponent("tgwatch-fixture-"+fixtureID.uuidString)
+            file = fixtureFolder.appendingPathComponent("fixture.json")
+            serviceSettingsFile=fixtureFolder.appendingPathComponent("service-settings-v1.json")
+            if ProcessInfo.processInfo.arguments[index+1] == "settings-corrupt", !FileManager.default.fileExists(atPath:serviceSettingsFile.path) {
+                try? FileManager.default.createDirectory(at:fixtureFolder,withIntermediateDirectories:true)
+                try? Data("{broken".utf8).write(to:serviceSettingsFile)
+            }
         }
         #endif
         fixtureMode = isFixture
+        let settingsStore=ServiceSettingsStore(url:serviceSettingsFile)
+        serviceSettingsStore=settingsStore
+        let savedSettings: ServiceSettings
+        var settingsLoadFailed=false
+        do { savedSettings=try settingsStore.load() }
+        catch { savedSettings = .defaults; settingsLoadFailed=true }
         country = CountrySession(provider: countryProvider)
-        services = SelectedServices(transport: serviceTransport)
+        services = SelectedServices(transport: serviceTransport,settings:savedSettings)
         session = MonitorSession(runner: runner, interval: .seconds(30)); store = HistoryStore(url: file)
         super.init()
+        serviceSettingsUnavailable=settingsLoadFailed
         if !isFixture, let handle = try? FileHandle(forReadingFrom: preferenceFile) {
             defer { try? handle.close() }
             let data = (try? handle.read(upToCount: 65)) ?? Data()
             if data.count <= 64 {
             alertsEnabled = (try? JSONDecoder().decode(Bool.self, from: data)) ?? false
             }
+        }
+        services.onSettingsChange = { [weak self] value in
+            guard let self else { return }
+            do { try self.serviceSettingsStore.save(value); self.serviceSettingsUnavailable=false }
+            catch { self.serviceSettingsUnavailable=true }
         }
         services.onChange = { [weak self] in self?.objectWillChange.send() }
         services.onObservation = { [weak self] target, value in self?.save(value,target:target) }
@@ -81,6 +106,10 @@ import TgWatchCore
             #endif
             await reload()
         }
+    }
+    func resetServiceSettings() {
+        do { try serviceSettingsStore.reset(); services.resetSettings(); serviceSettingsUnavailable=false }
+        catch { services.setAutomatic(false); serviceSettingsUnavailable=true }
     }
     func setActive(_ active: Bool) {
         session.setActive(active); country.setActive(active); services.setActive(active)

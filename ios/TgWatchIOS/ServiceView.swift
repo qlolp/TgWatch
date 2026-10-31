@@ -2,8 +2,15 @@ import SwiftUI
 import TgWatchCore
 struct ServiceView: View {
     @ObservedObject var controller: MonitorController
+    @State private var confirmingReset=false
     var body: some View {
         List {
+            if controller.serviceSettingsUnavailable {
+                Section {
+                    Text("serviceSettingsFailure").foregroundStyle(.red).accessibilityIdentifier("serviceSettingsFailure")
+                    Button("resetServiceSettings") { confirmingReset=true }.accessibilityIdentifier("resetServiceSettings")
+                }
+            }
             Section {
                 Picker("historyTarget", selection:Binding(get:{controller.services.target},set:controller.services.select)) {
                     Text("Matrix").tag(ServiceTarget.matrix); Text("WhatsApp Web").tag(ServiceTarget.whatsapp)
@@ -34,12 +41,16 @@ struct ServiceView: View {
             Section("serviceSchedule") {
                 Picker("serviceInterval",selection:Binding(get:{controller.services.intervalSeconds},set:controller.services.setInterval)) {
                     Text("service60").tag(60); Text("service120").tag(120); Text("service300").tag(300)
-                }
-                Toggle("serviceAuto",isOn:Binding(get:{controller.services.session.monitoring},set:controller.services.session.setMonitoring))
+                }.pickerStyle(.menu).accessibilityIdentifier("serviceInterval")
+                Toggle("serviceAuto",isOn:Binding(get:{controller.services.session.monitoring},set:controller.services.setAutomatic)).accessibilityIdentifier("serviceAutomatic")
                 Text("serviceLimits").font(.footnote).foregroundStyle(.secondary)
             }
         }.navigationTitle("serviceChecks")
             .toolbar { NavigationLink("history") { HistoryView(controller:controller,target:controller.services.target) }.accessibilityIdentifier("serviceHistory") }
+            .alert("resetServiceSettingsQuestion",isPresented:$confirmingReset) {
+                Button("resetServiceSettings",role:.destructive,action:controller.resetServiceSettings)
+                Button("cancel",role:.cancel) {}
+            }
             .onAppear { controller.services.setVisible(true) }
             .onDisappear { controller.services.setVisible(false) }
     }

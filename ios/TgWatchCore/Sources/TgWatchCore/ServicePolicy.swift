@@ -44,7 +44,7 @@ public enum ServicePolicy {
     }
 }
 /// Bounds nesting before Foundation decoding and rejects duplicate decoded keys at every level.
-private struct UniqueJSON {
+struct UniqueJSON {
     let bytes: [UInt8]
     var index=0, nodes=0
     mutating func valid() -> Bool { guard value(depth:0) else { return false }; space(); return index == bytes.count }

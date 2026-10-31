@@ -55,3 +55,5 @@ See [Android parity and alert acceptance](android-parity.md) for country privacy
 History now includes 24h/7d sampled coverage, confirmed/unconfirmed incident episodes and explicit CSV export. Legacy records without a session UUID remain visible but do not prove continuity across launches. See [history contract](history-plan.md).
 
 [Public Matrix and WhatsApp targets](services-plan.md) have separate visible-screen checks and per-target history. Their response criteria do not prove account access, delivery or regional availability. Telegram alone drives notifications.
+
+Service selection, 60/120/300-second interval and automatic mode persist locally. Defaults are Matrix/60seconds/off; invalid or future settings are preserved until an explicit reset. Restored automatic mode still runs only with the service screen visible and app active; no result is restored as fresh. See [settings contract](service-settings-plan.md).

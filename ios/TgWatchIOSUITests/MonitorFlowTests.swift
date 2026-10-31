@@ -28,6 +28,40 @@ final class MonitorFlowTests: XCTestCase {
         app.alerts.buttons["Delete history"].tap()
         XCTAssertTrue(app.staticTexts["historyEmpty"].waitForExistence(timeout: 5))
     }
+    func testServicePreferencesSurviveRelaunch() {
+        let app=XCUIApplication(), id=UUID().uuidString
+        app.launchArguments=["--fixture","ok","--fixture-store",id,"-AppleLanguages","(en)"]
+        app.launch(); openServices(app)
+        app.segmentedControls["serviceTarget"].buttons["WhatsApp Web"].tap()
+        for _ in 0..<8 { if app.buttons["serviceInterval"].isHittable { break }; app.swipeUp() }
+        app.buttons["serviceInterval"].tap(); app.buttons["300 seconds"].tap()
+        for _ in 0..<8 { if app.switches["serviceAutomatic"].isHittable { break }; app.swipeUp() }
+        app.switches["serviceAutomatic"].tap()
+        app.terminate(); app.launch(); openServices(app)
+        XCTAssertTrue(app.segmentedControls["serviceTarget"].buttons["WhatsApp Web"].isSelected)
+        for _ in 0..<8 { if app.switches["serviceAutomatic"].isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(app.switches["serviceAutomatic"].value as? String,"1")
+        let interval=app.buttons["serviceInterval"]
+        XCTAssertTrue((interval.label + " " + String(describing:interval.value)).contains("300"))
+        let shot=XCTAttachment(screenshot:app.screenshot()); shot.name="Restored service preferences"; shot.lifetime = .keepAlways; add(shot)
+    }
+    func testCorruptServicePreferencesUseDefaultsAndExplicitReset() {
+        let app=XCUIApplication(); app.launchArguments=["--fixture","settings-corrupt","--fixture-store",UUID().uuidString,"-AppleLanguages","(en)"]
+        app.launch(); openServices(app)
+        XCTAssertTrue(app.staticTexts["serviceSettingsFailure"].waitForExistence(timeout:3))
+        app.buttons["resetServiceSettings"].tap()
+        app.alerts.buttons["Reset service settings"].tap()
+        XCTAssertFalse(app.staticTexts["serviceSettingsFailure"].exists)
+        app.terminate(); app.launch(); openServices(app)
+        XCTAssertFalse(app.staticTexts["serviceSettingsFailure"].exists)
+        XCTAssertTrue(app.segmentedControls["serviceTarget"].buttons["Matrix"].isSelected)
+        for _ in 0..<8 { if app.switches["serviceAutomatic"].isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(app.switches["serviceAutomatic"].value as? String,"0")
+    }
+    private func openServices(_ app: XCUIApplication) {
+        for _ in 0..<8 { if app.buttons["serviceChecks"].isHittable { break }; app.swipeUp() }
+        app.buttons["serviceChecks"].tap()
+    }
     func testAdditionalServiceCheckHasOwnHistory() {
         let app=XCUIApplication(); app.launchArguments=["--fixture","ok","-AppleLanguages","(en)"]
         app.launch()

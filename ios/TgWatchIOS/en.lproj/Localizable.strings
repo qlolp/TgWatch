@@ -78,7 +78,7 @@
 "service120" = "120 seconds";
 "service300" = "300 seconds";
 "serviceAuto" = "Repeat while this screen is visible";
-"serviceLimits" = "Results expire after two minutes; a five-minute interval has unknown gaps. Session-only settings. Checks stop when you leave this screen or the app becomes inactive. Telegram monitoring and its alerts are separate. No alerts are sent for these targets. Each request has a 3-second deadline; a failed check may use a separate public control request.";
+"serviceLimits" = "Results expire after two minutes; a five-minute interval has unknown gaps. Selection, interval and repeat mode are saved on this device. Checks stop when you leave this screen or the app becomes inactive. Telegram monitoring and its alerts are separate. No alerts are sent for these targets. Each request has a 3-second deadline; a failed check may use a separate public control request.";
 "serviceStatus.ok" = "Check passed";
 "serviceStatus.down" = "Expected response not confirmed; control responded";
 "serviceStatus.partial" = "Incomplete check";
@@ -96,3 +96,7 @@
 "serviceIncidentUnconfirmed" = "Single failed check — unconfirmed episode";
 "serviceIncidentRecovered" = "Criterion confirmed again";
 "serviceLastFailure" = "Last failed check";
+
+"serviceSettingsFailure" = "Service settings could not be loaded or saved. Unsaved changes may be lost on restart. Unreadable settings use Matrix, 60 seconds and automatic checks off. Reset to restore a valid settings file.";
+"resetServiceSettings" = "Reset service settings";
+"resetServiceSettingsQuestion" = "Reset only the selected service, interval and repeat mode? History and Telegram alerts are kept.";
