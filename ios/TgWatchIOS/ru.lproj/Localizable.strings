@@ -23,3 +23,17 @@
 "status.down" = "Telegram не ответил; контрольный адрес доступен";
 "status.noNetwork" = "Нет подключения";
 "status.unknown" = "Неизвестно";
+
+"connectionOverview" = "Доступность Telegram";
+"lastCheck" = "Последняя проверка";
+"lastCheckStale" = "Результат устарел — повторите проверку";
+"connectToInternet" = "Подключитесь к Wi-Fi или мобильной сети.";
+"startCheckHint" = "Узнайте, отвечает ли Telegram в вашей сети.";
+"autoMonitoring" = "Автопроверка";
+"monitoringInterval" = "Раз в минуту, пока приложение открыто";
+"diagnostics" = "Диагностика";
+"mtprotoDescription" = "Соединение по протоколу Telegram";
+"webDescription" = "Доступность веб-версии";
+"controlDescription" = "Независимый адрес для проверки интернета";
+"notChecked" = "Ещё не проверено";
+"historyEmptyHint" = "Запустите проверку на главном экране — результат появится здесь.";

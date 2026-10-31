@@ -23,3 +23,17 @@
 "status.down" = "Telegram probes failed; control responded";
 "status.noNetwork" = "No connection";
 "status.unknown" = "Unknown";
+
+"connectionOverview" = "Telegram connectivity";
+"lastCheck" = "Last checked";
+"lastCheckStale" = "Result is out of date — check again";
+"connectToInternet" = "Connect to Wi-Fi or a mobile network.";
+"startCheckHint" = "Find out whether Telegram responds on your network.";
+"autoMonitoring" = "Automatic checks";
+"monitoringInterval" = "Every minute while the app is open";
+"diagnostics" = "Diagnostics";
+"mtprotoDescription" = "Telegram protocol connection";
+"webDescription" = "Web version availability";
+"controlDescription" = "Independent internet connectivity check";
+"notChecked" = "Not checked yet";
+"historyEmptyHint" = "Run a check on the main screen to see your first result here.";
