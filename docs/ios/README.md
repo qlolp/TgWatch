@@ -1,14 +1,16 @@
 # TgWatch iPhone MVP
 
 Native SwiftUI foreground Telegram reachability monitor. Minimum deployment target iOS 17;
-no Telegram account, message access, backend, APNs, background timer or notification permission.
+no Telegram account, message access, backend, APNs or background timer.
+Local notification permission is requested only from the explicit Alerts screen.
 MTProto greeting is unauthenticated reachability evidence, not proof of service identity or message delivery.
 Web HTTP 100–499 is an endpoint response, not account availability. Partial/incomplete measurements
 remain distinct from a confirmed negative result. A network transition invalidates outstanding results.
 
 Open `ios/TgWatchIOS.xcodeproj`, scheme `TgWatchIOS`. SwiftPM dependency is the local
 `ios/TgWatchCore` package; no CocoaPods, Fastlane or third-party runtime dependencies.
-Development team is deliberately unset. Do not enable automatic account provisioning during simulator tests.
+The local project has the owner's development team configured for physical-device builds.
+Do not enable automatic account provisioning during simulator tests.
 
 ## Tests
 
@@ -56,10 +58,49 @@ outage count, longest outage and a state chart. Availability excludes offline an
 Outages and their duration are clipped to the report window; unknown gaps split episodes.
 Pull to refresh updates the report window.
 
-CSV export uses Android's five-column format
-`from_utc,until_utc,status,duration_ms,latency_ms`, with UTC timestamps and `-1` for unmeasured
-latency. It exports the selected report window, including unknown gaps, rather than an app backup.
-Custom targets, background alerts, widgets and encrypted backup import are not yet implemented.
+CSV export uses Android's nine-column v3 format with public target ID, UTC intervals and measured
+latency (`-1` when unavailable). Only the selected current revision/clock segment is exported,
+with normalized portable revision 1 and epoch 0. Unknown gaps remain explicit.
+Import validates a single target/current revision v3 file or Telegram's legacy five-column file,
+shows a preview, and replaces only that history after confirmation. It rejects mixed targets,
+archived revisions, inconsistent durations and files above 8 MiB / 10,000 observations.
+Monitoring stays stopped after replacement. This is history transfer, not an app backup.
+
+## Independent services
+
+The Services tab includes Telegram, Matrix versions, WhatsApp Web and up to five custom HTTPS
+targets. Each has an independent session, 10–300-second interval, history, alerts and reports.
+The interval is a pause after check completion. No target starts monitoring automatically at launch.
+Changing an address creates a new local revision and stops that target; old revisions remain on
+disk, outside current statistics. Removing a custom target removes its local revision directory.
+Private definitions are file-protected and excluded from system backups.
+
+HTTPS targets accept 2xx by default, optionally an exact HTTP code and one JSON string condition
+at up to three nested keys. JSON bodies are capped at 32 KiB. HEAD falls back to GET on 405/501;
+JSON and Matrix use GET. Redirects are not followed. A failed check is DOWN only if a control
+endpoint confirms internet access. Generic targets never fabricate MTProto evidence.
+
+Alerts independently select outage, partial availability, recovery and network loss. They share
+an optional sound, minute-based quiet hours and an in-process one-hour mute. Gaps, suspension,
+network changes and clock rollback reset recovery continuity. The event journal derives the last
+150 state transitions from retained history. Latency reports show mean, p50 and p95 over an hour,
+day or week; Telegram stores the fastest confirmed MTProto reply. Share status previews a fixed
+public snapshot before opening the system share sheet.
+
+Optional per-target webhooks support plain text and Android's JSON v1 eight-key allowlist;
+network is currently UNKNOWN. Test events have null measurement fields. One request per target,
+5-second request / 10-second resource deadline, no redirects, cookies or cache. In-flight events
+are not queued and failures are not retried. Changing the recipient cancels the prior request and
+prevents its result from overwriting the new recipient's delivery state. The address is private,
+file-protected and excluded from system backups. No JSON v2 heartbeat is claimed.
+
+## Remaining Android differences
+
+This is not full feature parity. Continuous Android-style background execution is not implemented
+on iOS. Widgets, encrypted TGWB backups, 30/90-day aggregation, daily scheduled summaries,
+multi-target/archive CSV import, custom request headers/multiple JSON conditions/status presets,
+slow-response alerts, scheduled pauses, network breakdowns and Android automation adapters remain
+unimplemented. The current iOS UI does not expose the retained old endpoint revisions.
 
 No analytics, cookies, shared diagnostic logs or account identifiers. Privacy manifest declares no
 tracking/collected data; current code does not use UserDefaults, file timestamp, disk-space or device-boot-time

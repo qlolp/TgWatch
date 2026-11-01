@@ -25,13 +25,16 @@ struct MonitorView: View {
                         )
                     }
                     MonitoringCard(
-                        profile: Binding(get: { controller.profile }, set: controller.setProfile),
+                        profile: Binding<CheckProfile?>(get: { CheckProfile(rawValue: controller.intervalSeconds) }, set: { if let value = $0 { controller.setProfile(value) } }),
                         preferencesUnavailable: controller.preferencesUnavailable,
                         monitoring: Binding(
                             get: { controller.session.monitoring },
-                            set: controller.session.setMonitoring
+                            set: controller.setMonitoring
                         )
                     )
+                    Stepper(value: Binding(get: { controller.intervalSeconds }, set: controller.setInterval), in: 10...300, step: 10) {
+                        LabeledContent("intervalSeconds", value: controller.intervalSeconds.formatted())
+                    }
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         DiagnosticsCard(
                             evidence: controller.session.snapshot?.evidence,
@@ -50,6 +53,15 @@ struct MonitorView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("TgWatch")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
+                        NavigationLink("eventJournal") { EventJournalView(controller: controller) }
+                        NavigationLink("latencyReport") { LatencyReportView(controller: controller) }
+                        NavigationLink("shareStatus") { ShareStatusView(controller: controller) }
+                        NavigationLink("webhook") { WebhookView(controller: controller) }
+                    } label: { Label("moreOptions", systemImage: "ellipsis.circle") }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         HistoryReportView(controller: controller)
@@ -145,7 +157,7 @@ private struct StatusCard: View {
 }
 
 private struct MonitoringCard: View {
-    @Binding var profile: CheckProfile
+    @Binding var profile: CheckProfile?
     let preferencesUnavailable: Bool
     @Binding var monitoring: Bool
 
@@ -157,8 +169,11 @@ private struct MonitoringCard: View {
             }
             .accessibilityLabel(Text("monitorWhileOpen"))
             Picker("checkFrequency", selection: $profile) {
+                if profile == nil {
+                    Text("profileCustom").tag(Optional<CheckProfile>.none)
+                }
                 ForEach(CheckProfile.allCases) { value in
-                    Text(value.title).tag(value)
+                    Text(value.title).tag(Optional(value))
                 }
             }
             .pickerStyle(.menu)

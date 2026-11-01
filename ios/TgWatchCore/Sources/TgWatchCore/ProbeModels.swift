@@ -20,9 +20,14 @@ public struct ProbeSnapshot: Codable, Equatable, Sendable {
     public let epoch: UInt64
     public let startedAt, finishedAt: Date
     public let evidence: ProbeEvidence
-    public var status: ProbeStatus { classify(evidence) }
-    public init(epoch: UInt64, startedAt: Date, finishedAt: Date, evidence: ProbeEvidence) {
+    public let measuredStatus: ProbeStatus?
+    public let latencyMilliseconds: Double?
+    public var status: ProbeStatus { measuredStatus ?? classify(evidence) }
+    public init(epoch: UInt64, startedAt: Date, finishedAt: Date, evidence: ProbeEvidence,
+                measuredStatus: ProbeStatus? = nil, latencyMilliseconds: Double? = nil) {
         self.epoch = epoch; self.startedAt = startedAt; self.finishedAt = finishedAt; self.evidence = evidence
+        self.measuredStatus = measuredStatus
+        self.latencyMilliseconds = latencyMilliseconds
     }
 }
 public protocol ProbeRunner: Sendable { func check(epoch: UInt64) async throws -> ProbeSnapshot }

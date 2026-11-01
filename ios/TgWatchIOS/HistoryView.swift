@@ -18,6 +18,7 @@ struct HistoryView: View {
                     Label("historyReport", systemImage: "chart.bar.xaxis")
                 }
                 .accessibilityIdentifier("historyReport")
+                NavigationLink("importCSV") { HistoryTransferView(controller: controller) }
                 Label("historyExplanation", systemImage: "clock")
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.vertical, 8)
@@ -187,7 +188,7 @@ struct HistoryReportView: View {
         .fileExporter(isPresented: $exporting,
                       document: HistoryCSVDocument(text: exportText),
                       contentType: .commaSeparatedText,
-                      defaultFilename: "TgWatch-\(exportDays)d") { outcome in
+                      defaultFilename: "TgWatch-\(controller.definition.id)-\(exportDays)d") { outcome in
             if case .failure = outcome { exportFailed = true }
         }
         .alert("exportFailed", isPresented: $exportFailed) {
@@ -201,11 +202,12 @@ struct HistoryReportView: View {
         result = nil
         let entries = controller.history
         let days = rangeDays
+        let targetID = controller.definition.id
         let prepared = await Task.detached(priority: .userInitiated) {
             let now = Date()
             let analytics = HistoryAnalytics(entries: entries, from: now.addingTimeInterval(-Double(days) * 86400), to: now)
             return HistoryReportResult(analytics: analytics, slices: analytics.chartSlices(count: days == 1 ? 24 : 28),
-                                       csv: analytics.csv)
+                                       csv: HistoryCSV.export(analytics, targetID: targetID, entries: entries))
         }.value
         guard !Task.isCancelled, generation == reportGeneration else { return }
         result = prepared

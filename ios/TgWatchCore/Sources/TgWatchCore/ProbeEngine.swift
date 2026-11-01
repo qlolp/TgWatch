@@ -37,25 +37,31 @@ public actor ProbeEngine: ProbeRunner {
         try Task.checkCancellation()
         let start = Date(), deadline = ContinuousClock.now.advanced(by: budget)
         let transport = self.transport, endpoints = self.endpoints
-        let results: [Int: Bool] = await withTaskGroup(of: (Int, Bool?).self) { group in
+        let results: [Int: (Bool, Double)] = await withTaskGroup(of: (Int, Bool?, Double).self) { group in
             // Timer participates in the group but is not a connection.
-            group.addTask { try? await Task.sleep(until: deadline, clock: .continuous); return (-1, nil) }
+            group.addTask { try? await Task.sleep(until: deadline, clock: .continuous); return (-1, nil, 0) }
             func add(_ index: Int) {
                 let endpoint = endpoints[index]
                 group.addTask {
-                    guard !Task.isCancelled, ContinuousClock.now < deadline else { return (index, nil) }
-                    do { return (index, try await transport.check(endpoint, deadline: deadline)) }
-                    catch is CancellationError { return (index, nil) }
-                    catch { return (index, ContinuousClock.now < deadline && !Task.isCancelled ? false : nil) }
+                    guard !Task.isCancelled, ContinuousClock.now < deadline else { return (index, nil, 0) }
+                    let began = ContinuousClock.now
+                    do {
+                        let confirmed = try await transport.check(endpoint, deadline: deadline)
+                        let elapsed = began.duration(to: .now)
+                        let milliseconds = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
+                        return (index, confirmed, milliseconds)
+                    }
+                    catch is CancellationError { return (index, nil, 0) }
+                    catch { return (index, ContinuousClock.now < deadline && !Task.isCancelled ? false : nil, 0) }
                 }
             }
-            var next = min(4, endpoints.count), remaining = next, values: [Int: Bool] = [:]
+            var next = min(4, endpoints.count), remaining = next, values: [Int: (Bool, Double)] = [:]
             for index in 0..<next { add(index) }
             if remaining == 0 { group.cancelAll(); return values }
-            while let (index, result) = await group.next() {
+            while let (index, result, latency) = await group.next() {
                 if index == -1 || Task.isCancelled { group.cancelAll(); break }
                 remaining -= 1
-                if let result { values[index] = result }
+                if let result { values[index] = (result, latency) }
                 if next < endpoints.count && ContinuousClock.now < deadline { add(next); next += 1; remaining += 1 }
                 if remaining == 0 { group.cancelAll(); break }
             }
@@ -64,13 +70,14 @@ public actor ProbeEngine: ProbeRunner {
         try Task.checkCancellation()
         var evidence = ProbeEvidence()
         evidence.primaryMeasurementsComplete = !endpoints.isEmpty && endpoints.indices.filter { endpoints[$0].group != .control }.allSatisfy { results[$0] != nil }
-        for (i, confirmed) in results where confirmed {
+        for (i, value) in results where value.0 {
             switch endpoints[i].group {
             case .web: evidence.webConfirmed = true
             case .mtproto: evidence.mtprotoConfirmed = true
             case .control: evidence.controlConfirmed = true
             }
         }
-        return ProbeSnapshot(epoch: epoch, startedAt: start, finishedAt: Date(), evidence: evidence)
+        let latency = results.filter { endpoints[$0.key].group == .mtproto && $0.value.0 }.map { $0.value.1 }.min()
+        return ProbeSnapshot(epoch: epoch, startedAt: start, finishedAt: Date(), evidence: evidence, latencyMilliseconds: latency)
     }
 }

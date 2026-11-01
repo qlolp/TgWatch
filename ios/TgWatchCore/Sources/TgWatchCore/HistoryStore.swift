@@ -6,10 +6,12 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public let observedAt: Date
     public let status: ProbeStatus
     public let validForSeconds: Double?
-    public var coverageLifetime: Double { min(120, max(1, validForSeconds ?? 120)) }
-    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, validForSeconds: Double? = nil) {
+    public let latencyMilliseconds: Double?
+    public var coverageLifetime: Double { min(600, max(0.001, validForSeconds ?? 120)) }
+    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, validForSeconds: Double? = nil, latencyMilliseconds: Double? = nil) {
+        self.latencyMilliseconds = latencyMilliseconds.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
         id = UUID(); schemaVersion = 1; self.epoch = epoch; self.observedAt = observedAt; self.status = status
-        self.validForSeconds = validForSeconds.flatMap { $0.isFinite ? min(120, max(1, $0)) : nil }
+        self.validForSeconds = validForSeconds.flatMap { $0.isFinite ? min(600, max(0.001, $0)) : nil }
     }
 }
 public actor HistoryStore {
@@ -36,6 +38,11 @@ public actor HistoryStore {
         all = prune(all, at: max(now(), entry.observedAt))
         entries = all
         try persist(all)
+    }
+    public func replace(_ replacement: [HistoryEntry]) throws {
+        let retained = prune(replacement, at: now())
+        try persist(retained)
+        entries = retained
     }
     public func clear() throws {
         try persist([]) // Only explicit clear can replace an unreadable file.

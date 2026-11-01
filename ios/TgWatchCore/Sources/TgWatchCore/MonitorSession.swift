@@ -66,7 +66,7 @@ import Foundation
         active = value; invalidate()
     }
     public func setCheckInterval(seconds: Int) {
-        let seconds = min(60, max(15, seconds))
+        let seconds = min(300, max(10, seconds))
         interval = .seconds(seconds)
         resultLifetime = Double(seconds + 15)
         invalidate()
@@ -84,6 +84,10 @@ import Foundation
         if batch != nil { pendingCheck = true } else { checkNow() }
         loop = Task { [weak self, interval] in
             while !Task.isCancelled {
+                // Android profiles measure the pause from completion, not from the previous start.
+                let running = self?.batch
+                await running?.value
+                guard !Task.isCancelled else { return }
                 do { try await Task.sleep(for: interval) } catch { return }
                 guard let self, self.active, self.monitoring else { return }
                 self.checkNow()

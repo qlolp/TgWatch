@@ -6,17 +6,33 @@ import TgWatchCore
     @Published var history: [HistoryEntry] = []
     @Published var historyUnavailable = false
     @Published private(set) var profile: CheckProfile = .economy
+    @Published private(set) var intervalSeconds = 60
     @Published private(set) var preferencesUnavailable = false
+    let definition: ServiceDefinition
+    let dataDirectory: URL
+    @Published var alertSettings = AlertSettings()
+    @Published var alertError = false
+    @Published private(set) var webhookSettings = WebhookSettings()
+    @Published private(set) var webhookDelivered: Bool?
+    @Published private(set) var webhookError = false
+    private let webhookSender = WebhookSender()
+    private var webhookTask: Task<Void, Never>?
+    private var webhookGeneration = 0
+    private var lastObservedStatus: ProbeStatus?
+    private var lastObservation: (date: Date, lifetime: Double)?
+    private var alertTransition = AlertTransition()
     private let preferencesURL: URL
     let fixtureMode: Bool
     let session: MonitorSession
     private let store: HistoryStore
     private let path = NWPathMonitor()
     private var writeTask: Task<Void, Never>?
-    init() {
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
+    init(definition: ServiceDefinition = .telegram) {
+        self.definition = definition
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
+        let directory = definition.kind == .telegram ? root : root.appendingPathComponent("targets/\(definition.id)/\(definition.revision.uuidString)")
         var isFixture = false
-        var runner: any ProbeRunner = ProbeEngine(transport: AppleProbeTransport())
+        var runner: any ProbeRunner = definition.kind == .telegram ? ProbeEngine(transport: AppleProbeTransport()) : ServiceProbeRunner(definition: definition)
         var file = directory.appendingPathComponent("history-v1.json")
         #if DEBUG
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--fixture"), ProcessInfo.processInfo.arguments.count > index + 1 {
@@ -25,6 +41,7 @@ import TgWatchCore
             file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("fixture.json")
         }
         #endif
+        dataDirectory = file.deletingLastPathComponent()
         fixtureMode = isFixture
         preferencesURL = file.deletingLastPathComponent().appendingPathComponent("preferences.json")
         session = MonitorSession(runner: runner); store = HistoryStore(url: file)
@@ -34,7 +51,26 @@ import TgWatchCore
                 profile = try JSONDecoder().decode(CheckProfile.self, from: data)
             } catch { preferencesUnavailable = true }
         }
-        session.setCheckInterval(seconds: profile.rawValue)
+        let alertsURL = dataDirectory.appendingPathComponent("alerts.json")
+        if FileManager.default.fileExists(atPath: alertsURL.path) {
+            do { alertSettings = try JSONDecoder().decode(AlertSettings.self, from: Data(contentsOf: alertsURL)) }
+            catch { alertError = true }
+        }
+        intervalSeconds = profile.rawValue
+        let intervalURL = dataDirectory.appendingPathComponent("interval.json")
+        if FileManager.default.fileExists(atPath: intervalURL.path) {
+            do {
+                let value = try JSONDecoder().decode(Int.self, from: Data(contentsOf: intervalURL))
+                guard (10...300).contains(value) else { throw CocoaError(.fileReadCorruptFile) }
+                intervalSeconds = value
+            } catch { preferencesUnavailable = true }
+        }
+        session.setCheckInterval(seconds: intervalSeconds)
+        let hookURL = dataDirectory.appendingPathComponent("webhook.json")
+        if FileManager.default.fileExists(atPath: hookURL.path) {
+            do { webhookSettings = try JSONDecoder().decode(WebhookSettings.self, from: Data(contentsOf: hookURL)) }
+            catch { webhookError = true }
+        }
         session.onChange = { [weak self] in self?.objectWillChange.send() }
         session.onObservation = { [weak self] value in self?.save(value) }
         path.pathUpdateHandler = { [weak self] value in
@@ -42,6 +78,7 @@ import TgWatchCore
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 // Every delivered path update may change routing, even with identical interface names.
+                self.resetContinuity()
                 self.session.networkChanged(unavailable: unavailable)
             }
         }
@@ -51,9 +88,28 @@ import TgWatchCore
     private func save(_ snapshot: ProbeSnapshot) {
         let previous = writeTask
         let lifetime = session.resultLifetime
+        let event = alertTransition.observe(snapshot.status, at: snapshot.finishedAt, validFor: lifetime)
+        if let lastObservation,
+           snapshot.finishedAt < lastObservation.date || snapshot.finishedAt.timeIntervalSince(lastObservation.date) > lastObservation.lifetime {
+            lastObservedStatus = nil
+        }
+        lastObservation = (snapshot.finishedAt, lifetime)
+        let previousStatus = lastObservedStatus
+        lastObservedStatus = snapshot.status
+        if !fixtureMode, event != nil || (previousStatus == .noNetwork && snapshot.status == .ok) {
+            sendWebhook(snapshot.status, snapshot: snapshot, previous: previousStatus)
+        }
+        if let event, alertSettings.enabled(event), !fixtureMode {
+            let title = definition.displayName
+            let sound = alertSettings.audible(at: snapshot.finishedAt)
+            Task { [weak self] in
+                do { try await MonitorNotifications.shared.send(target: title, status: event, sound: sound) }
+                catch { self?.alertError = true }
+            }
+        }
         writeTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime)) }
+            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime, latencyMilliseconds: snapshot.latencyMilliseconds)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
         }
@@ -70,16 +126,76 @@ import TgWatchCore
             catch { self?.historyUnavailable = true }
         }
     }
+    func setMonitoring(_ value: Bool) {
+        resetContinuity()
+        session.setMonitoring(value)
+    }
     func setProfile(_ value: CheckProfile) {
         profile = value
-        session.setCheckInterval(seconds: value.rawValue)
+        setInterval(value.rawValue)
         do {
             try FileManager.default.createDirectory(at: preferencesURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(value).write(to: preferencesURL, options: .atomic)
-            preferencesUnavailable = false
         } catch { preferencesUnavailable = true }
     }
 
+    func setInterval(_ value: Int) {
+        intervalSeconds = min(300, max(10, value))
+        session.setCheckInterval(seconds: intervalSeconds)
+        resetContinuity()
+        do {
+            try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+            try JSONEncoder().encode(intervalSeconds).write(to: dataDirectory.appendingPathComponent("interval.json"), options: .atomic)
+            preferencesUnavailable = false
+        } catch { preferencesUnavailable = true }
+    }
+    func saveWebhook(_ value: WebhookSettings) {
+        guard !value.enabled || ServiceDefinition.validAddress(value.address) else { webhookError = true; return }
+        do {
+            try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+            var url = dataDirectory.appendingPathComponent("webhook.json")
+            try JSONEncoder().encode(value).write(to: url, options: [.atomic, .completeFileProtection])
+            var flags = URLResourceValues(); flags.isExcludedFromBackup = true
+            try url.setResourceValues(flags)
+            webhookSettings = value; webhookError = false; webhookDelivered = nil
+            webhookGeneration += 1; webhookTask?.cancel()
+        } catch { webhookError = true }
+    }
+    func sendWebhook(_ status: ProbeStatus, snapshot: ProbeSnapshot? = nil, previous: ProbeStatus? = nil) {
+        guard webhookSettings.enabled, webhookTask == nil, !fixtureMode else { return }
+        let generation = webhookGeneration, settings = webhookSettings, targetID = definition.id
+        webhookTask = Task { [weak self, webhookSender] in
+            let delivered = (try? await webhookSender.send(settings: settings, event: WebhookEvent(serviceID: targetID, snapshot: snapshot, previous: previous))) == true
+            guard let self else { return }
+            if generation == self.webhookGeneration && !Task.isCancelled { self.webhookDelivered = delivered }
+            self.webhookTask = nil
+        }
+    }
+    func saveAlerts() {
+        do {
+            try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+            try JSONEncoder().encode(alertSettings).write(to: dataDirectory.appendingPathComponent("alerts.json"), options: .atomic)
+            alertError = false
+        } catch { alertError = true }
+    }
+    func stopAndFlush() async {
+        session.setMonitoring(false)
+        session.setActive(false)
+        webhookTask?.cancel()
+        await webhookTask?.value
+        await writeTask?.value
+    }
+    func replaceHistory(_ entries: [HistoryEntry]) async throws {
+        let wasActive = session.active
+        session.setMonitoring(false)
+        session.setActive(false)
+        defer { session.setActive(wasActive && UIApplication.shared.applicationState == .active) }
+        resetContinuity()
+        await writeTask?.value
+        try await store.replace(entries)
+        await reload()
+    }
+    func resetContinuity() { alertTransition = AlertTransition(); lastObservedStatus = nil; lastObservation = nil }
     deinit { path.cancel() }
 }
 enum CheckProfile: Int, Codable, CaseIterable, Identifiable {
