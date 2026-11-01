@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -39,6 +39,10 @@
 		E7F08BCC397888750F5CB9BD /* TgWatchIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = TgWatchIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F30CDB58647C550F45A6333C /* MonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7ECBD20430971CBF00C4AA88 /* Resources */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Resources; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		497639E2F38DB3F946CE62A2 /* Frameworks */ = {
@@ -94,6 +98,7 @@
 				85F80855CCDBAAC7FFC06E2C /* HistoryView.swift */,
 				6D123AE8AB04EEE632CC6C18 /* PrivacyInfo.xcprivacy */,
 				A3CACB75505CC02B52B47594 /* Localizable.strings */,
+				7ECBD20430971CBF00C4AA88 /* Resources */,
 			);
 			path = TgWatchIOS;
 			sourceTree = "<group>";
@@ -130,6 +135,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7ECBD20430971CBF00C4AA88 /* Resources */,
 			);
 			name = TgWatchIOS;
 			packageProductDependencies = (
