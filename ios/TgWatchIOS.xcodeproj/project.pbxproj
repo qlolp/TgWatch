@@ -31,6 +31,7 @@
 		0110863C083207ED3792378B /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		56E37A5146930C161A715EA6 /* TgWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TgWatchApp.swift; sourceTree = "<group>"; };
 		6D123AE8AB04EEE632CC6C18 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		7ECBD21630972BF300C4AA88 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8085ACBDAA0C6AA823116375 /* MonitorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorController.swift; sourceTree = "<group>"; };
 		85F80855CCDBAAC7FFC06E2C /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		9619E170DD2B21FD548B4ACC /* MonitorFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorFlowTests.swift; sourceTree = "<group>"; };
@@ -93,6 +94,7 @@
 		E17E80AD8E2103CF3FC3FD96 /* TgWatchIOS */ = {
 			isa = PBXGroup;
 			children = (
+				7ECBD21630972BF300C4AA88 /* Info.plist */,
 				56E37A5146930C161A715EA6 /* TgWatchApp.swift */,
 				8085ACBDAA0C6AA823116375 /* MonitorController.swift */,
 				F30CDB58647C550F45A6333C /* MonitorView.swift */,
@@ -298,6 +300,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TgWatchIOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TgWatch;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -364,6 +367,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TgWatchIOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TgWatch;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
