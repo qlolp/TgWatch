@@ -38,13 +38,18 @@ public struct ServiceProbeRunner: ProbeRunner, @unchecked Sendable {
         config.timeoutIntervalForRequest = 3; config.timeoutIntervalForResource = 6
         let session = URLSession(configuration: config, delegate: ServiceRedirectPolicy(), delegateQueue: nil)
         defer { session.invalidateAndCancel() }
-        let needsBody = definition.kind == .matrix || !definition.jsonPath.isEmpty
+        let needsBody = definition.needsBody
         for method in needsBody ? ["GET"] : ["HEAD", "GET"] {
             try Task.checkCancellation()
             var request = URLRequest(url: url)
             request.httpMethod = method
+            for header in definition.requestHeaders ?? [] {
+                request.setValue(header.value, forHTTPHeaderField: header.name)
+            }
             request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-            if needsBody { request.setValue("application/json", forHTTPHeaderField: "Accept") }
+            if definition.needsJSON, request.value(forHTTPHeaderField: "Accept") == nil {
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+            }
             let (bytes, response) = try await session.bytes(for: request)
             guard let response = response as? HTTPURLResponse else { return false }
             if method == "HEAD" && [405, 501].contains(response.statusCode) { continue }
@@ -57,6 +62,7 @@ public struct ServiceProbeRunner: ProbeRunner, @unchecked Sendable {
                 guard body.count < 32_768 else { return false }
                 body.append(byte)
             }
+            if response.expectedContentLength < 0 && body.count == 32_768 { return false }
             return definition.accepts(code: response.statusCode, body: body)
         }
         return false

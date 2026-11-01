@@ -18,6 +18,7 @@ struct HistoryView: View {
                     Label("historyReport", systemImage: "chart.bar.xaxis")
                 }
                 .accessibilityIdentifier("historyReport")
+                NavigationLink("longTermReport") { LongTermHistoryView(controller: controller) }
                 NavigationLink("importCSV") { HistoryTransferView(controller: controller) }
                 Label("historyExplanation", systemImage: "clock")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -61,7 +62,7 @@ struct HistoryView: View {
                 Button("clearHistory", systemImage: "trash", role: .destructive) {
                     confirming = true
                 }
-                .disabled(controller.history.isEmpty && !controller.historyUnavailable)
+                .disabled(controller.history.isEmpty && controller.longTermHistory.days.isEmpty && !controller.historyUnavailable)
                 .accessibilityIdentifier("clearHistory")
             }
         }
@@ -138,6 +139,24 @@ struct HistoryReportView: View {
             }
             if let result {
                 HistorySummarySection(result: result)
+                Section("outageEpisodes") {
+                    if result.analytics.outageEpisodes.isEmpty {
+                        Text("noOutages")
+                    }
+                    ForEach(Array(result.analytics.outageEpisodes.suffix(100).reversed())) { episode in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(episode.from, format: .dateTime.day().month().hour().minute().second())
+                                .font(.headline)
+                            Text(Duration.seconds(episode.duration), format: .time(pattern: .hourMinuteSecond))
+                                .monospacedDigit()
+                            Text(episode.ending == .recovered ? "outageRecovered" : episode.ending == .interrupted ? "outageInterrupted" : "outageOngoing")
+                                .foregroundStyle(.secondary)
+                            if !episode.startObserved { Text("outageStartUnknown").font(.caption).foregroundStyle(.secondary) }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    Text("outageEpisodesHint").font(.caption).foregroundStyle(.secondary)
+                }
                 Section("stateChart") {
                     Chart(result.slices) { slice in
                         BarMark(x: .value("Time", slice.date), y: .value("Minutes", slice.seconds / 60),
@@ -247,6 +266,11 @@ private struct HistorySummarySection: View {
             LabeledContent("outagesCount", value: result.analytics.outageCount.formatted())
             LabeledContent("longestOutage") {
                 Text(Duration.seconds(result.analytics.longestOutage), format: .time(pattern: .hourMinuteSecond))
+            }
+            LabeledContent("meanTimeToRecovery") {
+                if let duration = result.analytics.meanTimeToRecovery {
+                    Text(Duration.seconds(duration), format: .time(pattern: .hourMinuteSecond))
+                } else { Text("insufficientData").foregroundStyle(.secondary) }
             }
             Text("availabilityExplanation").font(.caption).foregroundStyle(.secondary)
         }

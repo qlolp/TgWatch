@@ -20,6 +20,12 @@ public actor HistoryStore {
     private let limit: Int
     private let now: @Sendable () -> Date
     private var entries: [HistoryEntry]?
+    private var archive = LongTermHistory()
+    private struct Envelope: Codable {
+        let schemaVersion: Int
+        let entries: [HistoryEntry]
+        let archive: LongTermHistory
+    }
     public init(url: URL, limit: Int = 10_000, now: @escaping @Sendable () -> Date = { Date() }) { self.url = url; self.limit = max(1, min(limit, 10_000)); self.now = now }
     public func load() throws -> [HistoryEntry] {
         if let entries { let retained = prune(entries, at: now()); self.entries = retained; return retained }
@@ -27,34 +33,62 @@ public actor HistoryStore {
         let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
         let data = try handle.read(upToCount: 8*1024*1024+1) ?? Data()
         guard data.count <= 8*1024*1024 else { throw Failure.oversized }
-        let decoded = try JSONDecoder().decode([HistoryEntry].self, from: data)
+        let decoded: [HistoryEntry]
+        var loadedArchive = LongTermHistory()
+        if data.first(where: { ![9, 10, 13, 32].contains($0) }) == 91 {
+            decoded = try JSONDecoder().decode([HistoryEntry].self, from: data)
+            for entry in decoded {
+                guard entry.observedAt.timeIntervalSince1970.isFinite else { throw Failure.unsupportedSchema }
+                loadedArchive.append(entry)
+            }
+        } else {
+            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            guard envelope.schemaVersion == 2, envelope.archive.valid else { throw Failure.unsupportedSchema }
+            decoded = envelope.entries
+            loadedArchive = envelope.archive
+        }
         guard decoded.allSatisfy({ $0.schemaVersion == 1 && $0.observedAt.timeIntervalSince1970.isFinite }) else { throw Failure.unsupportedSchema }
+        loadedArchive.prune(at: now())
+        archive = loadedArchive
         entries = prune(decoded, at: now()); return entries!
     }
     public func append(_ entry: HistoryEntry) throws {
+        guard entry.schemaVersion == 1, entry.observedAt.timeIntervalSince1970.isFinite else { throw Failure.unsupportedSchema }
         var all = try load()
         all.append(entry)
+        archive.append(entry)
         // Bound memory even if the disk remains unavailable; never discard a dirty batch on retry.
         all = prune(all, at: max(now(), entry.observedAt))
         entries = all
         try persist(all)
     }
     public func replace(_ replacement: [HistoryEntry]) throws {
+        guard replacement.allSatisfy({ $0.schemaVersion == 1 && $0.observedAt.timeIntervalSince1970.isFinite }) else { throw Failure.unsupportedSchema }
         let retained = prune(replacement, at: now())
-        try persist(retained)
+        var replacementArchive = LongTermHistory()
+        for entry in replacement { replacementArchive.append(entry) }
+        replacementArchive.prune(at: now())
+        try persist(retained, archive: replacementArchive)
+        archive = replacementArchive
         entries = retained
     }
     public func clear() throws {
-        try persist([]) // Only explicit clear can replace an unreadable file.
+        try persist([], archive: LongTermHistory()) // Only explicit clear can replace an unreadable file.
+        archive = LongTermHistory()
         entries = []
     }
     private func prune(_ value: [HistoryEntry], at date: Date) -> [HistoryEntry] {
         let cutoff = date.addingTimeInterval(-7*86400)
         return Array(value.filter { $0.observedAt >= cutoff }.suffix(limit))
     }
-    private func persist(_ value: [HistoryEntry]) throws {
+    public func longTermHistory() throws -> LongTermHistory {
+        _ = try load()
+        archive.prune(at: now())
+        return archive
+    }
+    private func persist(_ value: [HistoryEntry], archive replacement: LongTermHistory? = nil) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(value)
+        let data = try JSONEncoder().encode(Envelope(schemaVersion: 2, entries: value, archive: replacement ?? archive))
         guard data.count <= 8*1024*1024 else { throw Failure.oversized }
         try data.write(to: url, options: .atomic)
     }

@@ -4,6 +4,7 @@ import Network
 import TgWatchCore
 @MainActor final class MonitorController: ObservableObject {
     @Published var history: [HistoryEntry] = []
+    @Published private(set) var longTermHistory = LongTermHistory()
     @Published var historyUnavailable = false
     @Published private(set) var profile: CheckProfile = .economy
     @Published private(set) var intervalSeconds = 60
@@ -21,6 +22,8 @@ import TgWatchCore
     private var lastObservedStatus: ProbeStatus?
     private var lastObservation: (date: Date, lifetime: Double)?
     private var alertTransition = AlertTransition()
+    private var slowResponseAlert = SlowResponseAlert()
+    private let alertClockOrigin = ContinuousClock.now
     private let preferencesURL: URL
     let fixtureMode: Bool
     let session: MonitorSession
@@ -92,10 +95,23 @@ import TgWatchCore
         if let lastObservation,
            snapshot.finishedAt < lastObservation.date || snapshot.finishedAt.timeIntervalSince(lastObservation.date) > lastObservation.lifetime {
             lastObservedStatus = nil
+            slowResponseAlert.resetContinuity()
         }
         lastObservation = (snapshot.finishedAt, lifetime)
         let previousStatus = lastObservedStatus
         lastObservedStatus = snapshot.status
+        let elapsed = alertClockOrigin.duration(to: .now).components
+        let monotonicSeconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
+        let slow = slowResponseAlert.observe(status: snapshot.status, latency: snapshot.latencyMilliseconds,
+            threshold: alertSettings.slowThresholdMilliseconds.map(Double.init), uptime: monotonicSeconds)
+        if slow, !fixtureMode {
+            let title = definition.displayName
+            let sound = alertSettings.audible(at: snapshot.finishedAt)
+            Task { [weak self] in
+                do { try await MonitorNotifications.shared.sendSlowResponse(target: title, sound: sound) }
+                catch { self?.alertError = true }
+            }
+        }
         if !fixtureMode, event != nil || (previousStatus == .noNetwork && snapshot.status == .ok) {
             sendWebhook(snapshot.status, snapshot: snapshot, previous: previousStatus)
         }
@@ -115,7 +131,11 @@ import TgWatchCore
         }
     }
     func reload() async {
-        do { history = try await store.load(); historyUnavailable = false }
+        do {
+            history = try await store.load()
+            longTermHistory = try await store.longTermHistory()
+            historyUnavailable = false
+        }
         catch { historyUnavailable = true }
     }
     func clearHistory() {
@@ -177,6 +197,7 @@ import TgWatchCore
         }
     }
     func saveAlerts() {
+        slowResponseAlert.resetContinuity()
         do {
             try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
             try JSONEncoder().encode(alertSettings).write(to: dataDirectory.appendingPathComponent("alerts.json"), options: .atomic)
@@ -200,7 +221,12 @@ import TgWatchCore
         try await store.replace(entries)
         await reload()
     }
-    func resetContinuity() { alertTransition = AlertTransition(); lastObservedStatus = nil; lastObservation = nil }
+    func resetContinuity() {
+        alertTransition = AlertTransition()
+        slowResponseAlert.resetContinuity()
+        lastObservedStatus = nil
+        lastObservation = nil
+    }
     deinit { path.cancel() }
 }
 enum CheckProfile: Int, Codable, CaseIterable, Identifiable {

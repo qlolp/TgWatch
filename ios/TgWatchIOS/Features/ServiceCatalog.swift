@@ -108,8 +108,12 @@ extension ServiceDefinition {
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
     private func persist(_ definitions: [ServiceDefinition]) throws {
+        let data = try JSONEncoder().encode(definitions)
+        // Match the reader's ceiling so a valid but large set of private criteria
+        // cannot create a manifest that becomes unreadable on the next launch.
+        guard data.count <= 65_536 else { throw CocoaError(.fileWriteOutOfSpace) }
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(definitions).write(to: file, options: [.atomic, .completeFileProtection])
+        try data.write(to: file, options: [.atomic, .completeFileProtection])
         var url = file
         var values = URLResourceValues(); values.isExcludedFromBackup = true
         try url.setResourceValues(values)

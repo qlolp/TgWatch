@@ -39,7 +39,13 @@ Tests must never depend on a currently reachable public Telegram endpoint.
 
 ## Data and privacy
 
-History schema 1 is local to iOS: 7 days / 10,000 entries, 8 MiB decode ceiling, atomic replacement.
+History envelope schema 2 is local to iOS: raw schema-1 observations retain the 7-day / 10,000-entry
+limit. The same atomic file also holds up to 90 UTC daily totals, independent of the raw-entry cap.
+The 8 MiB decode ceiling still applies. Legacy arrays migrate using all surviving records before
+pruning; already deleted records cannot be recovered. Older app builds cannot read the new envelope.
+Daily reports include today and the preceding 6/29/89 UTC days. Gaps are unknown; pending coverage
+is capped at observation expiry, split at midnight, and never counted twice after reload. Rollback
+starts a new aggregate segment. Clear/import replaces both raw observations and daily totals.
 A corrupted file remains untouched until explicit Delete history. Failed writes keep bounded dirty entries
 in memory for retry; the UI reports storage failure. No Android backup import is claimed.
 New results expire after the selected check interval plus 15 seconds; legacy entries retain their
@@ -54,9 +60,13 @@ in `preferences.json`. iOS does not provide Android's continuous foreground serv
 when the app becomes inactive.
 
 Statistics cover the last 24 hours or 7 days: availability, observation coverage, check count,
-outage count, longest outage and a state chart. Availability excludes offline and unknown time.
+outage count, longest outage, up to 100 recent episodes, mean recovery time and a state chart. Availability excludes offline and unknown time.
 Outages and their duration are clipped to the report window; unknown gaps split episodes.
-Pull to refresh updates the report window.
+Mean recovery time includes only episodes with an observed beginning and uninterrupted recovery
+to OK; partial status continues an episode, while offline/unknown time interrupts it. Clipped starts
+and episodes without observed recovery are labeled explicitly. Pull to refresh updates the report window.
+A separate 7/30/90-day report shows daily check counts, availability, downtime and unknown coverage.
+Daily aggregates are not exported as fabricated CSV intervals.
 
 CSV export uses Android's nine-column v3 format with public target ID, UTC intervals and measured
 latency (`-1` when unavailable). Only the selected current revision/clock segment is exported,
@@ -75,10 +85,29 @@ Changing an address creates a new local revision and stops that target; old revi
 disk, outside current statistics. Removing a custom target removes its local revision directory.
 Private definitions are file-protected and excluded from system backups.
 
-HTTPS targets accept 2xx by default, optionally an exact HTTP code and one JSON string condition
-at up to three nested keys. JSON bodies are capped at 32 KiB. HEAD falls back to GET on 405/501;
-JSON and Matrix use GET. Redirects are not followed. A failed check is DOWN only if a control
-endpoint confirms internet access. Generic targets never fabricate MTProto evidence.
+HTTPS targets accept 2xx by default, optionally an exact HTTP code, a case-sensitive body
+substring (256 characters), and up to four JSON string conditions. Every configured condition
+must match. JSON paths use up to three nested keys and 64 characters; expected strings may be
+empty and are limited to 256 characters. Full JSON validation rejects duplicate keys (including
+escaped equivalents), malformed UTF-8 and nesting beyond 10 containers.
+
+Up to eight request headers can be configured, with case-insensitively unique ASCII token names
+(64 bytes) and printable ASCII values (256 bytes). Host, Content-Length, Transfer-Encoding,
+Connection and Accept-Encoding remain transport-owned. Headers are only sent to the target;
+they are never forwarded to the internet control probe. Redirects are not followed.
+
+Body or JSON conditions use one GET with identity encoding and a 32 KiB response cap. Unknown-length
+responses reaching the cap are rejected; an exact-cap response with known length is allowed.
+Without body criteria, HEAD falls back to GET on 405/501. Matrix always uses JSON GET.
+A failed check is DOWN only if a control endpoint confirms internet access. Generic targets never
+fabricate MTProto evidence. An HTTP/JSON success does not prove all service features work.
+
+The custom-target editor includes GitHub, Discord, Cloudflare, Atlassian and OpenAI status-page
+presets. Applying one explicitly replaces the form fields and clears headers, then requires Save.
+Each preset checks HTTP 200 and status.indicator = none. Existing definitions with a single JSON
+condition still decode; edits preserve their criteria. New criteria are optional fields in the
+local manifest, excluded from CSV, sharing and webhook payloads. Older iOS builds do not understand
+the new fields: do not downgrade a configured installation and expect equivalent checks.
 
 Alerts independently select outage, partial availability, recovery and network loss. They share
 an optional sound, minute-based quiet hours and an in-process one-hour mute. Gaps, suspension,
@@ -94,12 +123,21 @@ are not queued and failures are not retried. Changing the recipient cancels the 
 prevents its result from overwriting the new recipient's delivery state. The address is private,
 file-protected and excluded from system backups. No JSON v2 heartbeat is claimed.
 
+## Slow-response alerts
+
+Per-target opt-in latency warnings offer 500/1000/2000/5000 ms thresholds. Three consecutive OK
+measurements at or above the threshold trigger a warning. Latency below 60% clears the warning;
+a monotonic 30-minute cooldown prevents repeated alerts. Lifecycle, route, observation gaps and
+settings changes reset the streak without resetting the cooldown. Missing latency cannot trigger an
+alert. Quiet hours and temporary silence suppress sound using the existing alert policy. No
+background latency monitoring or slow-response webhook delivery is implied.
+
 ## Remaining Android differences
 
 This is not full feature parity. Continuous Android-style background execution is not implemented
-on iOS. Widgets, encrypted TGWB backups, 30/90-day aggregation, daily scheduled summaries,
-multi-target/archive CSV import, custom request headers/multiple JSON conditions/status presets,
-slow-response alerts, scheduled pauses, network breakdowns and Android automation adapters remain
+on iOS. Widgets, encrypted TGWB backups, Android-compatible minute/five-minute aggregation, daily scheduled summaries,
+multi-target/archive CSV import,
+scheduled pauses, network breakdowns and Android automation adapters remain
 unimplemented. The current iOS UI does not expose the retained old endpoint revisions.
 
 No analytics, cookies, shared diagnostic logs or account identifiers. Privacy manifest declares no
