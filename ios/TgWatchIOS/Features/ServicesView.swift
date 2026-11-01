@@ -118,12 +118,22 @@ struct ServiceDetailView: View {
 struct ServiceEditor: View {
     @ObservedObject var catalog: ServiceCatalog
     let definition: ServiceDefinition
-    @State private var address = ""
-    @State private var code = ""
-    @State private var jsonPath = ""
-    @State private var expected = ""
+    @State private var address: String
+    @State private var code: String
+    @State private var jsonPath: String
+    @State private var expected: String
     @State private var failure = false
     @Environment(\.dismiss) private var dismiss
+
+    init(catalog: ServiceCatalog, definition: ServiceDefinition) {
+        self.catalog = catalog
+        self.definition = definition
+        // New targets pass an empty definition, so their fields stay blank. Edits keep the saved health check.
+        _address = State(initialValue: definition.address)
+        _code = State(initialValue: definition.expectedCode.map(String.init) ?? "")
+        _jsonPath = State(initialValue: definition.jsonPath)
+        _expected = State(initialValue: definition.expectedValue)
+    }
     private var candidate: ServiceDefinition {
         .init(id: definition.id, kind: definition.kind, address: address.trimmingCharacters(in: .whitespacesAndNewlines),
               expectedCode: code.isEmpty ? nil : Int(code), jsonPath: jsonPath, expectedValue: expected)

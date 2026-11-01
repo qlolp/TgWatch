@@ -85,10 +85,13 @@ extension ServiceDefinition {
             let previous = monitors[index]
             previous.session.setMonitoring(false)
             previous.session.setActive(false)
+            previous.cancelInFlightWebhook()
             replacement.setProfile(previous.profile)
             replacement.setInterval(previous.intervalSeconds)
             replacement.alertSettings = previous.alertSettings
             replacement.saveAlerts()
+            // The new revision directory has no webhook.json; keep the previous recipient and stop its delivery.
+            replacement.saveWebhook(previous.webhookSettings)
             monitors[index] = replacement
         } else { monitors.append(replacement) }
     }

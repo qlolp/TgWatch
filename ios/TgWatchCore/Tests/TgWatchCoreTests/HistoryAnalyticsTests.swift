@@ -34,6 +34,23 @@ struct HistoryAnalyticsTests {
         #expect(result.checks == 2)
     }
 
+    @Test func currentClockSegmentDropsPrecedingRollback() {
+        let now = Date()
+        let forward = [
+            HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-120), status: .ok, latencyMilliseconds: 1000),
+            HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-30), status: .ok, latencyMilliseconds: 10)
+        ]
+        #expect(HistoryAnalytics.currentClockSegment(entries: forward).compactMap(\.latencyMilliseconds) == [1000, 10])
+        let rolledBack = [
+            HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-60), status: .ok, latencyMilliseconds: 1000),
+            HistoryEntry(epoch: 2, observedAt: now.addingTimeInterval(-3600), status: .ok, latencyMilliseconds: 10)
+        ]
+        let segment = HistoryAnalytics.currentClockSegment(entries: rolledBack)
+        let cutoff = now.addingTimeInterval(-24 * 3600)
+        let values = segment.filter { $0.observedAt >= cutoff && $0.observedAt <= now }.compactMap(\.latencyMilliseconds)
+        #expect(values == [10])
+    }
+
     @Test func emptyAndRollbackAreUnknown() {
         let empty = HistoryAnalytics(entries: [], from: start, to: start.addingTimeInterval(86400))
         #expect(empty.availability == nil)

@@ -149,6 +149,11 @@ import TgWatchCore
             preferencesUnavailable = false
         } catch { preferencesUnavailable = true }
     }
+    /// Drops a delivery still running on this controller so an endpoint replacement cannot finish it.
+    func cancelInFlightWebhook() {
+        webhookGeneration += 1
+        webhookTask?.cancel()
+    }
     func saveWebhook(_ value: WebhookSettings) {
         guard !value.enabled || ServiceDefinition.validAddress(value.address) else { webhookError = true; return }
         do {

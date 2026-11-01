@@ -9,10 +9,8 @@ public struct HistoryAnalytics: Sendable {
     public let outageCount: Int
     public let longestOutage: TimeInterval
 
-    public init(entries: [HistoryEntry], from: Date, to: Date) {
-        let lower = min(from, to)
-        self.from = lower
-        self.to = to
+    /// Arrival-order segment after the latest backward timestamp. Earlier segments stay archived.
+    public static func currentClockSegment(entries: [HistoryEntry]) -> [HistoryEntry] {
         var current: [HistoryEntry] = []
         for entry in entries {
             if let last = current.last, entry.observedAt < last.observedAt {
@@ -20,6 +18,14 @@ public struct HistoryAnalytics: Sendable {
             }
             current.append(entry)
         }
+        return current
+    }
+
+    public init(entries: [HistoryEntry], from: Date, to: Date) {
+        let lower = min(from, to)
+        self.from = lower
+        self.to = to
+        let current = Self.currentClockSegment(entries: entries)
         checks = current.filter { $0.observedAt >= lower && $0.observedAt <= to }.count
         var clipped: [ObservationInterval] = []
         var cursor = lower

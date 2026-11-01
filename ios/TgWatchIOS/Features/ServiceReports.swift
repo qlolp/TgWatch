@@ -103,8 +103,10 @@ struct LatencyReportView: View {
         }
         .navigationTitle("latencyReport")
         .task(id: LatencyRequest(entries: controller.history, hours: hours)) {
-            let cutoff = Date().addingTimeInterval(-Double(hours) * 3600)
-            values = controller.history.filter { $0.observedAt >= cutoff && $0.observedAt <= Date() }
+            let now = Date()
+            let cutoff = now.addingTimeInterval(-Double(hours) * 3600)
+            let segment = HistoryAnalytics.currentClockSegment(entries: controller.history)
+            values = segment.filter { $0.observedAt >= cutoff && $0.observedAt <= now }
                 .compactMap(\.latencyMilliseconds).filter { $0.isFinite && $0 >= 0 }.sorted()
         }
     }

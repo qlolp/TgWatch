@@ -49,11 +49,13 @@ public enum HistoryCSV {
         var previousEnd: Date?
         for line in lines.dropFirst() {
             let fields = line.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
-            guard fields.count == (legacy ? 5 : 9),
-                  let start = formatter.date(from: fields[0]), let end = formatter.date(from: fields[1]),
+            guard fields.count == (legacy ? 5 : 9) else { throw Failure.invalid }
+            // Android TargetCsv.encode leaves latency_ms empty when it was not measured; CsvImport treats that as -1.
+            let latencyField = fields[4].isEmpty ? "-1" : fields[4]
+            guard let start = formatter.date(from: fields[0]), let end = formatter.date(from: fields[1]),
                   let duration = Int64(fields[3]), duration >= 0,
                   Int64((end.timeIntervalSince(start) * 1000).rounded()) == duration,
-                  let latency = Int64(fields[4]), (-1...600_000).contains(latency) else { throw Failure.invalid }
+                  let latency = Int64(latencyField), (-1...600_000).contains(latency) else { throw Failure.invalid }
             if !legacy {
                 guard fields[7] == targetID else { throw Failure.wrongTarget }
                 guard UInt64(fields[5]) != nil, UInt64(fields[8]) != nil, fields[6] == "true" else { throw Failure.multipleRevisions }
