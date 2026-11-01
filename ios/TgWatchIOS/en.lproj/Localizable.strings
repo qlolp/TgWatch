@@ -189,3 +189,17 @@
 
 "longTermTitle" = "Daily statistics";
 "downtimeDuration" = "Downtime";
+
+"egressTitle" = "Internet exit";
+
+"egressRefresh" = "Refresh public IP";
+
+"egressUnknownCountry" = "Country unknown";
+
+"egressChecking" = "Checking IP and country…";
+
+"egressFailed" = "Could not determine the exit. Try refreshing.";
+
+"egressNotChecked" = "A fresh check is needed";
+
+"egressHint" = "IP country according to Cloudflare. This checks the route of this request; split-tunnel VPNs may route other apps differently. The IP is not saved.";

@@ -132,6 +132,27 @@ settings changes reset the streak without resetting the cooldown. Missing latenc
 alert. Quiet hours and temporary silence suppress sound using the existing alert policy. No
 background latency monitoring or slow-response webhook delivery is implied.
 
+## Public IP and exit country
+
+The Telegram dashboard and Services tab share one foreground-only exit card: flag, localized
+country name, public IP and check time. Like Android, the source is
+[Cloudflare HTTPS trace](https://developers.cloudflare.com/fundamentals/reference/cdn-cgi-endpoint/).
+Country comes from `loc`, never from the `colo` data-center code. IPv4 and IPv6 are accepted;
+unknown country codes show a globe rather than a fabricated flag.
+
+One ephemeral HTTPS request runs on foreground entry, network-path changes, manual refresh and
+about every minute while active. A route change immediately invalidates the old result; generation
+checks and cancellation reject late completions. Requests are debounced and at least five seconds
+apart. No cookies, credentials, disk cache or redirects; 4 KiB maximum body and eight-second
+resource timeout. Errors clear the previous result. The display expires after 90 seconds, including
+when the wall clock moves backward. Fixture runs use a documentation IP and perform no lookup.
+
+Cloudflare sees the source IP needed to answer the request. The app retains the returned IP only
+in memory: no history, preferences, diagnostics, CSV, webhook or backup includes it. Country is
+approximate IP geolocation for this HTTPS route, not GPS location or proof that all traffic uses a
+VPN. Split routing, proxies and different IPv4/IPv6 paths can produce different exits for other
+requests. This is not a VPN leak test and it does not change VPN configuration.
+
 ## Remaining Android differences
 
 This is not full feature parity. Continuous Android-style background execution is not implemented
