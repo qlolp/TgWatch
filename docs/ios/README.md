@@ -75,10 +75,29 @@ Changing an address creates a new local revision and stops that target; old revi
 disk, outside current statistics. Removing a custom target removes its local revision directory.
 Private definitions are file-protected and excluded from system backups.
 
-HTTPS targets accept 2xx by default, optionally an exact HTTP code and one JSON string condition
-at up to three nested keys. JSON bodies are capped at 32 KiB. HEAD falls back to GET on 405/501;
-JSON and Matrix use GET. Redirects are not followed. A failed check is DOWN only if a control
-endpoint confirms internet access. Generic targets never fabricate MTProto evidence.
+HTTPS targets accept 2xx by default, optionally an exact HTTP code, a case-sensitive body
+substring (256 characters), and up to four JSON string conditions. Every configured condition
+must match. JSON paths use up to three nested keys and 64 characters; expected strings may be
+empty and are limited to 256 characters. Full JSON validation rejects duplicate keys (including
+escaped equivalents), malformed UTF-8 and nesting beyond 10 containers.
+
+Up to eight request headers can be configured, with case-insensitively unique ASCII token names
+(64 bytes) and printable ASCII values (256 bytes). Host, Content-Length, Transfer-Encoding,
+Connection and Accept-Encoding remain transport-owned. Headers are only sent to the target;
+they are never forwarded to the internet control probe. Redirects are not followed.
+
+Body or JSON conditions use one GET with identity encoding and a 32 KiB response cap. Unknown-length
+responses reaching the cap are rejected; an exact-cap response with known length is allowed.
+Without body criteria, HEAD falls back to GET on 405/501. Matrix always uses JSON GET.
+A failed check is DOWN only if a control endpoint confirms internet access. Generic targets never
+fabricate MTProto evidence. An HTTP/JSON success does not prove all service features work.
+
+The custom-target editor includes GitHub, Discord, Cloudflare, Atlassian and OpenAI status-page
+presets. Applying one explicitly replaces the form fields and clears headers, then requires Save.
+Each preset checks HTTP 200 and status.indicator = none. Existing definitions with a single JSON
+condition still decode; edits preserve their criteria. New criteria are optional fields in the
+local manifest, excluded from CSV, sharing and webhook payloads. Older iOS builds do not understand
+the new fields: do not downgrade a configured installation and expect equivalent checks.
 
 Alerts independently select outage, partial availability, recovery and network loss. They share
 an optional sound, minute-based quiet hours and an in-process one-hour mute. Gaps, suspension,
@@ -98,7 +117,7 @@ file-protected and excluded from system backups. No JSON v2 heartbeat is claimed
 
 This is not full feature parity. Continuous Android-style background execution is not implemented
 on iOS. Widgets, encrypted TGWB backups, 30/90-day aggregation, daily scheduled summaries,
-multi-target/archive CSV import, custom request headers/multiple JSON conditions/status presets,
+multi-target/archive CSV import,
 slow-response alerts, scheduled pauses, network breakdowns and Android automation adapters remain
 unimplemented. The current iOS UI does not expose the retained old endpoint revisions.
 

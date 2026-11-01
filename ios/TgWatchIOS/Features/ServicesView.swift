@@ -120,24 +120,28 @@ struct ServiceEditor: View {
     let definition: ServiceDefinition
     @State private var address: String
     @State private var code: String
-    @State private var jsonPath: String
-    @State private var expected: String
+    @State private var bodySubstring: String
+    @State private var conditions: [HealthConditionDraft]
+    @State private var headers: [HealthHeaderDraft]
+    @State private var selectedPreset: HealthPreset?
     @State private var failure = false
     @Environment(\.dismiss) private var dismiss
 
     init(catalog: ServiceCatalog, definition: ServiceDefinition) {
         self.catalog = catalog
         self.definition = definition
-        // New targets pass an empty definition, so their fields stay blank. Edits keep the saved health check.
         _address = State(initialValue: definition.address)
         _code = State(initialValue: definition.expectedCode.map(String.init) ?? "")
-        _jsonPath = State(initialValue: definition.jsonPath)
-        _expected = State(initialValue: definition.expectedValue)
+        _bodySubstring = State(initialValue: definition.bodySubstring ?? "")
+        _conditions = State(initialValue: definition.healthConditions.map { HealthConditionDraft(value: $0) })
+        _headers = State(initialValue: (definition.requestHeaders ?? []).map { HealthHeaderDraft(value: $0) })
     }
     private var candidate: ServiceDefinition {
         .init(id: definition.id, kind: definition.kind, address: address.trimmingCharacters(in: .whitespacesAndNewlines),
-              expectedCode: code.isEmpty ? nil : Int(code), jsonPath: jsonPath, expectedValue: expected)
+              expectedCode: code.isEmpty ? nil : Int(code), bodySubstring: bodySubstring,
+              additionalJSONConditions: conditions.map(\.value), requestHeaders: headers.map(\.value))
     }
+    private var valid: Bool { candidate.valid && (code.isEmpty || Int(code) != nil) }
     var body: some View {
         NavigationStack {
             Form {
@@ -145,12 +149,27 @@ struct ServiceEditor: View {
                     TextField("https://example.com/health", text: $address).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                         .accessibilityIdentifier("endpointAddress")
                     Text("privateEndpointHint").font(.caption)
+                    if definition.kind == .custom {
+                        Menu("healthPresets") {
+                            ForEach(HealthPreset.allCases) { preset in
+                                Button(preset.rawValue) { selectedPreset = preset }
+                            }
+                        }.accessibilityIdentifier("healthPresets")
+                    }
                 }
                 Section("healthCriteria") {
                     TextField("expectedHTTPCode", text: $code).keyboardType(.numberPad)
-                    TextField("jsonFieldPath", text: $jsonPath).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    SecureField("expectedJSONValue", text: $expected)
-                    Text("healthCriteriaHint").font(.caption)
+                    SecureField("healthBodySubstring", text: $bodySubstring)
+                    Text("healthAllConditionsHint").font(.caption)
+                }
+                HealthConditionsSection(conditions: $conditions)
+                HealthHeadersSection(headers: $headers)
+                Section {
+                    if !valid {
+                        Label("healthValidationHint", systemImage: "exclamationmark.circle")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text("healthPrivacyHint").font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .navigationTitle(definition.displayName)
@@ -159,10 +178,21 @@ struct ServiceEditor: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("saveService") {
                         do { try catalog.save(candidate); dismiss() } catch { failure = true }
-                    }.disabled(!candidate.valid || (!code.isEmpty && Int(code) == nil))
-                        .accessibilityIdentifier("saveService")
+                    }.disabled(!valid).accessibilityIdentifier("saveService")
                 }
             }
+            .confirmationDialog("healthPresetReplace", isPresented: Binding(get: { selectedPreset != nil }, set: { if !$0 { selectedPreset = nil } })) {
+                Button("healthApplyPreset", role: .destructive) {
+                    guard let preset = selectedPreset else { return }
+                    address = preset.address
+                    code = "200"
+                    bodySubstring = ""
+                    conditions = [.init(value: .init(path: "status.indicator", expectedValue: "none"))]
+                    headers = []
+                    selectedPreset = nil
+                }
+                Button("cancel", role: .cancel) { selectedPreset = nil }
+            } message: { Text("healthPresetReplaceHint") }
             .alert("preferencesUnavailable", isPresented: $failure) { Button("dismiss", role: .cancel) {} }
         }
     }

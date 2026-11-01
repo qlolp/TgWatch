@@ -131,3 +131,22 @@
 "webhookPrivacy" = "Only public target ID, status and timestamp are sent. No history, probe address or health criteria. No redirects; one request at a time. Events during an ongoing delivery are not queued; failed deliveries are not retried automatically.";
 
 "profileCustom" = "Custom interval";
+
+"healthPresets" = "Status page presets";
+"healthBodySubstring" = "Required response text";
+"healthAllConditionsHint" = "All conditions must match. Any 2xx is accepted when the code is blank. Text matching is case-sensitive, up to 256 characters.";
+"healthJSONConditions" = "JSON conditions";
+"healthAddCondition" = "Add condition";
+"healthRemoveCondition" = "Remove condition";
+"healthJSONHint" = "Up to 4 conditions. Path: status.indicator, up to 3 levels and 64 characters. Expected value: a string up to 256 characters; an empty string is allowed.";
+"healthRequestHeaders" = "Request headers";
+"healthHeaderName" = "Name, such as Authorization";
+"healthHeaderValue" = "Header value";
+"healthAddHeader" = "Add header";
+"healthRemoveHeader" = "Remove header";
+"healthHeadersHint" = "Up to 8 unique headers: name up to 64 characters, value up to 256 printable ASCII characters. Host, Content-Length, Transfer-Encoding, Connection and Accept-Encoding are managed by the app.";
+"healthValidationHint" = "Check the HTTPS address, code 200–599 and conditions. Each JSON condition needs a path; each header needs a valid unique name. Remove unfinished rows.";
+"healthPrivacyHint" = "Address, criteria and headers stay on this device and are excluded from CSV, shared status and webhooks. A status-page check does not prove every service feature is available.";
+"healthPresetReplace" = "Apply this preset?";
+"healthApplyPreset" = "Replace fields";
+"healthPresetReplaceHint" = "The address and criteria will be replaced and headers cleared. Changes take effect only after saving.";
