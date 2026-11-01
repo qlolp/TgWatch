@@ -9,7 +9,8 @@ import Foundation
     public var onChange: (() -> Void)?
     public var onObservation: ((ProbeSnapshot) -> Void)?
     private let runner: any ProbeRunner
-    private let interval: Duration
+    private var interval: Duration
+    public private(set) var resultLifetime: Double = 120
     private let now: @Sendable () -> Date
     private let instant: @Sendable () -> ContinuousClock.Instant
     private var receivedWall: Date?
@@ -28,7 +29,7 @@ import Foundation
         guard snapshot != nil, let receivedInstant, let receivedWall else { return false }
         let age = receivedInstant.duration(to: instant())
         let seconds = Double(age.components.seconds) + Double(age.components.attoseconds) / 1e18
-        return age >= .zero && age <= .seconds(120) && abs(now().timeIntervalSince(receivedWall) - seconds) <= 5
+        return age >= .zero && age <= .seconds(resultLifetime) && abs(now().timeIntervalSince(receivedWall) - seconds) <= 5
     }
     public func checkNow() {
         guard active, batch == nil else { return }
@@ -63,6 +64,12 @@ import Foundation
     public func setActive(_ value: Bool) {
         guard value != active else { return }
         active = value; invalidate()
+    }
+    public func setCheckInterval(seconds: Int) {
+        let seconds = min(60, max(15, seconds))
+        interval = .seconds(seconds)
+        resultLifetime = Double(seconds + 15)
+        invalidate()
     }
     public func setMonitoring(_ value: Bool) { monitoring = value; restartLoop(); onChange?() }
     public func networkChanged(unavailable: Bool) { pathUnavailable = unavailable; invalidate() }

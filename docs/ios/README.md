@@ -40,8 +40,26 @@ Tests must never depend on a currently reachable public Telegram endpoint.
 History schema 1 is local to iOS: 7 days / 10,000 entries, 8 MiB decode ceiling, atomic replacement.
 A corrupted file remains untouched until explicit Delete history. Failed writes keep bounded dirty entries
 in memory for retry; the UI reports storage failure. No Android backup import is claimed.
-Results expire after 120 seconds. History entries are observations, not fabricated coverage while suspended.
+New results expire after the selected check interval plus 15 seconds; legacy entries retain their
+120-second lifetime. History entries are observations, not fabricated coverage while suspended.
 Clock rollback starts a new segment. Returning from background never restores an old result as live.
+
+## Monitoring and reports
+
+The foreground monitor offers Economy (60 seconds), Balanced (30 seconds), and Frequent
+(15 seconds) profiles, matching Android's awake intervals. The selected profile is saved locally
+in `preferences.json`. iOS does not provide Android's continuous foreground service: checks stop
+when the app becomes inactive.
+
+Statistics cover the last 24 hours or 7 days: availability, observation coverage, check count,
+outage count, longest outage and a state chart. Availability excludes offline and unknown time.
+Outages and their duration are clipped to the report window; unknown gaps split episodes.
+Pull to refresh updates the report window.
+
+CSV export uses Android's five-column format
+`from_utc,until_utc,status,duration_ms,latency_ms`, with UTC timestamps and `-1` for unmeasured
+latency. It exports the selected report window, including unknown gaps, rather than an app backup.
+Custom targets, background alerts, widgets and encrypted backup import are not yet implemented.
 
 No analytics, cookies, shared diagnostic logs or account identifiers. Privacy manifest declares no
 tracking/collected data; current code does not use UserDefaults, file timestamp, disk-space or device-boot-time

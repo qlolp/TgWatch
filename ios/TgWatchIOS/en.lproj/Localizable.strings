@@ -3,7 +3,7 @@
 "checkNow" = "Check now";
 "checking" = "Checking…";
 "cancel" = "Cancel";
-"monitorWhileOpen" = "Check every minute while open";
+"monitorWhileOpen" = "Check automatically while the app is open";
 "evidence" = "Evidence";
 "telegramWeb" = "Telegram Web";
 "controlEndpoint" = "Control endpoint";
@@ -14,7 +14,7 @@
 "reachabilityOnly" = "A handshake or web response does not prove account access, message delivery or server identity.";
 "history" = "History";
 "historyUnavailable" = "History could not be read or saved. Existing data has been preserved.";
-"historyExplanation" = "Local observations, up to 7 days. Gaps over 2 minutes are unknown, not uptime or an outage.";
+"historyExplanation" = "Local observations, up to 7 days. Periods without fresh checks are unknown, not uptime or an outage.";
 "historyEmpty" = "No observations yet";
 "clearHistory" = "Delete history";
 "clearHistoryQuestion" = "Delete all local observations?";
@@ -37,3 +37,29 @@
 "controlDescription" = "Independent internet connectivity check";
 "notChecked" = "Not checked yet";
 "historyEmptyHint" = "Run a check on the main screen to see your first result here.";
+
+"profileEconomy" = "Economy · 60 s";
+"profileBalanced" = "Balanced · 30 s";
+"profileFrequent" = "Frequent · 15 s";
+"checkFrequency" = "Check frequency";
+"preferencesUnavailable" = "Settings could not be read or saved. The selected profile applies until the app closes.";
+"historyReport" = "Statistics";
+"reportPeriod" = "Period";
+"lastDay" = "24 hours";
+"lastWeek" = "7 days";
+"stateChart" = "States over time";
+"chartExplanation" = "Colors show time attributed to observed states. Gray means offline or unknown; durations are listed below.";
+"exportCSV" = "Save CSV";
+"csvExplanation" = "Export the selected window in UTC, including UNKNOWN gaps. Response latency is not measured. Uses Android's five-column Telegram CSV format.";
+"summaryAsOf" = "Calculated at";
+"preparingReport" = "Preparing summary…";
+"exportFailed" = "Could not save CSV";
+"dismiss" = "Close";
+"reportSummary" = "Summary";
+"availability" = "Availability";
+"observationCoverage" = "Observation coverage";
+"checksCount" = "Checks";
+"outagesCount" = "Outage episodes";
+"longestOutage" = "Longest episode";
+"insufficientData" = "Not enough data";
+"availabilityExplanation" = "Availability is available time divided by available, partial and confirmed outage time. Offline and unknown time are excluded. Episodes may be clipped by the selected window.";

@@ -5,6 +5,9 @@ import TgWatchCore
 @MainActor final class MonitorController: ObservableObject {
     @Published var history: [HistoryEntry] = []
     @Published var historyUnavailable = false
+    @Published private(set) var profile: CheckProfile = .economy
+    @Published private(set) var preferencesUnavailable = false
+    private let preferencesURL: URL
     let fixtureMode: Bool
     let session: MonitorSession
     private let store: HistoryStore
@@ -23,7 +26,15 @@ import TgWatchCore
         }
         #endif
         fixtureMode = isFixture
+        preferencesURL = file.deletingLastPathComponent().appendingPathComponent("preferences.json")
         session = MonitorSession(runner: runner); store = HistoryStore(url: file)
+        if FileManager.default.fileExists(atPath: preferencesURL.path) {
+            do {
+                let data = try Data(contentsOf: preferencesURL)
+                profile = try JSONDecoder().decode(CheckProfile.self, from: data)
+            } catch { preferencesUnavailable = true }
+        }
+        session.setCheckInterval(seconds: profile.rawValue)
         session.onChange = { [weak self] in self?.objectWillChange.send() }
         session.onObservation = { [weak self] value in self?.save(value) }
         path.pathUpdateHandler = { [weak self] value in
@@ -39,9 +50,10 @@ import TgWatchCore
     }
     private func save(_ snapshot: ProbeSnapshot) {
         let previous = writeTask
+        let lifetime = session.resultLifetime
         writeTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status)) }
+            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
         }
@@ -58,8 +70,33 @@ import TgWatchCore
             catch { self?.historyUnavailable = true }
         }
     }
+    func setProfile(_ value: CheckProfile) {
+        profile = value
+        session.setCheckInterval(seconds: value.rawValue)
+        do {
+            try FileManager.default.createDirectory(at: preferencesURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(value).write(to: preferencesURL, options: .atomic)
+            preferencesUnavailable = false
+        } catch { preferencesUnavailable = true }
+    }
+
     deinit { path.cancel() }
 }
+enum CheckProfile: Int, Codable, CaseIterable, Identifiable {
+    case economy = 60
+    case balanced = 30
+    case frequent = 15
+
+    var id: Int { rawValue }
+    var title: LocalizedStringKey {
+        switch self {
+        case .economy: "profileEconomy"
+        case .balanced: "profileBalanced"
+        case .frequent: "profileFrequent"
+        }
+    }
+}
+
 #if DEBUG
 private struct FixtureRunner: ProbeRunner {
     let mode: String

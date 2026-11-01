@@ -5,8 +5,11 @@ public struct HistoryEntry: Codable, Equatable, Identifiable, Sendable {
     public let epoch: UInt64
     public let observedAt: Date
     public let status: ProbeStatus
-    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus) {
+    public let validForSeconds: Double?
+    public var coverageLifetime: Double { min(120, max(1, validForSeconds ?? 120)) }
+    public init(epoch: UInt64, observedAt: Date, status: ProbeStatus, validForSeconds: Double? = nil) {
         id = UUID(); schemaVersion = 1; self.epoch = epoch; self.observedAt = observedAt; self.status = status
+        self.validForSeconds = validForSeconds.flatMap { $0.isFinite ? min(120, max(1, $0)) : nil }
     }
 }
 public actor HistoryStore {
@@ -55,7 +58,7 @@ public struct ObservationInterval: Equatable, Sendable {
 }
 public enum HistoryCoverage {
     public static func isFresh(_ entry: HistoryEntry, now: Date) -> Bool {
-        let age = now.timeIntervalSince(entry.observedAt); return age >= 0 && age <= 120
+        let age = now.timeIntervalSince(entry.observedAt); return age >= 0 && age <= entry.coverageLifetime
     }
     public static func intervals(entries: [HistoryEntry], now: Date) -> [ObservationInterval] {
         // Arrival order is intentional: a clock rollback starts a new segment, never reorders observations.
@@ -68,7 +71,7 @@ public enum HistoryCoverage {
         var result: [ObservationInterval] = []
         for (index, entry) in segment.enumerated() {
             let end = index + 1 < segment.count ? segment[index+1].observedAt : now
-            let freshEnd = min(end, entry.observedAt.addingTimeInterval(120))
+            let freshEnd = min(end, entry.observedAt.addingTimeInterval(entry.coverageLifetime))
             if freshEnd > entry.observedAt { result.append(.init(from: entry.observedAt, to: freshEnd, status: entry.status)) }
             if end > freshEnd { result.append(.init(from: freshEnd, to: end, status: .unknown)) }
         }

@@ -42,6 +42,30 @@ final class MonitorFlowTests: XCTestCase {
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Largest Dynamic Type"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
+    func testStatisticsAndFrequencyProfile() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]
+        app.launch()
+        app.buttons["checkFrequency"].tap()
+        app.buttons["Frequent · 15 s"].tap()
+        app.buttons["checkNow"].tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "Available"),
+                    evaluatedWith: app.staticTexts["status"])
+        waitForExpectations(timeout: 5)
+        app.buttons["historyReport"].tap()
+        XCTAssertTrue(app.staticTexts["Availability"].waitForExistence(timeout: 5))
+        app.buttons["7 days"].tap()
+        for _ in 0..<6 {
+            if app.buttons["exportCSV"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["exportCSV"].isHittable)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Statistics and chart"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testRussianOfflineFixture() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "offline", "-AppleLanguages", "(ru)"]
         app.launch(); app.buttons["checkNow"].tap()

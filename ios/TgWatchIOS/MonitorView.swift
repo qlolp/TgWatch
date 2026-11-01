@@ -25,6 +25,8 @@ struct MonitorView: View {
                         )
                     }
                     MonitoringCard(
+                        profile: Binding(get: { controller.profile }, set: controller.setProfile),
+                        preferencesUnavailable: controller.preferencesUnavailable,
                         monitoring: Binding(
                             get: { controller.session.monitoring },
                             set: controller.session.setMonitoring
@@ -48,6 +50,14 @@ struct MonitorView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("TgWatch")
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        HistoryReportView(controller: controller)
+                    } label: {
+                        Label("historyReport", systemImage: "chart.bar.xaxis")
+                    }
+                    .accessibilityIdentifier("historyReport")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         HistoryView(controller: controller)
@@ -135,6 +145,8 @@ private struct StatusCard: View {
 }
 
 private struct MonitoringCard: View {
+    @Binding var profile: CheckProfile
+    let preferencesUnavailable: Bool
     @Binding var monitoring: Bool
 
     var body: some View {
@@ -144,8 +156,17 @@ private struct MonitoringCard: View {
                     .font(.headline)
             }
             .accessibilityLabel(Text("monitorWhileOpen"))
-            Text("monitoringInterval")
-                .font(.subheadline).foregroundStyle(.secondary)
+            Picker("checkFrequency", selection: $profile) {
+                ForEach(CheckProfile.allCases) { value in
+                    Text(value.title).tag(value)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier("checkFrequency")
+            if preferencesUnavailable {
+                Label("preferencesUnavailable", systemImage: "exclamationmark.triangle")
+                    .font(.footnote).foregroundStyle(.red)
+            }
             Divider()
             Label {
                 Text("foregroundExplanation").accessibilityIdentifier("foregroundExplanation")
