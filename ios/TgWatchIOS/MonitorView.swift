@@ -12,6 +12,7 @@ struct MonitorView: View {
                         Label("TEST FIXTURE — no live measurements", systemImage: "testtube.2")
                             .font(.caption).foregroundStyle(.orange)
                     }
+                    EgressCountryCard()
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         let snapshot = controller.session.snapshot
                         let fresh = controller.session.isFresh()

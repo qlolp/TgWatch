@@ -3,6 +3,8 @@ import TgWatchCore
 
 struct ServicesRootView: View {
     @ObservedObject var catalog: ServiceCatalog
+    @State private var egress = EgressController()
+    @Environment(\.scenePhase) private var phase
     var body: some View {
         TabView {
             if let telegram = catalog.monitors.first(where: { $0.definition.kind == .telegram }) {
@@ -10,6 +12,8 @@ struct ServicesRootView: View {
             }
             ServicesView(catalog: catalog).tabItem { Label("services", systemImage: "square.grid.2x2") }
         }
+        .environment(egress)
+        .onChange(of: phase, initial: true) { _, value in egress.setActive(value == .active) }
     }
 }
 
@@ -19,6 +23,7 @@ struct ServicesView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section { EgressCountryCard().listRowInsets(EdgeInsets()) }
                 Section {
                     Text("independentServices").font(.subheadline).foregroundStyle(.secondary)
                     if catalog.storageError { Label("preferencesUnavailable", systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
