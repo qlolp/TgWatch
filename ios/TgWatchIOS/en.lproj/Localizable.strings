@@ -150,3 +150,42 @@
 "healthPresetReplace" = "Apply this preset?";
 "healthApplyPreset" = "Replace fields";
 "healthPresetReplaceHint" = "The address and criteria will be replaced and headers cleared. Changes take effect only after saving.";
+
+"slowResponses" = "Slow responses";
+
+"slowResponseAlerts" = "Warn about slow responses";
+
+"slowResponseThreshold" = "Latency threshold";
+
+"slowResponseHint" = "Three successful checks at or above the threshold. Clears below 60% of the threshold; repeats at most every 30 minutes. Works while the app is open. Quiet hours silence the sound.";
+
+"slowResponseMessage" = "The service responds, but three consecutive checks showed high latency.";
+
+"outageEpisodes" = "Recent outages";
+
+"noOutages" = "No outages observed in this period.";
+
+"outageRecovered" = "Recovery confirmed";
+
+"outageInterrupted" = "Observation interrupted";
+
+"outageOngoing" = "Recovery not yet observed";
+
+"outageStartUnknown" = "Exact outage start was not observed";
+
+"outageEpisodesHint" = "Up to 100 recent episodes. Partial availability continues an outage. Missing checks or network loss interrupt observation. Mean recovery time includes only fully observed episodes.";
+
+"meanTimeToRecovery" = "Mean recovery time";
+
+"longTermReport" = "30/90-day statistics";
+
+"lastMonth" = "30 days";
+
+"lastQuarter" = "90 days";
+
+"dailyTotals" = "Daily totals · UTC";
+
+"longTermHint" = "UTC days, including today. Detailed history is kept for up to 7 days; daily totals for up to 90. Gaps never count as uptime. After upgrading, only surviving observations can be included. CSV contains detailed history only.";
+
+"longTermTitle" = "Daily statistics";
+"downtimeDuration" = "Downtime";

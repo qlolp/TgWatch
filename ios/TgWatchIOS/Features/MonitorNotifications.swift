@@ -11,6 +11,8 @@ struct AlertSettings: Codable, Equatable {
     var quietStart = 23 * 60
     var quietEnd = 8 * 60
     var quietEnabled = false
+    // Optional for compatibility with settings saved by previous app versions.
+    var slowThresholdMilliseconds: Int?
     // A temporary mute is intentionally not persisted or transferred.
     var mutedUntil: Date?
 
@@ -31,7 +33,7 @@ struct AlertSettings: Codable, Equatable {
         let quiet = quietStart < quietEnd ? (quietStart..<quietEnd).contains(minute) : minute >= quietStart || minute < quietEnd
         return !quiet
     }
-    enum CodingKeys: String, CodingKey { case down, partial, recovery, offline, sound, quietStart, quietEnd, quietEnabled }
+    enum CodingKeys: String, CodingKey { case down, partial, recovery, offline, sound, quietStart, quietEnd, quietEnabled, slowThresholdMilliseconds }
 }
 
 final class MonitorNotifications: NSObject, UNUserNotificationCenterDelegate {
@@ -44,9 +46,15 @@ final class MonitorNotifications: NSObject, UNUserNotificationCenterDelegate {
         try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
     }
     func send(target: String, status: ProbeStatus, sound: Bool) async throws {
+        try await send(target: target, message: NSLocalizedString(status == .ok ? "serviceRecovered" : "status.\(status.rawValue)", comment: ""), sound: sound)
+    }
+    func sendSlowResponse(target: String, sound: Bool) async throws {
+        try await send(target: target, message: NSLocalizedString("slowResponseMessage", comment: ""), sound: sound)
+    }
+    private func send(target: String, message: String, sound: Bool) async throws {
         let content = UNMutableNotificationContent()
         content.title = target
-        content.body = NSLocalizedString(status == .ok ? "serviceRecovered" : "status.\(status.rawValue)", comment: "")
+        content.body = message
         if sound { content.sound = .default }
         try await UNUserNotificationCenter.current().add(.init(identifier: UUID().uuidString, content: content, trigger: nil))
     }

@@ -47,7 +47,9 @@ public struct ServiceProbeRunner: ProbeRunner, @unchecked Sendable {
                 request.setValue(header.value, forHTTPHeaderField: header.name)
             }
             request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-            if definition.needsJSON { request.setValue("application/json", forHTTPHeaderField: "Accept") }
+            if definition.needsJSON, request.value(forHTTPHeaderField: "Accept") == nil {
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+            }
             let (bytes, response) = try await session.bytes(for: request)
             guard let response = response as? HTTPURLResponse else { return false }
             if method == "HEAD" && [405, 501].contains(response.statusCode) { continue }

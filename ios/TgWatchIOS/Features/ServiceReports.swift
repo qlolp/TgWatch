@@ -36,6 +36,23 @@ struct AlertSettingsView: View {
                     Button("unmute") { controller.alertSettings.mutedUntil = nil }
                 }
             }
+            Section("slowResponses") {
+                Toggle("slowResponseAlerts", isOn: Binding(get: {
+                    controller.alertSettings.slowThresholdMilliseconds != nil
+                }, set: { enabled in
+                    controller.alertSettings.slowThresholdMilliseconds = enabled ? 1000 : nil
+                }))
+                if controller.alertSettings.slowThresholdMilliseconds != nil {
+                    Picker("slowResponseThreshold", selection: Binding(get: {
+                        controller.alertSettings.slowThresholdMilliseconds ?? 1000
+                    }, set: { controller.alertSettings.slowThresholdMilliseconds = $0 })) {
+                        ForEach([500, 1000, 2000, 5000], id: \.self) { value in
+                            Text(Duration.milliseconds(value), format: .units(allowed: [.milliseconds], width: .abbreviated)).tag(value)
+                        }
+                    }
+                }
+                Text("slowResponseHint").font(.caption).foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("alertSettings")
         .onChange(of: controller.alertSettings) { _, _ in controller.saveAlerts() }

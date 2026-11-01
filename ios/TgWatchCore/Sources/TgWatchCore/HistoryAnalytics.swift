@@ -8,6 +8,7 @@ public struct HistoryAnalytics: Sendable {
     public let checks: Int
     public let outageCount: Int
     public let longestOutage: TimeInterval
+    public let outageEpisodes: [OutageEpisode]
 
     /// Arrival-order segment after the latest backward timestamp. Earlier segments stay archived.
     public static func currentClockSegment(entries: [HistoryEntry]) -> [HistoryEntry] {
@@ -29,7 +30,8 @@ public struct HistoryAnalytics: Sendable {
         checks = current.filter { $0.observedAt >= lower && $0.observedAt <= to }.count
         var clipped: [ObservationInterval] = []
         var cursor = lower
-        for value in HistoryCoverage.intervals(entries: current, now: to) {
+        let fullIntervals = HistoryCoverage.intervals(entries: current, now: to)
+        for value in fullIntervals {
             let start = max(lower, value.from), end = min(to, value.to)
             guard end > start else { continue }
             if start > cursor { clipped.append(.init(from: cursor, to: start, status: .unknown)) }
@@ -38,18 +40,10 @@ public struct HistoryAnalytics: Sendable {
         }
         if cursor < to { clipped.append(.init(from: cursor, to: to, status: .unknown)) }
         intervals = clipped
-        var count = 0
-        var duration: TimeInterval = 0
-        var longest: TimeInterval = 0
-        for value in clipped {
-            if value.status == .down || (value.status == .partial && duration > 0) {
-                if duration == 0 { count += 1 }
-                duration += value.to.timeIntervalSince(value.from)
-                longest = max(longest, duration)
-            } else { duration = 0 }
-        }
-        outageCount = count
-        longestOutage = longest
+        let episodes = Self.episodes(intervals: fullIntervals, from: lower, to: to)
+        outageEpisodes = episodes
+        outageCount = episodes.count
+        longestOutage = episodes.map(\.duration).max() ?? 0
     }
 
     public func duration(_ status: ProbeStatus) -> TimeInterval {

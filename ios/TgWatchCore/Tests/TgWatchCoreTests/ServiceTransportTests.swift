@@ -14,6 +14,7 @@ private final class ServiceFixtureProtocol: URLProtocol, @unchecked Sendable {
         if path == "/fallback", request.httpMethod == "HEAD" { code = 405 }
         if path == "/redirect" { code = 302 }
         if path == "/down" { code = 503 }
+        if path == "/vendor", request.value(forHTTPHeaderField: "Accept") != "application/vnd.health+json" { code = 406 }
         if path == "/headers" {
             let correct = request.httpMethod == "GET" && request.value(forHTTPHeaderField: "X-Health-Key") == "fixture-secret" &&
                 request.value(forHTTPHeaderField: "Accept-Encoding") == "identity" && request.value(forHTTPHeaderField: "Accept") == "application/json"
@@ -35,6 +36,15 @@ private final class ServiceFixtureProtocol: URLProtocol, @unchecked Sendable {
 }
 
 struct ServiceTransportTests {
+    @Test func preservesVendorAcceptForJSONChecks() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ServiceFixtureProtocol.self]
+        let target = ServiceDefinition(id: "custom", kind: .custom, address: "https://fixture.invalid/vendor",
+            additionalJSONConditions: [.init(path: "status", expectedValue: "ok")],
+            requestHeaders: [.init(name: "aCcEpT", value: "application/vnd.health+json")])
+        #expect(try await ServiceProbeRunner(definition: target, configuration: config).check(epoch: 0).status == .ok)
+    }
+
     @Test func bodyBoundariesAndAmbiguousResponsesFailClosed() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [ServiceFixtureProtocol.self]
