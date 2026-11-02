@@ -1,60 +1,202 @@
-//
-//  TgWatchWidget.swift
-//  TgWatchWidget
-//
-//  Created by Евгений Чистяков on 01.11.2026.
-//
-
 import WidgetKit
 import SwiftUI
 
 struct Provider: TimelineProvider {
-    func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), emoji: "😀")
+    typealias Entry = StatusEntry
+
+    private var appGroupURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.ru.tgwatch.ios")?
+            .appendingPathComponent("companion_snapshot.json")
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = SimpleEntry(date: Date(), emoji: "😀")
-        completion(entry)
+    private func loadSnapshot() -> CompanionSnapshot? {
+        guard let url = appGroupURL, let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(CompanionSnapshot.self, from: data)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        var entries: [SimpleEntry] = []
+    func placeholder(in context: Context) -> StatusEntry {
+        StatusEntry(date: Date(), snapshot: nil, isStale: false)
+    }
 
-        // Generate a timeline consisting of five entries an hour apart, starting from the current date.
-        let currentDate = Date()
-        for hourOffset in 0 ..< 5 {
-            let entryDate = Calendar.current.date(byAdding: .hour, value: hourOffset, to: currentDate)!
-            let entry = SimpleEntry(date: entryDate, emoji: "😀")
-            entries.append(entry)
+    func getSnapshot(in context: Context, completion: @escaping (StatusEntry) -> Void) {
+        let snapshot = loadSnapshot()
+        let isStale = snapshot?.telegramItem?.isStale(at: Date()) ?? true
+        completion(StatusEntry(date: Date(), snapshot: snapshot, isStale: isStale))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
+        let snapshot = loadSnapshot()
+        let now = Date()
+
+        if let item = snapshot?.telegramItem {
+            let currentStale = item.isStale(at: now)
+            let entryNow = StatusEntry(date: now, snapshot: snapshot, isStale: currentStale)
+
+            var entries = [entryNow]
+            if !currentStale && item.validUntil > now {
+                let entryExpiry = StatusEntry(date: item.validUntil, snapshot: snapshot, isStale: true)
+                entries.append(entryExpiry)
+                let timeline = Timeline(entries: entries, policy: .after(item.validUntil.addingTimeInterval(60)))
+                completion(timeline)
+                return
+            }
         }
 
-        let timeline = Timeline(entries: entries, policy: .atEnd)
+        let entry = StatusEntry(date: now, snapshot: snapshot, isStale: true)
+        let timeline = Timeline(entries: [entry], policy: .after(now.addingTimeInterval(300)))
         completion(timeline)
     }
-
-//    func relevances() async -> WidgetRelevances<Void> {
-//        // Generate a list containing the contexts this widget is relevant in.
-//    }
 }
 
-struct SimpleEntry: TimelineEntry {
+struct StatusEntry: TimelineEntry {
     let date: Date
-    let emoji: String
+    let snapshot: CompanionSnapshot?
+    let isStale: Bool
 }
 
 struct TgWatchWidgetEntryView : View {
+    @Environment(\.widgetFamily) private var family
     var entry: Provider.Entry
 
     var body: some View {
-        VStack {
+        switch family {
+        case .systemMedium:
+            mediumView
+        default:
+            smallView
+        }
+    }
+
+    private var item: CompanionSnapshot.Item? {
+        entry.snapshot?.telegramItem
+    }
+
+    private var smallView: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Time:")
-                Text(entry.date, style: .time)
+                Label("Telegram", systemImage: "paperplane.fill")
+                    .font(.caption.bold())
+                Spacer()
+                if let flag = item?.countryFlag {
+                    Text(flag).font(.caption)
+                }
             }
 
-            Text("Emoji:")
-            Text(entry.emoji)
+            Spacer()
+
+            if let item {
+                HStack(spacing: 6) {
+                    Image(systemName: iconName(for: item.statusRaw))
+                        .foregroundStyle(statusColor(for: item.statusRaw))
+                    Text(statusTitle(for: item.statusRaw))
+                        .font(.headline)
+                        .minimumScaleFactor(0.8)
+                }
+
+                if let latency = item.latencyMilliseconds {
+                    Text("\(Int(latency)) ms")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("No data")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack {
+                if let item {
+                    Text(item.observedAt, format: .dateTime.hour().minute())
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if entry.isStale {
+                    Text("Stale")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(.orange.opacity(0.2), in: Capsule())
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    private var mediumView: some View {
+        HStack(alignment: .top, spacing: 16) {
+            smallView
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Favorites")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+
+                let favorites = entry.snapshot?.items.filter { $0.id != "telegram" } ?? []
+                if favorites.isEmpty {
+                    Text("No other favorites")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                } else {
+                    ForEach(favorites.prefix(3)) { fav in
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(statusColor(for: fav.statusRaw))
+                                .frame(width: 8, height: 8)
+                            Text(fav.displayName)
+                                .font(.caption)
+                                .lineLimit(1)
+                            Spacer()
+                            if let ms = fav.latencyMilliseconds {
+                                Text("\(Int(ms))ms")
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func iconName(for statusRaw: String) -> String {
+        switch statusRaw {
+        case "ok": return "checkmark.circle.fill"
+        case "slow": return "tortoise.fill"
+        case "partial": return "exclamationmark.triangle.fill"
+        case "down": return "xmark.circle.fill"
+        case "noNetwork": return "wifi.slash"
+        default: return "questionmark.circle"
+        }
+    }
+
+    private func statusColor(for statusRaw: String) -> Color {
+        switch statusRaw {
+        case "ok": return .green
+        case "slow": return .yellow
+        case "partial": return .orange
+        case "down": return .red
+        case "noNetwork": return .gray
+        default: return .secondary
+        }
+    }
+
+    private func statusTitle(for statusRaw: String) -> String {
+        switch statusRaw {
+        case "ok": return "Available"
+        case "slow": return "Slow"
+        case "partial": return "Partial"
+        case "down": return "Down"
+        case "noNetwork": return "Offline"
+        default: return "Unknown"
         }
     }
 }
@@ -64,23 +206,11 @@ struct TgWatchWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
-            if #available(macOS 14.0, iOS 17.0, *) {
-                TgWatchWidgetEntryView(entry: entry)
-                    .containerBackground(.fill.tertiary, for: .widget)
-            } else {
-                TgWatchWidgetEntryView(entry: entry)
-                    .padding()
-                    .background()
-            }
+            TgWatchWidgetEntryView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("My Widget")
-        .description("This is an example widget.")
+        .configurationDisplayName("TgWatch")
+        .description("Telegram and services reachability status.")
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
-}
-
-#Preview(as: .systemSmall) {
-    TgWatchWidget()
-} timeline: {
-    SimpleEntry(date: .now, emoji: "😀")
-    SimpleEntry(date: .now, emoji: "🤩")
 }

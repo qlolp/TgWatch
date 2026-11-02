@@ -52,6 +52,12 @@ extension ServiceDefinition {
             } catch { storageError = true; writable = false }
         }
         monitors = definitions.map { MonitorController(definition: $0) }
+        for monitor in monitors {
+            monitor.onObservationPublished = { [weak self] in
+                guard let self else { return }
+                CompanionBridge.shared.publish(catalog: self)
+            }
+        }
         if writable && !FileManager.default.fileExists(atPath: file.path) {
             do { try persist(definitions) } catch { storageError = true; writable = false }
         }
@@ -61,6 +67,8 @@ extension ServiceDefinition {
             favoriteIDs = ids.intersection(Set(definitions.map(\.id)))
         }
         _ = MonitorNotifications.shared
+        CompanionBridge.shared.register(catalog: self)
+        CompanionBridge.shared.publish(catalog: self)
     }
 
     func setActive(_ value: Bool) {
@@ -80,6 +88,7 @@ extension ServiceDefinition {
         do {
             try JSONEncoder().encode(updated).write(to: dataRoot.appendingPathComponent("favorites.json"), options: .atomic)
             favoriteIDs = updated
+            CompanionBridge.shared.publish(catalog: self)
         } catch { storageError = true }
     }
     var nextCustomID: String? {
@@ -97,6 +106,10 @@ extension ServiceDefinition {
         try persist(definitions)
         let replacement = MonitorController(definition: definition)
         replacement.session.setActive(active)
+        replacement.onObservationPublished = { [weak self] in
+            guard let self else { return }
+            CompanionBridge.shared.publish(catalog: self)
+        }
         if let index = monitors.firstIndex(where: { $0.definition.id == definition.id }) {
             let previous = monitors[index]
             previous.session.setMonitoring(false)
@@ -110,6 +123,7 @@ extension ServiceDefinition {
             replacement.saveWebhook(previous.webhookSettings)
             monitors[index] = replacement
         } else { monitors.append(replacement) }
+        CompanionBridge.shared.publish(catalog: self)
     }
     func remove(_ definition: ServiceDefinition) async throws {
         guard writable, !removing, definition.kind == .custom else { throw CocoaError(.fileWriteUnknown) }
@@ -121,18 +135,13 @@ extension ServiceDefinition {
         await monitors.first { $0.definition.id == definition.id }?.stopAndFlush()
         monitors = remaining
         favoriteIDs.remove(definition.id)
+        CompanionBridge.shared.publish(catalog: self)
         let directory = file.deletingLastPathComponent().appendingPathComponent("targets/\(definition.id)")
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
-    private func persist(_ definitions: [ServiceDefinition]) throws {
-        let data = try JSONEncoder().encode(definitions)
-        // Match the reader's ceiling so a valid but large set of private criteria
-        // cannot create a manifest that becomes unreadable on the next launch.
-        guard data.count <= 65_536 else { throw CocoaError(.fileWriteOutOfSpace) }
+    private func persist(_ list: [ServiceDefinition]) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: file, options: [.atomic, .completeFileProtection])
-        var url = file
-        var values = URLResourceValues(); values.isExcludedFromBackup = true
-        try url.setResourceValues(values)
+        let data = try JSONEncoder().encode(list)
+        try data.write(to: file, options: .atomic)
     }
 }

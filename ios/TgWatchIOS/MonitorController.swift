@@ -16,6 +16,7 @@ import TgWatchCore
     @Published private(set) var webhookSettings = WebhookSettings()
     @Published private(set) var webhookDelivered: Bool?
     @Published private(set) var webhookError = false
+    var onObservationPublished: (() -> Void)?
     private let webhookSender = WebhookSender()
     private var webhookTask: Task<Void, Never>?
     private var webhookGeneration = 0
@@ -128,6 +129,7 @@ import TgWatchCore
             do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime, latencyMilliseconds: snapshot.latencyMilliseconds)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
+            await MainActor.run { self?.onObservationPublished?() }
         }
     }
     func reload() async {
