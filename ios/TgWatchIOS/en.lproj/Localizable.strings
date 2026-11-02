@@ -203,3 +203,61 @@
 "egressNotChecked" = "A fresh check is needed";
 
 "egressHint" = "IP country according to Cloudflare. This checks the route of this request; split-tunnel VPNs may route other apps differently. The IP is not saved.";
+
+"connectionDiagnosis" = "What is happening";
+
+"diagnosis.stale" = "No fresh result. Run a check to identify the cause.";
+
+"diagnosis.healthy" = "Telegram responds over MTProto and the web. No issue was observed in this check.";
+
+"diagnosis.slow" = "Telegram is reachable, but its response took at least a second. Compare the connection with and without VPN.";
+
+"diagnosis.partial" = "Only some Telegram checks respond. A route or protocol may be affected.";
+
+"diagnosis.serviceDown" = "The control site responds, but Telegram checks failed. Access to Telegram may be affected.";
+
+"diagnosis.offline" = "The system reports no network connection. Check Wi-Fi or mobile data.";
+
+"diagnosis.inconclusive" = "There is not enough evidence to distinguish a Telegram outage from a connection problem. Try again.";
+
+"favorites" = "Favorite services";
+
+"favoritesHint" = "Add favorites in service settings.";
+
+"addFavorite" = "Add favorite";
+
+"removeFavorite" = "Remove favorite";
+
+"lastOutage" = "Last outage";
+
+"vpnComparison" = "Compare VPN";
+
+"vpnComparisonHint" = "Take a baseline, then enable or change VPN yourself and return for the second measurement. Checks cover Telegram and your public IP. The baseline lasts 30 minutes.";
+
+"vpnBefore" = "Before changing VPN";
+
+"vpnAfter" = "After changing VPN";
+
+"vpnMeasureBefore" = "Record baseline";
+
+"vpnMeasureAfter" = "Record second measurement";
+
+"vpnComparisonFailed" = "The measurement was interrupted or expired. Wait for a stable connection and try again.";
+
+"vpnResult" = "Measurement comparison";
+
+"vpnOutcome.improved" = "Telegram reachability improved.";
+
+"vpnOutcome.worsened" = "Telegram reachability worsened.";
+
+"vpnOutcome.unchanged" = "Telegram reachability is unchanged.";
+
+"vpnOutcome.inconclusive" = "Not enough evidence to compare reachability.";
+
+"vpnLatencyChange" = "Latency change";
+
+"vpnIPChanged" = "Public IP changed.";
+
+"vpnIPUnchanged" = "Public IP is unchanged.";
+
+"vpnResultHint" = "These are two observations, not proof of what caused a change. Split routing can affect apps differently.";

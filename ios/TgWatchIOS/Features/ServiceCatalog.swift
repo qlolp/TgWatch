@@ -23,6 +23,8 @@ extension ServiceDefinition {
 @MainActor final class ServiceCatalog: ObservableObject {
     @Published private(set) var monitors: [MonitorController] = []
     @Published var storageError = false
+    @Published private(set) var favoriteIDs: Set<String> = ["telegram"]
+    var dataRoot: URL { file.deletingLastPathComponent() }
     private let file: URL
     private var active = false
     private var writable = true
@@ -53,6 +55,11 @@ extension ServiceDefinition {
         if writable && !FileManager.default.fileExists(atPath: file.path) {
             do { try persist(definitions) } catch { storageError = true; writable = false }
         }
+        let favoritesFile = root.appendingPathComponent("favorites.json")
+        if let data = try? Data(contentsOf: favoritesFile), data.count <= 4096,
+           let ids = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            favoriteIDs = ids.intersection(Set(definitions.map(\.id)))
+        }
         _ = MonitorNotifications.shared
     }
 
@@ -65,6 +72,15 @@ extension ServiceDefinition {
     }
     func clockChanged() {
         for monitor in monitors { monitor.resetContinuity(); monitor.session.clockChanged() }
+    }
+    func toggleFavorite(_ id: String) {
+        guard monitors.contains(where: { $0.definition.id == id }) else { return }
+        var updated = favoriteIDs
+        if updated.contains(id) { updated.remove(id) } else { updated.insert(id) }
+        do {
+            try JSONEncoder().encode(updated).write(to: dataRoot.appendingPathComponent("favorites.json"), options: .atomic)
+            favoriteIDs = updated
+        } catch { storageError = true }
     }
     var nextCustomID: String? {
         ["custom", "custom2", "custom3", "custom4", "custom5"].first { id in !monitors.contains { $0.definition.id == id } }
@@ -104,6 +120,7 @@ extension ServiceDefinition {
         try persist(remaining.map(\.definition))
         await monitors.first { $0.definition.id == definition.id }?.stopAndFlush()
         monitors = remaining
+        favoriteIDs.remove(definition.id)
         let directory = file.deletingLastPathComponent().appendingPathComponent("targets/\(definition.id)")
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }

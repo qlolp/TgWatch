@@ -8,7 +8,7 @@ struct ServicesRootView: View {
     var body: some View {
         TabView {
             if let telegram = catalog.monitors.first(where: { $0.definition.kind == .telegram }) {
-                MonitorView(controller: telegram).tabItem { Label("Telegram", systemImage: "paperplane") }
+                MonitorView(controller: telegram, catalog: catalog).tabItem { Label("Telegram", systemImage: "paperplane") }
             }
             ServicesView(catalog: catalog).tabItem { Label("services", systemImage: "square.grid.2x2") }
         }
@@ -33,6 +33,11 @@ struct ServicesView: View {
                         ServiceDetailView(controller: monitor, catalog: catalog)
                             .id(monitor.definition.revision)
                     } label: { ServiceRow(controller: monitor) }
+                    .swipeActions(edge: .leading) {
+                        Button { catalog.toggleFavorite(monitor.definition.id) } label: {
+                            Label(catalog.favoriteIDs.contains(monitor.definition.id) ? "removeFavorite" : "addFavorite", systemImage: "star")
+                        }.tint(.yellow)
+                    }
                 }
                 if catalog.nextCustomID != nil {
                     Button("addHTTPS", systemImage: "plus") { adding = true }
@@ -47,7 +52,7 @@ struct ServicesView: View {
     }
 }
 
-private struct ServiceRow: View {
+struct ServiceRow: View {
     @ObservedObject var controller: MonitorController
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -88,6 +93,9 @@ struct ServiceDetailView: View {
                 Text("serviceReachability").font(.caption).foregroundStyle(.secondary)
             }
             Section {
+                Button { catalog.toggleFavorite(controller.definition.id) } label: {
+                    Label(catalog.favoriteIDs.contains(controller.definition.id) ? "removeFavorite" : "addFavorite", systemImage: "star")
+                }
                 NavigationLink("historyReport") { HistoryReportView(controller: controller) }
                 NavigationLink("history") { HistoryView(controller: controller) }
                 NavigationLink("eventJournal") { EventJournalView(controller: controller) }
