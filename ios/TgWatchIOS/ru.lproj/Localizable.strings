@@ -261,3 +261,25 @@
 "vpnIPUnchanged" = "Внешний IP остался прежним.";
 
 "vpnResultHint" = "Это два отдельных замера, а не доказательство причины изменений. Раздельная маршрутизация VPN может влиять на приложения по-разному.";
+
+"backupTitle" = "Резервная копия";
+"backupSectionExport" = "Экспорт";
+"backupSectionImport" = "Импорт";
+"exportBackup" = "Создать зашифрованную копию";
+"importBackup" = "Импорт зашифрованной копии";
+"backupPasswordPrompt" = "Введите пароль (от 12 до 256 символов) для шифрования или дешифрования.";
+"backupPasswordPlaceholder" = "Пароль (мин. 12 символов)";
+"backupPasswordConfirmation" = "Повторите пароль";
+"backupPasswordMismatch" = "Пароли не совпадают.";
+"backupPasswordTooShort" = "Пароль должен быть не короче 12 символов.";
+"backupExportSuccess" = "Резервная копия успешно создана.";
+"backupImportPreview" = "Просмотр копии";
+"backupCreatedAt" = "Создана";
+"backupAppVersion" = "Версия приложения";
+"backupServicesCount" = "Количество сервисов";
+"backupEntriesCount" = "Записей истории";
+"backupReplaceWarning" = "Восстановление заменит все текущие сервисы, настройки и историю.";
+"confirmRestore" = "Подтвердить и восстановить";
+"restoreSuccess" = "Восстановление успешно завершено.";
+"backupFailed" = "Ошибка операции";
+"shareBackup" = "Поделиться / Сохранить файл";

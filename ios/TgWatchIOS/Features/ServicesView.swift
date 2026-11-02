@@ -45,6 +45,15 @@ struct ServicesView: View {
                 }
             }
             .navigationTitle("services")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        BackupView(catalog: catalog)
+                    } label: {
+                        Label("backupTitle", systemImage: "arrow.triangle.2.circlepath.circle")
+                    }
+                }
+            }
             .sheet(isPresented: $adding) {
                 if let id = catalog.nextCustomID { ServiceEditor(catalog: catalog, definition: .init(id: id, kind: .custom)) }
             }

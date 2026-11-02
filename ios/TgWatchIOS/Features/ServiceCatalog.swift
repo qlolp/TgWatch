@@ -144,4 +144,152 @@ extension ServiceDefinition {
         let data = try JSONEncoder().encode(list)
         try data.write(to: file, options: .atomic)
     }
+
+    func createBackup(password: String) throws -> Data {
+        guard writable else { throw CocoaError(.fileWriteUnknown) }
+        try EncryptedBackup.validatePassword(password)
+
+        var files: [String: Data] = [:]
+        let fileManager = FileManager.default
+
+        let rootFiles = [
+            "services-v1.json",
+            "favorites.json",
+            "history-v1.json",
+            "long-term-v1.json",
+            "preferences.json",
+            "alerts.json",
+            "interval.json",
+            "webhook.json"
+        ]
+        for name in rootFiles {
+            let fileURL = dataRoot.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: fileURL.path), let data = try? Data(contentsOf: fileURL) {
+                files[name] = data
+            }
+        }
+
+        let targetsURL = dataRoot.appendingPathComponent("targets")
+        if fileManager.fileExists(atPath: targetsURL.path),
+           let serviceIDs = try? fileManager.contentsOfDirectory(atPath: targetsURL.path) {
+            for serviceID in serviceIDs {
+                let serviceURL = targetsURL.appendingPathComponent(serviceID)
+                if let revisions = try? fileManager.contentsOfDirectory(atPath: serviceURL.path) {
+                    for rev in revisions {
+                        let revURL = serviceURL.appendingPathComponent(rev)
+                        let targetFiles = [
+                            "history-v1.json",
+                            "long-term-v1.json",
+                            "preferences.json",
+                            "alerts.json",
+                            "interval.json",
+                            "webhook.json"
+                        ]
+                        for name in targetFiles {
+                            let itemURL = revURL.appendingPathComponent(name)
+                            if fileManager.fileExists(atPath: itemURL.path), let data = try? Data(contentsOf: itemURL) {
+                                let relative = "targets/\(serviceID)/\(rev)/\(name)"
+                                files[relative] = data
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        var totalEntries = 0
+        for monitor in monitors {
+            totalEntries += monitor.history.count
+        }
+
+        let preview = EncryptedBackupPayload.Preview(
+            createdAt: Date(),
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+            serviceCount: monitors.count,
+            serviceNames: monitors.map(\.definition.displayName),
+            totalHistoryEntries: totalEntries
+        )
+
+        return try EncryptedBackup.seal(files: files, preview: preview, password: password)
+    }
+
+    func previewBackup(data: Data, password: String) throws -> EncryptedBackupPayload {
+        try EncryptedBackup.open(data: data, password: password)
+    }
+
+    func restore(payload: EncryptedBackupPayload) async throws {
+        guard writable else { throw CocoaError(.fileWriteUnknown) }
+
+        for path in payload.files.keys {
+            try EncryptedBackup.validatePath(path)
+        }
+
+        setActive(false)
+        for monitor in monitors {
+            await monitor.stopAndFlush()
+        }
+
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("tgwatch_restore_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        do {
+            for (relativePath, data) in payload.files {
+                let dest = tempDir.appendingPathComponent(relativePath)
+                try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: dest, options: .atomic)
+            }
+
+            let backupDir = FileManager.default.temporaryDirectory.appendingPathComponent("tgwatch_backup_\(UUID().uuidString)")
+            if FileManager.default.fileExists(atPath: dataRoot.path) {
+                try FileManager.default.moveItem(at: dataRoot, to: backupDir)
+            }
+
+            do {
+                try FileManager.default.moveItem(at: tempDir, to: dataRoot)
+                try? FileManager.default.removeItem(at: backupDir)
+            } catch {
+                if FileManager.default.fileExists(atPath: backupDir.path) {
+                    try? FileManager.default.moveItem(at: backupDir, to: dataRoot)
+                }
+                throw error
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tempDir)
+            throw error
+        }
+
+        reloadAfterRestore()
+    }
+
+    private func reloadAfterRestore() {
+        var loadedDefinitions = ServiceDefinition.defaults
+        if FileManager.default.fileExists(atPath: file.path) {
+            if let data = try? Data(contentsOf: file),
+               let decoded = try? JSONDecoder().decode([ServiceDefinition].self, from: data) {
+                let allowed = Set(["telegram", "matrix", "whatsapp", "custom", "custom2", "custom3", "custom4", "custom5"])
+                if data.count <= 65_536 && decoded.count <= 8 &&
+                   Set(decoded.map(\.id)).count == decoded.count &&
+                   decoded.contains(where: { $0.id == "telegram" && $0.kind == .telegram }) &&
+                   decoded.allSatisfy({ allowed.contains($0.id) && $0.valid }) {
+                    loadedDefinitions = decoded
+                }
+            }
+        }
+        let favoritesFile = dataRoot.appendingPathComponent("favorites.json")
+        if let data = try? Data(contentsOf: favoritesFile), data.count <= 4096,
+           let ids = try? JSONDecoder().decode(Set<String>.self, from: data) {
+            favoriteIDs = ids.intersection(Set(loadedDefinitions.map(\.id)))
+        } else {
+            favoriteIDs = ["telegram"]
+        }
+        monitors = loadedDefinitions.map { MonitorController(definition: $0) }
+        for monitor in monitors {
+            monitor.onObservationPublished = { [weak self] in
+                guard let self else { return }
+                CompanionBridge.shared.publish(catalog: self)
+            }
+        }
+        CompanionBridge.shared.publish(catalog: self)
+    }
 }
+

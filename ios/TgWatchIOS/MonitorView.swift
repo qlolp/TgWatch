@@ -67,6 +67,7 @@ struct MonitorView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         NavigationLink("vpnComparison") { VPNComparisonView(fixture: controller.fixtureMode) }
+                        NavigationLink("backupTitle") { BackupView(catalog: catalog) }
                         NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
                         NavigationLink("eventJournal") { EventJournalView(controller: controller) }
                         NavigationLink("latencyReport") { LatencyReportView(controller: controller) }

@@ -261,3 +261,25 @@
 "vpnIPUnchanged" = "Public IP is unchanged.";
 
 "vpnResultHint" = "These are two observations, not proof of what caused a change. Split routing can affect apps differently.";
+
+"backupTitle" = "Backup & Restore";
+"backupSectionExport" = "Export";
+"backupSectionImport" = "Import";
+"exportBackup" = "Create Encrypted Backup";
+"importBackup" = "Import Encrypted Backup";
+"backupPasswordPrompt" = "Enter a password (12–256 characters) to encrypt or decrypt this backup.";
+"backupPasswordPlaceholder" = "Password (min 12 characters)";
+"backupPasswordConfirmation" = "Confirm Password";
+"backupPasswordMismatch" = "Passwords do not match.";
+"backupPasswordTooShort" = "Password must be at least 12 characters.";
+"backupExportSuccess" = "Backup created successfully.";
+"backupImportPreview" = "Backup Preview";
+"backupCreatedAt" = "Created";
+"backupAppVersion" = "App version";
+"backupServicesCount" = "Services count";
+"backupEntriesCount" = "History entries";
+"backupReplaceWarning" = "Restoring will replace all current services, preferences, and history.";
+"confirmRestore" = "Confirm & Restore";
+"restoreSuccess" = "Restore completed successfully.";
+"backupFailed" = "Operation failed";
+"shareBackup" = "Share / Save Backup";
