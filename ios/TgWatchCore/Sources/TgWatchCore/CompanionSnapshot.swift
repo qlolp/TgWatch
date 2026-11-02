@@ -29,7 +29,9 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
         }
 
         public func isStale(at date: Date = Date()) -> Bool {
-            date > validUntil
+            guard date.timeIntervalSince1970.isFinite, observedAt.timeIntervalSince1970.isFinite,
+                  validUntil.timeIntervalSince1970.isFinite, validUntil >= observedAt else { return true }
+            return date < observedAt || date > validUntil
         }
     }
 
@@ -39,6 +41,11 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
     public init(generatedAt: Date = Date(), items: [Item]) {
         self.generatedAt = generatedAt
         self.items = items
+    }
+
+    public func isStale(_ item: Item, at date: Date = Date()) -> Bool {
+        !generatedAt.timeIntervalSince1970.isFinite || date < generatedAt ||
+        generatedAt < item.observedAt || item.isStale(at: date)
     }
 
     public var telegramItem: Item? {

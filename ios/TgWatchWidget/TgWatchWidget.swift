@@ -20,7 +20,7 @@ struct Provider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (StatusEntry) -> Void) {
         let snapshot = loadSnapshot()
-        let isStale = snapshot?.telegramItem?.isStale(at: Date()) ?? true
+        let isStale = snapshot.flatMap { value in value.telegramItem.map { value.isStale($0, at: Date()) } } ?? true
         completion(StatusEntry(date: Date(), snapshot: snapshot, isStale: isStale))
     }
 
@@ -28,18 +28,14 @@ struct Provider: TimelineProvider {
         let snapshot = loadSnapshot()
         let now = Date()
 
-        if let item = snapshot?.telegramItem {
-            let currentStale = item.isStale(at: now)
-            let entryNow = StatusEntry(date: now, snapshot: snapshot, isStale: currentStale)
-
-            var entries = [entryNow]
-            if !currentStale && item.validUntil > now {
-                let entryExpiry = StatusEntry(date: item.validUntil, snapshot: snapshot, isStale: true)
-                entries.append(entryExpiry)
-                let timeline = Timeline(entries: entries, policy: .after(item.validUntil.addingTimeInterval(60)))
-                completion(timeline)
-                return
+        if let snapshot, let item = snapshot.telegramItem {
+            let dates = Set(snapshot.items.filter { !snapshot.isStale($0, at: now) }
+                .map { $0.validUntil.addingTimeInterval(0.001) }).sorted()
+            let entries = ([now] + dates).map { date in
+                StatusEntry(date: date, snapshot: snapshot, isStale: snapshot.isStale(item, at: date))
             }
+            completion(Timeline(entries: entries, policy: .after((dates.last ?? now).addingTimeInterval(60))))
+            return
         }
 
         let entry = StatusEntry(date: now, snapshot: snapshot, isStale: true)
@@ -146,14 +142,16 @@ struct TgWatchWidgetEntryView : View {
                 } else {
                     ForEach(favorites.prefix(3)) { fav in
                         HStack(spacing: 6) {
+                            let stale = entry.snapshot?.isStale(fav, at: entry.date) ?? true
                             Circle()
-                                .fill(statusColor(for: fav.statusRaw))
+                                .fill(stale ? .gray : statusColor(for: fav.statusRaw))
                                 .frame(width: 8, height: 8)
                             Text(fav.displayName)
                                 .font(.caption)
                                 .lineLimit(1)
                             Spacer()
-                            if let ms = fav.latencyMilliseconds {
+                            if stale { Text("Stale").font(.caption2).foregroundStyle(.orange) }
+                            if let ms = fav.latencyMilliseconds, !stale {
                                 Text("\(Int(ms))ms")
                                     .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.secondary)

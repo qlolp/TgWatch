@@ -75,7 +75,10 @@ import TgWatchCore
             do { webhookSettings = try JSONDecoder().decode(WebhookSettings.self, from: Data(contentsOf: hookURL)) }
             catch { webhookError = true }
         }
-        session.onChange = { [weak self] in self?.objectWillChange.send() }
+        session.onChange = { [weak self] in
+            self?.objectWillChange.send()
+            self?.onObservationPublished?() // Includes route/lifecycle/clock invalidation, not only new results.
+        }
         session.onObservation = { [weak self] value in self?.save(value) }
         path.pathUpdateHandler = { [weak self] value in
             let unavailable = value.status == .unsatisfied
@@ -129,7 +132,6 @@ import TgWatchCore
             do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime, latencyMilliseconds: snapshot.latencyMilliseconds)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
-            await MainActor.run { self?.onObservationPublished?() }
         }
     }
     func reload() async {
@@ -177,13 +179,11 @@ import TgWatchCore
         webhookTask?.cancel()
     }
     func saveWebhook(_ value: WebhookSettings) {
-        guard !value.enabled || ServiceDefinition.validAddress(value.address) else { webhookError = true; return }
+        guard value.valid else { webhookError = true; return }
         do {
             try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
-            var url = dataDirectory.appendingPathComponent("webhook.json")
-            try JSONEncoder().encode(value).write(to: url, options: [.atomic, .completeFileProtection])
-            var flags = URLResourceValues(); flags.isExcludedFromBackup = true
-            try url.setResourceValues(flags)
+            let url = dataDirectory.appendingPathComponent("webhook.json")
+            try BackupFileStore.writePrivate(JSONEncoder().encode(value), to: url, limit: BackupContents.settingsLimit)
             webhookSettings = value; webhookError = false; webhookDelivered = nil
             webhookGeneration += 1; webhookTask?.cancel()
         } catch { webhookError = true }

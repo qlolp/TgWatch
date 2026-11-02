@@ -12,7 +12,11 @@ struct ServicesRootView: View {
             }
             ServicesView(catalog: catalog).tabItem { Label("services", systemImage: "square.grid.2x2") }
         }
+        .id(catalog.restoreRevision)
         .environment(egress)
+        .alert("restoreSuccess", isPresented: $catalog.restoreCompleted) {
+            Button("OK", role: .cancel) {}
+        }
         .onChange(of: phase, initial: true) { _, value in egress.setActive(value == .active) }
     }
 }

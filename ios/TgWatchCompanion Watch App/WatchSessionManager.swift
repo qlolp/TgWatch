@@ -78,19 +78,21 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
-        if let data = applicationContext["snapshot"] as? Data,
-           let decoded = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) {
+        if let data = applicationContext["snapshot"] as? Data {
             Task { @MainActor in
-                self.snapshot = decoded
+                if let decoded = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) {
+                    self.snapshot = decoded
+                }
             }
         }
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
-        if let data = message["snapshot"] as? Data,
-           let decoded = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) {
+        if let data = message["snapshot"] as? Data {
             Task { @MainActor in
-                self.snapshot = decoded
+                if let decoded = try? JSONDecoder().decode(CompanionSnapshot.self, from: data) {
+                    self.snapshot = decoded
+                }
             }
         }
     }

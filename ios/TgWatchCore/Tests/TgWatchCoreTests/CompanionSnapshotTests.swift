@@ -3,6 +3,25 @@ import Foundation
 @testable import TgWatchCore
 
 @Suite struct CompanionSnapshotTests {
+    @Test func futureObservationAndClockRollbackNeverLookFresh() {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        let item = CompanionSnapshot.Item(id: "telegram", displayName: "Telegram", statusRaw: "ok",
+            latencyMilliseconds: 10, observedAt: observed, validUntil: observed.addingTimeInterval(120))
+        #expect(item.isStale(at: observed.addingTimeInterval(-3600)))
+        let snapshot = CompanionSnapshot(generatedAt: observed.addingTimeInterval(30), items: [item])
+        #expect(snapshot.isStale(item, at: observed.addingTimeInterval(10)))
+        #expect(!snapshot.isStale(item, at: observed.addingTimeInterval(31)))
+    }
+
+    @Test func invalidExpiryOrNonFiniteTimeNeverLooksFresh() {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        let backwards = CompanionSnapshot.Item(id: "telegram", displayName: "Telegram", statusRaw: "ok",
+            latencyMilliseconds: nil, observedAt: observed, validUntil: observed.addingTimeInterval(-1))
+        #expect(backwards.isStale(at: observed))
+        let infinite = CompanionSnapshot.Item(id: "telegram", displayName: "Telegram", statusRaw: "ok",
+            latencyMilliseconds: nil, observedAt: observed, validUntil: Date(timeIntervalSince1970: .infinity))
+        #expect(infinite.isStale(at: observed))
+    }
     @Test func expiryMarksStaleAccurately() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let item = CompanionSnapshot.Item(

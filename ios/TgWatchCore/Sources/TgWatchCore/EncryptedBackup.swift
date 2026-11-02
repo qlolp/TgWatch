@@ -9,6 +9,7 @@ public enum BackupError: Error, Equatable, LocalizedError {
     case payloadTooLarge
     case invalidPath(String)
     case corruptedData
+    case restoreRecoveryRequired
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +25,8 @@ public enum BackupError: Error, Equatable, LocalizedError {
             return "Invalid file path in backup: \(path)"
         case .corruptedData:
             return "Corrupted backup data"
+        case .restoreRecoveryRequired:
+            return "Restore could not complete. Previous data was retained for recovery; stop using this installation until it is recovered."
         }
     }
 }
@@ -65,6 +68,7 @@ public enum EncryptedBackup {
     public static let saltLength = 16
     public static let pbkdf2Iterations: UInt32 = 600_000
     public static let maxPlaintextSize = 32 * 1024 * 1024 // 32 MiB
+    public static let maxEncryptedSize = maxPlaintextSize + magic.count + saltLength + 28
 
     public static func validatePassword(_ password: String) throws {
         guard (12...256).contains(password.count) else {
@@ -107,7 +111,9 @@ public enum EncryptedBackup {
                 "webhook.json"
             ]
 
-            if !serviceID.isEmpty, UUID(uuidString: revision) != nil, allowedTargetFiles.contains(filename) {
+            if BackupContents.serviceIDs.contains(serviceID), serviceID != "telegram",
+               let uuid = UUID(uuidString: revision), uuid.uuidString == revision,
+               allowedTargetFiles.contains(filename) {
                 return
             }
         }
@@ -153,6 +159,7 @@ public enum EncryptedBackup {
         }
 
         let payload = EncryptedBackupPayload(preview: preview, files: files)
+        _ = try BackupContents.validate(payload)
         let plaintext = try JSONEncoder().encode(payload)
         guard plaintext.count <= maxPlaintextSize else {
             throw BackupError.payloadTooLarge
@@ -186,6 +193,7 @@ public enum EncryptedBackup {
         guard data.count >= headerSize + 28 else {
             throw BackupError.invalidFormat
         }
+        guard data.count <= maxEncryptedSize else { throw BackupError.payloadTooLarge }
 
         let fileMagic = data.prefix(magic.count)
         guard fileMagic == magic else {
@@ -222,10 +230,7 @@ public enum EncryptedBackup {
             throw BackupError.corruptedData
         }
 
-        for path in payload.files.keys {
-            try validatePath(path)
-        }
-
+        _ = try BackupContents.validate(payload)
         return payload
     }
 }

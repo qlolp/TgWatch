@@ -9,7 +9,7 @@ struct ContentView: View {
                 List {
                     if let snapshot = sessionManager.snapshot, !snapshot.items.isEmpty {
                         ForEach(snapshot.items) { item in
-                            itemRow(item, currentDate: context.date)
+                            itemRow(item, stale: snapshot.isStale(item, at: context.date))
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
@@ -50,7 +50,7 @@ struct ContentView: View {
         }
     }
 
-    private func itemRow(_ item: CompanionSnapshot.Item, currentDate: Date) -> some View {
+    private func itemRow(_ item: CompanionSnapshot.Item, stale: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(item.displayName)
@@ -64,7 +64,7 @@ struct ContentView: View {
 
             HStack(spacing: 6) {
                 Image(systemName: iconName(for: item.statusRaw))
-                    .foregroundStyle(statusColor(for: item.statusRaw))
+                    .foregroundStyle(stale ? .gray : statusColor(for: item.statusRaw))
                 Text(statusTitle(for: item.statusRaw))
                     .font(.subheadline)
 
@@ -84,7 +84,7 @@ struct ContentView: View {
 
                 Spacer()
 
-                if item.isStale(at: currentDate) {
+                if stale {
                     Text("Stale")
                         .font(.caption2.bold())
                         .foregroundStyle(.orange)

@@ -24,11 +24,14 @@ extension ServiceDefinition {
     @Published private(set) var monitors: [MonitorController] = []
     @Published var storageError = false
     @Published private(set) var favoriteIDs: Set<String> = ["telegram"]
+    @Published private(set) var restoreRevision = UUID()
+    @Published var restoreCompleted = false
     var dataRoot: URL { file.deletingLastPathComponent() }
     private let file: URL
     private var active = false
     private var writable = true
     private var removing = false
+    private var restoring = false
 
     init() {
         var root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
@@ -72,6 +75,7 @@ extension ServiceDefinition {
     }
 
     func setActive(_ value: Bool) {
+        guard !restoring || !value else { return }
         active = value
         for monitor in monitors {
             if !value { monitor.resetContinuity() }
@@ -82,7 +86,7 @@ extension ServiceDefinition {
         for monitor in monitors { monitor.resetContinuity(); monitor.session.clockChanged() }
     }
     func toggleFavorite(_ id: String) {
-        guard monitors.contains(where: { $0.definition.id == id }) else { return }
+        guard writable, !restoring, monitors.contains(where: { $0.definition.id == id }) else { return }
         var updated = favoriteIDs
         if updated.contains(id) { updated.remove(id) } else { updated.insert(id) }
         do {
@@ -95,7 +99,7 @@ extension ServiceDefinition {
         ["custom", "custom2", "custom3", "custom4", "custom5"].first { id in !monitors.contains { $0.definition.id == id } }
     }
     func save(_ definition: ServiceDefinition) throws {
-        guard writable, !removing, definition.valid else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !removing, !restoring, definition.valid else { throw CocoaError(.fileWriteUnknown) }
         var definitions = monitors.map(\.definition)
         if let index = definitions.firstIndex(where: { $0.id == definition.id }) {
             definitions[index] = definition
@@ -126,7 +130,7 @@ extension ServiceDefinition {
         CompanionBridge.shared.publish(catalog: self)
     }
     func remove(_ definition: ServiceDefinition) async throws {
-        guard writable, !removing, definition.kind == .custom else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !removing, !restoring, definition.kind == .custom else { throw CocoaError(.fileWriteUnknown) }
         removing = true
         defer { removing = false }
         let remaining = monitors.filter { $0.definition.id != definition.id }
@@ -135,161 +139,73 @@ extension ServiceDefinition {
         await monitors.first { $0.definition.id == definition.id }?.stopAndFlush()
         monitors = remaining
         favoriteIDs.remove(definition.id)
+        try JSONEncoder().encode(favoriteIDs).write(to: dataRoot.appendingPathComponent("favorites.json"), options: .atomic)
         CompanionBridge.shared.publish(catalog: self)
         let directory = file.deletingLastPathComponent().appendingPathComponent("targets/\(definition.id)")
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
     private func persist(_ list: [ServiceDefinition]) throws {
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(list)
-        try data.write(to: file, options: .atomic)
+        let data = try BackupContents.encodedManifest(list)
+        try BackupFileStore.writePrivate(data, to: file, limit: BackupContents.manifestLimit)
     }
 
-    func createBackup(password: String) throws -> Data {
-        guard writable else { throw CocoaError(.fileWriteUnknown) }
+    func createBackup(password: String) async throws -> Data {
+        guard writable, !restoring, !removing else { throw CocoaError(.fileWriteUnknown) }
         try EncryptedBackup.validatePassword(password)
-
-        var files: [String: Data] = [:]
-        let fileManager = FileManager.default
-
-        let rootFiles = [
-            "services-v1.json",
-            "favorites.json",
-            "history-v1.json",
-            "long-term-v1.json",
-            "preferences.json",
-            "alerts.json",
-            "interval.json",
-            "webhook.json"
-        ]
-        for name in rootFiles {
-            let fileURL = dataRoot.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: fileURL.path), let data = try? Data(contentsOf: fileURL) {
-                files[name] = data
-            }
-        }
-
-        let targetsURL = dataRoot.appendingPathComponent("targets")
-        if fileManager.fileExists(atPath: targetsURL.path),
-           let serviceIDs = try? fileManager.contentsOfDirectory(atPath: targetsURL.path) {
-            for serviceID in serviceIDs {
-                let serviceURL = targetsURL.appendingPathComponent(serviceID)
-                if let revisions = try? fileManager.contentsOfDirectory(atPath: serviceURL.path) {
-                    for rev in revisions {
-                        let revURL = serviceURL.appendingPathComponent(rev)
-                        let targetFiles = [
-                            "history-v1.json",
-                            "long-term-v1.json",
-                            "preferences.json",
-                            "alerts.json",
-                            "interval.json",
-                            "webhook.json"
-                        ]
-                        for name in targetFiles {
-                            let itemURL = revURL.appendingPathComponent(name)
-                            if fileManager.fileExists(atPath: itemURL.path), let data = try? Data(contentsOf: itemURL) {
-                                let relative = "targets/\(serviceID)/\(rev)/\(name)"
-                                files[relative] = data
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        var totalEntries = 0
-        for monitor in monitors {
-            totalEntries += monitor.history.count
-        }
-
+        let files = try BackupFileStore.capture(at: dataRoot)
+        let contents = try BackupContents.validateFiles(files)
         let preview = EncryptedBackupPayload.Preview(
             createdAt: Date(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
-            serviceCount: monitors.count,
-            serviceNames: monitors.map(\.definition.displayName),
-            totalHistoryEntries: totalEntries
+            serviceCount: contents.definitions.count,
+            serviceNames: contents.definitions.map(\.displayName),
+            totalHistoryEntries: contents.historyEntries
         )
-
-        return try EncryptedBackup.seal(files: files, preview: preview, password: password)
+        return try await Task.detached {
+            try EncryptedBackup.seal(files: files, preview: preview, password: password)
+        }.value
     }
 
-    func previewBackup(data: Data, password: String) throws -> EncryptedBackupPayload {
-        try EncryptedBackup.open(data: data, password: password)
+    func previewBackup(data: Data, password: String) async throws -> EncryptedBackupPayload {
+        let payload = try await Task.detached {
+            try EncryptedBackup.open(data: data, password: password)
+        }.value
+        let contents = try BackupContents.validate(payload)
+        return EncryptedBackupPayload(preview: .init(createdAt: payload.preview.createdAt,
+            appVersion: payload.preview.appVersion, serviceCount: contents.definitions.count,
+            serviceNames: contents.definitions.map(\.displayName), totalHistoryEntries: contents.historyEntries),
+            files: payload.files)
     }
 
     func restore(payload: EncryptedBackupPayload) async throws {
-        guard writable else { throw CocoaError(.fileWriteUnknown) }
-
-        for path in payload.files.keys {
-            try EncryptedBackup.validatePath(path)
+        guard writable, !restoring, !removing else { throw CocoaError(.fileWriteUnknown) }
+        _ = try BackupContents.validate(payload) // Reject corruption before stopping or flushing monitors.
+        restoring = true
+        defer {
+            restoring = false
+            if writable { setActive(UIApplication.shared.applicationState == .active) }
         }
-
         setActive(false)
-        for monitor in monitors {
-            await monitor.stopAndFlush()
-        }
-
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("tgwatch_restore_\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-
+        for monitor in monitors { await monitor.stopAndFlush() }
         do {
-            for (relativePath, data) in payload.files {
-                let dest = tempDir.appendingPathComponent(relativePath)
-                try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try data.write(to: dest, options: .atomic)
-            }
-
-            let backupDir = FileManager.default.temporaryDirectory.appendingPathComponent("tgwatch_backup_\(UUID().uuidString)")
-            if FileManager.default.fileExists(atPath: dataRoot.path) {
-                try FileManager.default.moveItem(at: dataRoot, to: backupDir)
-            }
-
-            do {
-                try FileManager.default.moveItem(at: tempDir, to: dataRoot)
-                try? FileManager.default.removeItem(at: backupDir)
-            } catch {
-                if FileManager.default.fileExists(atPath: backupDir.path) {
-                    try? FileManager.default.moveItem(at: backupDir, to: dataRoot)
-                }
-                throw error
-            }
-        } catch {
-            try? FileManager.default.removeItem(at: tempDir)
-            throw error
-        }
-
-        reloadAfterRestore()
-    }
-
-    private func reloadAfterRestore() {
-        var loadedDefinitions = ServiceDefinition.defaults
-        if FileManager.default.fileExists(atPath: file.path) {
-            if let data = try? Data(contentsOf: file),
-               let decoded = try? JSONDecoder().decode([ServiceDefinition].self, from: data) {
-                let allowed = Set(["telegram", "matrix", "whatsapp", "custom", "custom2", "custom3", "custom4", "custom5"])
-                if data.count <= 65_536 && decoded.count <= 8 &&
-                   Set(decoded.map(\.id)).count == decoded.count &&
-                   decoded.contains(where: { $0.id == "telegram" && $0.kind == .telegram }) &&
-                   decoded.allSatisfy({ allowed.contains($0.id) && $0.valid }) {
-                    loadedDefinitions = decoded
+            let contents = try BackupFileStore.restore(payload, at: dataRoot)
+            // Use already validated definitions, never a silent fallback to default services.
+            favoriteIDs = contents.favorites
+            monitors = contents.definitions.map { MonitorController(definition: $0) }
+            for monitor in monitors {
+                monitor.onObservationPublished = { [weak self] in
+                    guard let self else { return }
+                    CompanionBridge.shared.publish(catalog: self)
                 }
             }
+            CompanionBridge.shared.publish(catalog: self)
+            // Discard navigation destinations that still retain pre-restore controllers.
+            restoreRevision = UUID()
+            restoreCompleted = true
+        } catch BackupError.restoreRecoveryRequired {
+            storageError = true
+            writable = false
+            throw BackupError.restoreRecoveryRequired
         }
-        let favoritesFile = dataRoot.appendingPathComponent("favorites.json")
-        if let data = try? Data(contentsOf: favoritesFile), data.count <= 4096,
-           let ids = try? JSONDecoder().decode(Set<String>.self, from: data) {
-            favoriteIDs = ids.intersection(Set(loadedDefinitions.map(\.id)))
-        } else {
-            favoriteIDs = ["telegram"]
-        }
-        monitors = loadedDefinitions.map { MonitorController(definition: $0) }
-        for monitor in monitors {
-            monitor.onObservationPublished = { [weak self] in
-                guard let self else { return }
-                CompanionBridge.shared.publish(catalog: self)
-            }
-        }
-        CompanionBridge.shared.publish(catalog: self)
     }
 }
-

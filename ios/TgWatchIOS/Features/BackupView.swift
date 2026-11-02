@@ -21,6 +21,8 @@ struct BackupView: View {
     @State private var restoreConfirmed = false
     @State private var restoreSuccess = false
     @State private var importError: String?
+    @State private var importGeneration = 0
+    @State private var isPreviewing = false
 
     var body: some View {
         Form {
@@ -28,6 +30,11 @@ struct BackupView: View {
             importSection
         }
         .navigationTitle("backupTitle")
+        .onChange(of: importPassword) { _, _ in
+            importGeneration += 1
+            importPreview = nil
+            restoreConfirmed = false
+        }
         .fileImporter(
             isPresented: $isImportingPicker,
             allowedContentTypes: [.data, .item]
@@ -119,11 +126,7 @@ struct BackupView: View {
         let password = exportPassword
         Task {
             do {
-                let data = try await Task.detached {
-                    try await MainActor.run {
-                        try catalog.createBackup(password: password)
-                    }
-                }.value
+                let data = try await catalog.createBackup(password: password)
 
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd-HHmmss"
@@ -150,15 +153,16 @@ struct BackupView: View {
             } label: {
                 Label("importBackup", systemImage: "square.and.arrow.down")
             }
-            .disabled(isRestoring)
+            .disabled(isRestoring || isPreviewing)
 
             if importData != nil {
                 SecureField("backupPasswordPlaceholder", text: $importPassword)
+                    .disabled(isRestoring || isPreviewing)
 
                 Button("backupImportPreview") {
                     previewImport()
                 }
-                .disabled(importPassword.count < 12 || isRestoring)
+                .disabled(!(12...256).contains(importPassword.count) || isRestoring || isPreviewing)
             }
 
             if let preview = importPreview?.preview {
@@ -204,8 +208,12 @@ struct BackupView: View {
     private func handleFileImport(_ result: Result<URL, Error>) {
         switch result {
         case .success(let url):
+            importGeneration += 1
+            restoreConfirmed = false
             importError = nil
             importPreview = nil
+            importData = nil
+            importPassword = ""
             restoreSuccess = false
 
             let accessing = url.startAccessingSecurityScopedResource()
@@ -214,11 +222,7 @@ struct BackupView: View {
             }
 
             do {
-                let data = try Data(contentsOf: url)
-                guard data.count <= 36 * 1024 * 1024 else {
-                    importError = NSLocalizedString("backupFailed", comment: "")
-                    return
-                }
+                let data = try BackupFileStore.read(url, limit: EncryptedBackup.maxEncryptedSize)
                 self.importData = data
             } catch {
                 importError = error.localizedDescription
@@ -235,12 +239,14 @@ struct BackupView: View {
         importPreview = nil
 
         let password = importPassword
+        let generation = importGeneration
+        isPreviewing = true
         Task {
+            defer { isPreviewing = false }
             do {
-                let payload = try await Task.detached {
-                    try EncryptedBackup.open(data: data, password: password)
-                }.value
+                let payload = try await catalog.previewBackup(data: data, password: password)
 
+                guard generation == importGeneration, importData == data, importPassword == password else { return }
                 self.importPreview = payload
             } catch {
                 self.importError = error.localizedDescription

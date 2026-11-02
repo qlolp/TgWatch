@@ -30,9 +30,9 @@ final class CompanionBridge: NSObject, WCSessionDelegate {
 
         // 1. Telegram
         if let telegram = catalog.monitors.first(where: { $0.definition.kind == .telegram }) {
-            let snapshot = telegram.session.snapshot
+            let snapshot = telegram.session.isFresh() ? telegram.session.snapshot : nil
             let observedAt = snapshot?.finishedAt ?? Date.distantPast
-            let validUntil = observedAt.addingTimeInterval(Double(telegram.intervalSeconds) * 2.0)
+            let validUntil = observedAt.addingTimeInterval(telegram.session.resultLifetime)
             items.append(
                 CompanionSnapshot.Item(
                     id: "telegram",
@@ -48,9 +48,9 @@ final class CompanionBridge: NSObject, WCSessionDelegate {
 
         // 2. Favorites
         for monitor in catalog.monitors where catalog.favoriteIDs.contains(monitor.definition.id) && monitor.definition.kind != .telegram {
-            let snapshot = monitor.session.snapshot
+            let snapshot = monitor.session.isFresh() ? monitor.session.snapshot : nil
             let observedAt = snapshot?.finishedAt ?? Date.distantPast
-            let validUntil = observedAt.addingTimeInterval(Double(monitor.intervalSeconds) * 2.0)
+            let validUntil = observedAt.addingTimeInterval(monitor.session.resultLifetime)
             items.append(
                 CompanionSnapshot.Item(
                     id: monitor.definition.id,

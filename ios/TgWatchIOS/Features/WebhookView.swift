@@ -1,12 +1,6 @@
 import SwiftUI
 import TgWatchCore
 
-struct WebhookSettings: Codable, Equatable {
-    var enabled = false
-    var address = ""
-    var json = true
-}
-
 actor WebhookSender {
     private var busy = false
     func send(settings: WebhookSettings, event: WebhookEvent) async throws -> Bool {

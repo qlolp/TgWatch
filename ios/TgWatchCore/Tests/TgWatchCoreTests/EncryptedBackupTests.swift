@@ -1,24 +1,32 @@
 import Testing
 import Foundation
+import CryptoKit
 @testable import TgWatchCore
 
 @Suite struct EncryptedBackupTests {
     private let testPassword = "correct-horse-battery-staple-1234"
 
-    @Test func roundtripSealAndOpen() throws {
-        let preview = EncryptedBackupPayload.Preview(
-            createdAt: Date(),
-            appVersion: "1.0",
-            serviceCount: 2,
-            serviceNames: ["Telegram", "Internal API"],
-            totalHistoryEntries: 150
-        )
+    @Test func authenticatedButInvalidContentIsRejectedOnOpen() throws {
+        let fixture = try BackupTestFixture.payload()
+        for files in [[String: Data](), ["services-v1.json": Data("not-json".utf8)]] {
+            let payload = BackupTestFixture.replacing(fixture, files: files)
+            let salt = Data(repeating: 7, count: EncryptedBackup.saltLength)
+            let key = try EncryptedBackup.deriveKey(password: testPassword, salt: salt)
+            let box = try AES.GCM.seal(JSONEncoder().encode(payload), using: key)
+            let encoded = EncryptedBackup.magic + salt + box.combined!
+            #expect(throws: (any Error).self) { try EncryptedBackup.open(data: encoded, password: testPassword) }
+        }
+    }
 
-        let files: [String: Data] = [
-            "services-v1.json": Data("{\"services\":[]}".utf8),
-            "favorites.json": Data("[\"telegram\"]".utf8),
-            "targets/custom1/550e8400-e29b-41d4-a716-446655440000/history-v1.json": Data("[]".utf8)
-        ]
+    @Test func oversizedCiphertextIsRejectedBeforeDecryption() {
+        let data = Data(repeating: 0, count: EncryptedBackup.maxPlaintextSize + 53)
+        #expect(throws: BackupError.payloadTooLarge) { try EncryptedBackup.open(data: data, password: testPassword) }
+    }
+
+    @Test func roundtripSealAndOpen() throws {
+        let fixture = try BackupTestFixture.payload()
+        let preview = fixture.preview
+        let files = fixture.files
 
         let encrypted = try EncryptedBackup.seal(files: files, preview: preview, password: testPassword)
         #expect(encrypted.starts(with: EncryptedBackup.magic))
@@ -36,14 +44,9 @@ import Foundation
     }
 
     @Test func wrongPasswordFailsAuthentication() throws {
-        let preview = EncryptedBackupPayload.Preview(
-            createdAt: Date(),
-            appVersion: "1.0",
-            serviceCount: 1,
-            serviceNames: ["Telegram"],
-            totalHistoryEntries: 5
-        )
-        let files = ["services-v1.json": Data("{}".utf8)]
+        let fixture = try BackupTestFixture.payload()
+        let preview = fixture.preview
+        let files = fixture.files
         let encrypted = try EncryptedBackup.seal(files: files, preview: preview, password: testPassword)
 
         #expect(throws: BackupError.authenticationFailed) {
@@ -52,14 +55,9 @@ import Foundation
     }
 
     @Test func tamperedCiphertextFailsAuthentication() throws {
-        let preview = EncryptedBackupPayload.Preview(
-            createdAt: Date(),
-            appVersion: "1.0",
-            serviceCount: 1,
-            serviceNames: ["Telegram"],
-            totalHistoryEntries: 5
-        )
-        let files = ["services-v1.json": Data("{}".utf8)]
+        let fixture = try BackupTestFixture.payload()
+        let preview = fixture.preview
+        let files = fixture.files
         var encrypted = try EncryptedBackup.seal(files: files, preview: preview, password: testPassword)
 
         // Corrupt a byte in ciphertext (towards the end)
