@@ -5,6 +5,18 @@ import Testing
 struct ParityCompletionTests {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
 
+    @Test func replaceKeepsOlderChecksInTheDailyArchive() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = HistoryStore(url: folder.appendingPathComponent("history.json"), now: { now })
+        let old = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-10 * 86_400), status: .ok, validForSeconds: 60)
+        try await store.replace([old])
+        let report = try await store.longTermHistory().report(days: 30, at: now)
+        #expect(report.days.contains { $0.checks == 1 })
+        #expect(try await store.load().isEmpty)
+        #expect(await store.storedBuckets().minutes.map(\.ok) == [1])
+    }
+
     @Test func agedChecksBecomeMinuteThenFiveMinuteBuckets() {
         let recent = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-3600), status: .ok, latencyMilliseconds: 20)
         let week = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-10 * 86_400), status: .down)

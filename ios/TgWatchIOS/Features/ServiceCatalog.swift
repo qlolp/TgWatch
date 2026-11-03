@@ -194,7 +194,7 @@ extension ServiceDefinition {
             for monitor in monitors {
                 monitor.onObservationPublished = { [weak self] in self?.noteObservation() }
             }
-            loadSideSettings()
+            loadSideSettings(resetMissing: true)
             applyMaintenance()
             CompanionBridge.shared.publish(catalog: self)
             // Discard navigation destinations that still retain pre-restore controllers.
@@ -227,7 +227,11 @@ extension ServiceDefinition {
         } catch { storageError = true }
     }
 
-    private func loadSideSettings() {
+    private func loadSideSettings(resetMissing: Bool = false) {
+        if resetMissing {
+            maintenanceWindows = []
+            dailySummary = DailySummarySettings()
+        }
         let maintenanceURL = dataRoot.appendingPathComponent("maintenance.json")
         if FileManager.default.fileExists(atPath: maintenanceURL.path) {
             do {

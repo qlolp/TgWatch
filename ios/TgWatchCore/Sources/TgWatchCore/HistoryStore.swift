@@ -107,10 +107,11 @@ public actor HistoryStore {
     }
     public func replace(_ replacement: [HistoryEntry]) throws {
         guard replacement.allSatisfy(Self.acceptable) else { throw Failure.unsupportedSchema }
-        let rolled = HistoryRollup.roll(entries: replacement, now: now(), rawLimit: limit)
+        let segment = HistoryRollup.currentSegment(replacement)
         var replacementArchive = LongTermHistory()
-        for entry in rolled.raw { replacementArchive.append(entry) }
+        for entry in segment { replacementArchive.append(entry) }
         replacementArchive.prune(at: now())
+        let rolled = HistoryRollup.roll(entries: replacement, now: now(), rawLimit: limit)
         try persist(rolled.raw, archive: replacementArchive, minutes: rolled.minutes, coarse: rolled.coarse)
         archive = replacementArchive
         minutes = rolled.minutes
