@@ -129,7 +129,7 @@ public actor HistoryStore {
         (entry.networkKind == nil || NetworkKind.normalize(entry.networkKind) != nil)
     }
     private func roll(_ value: [HistoryEntry], at date: Date) -> RolledHistory {
-        let rolled = HistoryRollup.roll(entries: value, minutes: minutes, coarse: coarse, now: date, rawLimit: limit)
+        let rolled = HistoryRollup.roll(entries: value, minuteBuckets: minutes, coarseBuckets: coarse, now: date, rawLimit: limit)
         minutes = rolled.minutes
         coarse = rolled.coarse
         return rolled

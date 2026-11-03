@@ -93,15 +93,15 @@ public enum HistoryRollup {
         return abs(seconds - Double(whole)) < 0.001 && whole % unit == 0
     }
 
-    public static func roll(entries: [HistoryEntry], minutes: [HistoryBucket] = [], coarse: [HistoryBucket] = [],
+    public static func roll(entries: [HistoryEntry], minuteBuckets: [HistoryBucket] = [], coarseBuckets: [HistoryBucket] = [],
                             now: Date, rawLimit: Int = 10_000) -> RolledHistory {
         let segment = currentSegment(entries)
         let reset = segment.count != entries.count
         var minuteMap: [Date: HistoryBucket] = [:]
         var coarseMap: [Date: HistoryBucket] = [:]
         if !reset {
-            for bucket in minutes where bucket.valid { minuteMap[bucket.start] = bucket }
-            for bucket in coarse where bucket.valid { coarseMap[bucket.start] = bucket }
+            for bucket in minuteBuckets where bucket.valid { minuteMap[bucket.start] = bucket }
+            for bucket in coarseBuckets where bucket.valid { coarseMap[bucket.start] = bucket }
         }
         let rawCutoff = now.addingTimeInterval(-rawWindow)
         let minuteCutoff = now.addingTimeInterval(-minuteWindow)

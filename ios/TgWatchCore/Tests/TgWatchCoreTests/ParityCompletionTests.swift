@@ -18,7 +18,7 @@ struct ParityCompletionTests {
         #expect(rolled.coarse.count == 1)
         #expect(rolled.coarse[0].partial == 1)
         #expect(rolled.coarse[0].resolution == HistoryRollup.coarse)
-        let again = HistoryRollup.roll(entries: rolled.raw, minutes: rolled.minutes, coarse: rolled.coarse, now: now)
+        let again = HistoryRollup.roll(entries: rolled.raw, minuteBuckets: rolled.minutes, coarseBuckets: rolled.coarse, now: now)
         #expect(again.minutes[0].fail == 1)
         #expect(again.coarse[0].partial == 1)
     }
@@ -27,7 +27,7 @@ struct ParityCompletionTests {
         let future = HistoryEntry(epoch: 1, observedAt: now, status: .ok)
         let past = HistoryEntry(epoch: 2, observedAt: now.addingTimeInterval(-40 * 86_400), status: .down)
         let kept = HistoryBucket(start: HistoryRollup.align(now.addingTimeInterval(-86_400), resolution: 60), resolution: 60, ok: 4)
-        let rolled = HistoryRollup.roll(entries: [future, past], minutes: [kept], now: now)
+        let rolled = HistoryRollup.roll(entries: [future, past], minuteBuckets: [kept], now: now)
         #expect(rolled.raw.isEmpty)
         #expect(rolled.minutes.isEmpty)
         #expect(rolled.coarse.count == 1)
