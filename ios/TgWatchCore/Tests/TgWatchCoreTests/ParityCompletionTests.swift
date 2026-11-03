@@ -10,17 +10,15 @@ struct ParityCompletionTests {
         let week = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-10 * 86_400), status: .down)
         let quarter = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-40 * 86_400), status: .partial)
         let ancient = HistoryEntry(epoch: 1, observedAt: now.addingTimeInterval(-100 * 86_400), status: .ok)
-        let rolled = HistoryRollup.roll(entries: [recent, week, quarter, ancient], now: now)
+        let rolled = HistoryRollup.roll(entries: [ancient, quarter, week, recent], now: now)
         #expect(rolled.raw.map(\.status) == [.ok])
-        #expect(rolled.minutes.count == 1)
-        #expect(rolled.minutes[0].fail == 1)
-        #expect(rolled.minutes[0].resolution == HistoryRollup.minute)
-        #expect(rolled.coarse.count == 1)
-        #expect(rolled.coarse[0].partial == 1)
-        #expect(rolled.coarse[0].resolution == HistoryRollup.coarse)
+        #expect(rolled.minutes.map(\.fail) == [1])
+        #expect(rolled.minutes.map(\.resolution) == [HistoryRollup.minute])
+        #expect(rolled.coarse.map(\.partial) == [1])
+        #expect(rolled.coarse.map(\.resolution) == [HistoryRollup.coarse])
         let again = HistoryRollup.roll(entries: rolled.raw, minuteBuckets: rolled.minutes, coarseBuckets: rolled.coarse, now: now)
-        #expect(again.minutes[0].fail == 1)
-        #expect(again.coarse[0].partial == 1)
+        #expect(again.minutes.map(\.fail) == [1])
+        #expect(again.coarse.map(\.partial) == [1])
     }
 
     @Test func clockRollbackDropsPreviousBuckets() {
@@ -30,8 +28,7 @@ struct ParityCompletionTests {
         let rolled = HistoryRollup.roll(entries: [future, past], minuteBuckets: [kept], now: now)
         #expect(rolled.raw.isEmpty)
         #expect(rolled.minutes.isEmpty)
-        #expect(rolled.coarse.count == 1)
-        #expect(rolled.coarse[0].fail == 1)
+        #expect(rolled.coarse.map(\.fail) == [1])
     }
 
     @Test func maintenanceSkipsEqualEndpointsAndOvernight() {
