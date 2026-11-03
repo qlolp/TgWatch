@@ -155,11 +155,17 @@ requests. This is not a VPN leak test and it does not change VPN configuration.
 
 ## Remaining Android differences
 
-This is not full feature parity. Continuous Android-style background execution is not implemented
-on iOS. Widgets, encrypted TGWB backups, Android-compatible minute/five-minute aggregation, daily scheduled summaries,
-multi-target/archive CSV import,
-scheduled pauses, network breakdowns and Android automation adapters remain
-unimplemented. The current iOS UI does not expose the retained old endpoint revisions.
+Continuous Android-style background execution is not implemented and is not claimed.
+The daily summary is a local notification whose text was prepared while the app was open.
+Widgets, Apple Watch snapshots and an iOS encrypted backup (not Android TGWB) are in the app.
+History keeps raw checks for 7 days, minute buckets through 30 days and five-minute buckets
+through 90 days. A v3 CSV can be imported for several known targets at once. Scheduled pauses
+skip history rows and alerts without stopping the visible check. The report splits checks by
+Wi-Fi, mobile, Ethernet or no network. Previous endpoint revisions can be listed read-only.
+ntfy is a preset that only composes the existing webhook address.
+
+Still absent: Android TGWB import, MQTT, Tasker/broadcast adapters, and a promise of
+locked-screen monitoring. The iOS backup format is intentionally separate from TGWB.
 
 No analytics, cookies, shared diagnostic logs or account identifiers. Privacy manifest declares no
 tracking/collected data; current code does not use UserDefaults, file timestamp, disk-space or device-boot-time

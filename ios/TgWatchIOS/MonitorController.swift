@@ -5,6 +5,8 @@ import TgWatchCore
 @MainActor final class MonitorController: ObservableObject {
     @Published var history: [HistoryEntry] = []
     @Published private(set) var longTermHistory = LongTermHistory()
+    @Published private(set) var minuteBuckets: [HistoryBucket] = []
+    @Published private(set) var coarseBuckets: [HistoryBucket] = []
     @Published var historyUnavailable = false
     @Published private(set) var profile: CheckProfile = .economy
     @Published private(set) var intervalSeconds = 60
@@ -16,6 +18,7 @@ import TgWatchCore
     @Published private(set) var webhookSettings = WebhookSettings()
     @Published private(set) var webhookDelivered: Bool?
     @Published private(set) var webhookError = false
+    var onObservationPublished: (() -> Void)?
     private let webhookSender = WebhookSender()
     private var webhookTask: Task<Void, Never>?
     private var webhookGeneration = 0
@@ -29,6 +32,8 @@ import TgWatchCore
     let session: MonitorSession
     private let store: HistoryStore
     private let path = NWPathMonitor()
+    private var networkKind = "unknown"
+    private var maintenance: [MaintenanceWindow] = []
     private var writeTask: Task<Void, Never>?
     init(definition: ServiceDefinition = .telegram) {
         self.definition = definition
@@ -74,12 +79,17 @@ import TgWatchCore
             do { webhookSettings = try JSONDecoder().decode(WebhookSettings.self, from: Data(contentsOf: hookURL)) }
             catch { webhookError = true }
         }
-        session.onChange = { [weak self] in self?.objectWillChange.send() }
+        session.onChange = { [weak self] in
+            self?.objectWillChange.send()
+            self?.onObservationPublished?() // Includes route/lifecycle/clock invalidation, not only new results.
+        }
         session.onObservation = { [weak self] value in self?.save(value) }
         path.pathUpdateHandler = { [weak self] value in
             let unavailable = value.status == .unsatisfied
+            let kind = Self.networkKind(of: value)
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                self.networkKind = kind
                 // Every delivered path update may change routing, even with identical interface names.
                 self.resetContinuity()
                 self.session.networkChanged(unavailable: unavailable)
@@ -89,6 +99,10 @@ import TgWatchCore
         Task { await reload() }
     }
     private func save(_ snapshot: ProbeSnapshot) {
+        if MaintenanceSchedule.active(maintenance, at: snapshot.finishedAt) {
+            resetContinuity()
+            return
+        }
         let previous = writeTask
         let lifetime = session.resultLifetime
         let event = alertTransition.observe(snapshot.status, at: snapshot.finishedAt, validFor: lifetime)
@@ -123,9 +137,10 @@ import TgWatchCore
                 catch { self?.alertError = true }
             }
         }
+        let kind = networkKind
         writeTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime, latencyMilliseconds: snapshot.latencyMilliseconds)) }
+            do { try await store.append(HistoryEntry(epoch: snapshot.epoch, observedAt: snapshot.finishedAt, status: snapshot.status, validForSeconds: lifetime, latencyMilliseconds: snapshot.latencyMilliseconds, networkKind: kind)) }
             catch { self?.historyUnavailable = true; return }
             await self?.reload()
         }
@@ -133,8 +148,12 @@ import TgWatchCore
     func reload() async {
         do {
             history = try await store.load()
+            let buckets = await store.storedBuckets()
+            minuteBuckets = buckets.minutes
+            coarseBuckets = buckets.coarse
             longTermHistory = try await store.longTermHistory()
             historyUnavailable = false
+            onObservationPublished?()
         }
         catch { historyUnavailable = true }
     }
@@ -145,6 +164,9 @@ import TgWatchCore
             do { try await store.clear(); await self?.reload() }
             catch { self?.historyUnavailable = true }
         }
+    }
+    func setMaintenance(_ windows: [MaintenanceWindow]) {
+        maintenance = MaintenanceSchedule.sanitized(windows) ?? []
     }
     func setMonitoring(_ value: Bool) {
         resetContinuity()
@@ -175,13 +197,11 @@ import TgWatchCore
         webhookTask?.cancel()
     }
     func saveWebhook(_ value: WebhookSettings) {
-        guard !value.enabled || ServiceDefinition.validAddress(value.address) else { webhookError = true; return }
+        guard value.valid else { webhookError = true; return }
         do {
             try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
-            var url = dataDirectory.appendingPathComponent("webhook.json")
-            try JSONEncoder().encode(value).write(to: url, options: [.atomic, .completeFileProtection])
-            var flags = URLResourceValues(); flags.isExcludedFromBackup = true
-            try url.setResourceValues(flags)
+            let url = dataDirectory.appendingPathComponent("webhook.json")
+            try BackupFileStore.writePrivate(JSONEncoder().encode(value), to: url, limit: BackupContents.settingsLimit)
             webhookSettings = value; webhookError = false; webhookDelivered = nil
             webhookGeneration += 1; webhookTask?.cancel()
         } catch { webhookError = true }
@@ -226,6 +246,13 @@ import TgWatchCore
         slowResponseAlert.resetContinuity()
         lastObservedStatus = nil
         lastObservation = nil
+    }
+    nonisolated private static func networkKind(of path: NWPath) -> String {
+        if path.status == .unsatisfied { return NetworkKind.unavailable.rawValue }
+        if path.usesInterfaceType(.wifi) { return NetworkKind.wifi.rawValue }
+        if path.usesInterfaceType(.cellular) { return NetworkKind.cellular.rawValue }
+        if path.usesInterfaceType(.wiredEthernet) { return NetworkKind.wired.rawValue }
+        return NetworkKind.other.rawValue
     }
     deinit { path.cancel() }
 }

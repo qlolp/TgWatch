@@ -3,6 +3,7 @@ import TgWatchCore
 
 struct MonitorView: View {
     @ObservedObject var controller: MonitorController
+    @ObservedObject var catalog: ServiceCatalog
 
     var body: some View {
         NavigationStack {
@@ -25,6 +26,15 @@ struct MonitorView: View {
                             cancel: controller.session.cancel
                         )
                     }
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("connectionDiagnosis", systemImage: "stethoscope").font(.headline)
+                            Text(LocalizedStringKey("diagnosis." + ConnectionDiagnosis.reason(controller.session.snapshot, fresh: controller.session.isFresh()).rawValue))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 20))
+                    }
+                    FavoritesView(catalog: catalog)
                     MonitoringCard(
                         profile: Binding<CheckProfile?>(get: { CheckProfile(rawValue: controller.intervalSeconds) }, set: { if let value = $0 { controller.setProfile(value) } }),
                         preferencesUnavailable: controller.preferencesUnavailable,
@@ -56,6 +66,11 @@ struct MonitorView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
+                        NavigationLink("vpnComparison") { VPNComparisonView(fixture: controller.fixtureMode) }
+                        NavigationLink("backupTitle") { BackupView(catalog: catalog) }
+                        NavigationLink("maintenanceWindows") { MaintenanceView(catalog: catalog) }
+                        NavigationLink("dailySummary") { DailySummaryView(catalog: catalog) }
+                        NavigationLink("archiveImport") { ArchiveImportView(catalog: catalog) }
                         NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
                         NavigationLink("eventJournal") { EventJournalView(controller: controller) }
                         NavigationLink("latencyReport") { LatencyReportView(controller: controller) }

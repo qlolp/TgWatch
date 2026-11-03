@@ -203,3 +203,125 @@
 "egressNotChecked" = "A fresh check is needed";
 
 "egressHint" = "IP country according to Cloudflare. This checks the route of this request; split-tunnel VPNs may route other apps differently. The IP is not saved.";
+
+"connectionDiagnosis" = "What is happening";
+
+"diagnosis.stale" = "No fresh result. Run a check to identify the cause.";
+
+"diagnosis.healthy" = "Telegram responds over MTProto and the web. No issue was observed in this check.";
+
+"diagnosis.slow" = "Telegram is reachable, but its response took at least a second. Compare the connection with and without VPN.";
+
+"diagnosis.partial" = "Only some Telegram checks respond. A route or protocol may be affected.";
+
+"diagnosis.serviceDown" = "The control site responds, but Telegram checks failed. Access to Telegram may be affected.";
+
+"diagnosis.offline" = "The system reports no network connection. Check Wi-Fi or mobile data.";
+
+"diagnosis.inconclusive" = "There is not enough evidence to distinguish a Telegram outage from a connection problem. Try again.";
+
+"favorites" = "Favorite services";
+
+"favoritesHint" = "Add favorites in service settings.";
+
+"addFavorite" = "Add favorite";
+
+"removeFavorite" = "Remove favorite";
+
+"lastOutage" = "Last outage";
+
+"vpnComparison" = "Compare VPN";
+
+"vpnComparisonHint" = "Take a baseline, then enable or change VPN yourself and return for the second measurement. Checks cover Telegram and your public IP. The baseline lasts 30 minutes.";
+
+"vpnBefore" = "Before changing VPN";
+
+"vpnAfter" = "After changing VPN";
+
+"vpnMeasureBefore" = "Record baseline";
+
+"vpnMeasureAfter" = "Record second measurement";
+
+"vpnComparisonFailed" = "The measurement was interrupted or expired. Wait for a stable connection and try again.";
+
+"vpnResult" = "Measurement comparison";
+
+"vpnOutcome.improved" = "Telegram reachability improved.";
+
+"vpnOutcome.worsened" = "Telegram reachability worsened.";
+
+"vpnOutcome.unchanged" = "Telegram reachability is unchanged.";
+
+"vpnOutcome.inconclusive" = "Not enough evidence to compare reachability.";
+
+"vpnLatencyChange" = "Latency change";
+
+"vpnIPChanged" = "Public IP changed.";
+
+"vpnIPUnchanged" = "Public IP is unchanged.";
+
+"vpnResultHint" = "These are two observations, not proof of what caused a change. Split routing can affect apps differently.";
+
+"backupTitle" = "Backup & Restore";
+"backupSectionExport" = "Export";
+"backupSectionImport" = "Import";
+"exportBackup" = "Create Encrypted Backup";
+"importBackup" = "Import Encrypted Backup";
+"backupPasswordPrompt" = "Enter a password (12–256 characters) to encrypt or decrypt this backup.";
+"backupPasswordPlaceholder" = "Password (min 12 characters)";
+"backupPasswordConfirmation" = "Confirm Password";
+"backupPasswordMismatch" = "Passwords do not match.";
+"backupPasswordTooShort" = "Password must be at least 12 characters.";
+"backupExportSuccess" = "Backup created successfully.";
+"backupImportPreview" = "Backup Preview";
+"backupCreatedAt" = "Created";
+"backupAppVersion" = "App version";
+"backupServicesCount" = "Services count";
+"backupEntriesCount" = "History entries";
+"backupReplaceWarning" = "Restoring will replace all current services, preferences, and history.";
+"confirmRestore" = "Confirm & Restore";
+"restoreSuccess" = "Restore completed successfully.";
+"backupFailed" = "Operation failed";
+"shareBackup" = "Share / Save Backup";
+
+"maintenanceWindows" = "Scheduled pauses";
+"maintenanceHint" = "During a pause, checks continue and the status stays visible, but new history rows and alerts are skipped. The gap stays unknown instead of becoming an outage.";
+"maintenanceAdd" = "Add pause";
+"dailySummary" = "Daily summary";
+"dailySummaryTime" = "Time";
+"dailySummaryHint" = "A local notification with the last summary prepared while the app was open. iOS does not recompute it in the background.";
+"dailyTitle" = "TgWatch day";
+"dailyTitlePercent" = "%1$@ · %2$.0f%%";
+"dailyNoChecks" = "%@ had no checks.";
+"dailyChecks" = "%1$@: %2$d checks.";
+"dailyNoOutages" = "No confirmed outages.";
+"dailyOngoing" = "%d outage(s), one still open.";
+"dailyLongest" = "%1$d outage(s), longest about %2$d min.";
+"dailyUnobserved" = "Unobserved about %d min.";
+"dailyPrepared" = "Prepared %@.";
+"archiveImport" = "Import several targets";
+"archiveImportHint" = "A v3 CSV may contain more than one current target. Each known target is replaced only after confirmation. Unknown targets are skipped.";
+"archiveSkipped" = "Skipped unknown targets: %@";
+"revisionArchive" = "Previous endpoints";
+"revisionArchiveHint" = "Earlier endpoint revisions stay on this iPhone. This list is read-only and does not restore a private address.";
+"revisionArchiveEmpty" = "No earlier revisions.";
+"networkBreakdown" = "Networks";
+"networkBreakdownHint" = "Counts of checks by the path observed at that moment. This is not a proof of which route Telegram used.";
+"network.wifi" = "Wi-Fi";
+"network.cellular" = "Mobile";
+"network.wired" = "Ethernet";
+"network.other" = "Other";
+"network.unavailable" = "No connection";
+"network.unknown" = "Unknown";
+"olderAggregates" = "Older checks";
+"minuteBuckets" = "Minute buckets (8–30 days)";
+"coarseBuckets" = "Five-minute buckets (31–90 days)";
+"olderAggregatesHint" = "Older checks are counts, not a second copy of the raw log. Missing time is still unknown.";
+"ntfyPreset" = "ntfy";
+"ntfyHint" = "Builds a normal webhook address. The topic and token stay in that address and are not sent anywhere else.";
+"ntfyTopic" = "Topic";
+"ntfyServer" = "Server, empty for ntfy.sh";
+"ntfyToken" = "Token tk_…, optional";
+"ntfyApply" = "Use this ntfy topic";
+"ntfyInvalid" = "Topic, server or token is not valid.";
+

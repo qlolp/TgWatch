@@ -8,11 +8,15 @@ struct ServicesRootView: View {
     var body: some View {
         TabView {
             if let telegram = catalog.monitors.first(where: { $0.definition.kind == .telegram }) {
-                MonitorView(controller: telegram).tabItem { Label("Telegram", systemImage: "paperplane") }
+                MonitorView(controller: telegram, catalog: catalog).tabItem { Label("Telegram", systemImage: "paperplane") }
             }
             ServicesView(catalog: catalog).tabItem { Label("services", systemImage: "square.grid.2x2") }
         }
+        .id(catalog.restoreRevision)
         .environment(egress)
+        .alert("restoreSuccess", isPresented: $catalog.restoreCompleted) {
+            Button("OK", role: .cancel) {}
+        }
         .onChange(of: phase, initial: true) { _, value in egress.setActive(value == .active) }
     }
 }
@@ -33,13 +37,32 @@ struct ServicesView: View {
                         ServiceDetailView(controller: monitor, catalog: catalog)
                             .id(monitor.definition.revision)
                     } label: { ServiceRow(controller: monitor) }
+                    .swipeActions(edge: .leading) {
+                        Button { catalog.toggleFavorite(monitor.definition.id) } label: {
+                            Label(catalog.favoriteIDs.contains(monitor.definition.id) ? "removeFavorite" : "addFavorite", systemImage: "star")
+                        }.tint(.yellow)
+                    }
                 }
                 if catalog.nextCustomID != nil {
                     Button("addHTTPS", systemImage: "plus") { adding = true }
                         .accessibilityIdentifier("addHTTPS")
                 }
+                Section {
+                    NavigationLink("maintenanceWindows") { MaintenanceView(catalog: catalog) }
+                    NavigationLink("dailySummary") { DailySummaryView(catalog: catalog) }
+                    NavigationLink("archiveImport") { ArchiveImportView(catalog: catalog) }
+                }
             }
             .navigationTitle("services")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        BackupView(catalog: catalog)
+                    } label: {
+                        Label("backupTitle", systemImage: "arrow.triangle.2.circlepath.circle")
+                    }
+                }
+            }
             .sheet(isPresented: $adding) {
                 if let id = catalog.nextCustomID { ServiceEditor(catalog: catalog, definition: .init(id: id, kind: .custom)) }
             }
@@ -47,7 +70,7 @@ struct ServicesView: View {
     }
 }
 
-private struct ServiceRow: View {
+struct ServiceRow: View {
     @ObservedObject var controller: MonitorController
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -88,13 +111,19 @@ struct ServiceDetailView: View {
                 Text("serviceReachability").font(.caption).foregroundStyle(.secondary)
             }
             Section {
+                Button { catalog.toggleFavorite(controller.definition.id) } label: {
+                    Label(catalog.favoriteIDs.contains(controller.definition.id) ? "removeFavorite" : "addFavorite", systemImage: "star")
+                }
                 NavigationLink("historyReport") { HistoryReportView(controller: controller) }
                 NavigationLink("history") { HistoryView(controller: controller) }
                 NavigationLink("eventJournal") { EventJournalView(controller: controller) }
                 NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
                 NavigationLink("latencyReport") { LatencyReportView(controller: controller) }
                 NavigationLink("shareStatus") { ShareStatusView(controller: controller) }
-                        NavigationLink("webhook") { WebhookView(controller: controller) }
+                NavigationLink("webhook") { WebhookView(controller: controller) }
+                if controller.definition.kind != .telegram {
+                    NavigationLink("revisionArchive") { RevisionArchiveView(controller: controller) }
+                }
             }
             if controller.definition.kind == .custom || controller.definition.kind == .matrix {
                 Section {

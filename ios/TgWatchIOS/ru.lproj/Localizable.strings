@@ -203,3 +203,125 @@
 "egressNotChecked" = "Нужна свежая проверка";
 
 "egressHint" = "Страна IP по данным Cloudflare. Проверяется маршрут этого запроса; при раздельной маршрутизации VPN другие приложения могут выходить иначе. IP не сохраняется.";
+
+"connectionDiagnosis" = "Что происходит";
+
+"diagnosis.stale" = "Свежей проверки нет. Запустите проверку, чтобы определить причину.";
+
+"diagnosis.healthy" = "Telegram отвечает по MTProto и через веб. Проблем в этой проверке не обнаружено.";
+
+"diagnosis.slow" = "Telegram доступен, но ответ занял больше секунды. Сравните соединение с VPN и без него.";
+
+"diagnosis.partial" = "Отвечает только часть проверок Telegram. Возможна проблема отдельного маршрута или протокола.";
+
+"diagnosis.serviceDown" = "Контрольный сайт отвечает, но проверки Telegram не прошли. Проблема может быть в доступе к Telegram.";
+
+"diagnosis.offline" = "Система сообщает, что подключения к сети нет. Проверьте Wi-Fi или мобильную связь.";
+
+"diagnosis.inconclusive" = "Данных недостаточно, чтобы отличить сбой Telegram от проблемы соединения. Повторите проверку.";
+
+"favorites" = "Избранные сервисы";
+
+"favoritesHint" = "Добавьте сервисы в избранное в их настройках.";
+
+"addFavorite" = "В избранное";
+
+"removeFavorite" = "Убрать из избранного";
+
+"lastOutage" = "Последний сбой";
+
+"vpnComparison" = "Сравнить VPN";
+
+"vpnComparisonHint" = "Сделайте первый замер, затем самостоятельно включите или смените VPN и вернитесь для второго. Замеры проверяют Telegram и внешний IP. Первый замер действует 30 минут.";
+
+"vpnBefore" = "До изменения VPN";
+
+"vpnAfter" = "После изменения VPN";
+
+"vpnMeasureBefore" = "Записать первый замер";
+
+"vpnMeasureAfter" = "Записать второй замер";
+
+"vpnComparisonFailed" = "Замер прерван или устарел. Дождитесь стабильного соединения и повторите.";
+
+"vpnResult" = "Сравнение замеров";
+
+"vpnOutcome.improved" = "Доступность Telegram улучшилась.";
+
+"vpnOutcome.worsened" = "Доступность Telegram ухудшилась.";
+
+"vpnOutcome.unchanged" = "Доступность Telegram не изменилась.";
+
+"vpnOutcome.inconclusive" = "Недостаточно данных для сравнения доступности.";
+
+"vpnLatencyChange" = "Изменение задержки";
+
+"vpnIPChanged" = "Внешний IP изменился.";
+
+"vpnIPUnchanged" = "Внешний IP остался прежним.";
+
+"vpnResultHint" = "Это два отдельных замера, а не доказательство причины изменений. Раздельная маршрутизация VPN может влиять на приложения по-разному.";
+
+"backupTitle" = "Резервная копия";
+"backupSectionExport" = "Экспорт";
+"backupSectionImport" = "Импорт";
+"exportBackup" = "Создать зашифрованную копию";
+"importBackup" = "Импорт зашифрованной копии";
+"backupPasswordPrompt" = "Введите пароль (от 12 до 256 символов) для шифрования или дешифрования.";
+"backupPasswordPlaceholder" = "Пароль (мин. 12 символов)";
+"backupPasswordConfirmation" = "Повторите пароль";
+"backupPasswordMismatch" = "Пароли не совпадают.";
+"backupPasswordTooShort" = "Пароль должен быть не короче 12 символов.";
+"backupExportSuccess" = "Резервная копия успешно создана.";
+"backupImportPreview" = "Просмотр копии";
+"backupCreatedAt" = "Создана";
+"backupAppVersion" = "Версия приложения";
+"backupServicesCount" = "Количество сервисов";
+"backupEntriesCount" = "Записей истории";
+"backupReplaceWarning" = "Восстановление заменит все текущие сервисы, настройки и историю.";
+"confirmRestore" = "Подтвердить и восстановить";
+"restoreSuccess" = "Восстановление успешно завершено.";
+"backupFailed" = "Ошибка операции";
+"shareBackup" = "Поделиться / Сохранить файл";
+
+"maintenanceWindows" = "Запланированные паузы";
+"maintenanceHint" = "Во время паузы проверки продолжаются и статус остаётся на экране, но новые строки истории и оповещения не записываются. Пробел остаётся неизвестным временем, а не сбоем.";
+"maintenanceAdd" = "Добавить паузу";
+"dailySummary" = "Сводка за день";
+"dailySummaryTime" = "Время";
+"dailySummaryHint" = "Локальное уведомление с последней сводкой, подготовленной при открытом приложении. В фоне iOS её заново не считает.";
+"dailyTitle" = "День TgWatch";
+"dailyTitlePercent" = "%1$@ · %2$.0f%%";
+"dailyNoChecks" = "У %@ не было проверок.";
+"dailyChecks" = "%1$@: проверок %2$d.";
+"dailyNoOutages" = "Подтверждённых сбоев нет.";
+"dailyOngoing" = "Сбоев: %d, один ещё не закрыт.";
+"dailyLongest" = "Сбоев: %1$d, самый долгий около %2$d мин.";
+"dailyUnobserved" = "Без наблюдений около %d мин.";
+"dailyPrepared" = "Подготовлено %@.";
+"archiveImport" = "Импорт нескольких целей";
+"archiveImportHint" = "CSV v3 может содержать несколько текущих целей. Известная цель заменяется только после подтверждения. Неизвестные цели пропускаются.";
+"archiveSkipped" = "Пропущены неизвестные цели: %@";
+"revisionArchive" = "Прежние адреса";
+"revisionArchiveHint" = "Старые ревизии адреса остаются на этом iPhone. Список только для чтения и не восстанавливает приватный адрес.";
+"revisionArchiveEmpty" = "Прежних ревизий нет.";
+"networkBreakdown" = "Сети";
+"networkBreakdownHint" = "Число проверок по типу сети в момент замера. Это не доказательство маршрута Telegram.";
+"network.wifi" = "Wi-Fi";
+"network.cellular" = "Мобильная сеть";
+"network.wired" = "Ethernet";
+"network.other" = "Другое";
+"network.unavailable" = "Нет соединения";
+"network.unknown" = "Неизвестно";
+"olderAggregates" = "Более старые проверки";
+"minuteBuckets" = "Минутные корзины (8–30 дней)";
+"coarseBuckets" = "Пятиминутные корзины (31–90 дней)";
+"olderAggregatesHint" = "Старые проверки хранятся как счётчики, а не как вторая копия журнала. Время без данных по-прежнему неизвестно.";
+"ntfyPreset" = "ntfy";
+"ntfyHint" = "Собирает обычный адрес webhook. Тема и токен остаются только в этом адресе.";
+"ntfyTopic" = "Тема";
+"ntfyServer" = "Сервер, пусто — ntfy.sh";
+"ntfyToken" = "Токен tk_…, необязательно";
+"ntfyApply" = "Использовать эту тему ntfy";
+"ntfyInvalid" = "Тема, сервер или токен не подходят.";
+

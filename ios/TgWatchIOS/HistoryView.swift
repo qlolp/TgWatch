@@ -181,6 +181,23 @@ struct HistoryReportView: View {
                         .font(.subheadline)
                     }
                 }
+                Section("networkBreakdown") {
+                    let breakdown = NetworkBreakdown(entries: controller.history)
+                    if breakdown.counts.isEmpty { Text("historyEmpty") }
+                    ForEach(NetworkKind.allCases.map(\.rawValue), id: \.self) { kind in
+                        if let count = breakdown.counts[kind], count > 0 {
+                            LabeledContent(LocalizedStringKey("network.\(kind)"), value: count.formatted())
+                        }
+                    }
+                    Text("networkBreakdownHint").font(.caption).foregroundStyle(.secondary)
+                }
+                if !controller.minuteBuckets.isEmpty || !controller.coarseBuckets.isEmpty {
+                    Section("olderAggregates") {
+                        LabeledContent("minuteBuckets", value: controller.minuteBuckets.reduce(0) { $0 + $1.total }.formatted())
+                        LabeledContent("coarseBuckets", value: controller.coarseBuckets.reduce(0) { $0 + $1.total }.formatted())
+                        Text("olderAggregatesHint").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Section {
                     Button {
                         exportText = result.csv

@@ -81,4 +81,33 @@ public enum HistoryCSV {
         }
         return result
     }
+
+    /// One v3 document may contain several current targets. Each target keeps a single revision.
+    /// Legacy five-column files are Telegram only. Unknown intervals are omitted, not stored as uptime.
+    public static func parseGrouped(_ data: Data) throws -> [String: [HistoryEntry]] {
+        guard data.count <= 8 * 1024 * 1024 else { throw Failure.oversized }
+        guard let text = String(data: data, encoding: .utf8) else { throw Failure.invalid }
+        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: true)
+        guard let first = lines.first else { throw Failure.invalid }
+        if first == legacyHeader {
+            return ["telegram": try parse(data, targetID: "telegram")]
+        }
+        guard first == header else { throw Failure.invalid }
+        var targets = Set<String>()
+        for line in lines.dropFirst() {
+            let fields = line.split(separator: ",", omittingEmptySubsequences: false)
+            guard fields.count == 9, !fields[7].isEmpty, fields[7].count <= 32 else { throw Failure.invalid }
+            targets.insert(String(fields[7]))
+        }
+        guard targets.count <= 8 else { throw Failure.oversized }
+        var grouped: [String: [HistoryEntry]] = [:]
+        for target in targets.sorted() {
+            let subset = ([header] + lines.dropFirst().filter { row in
+                let fields = row.split(separator: ",", omittingEmptySubsequences: false)
+                return fields.count == 9 && fields[7] == Substring(target)
+            }.map(String.init)).joined(separator: "\n") + "\n"
+            grouped[target] = try parse(Data(subset.utf8), targetID: target)
+        }
+        return grouped
+    }
 }
