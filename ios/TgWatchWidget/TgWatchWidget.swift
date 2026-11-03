@@ -187,7 +187,7 @@ struct TgWatchWidgetEntryView : View {
         }
     }
 
-    private func statusTitle(for statusRaw: String) -> String {
+    private func statusTitle(for statusRaw: String) -> LocalizedStringKey {
         switch statusRaw {
         case "ok": return "Available"
         case "slow": return "Slow"

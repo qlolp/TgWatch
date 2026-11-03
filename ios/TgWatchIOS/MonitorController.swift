@@ -224,6 +224,17 @@ import TgWatchCore
             alertError = false
         } catch { alertError = true }
     }
+    func flushHistoryForBackup() async throws {
+        await writeTask?.value
+        do {
+            try await store.flush()
+            historyUnavailable = false
+        } catch {
+            historyUnavailable = true
+            throw error
+        }
+    }
+
     func stopAndFlush() async {
         session.setMonitoring(false)
         session.setActive(false)

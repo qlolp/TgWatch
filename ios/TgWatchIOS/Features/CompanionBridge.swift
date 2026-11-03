@@ -10,6 +10,21 @@ final class CompanionBridge: NSObject, WCSessionDelegate {
     private let appGroupID = "group.ru.tgwatch.ios"
     private var lastSnapshotData: Data?
     private weak var catalogRef: ServiceCatalog?
+    private weak var egress: EgressController?
+
+    func register(egress: EgressController) {
+        self.egress = egress
+        egress.onChange = { [weak self] in
+            guard let self, let catalog = self.catalogRef else { return }
+            self.publish(catalog: catalog)
+        }
+    }
+
+    private var egressCountryFlag: String? {
+        guard let egress, let date = egress.checkedAt,
+              (0...90).contains(Date().timeIntervalSince(date)) else { return nil }
+        return egress.address?.flag
+    }
 
     override init() {
         super.init()
@@ -24,7 +39,7 @@ final class CompanionBridge: NSObject, WCSessionDelegate {
         self.catalogRef = catalog
     }
 
-    func publish(catalog: ServiceCatalog, egressCountryFlag: String? = nil) {
+    func publish(catalog: ServiceCatalog) {
         self.catalogRef = catalog
         var items: [CompanionSnapshot.Item] = []
 

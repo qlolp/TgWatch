@@ -1,0 +1,156 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld ms" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld мс"
+          }
+        }
+      }
+    },
+    "%lldms" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld мс"
+          }
+        }
+      }
+    },
+    "Available" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Доступен"
+          }
+        }
+      }
+    },
+    "Down" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Не отвечает"
+          }
+        }
+      }
+    },
+    "Favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Избранное"
+          }
+        }
+      }
+    },
+    "No data" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Нет данных"
+          }
+        }
+      }
+    },
+    "No other favorites" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Других избранных нет"
+          }
+        }
+      }
+    },
+    "Offline" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Нет сети"
+          }
+        }
+      }
+    },
+    "Partial" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Частично"
+          }
+        }
+      }
+    },
+    "Slow" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Медленно"
+          }
+        }
+      }
+    },
+    "Stale" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Устарело"
+          }
+        }
+      }
+    },
+    "Telegram" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Telegram"
+          }
+        }
+      }
+    },
+    "Telegram and services reachability status." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Доступность Telegram и других сервисов."
+          }
+        }
+      }
+    },
+    "TgWatch" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "TgWatch"
+          }
+        }
+      }
+    },
+    "Unknown" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Неизвестно"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

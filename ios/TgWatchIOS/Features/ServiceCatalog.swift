@@ -34,6 +34,7 @@ extension ServiceDefinition {
     private var writable = true
     private var removing = false
     private var restoring = false
+    private var exporting = false
 
     init() {
         var root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
@@ -76,7 +77,7 @@ extension ServiceDefinition {
     }
 
     func setActive(_ value: Bool) {
-        guard !restoring || !value else { return }
+        guard !restoring && !exporting || !value else { return }
         active = value
         for monitor in monitors {
             if !value { monitor.resetContinuity() }
@@ -87,7 +88,7 @@ extension ServiceDefinition {
         for monitor in monitors { monitor.resetContinuity(); monitor.session.clockChanged() }
     }
     func toggleFavorite(_ id: String) {
-        guard writable, !restoring, monitors.contains(where: { $0.definition.id == id }) else { return }
+        guard writable, !restoring, !exporting, monitors.contains(where: { $0.definition.id == id }) else { return }
         var updated = favoriteIDs
         if updated.contains(id) { updated.remove(id) } else { updated.insert(id) }
         do {
@@ -100,7 +101,7 @@ extension ServiceDefinition {
         ["custom", "custom2", "custom3", "custom4", "custom5"].first { id in !monitors.contains { $0.definition.id == id } }
     }
     func save(_ definition: ServiceDefinition) throws {
-        guard writable, !removing, !restoring, definition.valid else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !removing, !restoring, !exporting, definition.valid else { throw CocoaError(.fileWriteUnknown) }
         var definitions = monitors.map(\.definition)
         if let index = definitions.firstIndex(where: { $0.id == definition.id }) {
             definitions[index] = definition
@@ -129,7 +130,7 @@ extension ServiceDefinition {
         CompanionBridge.shared.publish(catalog: self)
     }
     func remove(_ definition: ServiceDefinition) async throws {
-        guard writable, !removing, !restoring, definition.kind == .custom else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !removing, !restoring, !exporting, definition.kind == .custom else { throw CocoaError(.fileWriteUnknown) }
         removing = true
         defer { removing = false }
         let remaining = monitors.filter { $0.definition.id != definition.id }
@@ -149,8 +150,17 @@ extension ServiceDefinition {
     }
 
     func createBackup(password: String) async throws -> Data {
-        guard writable, !restoring, !removing else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !restoring, !exporting, !removing else { throw CocoaError(.fileWriteUnknown) }
         try EncryptedBackup.validatePassword(password)
+        let wasActive = active
+        exporting = true
+        defer {
+            exporting = false
+            setActive(wasActive && UIApplication.shared.applicationState == .active)
+        }
+        // Prevent new observations while draining every pending history write.
+        setActive(false)
+        for monitor in monitors { try await monitor.flushHistoryForBackup() }
         let files = try BackupFileStore.capture(at: dataRoot)
         let contents = try BackupContents.validateFiles(files)
         let preview = EncryptedBackupPayload.Preview(
@@ -177,7 +187,7 @@ extension ServiceDefinition {
     }
 
     func restore(payload: EncryptedBackupPayload) async throws {
-        guard writable, !restoring, !removing else { throw CocoaError(.fileWriteUnknown) }
+        guard writable, !restoring, !exporting, !removing else { throw CocoaError(.fileWriteUnknown) }
         _ = try BackupContents.validate(payload) // Reject corruption before stopping or flushing monitors.
         restoring = true
         defer {
@@ -208,7 +218,7 @@ extension ServiceDefinition {
     }
 
     func saveMaintenance(_ windows: [MaintenanceWindow]) {
-        guard writable, !restoring, let clean = MaintenanceSchedule.sanitized(windows) else { storageError = true; return }
+        guard writable, !restoring, !exporting, let clean = MaintenanceSchedule.sanitized(windows) else { storageError = true; return }
         do {
             try BackupFileStore.writePrivate(JSONEncoder().encode(clean), to: dataRoot.appendingPathComponent("maintenance.json"), limit: 4096)
             maintenanceWindows = clean
@@ -218,7 +228,7 @@ extension ServiceDefinition {
     }
 
     func saveDailySummary(_ settings: DailySummarySettings) {
-        guard writable, !restoring, settings.valid else { storageError = true; return }
+        guard writable, !restoring, !exporting, settings.valid else { storageError = true; return }
         do {
             try BackupFileStore.writePrivate(JSONEncoder().encode(settings), to: dataRoot.appendingPathComponent("daily-summary.json"), limit: 4096)
             dailySummary = settings

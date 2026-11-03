@@ -15,6 +15,7 @@ import TgWatchCore
     @ObservationIgnored private var task: Task<Void, Never>?
     private let path = NWPathMonitor()
     private let fixture: Bool
+    @ObservationIgnored var onChange: (() -> Void)?
 
     init() {
         #if DEBUG
@@ -45,6 +46,7 @@ import TgWatchCore
         task?.cancel()
         address = nil
         checkedAt = nil
+        onChange?()
         checking = false
         failed = false
         guard active else { return }
@@ -67,6 +69,7 @@ import TgWatchCore
                 guard !Task.isCancelled, generation == self.generation, self.active else { return }
                 self.address = result
                 self.checkedAt = Date()
+                self.onChange?()
                 self.checking = false
             } catch {
                 guard !Task.isCancelled, generation == self.generation, self.active else { return }
