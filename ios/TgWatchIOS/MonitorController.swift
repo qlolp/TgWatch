@@ -247,7 +247,7 @@ import TgWatchCore
         lastObservedStatus = nil
         lastObservation = nil
     }
-    private static func networkKind(of path: NWPath) -> String {
+    nonisolated private static func networkKind(of path: NWPath) -> String {
         if path.status == .unsatisfied { return NetworkKind.unavailable.rawValue }
         if path.usesInterfaceType(.wifi) { return NetworkKind.wifi.rawValue }
         if path.usesInterfaceType(.cellular) { return NetworkKind.cellular.rawValue }
