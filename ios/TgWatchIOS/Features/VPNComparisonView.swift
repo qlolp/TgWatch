@@ -1,6 +1,5 @@
 import SwiftUI
 import Observation
-import Network
 import TgWatchCore
 
 private struct VPNMeasurement {
@@ -15,13 +14,14 @@ private struct VPNMeasurement {
     var failed = false
     private var generation = 0
     @ObservationIgnored private var task: Task<Void, Never>?
-    private let path = NWPathMonitor()
+    @ObservationIgnored private var networkSubscription: UUID?
     private let fixture: Bool
 
     init(fixture: Bool) {
         self.fixture = fixture
-        path.pathUpdateHandler = { [weak self] _ in Task { @MainActor [weak self] in self?.cancel() } }
-        if !fixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.vpncomparison")) }
+        if !fixture {
+            networkSubscription = NetworkPathObserver.shared.hub.subscribe { [weak self] _ in self?.cancel() }
+        }
     }
     func cancel() {
         generation += 1
@@ -61,7 +61,12 @@ private struct VPNMeasurement {
             }
         }
     }
-    deinit { path.cancel(); task?.cancel() }
+    deinit {
+        task?.cancel()
+        if let networkSubscription {
+            Task { @MainActor in NetworkPathObserver.shared.hub.unsubscribe(networkSubscription) }
+        }
+    }
 }
 
 struct VPNComparisonView: View {
