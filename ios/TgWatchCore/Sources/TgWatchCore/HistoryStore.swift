@@ -32,6 +32,9 @@ public actor HistoryStore {
         let archive: LongTermHistory
         let minutes: [HistoryBucket]
         let coarse: [HistoryBucket]
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion, entries, archive, minutes, coarse
+        }
         init(entries: [HistoryEntry], archive: LongTermHistory, minutes: [HistoryBucket], coarse: [HistoryBucket]) {
             schemaVersion = 3; self.entries = entries; self.archive = archive; self.minutes = minutes; self.coarse = coarse
         }
