@@ -30,17 +30,24 @@ extension ServiceDefinition {
     @Published var restoreCompleted = false
     var dataRoot: URL { file.deletingLastPathComponent() }
     private let file: URL
+    private let fixtureMode: String?
     private var active = false
     private var writable = true
     private var removing = false
     private var restoring = false
     private var exporting = false
 
-    init() {
-        var root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
-        if ProcessInfo.processInfo.arguments.contains("--fixture") {
-            root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        }
+    init(dataRoot: URL? = nil) {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--fixture"), arguments.count > index + 1 {
+            fixtureMode = arguments[index + 1]
+        } else { fixtureMode = nil }
+        #else
+        fixtureMode = nil
+        #endif
+        let defaultRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
+        let root = dataRoot ?? (fixtureMode == nil ? defaultRoot : FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         file = root.appendingPathComponent("services-v1.json")
         var definitions = ServiceDefinition.defaults
         if FileManager.default.fileExists(atPath: file.path) {
@@ -57,7 +64,7 @@ extension ServiceDefinition {
                 definitions = decoded
             } catch { storageError = true; writable = false }
         }
-        monitors = definitions.map { MonitorController(definition: $0) }
+        monitors = definitions.map { MonitorController(definition: $0, dataRoot: root, fixtureMode: fixtureMode) }
         for monitor in monitors {
             monitor.onObservationPublished = { [weak self] in self?.noteObservation() }
         }
@@ -110,7 +117,7 @@ extension ServiceDefinition {
             definitions.append(definition)
         }
         try persist(definitions)
-        let replacement = MonitorController(definition: definition)
+        let replacement = MonitorController(definition: definition, dataRoot: dataRoot, fixtureMode: fixtureMode)
         replacement.session.setActive(active)
         replacement.onObservationPublished = { [weak self] in self?.noteObservation() }
         if let index = monitors.firstIndex(where: { $0.definition.id == definition.id }) {
@@ -200,7 +207,7 @@ extension ServiceDefinition {
             let contents = try BackupFileStore.restore(payload, at: dataRoot)
             // Use already validated definitions, never a silent fallback to default services.
             favoriteIDs = contents.favorites
-            monitors = contents.definitions.map { MonitorController(definition: $0) }
+            monitors = contents.definitions.map { MonitorController(definition: $0, dataRoot: dataRoot, fixtureMode: fixtureMode) }
             for monitor in monitors {
                 monitor.onObservationPublished = { [weak self] in self?.noteObservation() }
             }

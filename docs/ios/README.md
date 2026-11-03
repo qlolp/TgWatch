@@ -34,14 +34,15 @@ The isolated iOS workflow proposes macos-26/Xcode 26.6, based on the published r
 This does not establish compatibility with the owner's reported iOS 27.2.
 
 UI fixtures are enabled only in DEBUG with `--fixture ok|offline|slow`; they use isolated ephemeral
-history, disable live path observation and display a visible fixture banner. Release cannot select them.
+history under one catalog-owned root (including backup capture), disable live path observation and display a visible fixture banner. Release cannot select them.
 Tests must never depend on a currently reachable public Telegram endpoint.
 
 ## Data and privacy
 
-History envelope schema 2 is local to iOS: raw schema-1 observations retain the 7-day / 10,000-entry
+History envelope schema 3 is local to iOS: raw schema-1 observations retain the 7-day / 10,000-entry
 limit. The same atomic file also holds up to 90 UTC daily totals, independent of the raw-entry cap.
-The 8 MiB decode ceiling still applies. Legacy arrays migrate using all surviving records before
+Schema 3 also retains minute buckets through 30 days and five-minute buckets through 90 days.
+Schema 2 envelopes remain readable. The 8 MiB decode ceiling still applies. Legacy arrays migrate using all surviving records before
 pruning; already deleted records cannot be recovered. Older app builds cannot read the new envelope.
 Daily reports include today and the preceding 6/29/89 UTC days. Gaps are unknown; pending coverage
 is capped at observation expiry, split at midnight, and never counted twice after reload. Rollback
@@ -58,6 +59,13 @@ The foreground monitor offers Economy (60 seconds), Balanced (30 seconds), and F
 (15 seconds) profiles, matching Android's awake intervals. The selected profile is saved locally
 in `preferences.json`. iOS does not provide Android's continuous foreground service: checks stop
 when the app becomes inactive.
+
+All service checks share a FIFO admission queue with at most two active measurements.
+Cancellation keeps the slot until transport cleanup finishes. This is a measurement limit,
+not a global socket limit; exit-country lookups and explicit VPN comparisons are separate.
+One Network.framework path observer broadcasts every route event to services, exit-country
+lookup and VPN comparison. A newly created controller immediately receives the latest path.
+The limit of two is provisional pending device energy measurements.
 
 Statistics cover the last 24 hours or 7 days: availability, observation coverage, check count,
 outage count, longest outage, up to 100 recent episodes, mean recovery time and a state chart. Availability excludes offline and unknown time.
@@ -173,3 +181,7 @@ APIs. Reassess required-reason declarations whenever these APIs are introduced. 
 [required-reason API guidance](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api).
 
 See [toolchain and verification](toolchain.md) and [device procedure](device-testing.md).
+
+Country flags in companion snapshots carry their own observation and expiry timestamps.
+Watch and widget hide expired flags even without a new phone update; older snapshots without
+these timestamps hide the flag. No IP address is added to the companion payload.

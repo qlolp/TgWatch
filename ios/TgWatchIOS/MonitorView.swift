@@ -68,6 +68,7 @@ struct MonitorView: View {
                     Menu {
                         NavigationLink("vpnComparison") { VPNComparisonView(fixture: controller.fixtureMode) }
                         NavigationLink("backupTitle") { BackupView(catalog: catalog) }
+                            .accessibilityIdentifier("backup")
                         NavigationLink("maintenanceWindows") { MaintenanceView(catalog: catalog) }
                         NavigationLink("dailySummary") { DailySummaryView(catalog: catalog) }
                         NavigationLink("archiveImport") { ArchiveImportView(catalog: catalog) }
@@ -77,6 +78,7 @@ struct MonitorView: View {
                         NavigationLink("shareStatus") { ShareStatusView(controller: controller) }
                         NavigationLink("webhook") { WebhookView(controller: controller) }
                     } label: { Label("moreOptions", systemImage: "ellipsis.circle") }
+                    .accessibilityIdentifier("moreOptions")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {

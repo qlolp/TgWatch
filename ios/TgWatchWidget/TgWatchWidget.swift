@@ -29,7 +29,9 @@ struct Provider: TimelineProvider {
         let now = Date()
 
         if let snapshot, let item = snapshot.telegramItem {
-            let dates = Set(snapshot.items.filter { !snapshot.isStale($0, at: now) }
+            let countryDates = snapshot.items.compactMap { $0.countryValidUntil }
+                .filter { $0 >= now }.map { $0.addingTimeInterval(0.001) }
+            let dates = Set(countryDates + snapshot.items.filter { !snapshot.isStale($0, at: now) }
                 .map { $0.validUntil.addingTimeInterval(0.001) }).sorted()
             let entries = ([now] + dates).map { date in
                 StatusEntry(date: date, snapshot: snapshot, isStale: snapshot.isStale(item, at: date))
@@ -73,7 +75,7 @@ struct TgWatchWidgetEntryView : View {
                 Label("Telegram", systemImage: "paperplane.fill")
                     .font(.caption.bold())
                 Spacer()
-                if let flag = item?.countryFlag {
+                if let flag = item?.freshCountryFlag(at: entry.date) {
                     Text(flag).font(.caption)
                 }
             }

@@ -3,6 +3,21 @@ import Foundation
 @testable import TgWatchCore
 
 @Suite struct CompanionSnapshotTests {
+    @Test func countryExpiresIndependentlyAndLegacySnapshotsHideIt() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let item = CompanionSnapshot.Item(id: "telegram", displayName: "Telegram", statusRaw: "ok",
+            latencyMilliseconds: nil, observedAt: now, validUntil: now.addingTimeInterval(300),
+            countryFlag: "🇩🇪", countryObservedAt: now, countryValidUntil: now.addingTimeInterval(90))
+        #expect(item.freshCountryFlag(at: now.addingTimeInterval(90)) == "🇩🇪")
+        #expect(item.freshCountryFlag(at: now.addingTimeInterval(91)) == nil)
+        #expect(item.freshCountryFlag(at: now.addingTimeInterval(-1)) == nil)
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(item)) as? [String: Any])
+        json.removeValue(forKey: "countryObservedAt")
+        json.removeValue(forKey: "countryValidUntil")
+        let legacy = try JSONDecoder().decode(CompanionSnapshot.Item.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(legacy.countryFlag == "🇩🇪")
+        #expect(legacy.freshCountryFlag(at: now) == nil)
+    }
     @Test func futureObservationAndClockRollbackNeverLookFresh() {
         let observed = Date(timeIntervalSince1970: 1_700_000_000)
         let item = CompanionSnapshot.Item(id: "telegram", displayName: "Telegram", statusRaw: "ok",

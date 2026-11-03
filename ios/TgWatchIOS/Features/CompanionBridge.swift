@@ -56,7 +56,9 @@ final class CompanionBridge: NSObject, WCSessionDelegate {
                     latencyMilliseconds: snapshot?.latencyMilliseconds,
                     observedAt: observedAt,
                     validUntil: validUntil,
-                    countryFlag: egressCountryFlag
+                    countryFlag: egressCountryFlag,
+                    countryObservedAt: egress?.checkedAt,
+                    countryValidUntil: egress?.checkedAt?.addingTimeInterval(90)
                 )
             )
         }

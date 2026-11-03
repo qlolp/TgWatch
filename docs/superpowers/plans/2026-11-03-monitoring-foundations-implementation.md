@@ -33,11 +33,13 @@
 
 **Interfaces:** `public actor ProbeAdmission { public init(limit: Int = 2); public func check(using runner: any ProbeRunner, epoch: UInt64) async throws -> ProbeSnapshot }`; `public struct AdmittedProbeRunner: ProbeRunner` с `init(base: any ProbeRunner, admission: ProbeAdmission)`.
 
-- [ ] Написать тесты, удерживающие transport continuations: максимум 2 активных; FIFO для лимита 1; отменённый ожидающий не стартует; слот активного не выдаётся до teardown; throw освобождает слот.
-- [ ] Запустить `swift test --package-path ios/TgWatchCore --filter ProbeAdmissionTests` из корня; сначала отсутствующий интерфейс/поведение должно приводить к ошибке, после реализации PASS.
-- [ ] Реализовать очередь continuation с UUID, обработкой отмены и освобождением на success/error; не использовать polling/sleep в реализации.
-- [ ] Обернуть service runner общим admission, сохранив fixture runner и lifecycle MonitorSession.
-- [ ] Запустить весь core suite и BuildProject; отдельный commit.
+- [x] Написать тесты, удерживающие transport continuations: максимум 2 активных; FIFO для лимита 1; отменённый ожидающий не стартует; слот активного не выдаётся до teardown; throw освобождает слот.
+- [x] Запустить `swift test --package-path ios/TgWatchCore --filter ProbeAdmissionTests` из корня; сначала отсутствующий интерфейс/поведение должно приводить к ошибке, после реализации PASS.
+- [x] Реализовать очередь continuation с UUID, обработкой отмены и освобождением на success/error; не использовать polling/sleep в реализации.
+- [x] Обернуть service runner общим admission, сохранив fixture runner и lifecycle MonitorSession.
+- [x] Запустить весь core suite и BuildProject; отдельный commit.
+
+Tasks 1–2 committed together as `01062d3` because both modify controller initialization.
 
 ### Task 2: общий поток сетевых изменений
 
@@ -45,12 +47,12 @@
 
 **Interfaces:** `NetworkPathState: Sendable, Equatable` с `unavailable: Bool`, `kind: String`, `generation: UInt64`; `@MainActor NetworkPathHub` предоставляет `subscribe(_ receive: @escaping (NetworkPathState) -> Void) -> UUID`, `unsubscribe(_ id: UUID)`, `publish(unavailable: Bool, kind: String)`. `@MainActor NetworkPathObserver.shared` предоставляет `hub`.
 
-- [ ] Написать тесты broadcast/replay, повторного одинакового события, unsubscribe и нормализации неизвестного kind.
-- [ ] Запустить фильтр NetworkPathHubTests до реализации и зафиксировать RED.
-- [ ] Реализовать hub; каждый publish увеличивает generation. Итерировать snapshot списка подписчиков.
-- [ ] Перенести NWPathMonitor и классификацию интерфейса в один адаптер; классифицировать NWPath до перехода на MainActor.
-- [ ] Подключить сервисы, egress и VPN comparison; weak callbacks, unsubscribe в deinit, fixture не создаёт singleton.
-- [ ] Core suite и BuildProject проходят; отдельный commit.
+- [x] Написать тесты broadcast/replay, повторного одинакового события, unsubscribe и нормализации неизвестного kind.
+- [x] Запустить фильтр NetworkPathHubTests до реализации и зафиксировать RED.
+- [x] Реализовать hub; каждый publish увеличивает generation. Итерировать snapshot списка подписчиков.
+- [x] Перенести NWPathMonitor и классификацию интерфейса в один адаптер; классифицировать NWPath до перехода на MainActor.
+- [x] Подключить сервисы, egress и VPN comparison; weak callbacks, unsubscribe в deinit, fixture не создаёт singleton.
+- [x] Core suite и BuildProject проходят; отдельный commit.
 
 ### Task 3: единый root и воспроизводимый backup fixture
 
@@ -58,12 +60,15 @@
 
 **Interfaces:** `MonitorStorage.directory(for definition: ServiceDefinition, root: URL) -> URL`; `MonitorController.init(definition: ServiceDefinition = .telegram, dataRoot: URL, fixtureMode: String? = nil)`; `ServiceCatalog.init(dataRoot: URL? = nil)`.
 
-- [ ] Тестировать расположение Telegram в root и остальных целей в targets/id/revision; две ревизии и два root не пересекаются.
-- [ ] Добавить UI fixture сценарий: выполнить проверку → открыть backup → ввести пароль/подтверждение → экспорт; проверить появление share без ошибки. Структуру capture проверить core round-trip тестом с записью истории в тот же root.
-- [ ] В DEBUG выбрать один временный root в каталоге, передавать его при init/save/restore. В Release игнорировать fixture arguments; MonitorController не создаёт собственную случайную директорию.
-- [ ] Добавить только необходимые accessibilityIdentifier для backup-сценария.
-- [ ] Обновить README (schema 3, общий network observer, границы admission, ограничения физической проверки).
-- [ ] Запустить полный core suite, BuildProject и доступные UI-проверки; ошибки окружения явно отделить от успеха.
+- [x] Тестировать расположение Telegram в root и остальных целей в targets/id/revision; две ревизии и два root не пересекаются.
+- [x] Добавить UI fixture сценарий: выполнить проверку → открыть backup → ввести пароль/подтверждение → экспорт; проверить появление share без ошибки. Структуру capture проверить core round-trip тестом с записью истории в тот же root.
+- [x] В DEBUG выбрать один временный root в каталоге, передавать его при init/save/restore. В Release игнорировать fixture arguments; MonitorController не создаёт собственную случайную директорию.
+- [x] Добавить только необходимые accessibilityIdentifier для backup-сценария.
+- [x] Обновить README (schema 3, общий network observer, границы admission, ограничения физической проверки).
+- [x] Запустить полный core suite, BuildProject и доступные UI-проверки; ошибки окружения явно отделить от успеха.
+
+Local UI execution was stopped after failing to return a result; UI verification remains pending CI.
+Final core suite: 109 passed. BuildProject with test targets: passed.
 
 ## Дальнейшие выпуски
 

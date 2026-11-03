@@ -35,22 +35,20 @@ import TgWatchCore
     private var networkKind = "unknown"
     private var maintenance: [MaintenanceWindow] = []
     private var writeTask: Task<Void, Never>?
-    init(definition: ServiceDefinition = .telegram) {
+    init(definition: ServiceDefinition = .telegram, dataRoot: URL, fixtureMode: String? = nil) {
         self.definition = definition
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
-        let directory = definition.kind == .telegram ? root : root.appendingPathComponent("targets/\(definition.id)/\(definition.revision.uuidString)")
+        let directory = MonitorStorage.directory(for: definition, root: dataRoot)
         var isFixture = false
         var runner: any ProbeRunner = definition.kind == .telegram ? ProbeEngine(transport: AppleProbeTransport()) : ServiceProbeRunner(definition: definition)
-        var file = directory.appendingPathComponent("history-v1.json")
+        let file = directory.appendingPathComponent("history-v1.json")
         #if DEBUG
-        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--fixture"), ProcessInfo.processInfo.arguments.count > index + 1 {
+        if let fixtureMode {
             isFixture = true
-            runner = FixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
-            file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("fixture.json")
+            runner = FixtureRunner(mode: fixtureMode)
         }
         #endif
         dataDirectory = file.deletingLastPathComponent()
-        fixtureMode = isFixture
+        self.fixtureMode = isFixture
         preferencesURL = file.deletingLastPathComponent().appendingPathComponent("preferences.json")
         session = MonitorSession(runner: AdmittedProbeRunner(base: runner, admission: Self.admission))
         store = HistoryStore(url: file)
