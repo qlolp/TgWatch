@@ -110,6 +110,14 @@ public enum BackupContents {
                 guard try JSONDecoder().decode(LongTermHistory.self, from: data).valid else { throw BackupError.corruptedData }
             }
         }
+        if let maintenance = files["maintenance.json"] {
+            let windows = try JSONDecoder().decode([MaintenanceWindow].self, from: maintenance)
+            guard MaintenanceSchedule.sanitized(windows) != nil else { throw BackupError.corruptedData }
+        }
+        if let summary = files["daily-summary.json"] {
+            let settings = try JSONDecoder().decode(DailySummarySettings.self, from: summary)
+            guard settings.valid else { throw BackupError.corruptedData }
+        }
         return Validated(definitions: definitions, favorites: favorites,
                          historyEntries: definitions.reduce(0) { $0 + (counts[prefix(for: $1)] ?? 0) })
     }
@@ -118,6 +126,8 @@ public enum BackupContents {
         let schemaVersion: Int
         let entries: [HistoryEntry]
         let archive: LongTermHistory
+        let minutes: [HistoryBucket]?
+        let coarse: [HistoryBucket]?
     }
 
     private static func validateHistory(_ data: Data) throws -> Int {
@@ -126,13 +136,17 @@ public enum BackupContents {
             entries = try JSONDecoder().decode([HistoryEntry].self, from: data)
         } else {
             let envelope = try JSONDecoder().decode(HistoryEnvelope.self, from: data)
-            guard envelope.schemaVersion == 2, envelope.archive.valid else { throw BackupError.corruptedData }
+            guard (envelope.schemaVersion == 2 || envelope.schemaVersion == 3), envelope.archive.valid,
+                  (envelope.minutes ?? []).allSatisfy(\.valid), (envelope.coarse ?? []).allSatisfy(\.valid) else {
+                throw BackupError.corruptedData
+            }
             entries = envelope.entries
         }
         guard entries.count <= 10_000, entries.allSatisfy({ entry in
             entry.schemaVersion == 1 && entry.observedAt.timeIntervalSince1970.isFinite &&
             (entry.validForSeconds.map { $0.isFinite && (0.001...600).contains($0) } ?? true) &&
-            (entry.latencyMilliseconds.map { $0.isFinite && $0 >= 0 } ?? true)
+            (entry.latencyMilliseconds.map { $0.isFinite && $0 >= 0 } ?? true) &&
+            (entry.networkKind == nil || NetworkKind.normalize(entry.networkKind) != nil)
         }) else { throw BackupError.corruptedData }
         return entries.count
     }

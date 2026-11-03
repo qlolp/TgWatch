@@ -47,6 +47,11 @@ struct ServicesView: View {
                     Button("addHTTPS", systemImage: "plus") { adding = true }
                         .accessibilityIdentifier("addHTTPS")
                 }
+                Section {
+                    NavigationLink("maintenanceWindows") { MaintenanceView(catalog: catalog) }
+                    NavigationLink("dailySummary") { DailySummaryView(catalog: catalog) }
+                    NavigationLink("archiveImport") { ArchiveImportView(catalog: catalog) }
+                }
             }
             .navigationTitle("services")
             .toolbar {
@@ -115,7 +120,10 @@ struct ServiceDetailView: View {
                 NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
                 NavigationLink("latencyReport") { LatencyReportView(controller: controller) }
                 NavigationLink("shareStatus") { ShareStatusView(controller: controller) }
-                        NavigationLink("webhook") { WebhookView(controller: controller) }
+                NavigationLink("webhook") { WebhookView(controller: controller) }
+                if controller.definition.kind != .telegram {
+                    NavigationLink("revisionArchive") { RevisionArchiveView(controller: controller) }
+                }
             }
             if controller.definition.kind == .custom || controller.definition.kind == .matrix {
                 Section {

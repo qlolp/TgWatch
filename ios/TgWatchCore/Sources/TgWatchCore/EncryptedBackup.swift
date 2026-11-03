@@ -89,7 +89,9 @@ public enum EncryptedBackup {
             "preferences.json",
             "alerts.json",
             "interval.json",
-            "webhook.json"
+            "webhook.json",
+            "maintenance.json",
+            "daily-summary.json"
         ]
 
         if allowedRootFiles.contains(path) {

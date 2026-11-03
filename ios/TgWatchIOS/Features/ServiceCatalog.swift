@@ -24,6 +24,8 @@ extension ServiceDefinition {
     @Published private(set) var monitors: [MonitorController] = []
     @Published var storageError = false
     @Published private(set) var favoriteIDs: Set<String> = ["telegram"]
+    @Published private(set) var maintenanceWindows: [MaintenanceWindow] = []
+    @Published private(set) var dailySummary = DailySummarySettings()
     @Published private(set) var restoreRevision = UUID()
     @Published var restoreCompleted = false
     var dataRoot: URL { file.deletingLastPathComponent() }
@@ -56,10 +58,7 @@ extension ServiceDefinition {
         }
         monitors = definitions.map { MonitorController(definition: $0) }
         for monitor in monitors {
-            monitor.onObservationPublished = { [weak self] in
-                guard let self else { return }
-                CompanionBridge.shared.publish(catalog: self)
-            }
+            monitor.onObservationPublished = { [weak self] in self?.noteObservation() }
         }
         if writable && !FileManager.default.fileExists(atPath: file.path) {
             do { try persist(definitions) } catch { storageError = true; writable = false }
@@ -69,6 +68,8 @@ extension ServiceDefinition {
            let ids = try? JSONDecoder().decode(Set<String>.self, from: data) {
             favoriteIDs = ids.intersection(Set(definitions.map(\.id)))
         }
+        loadSideSettings()
+        applyMaintenance()
         _ = MonitorNotifications.shared
         CompanionBridge.shared.register(catalog: self)
         CompanionBridge.shared.publish(catalog: self)
@@ -110,10 +111,7 @@ extension ServiceDefinition {
         try persist(definitions)
         let replacement = MonitorController(definition: definition)
         replacement.session.setActive(active)
-        replacement.onObservationPublished = { [weak self] in
-            guard let self else { return }
-            CompanionBridge.shared.publish(catalog: self)
-        }
+        replacement.onObservationPublished = { [weak self] in self?.noteObservation() }
         if let index = monitors.firstIndex(where: { $0.definition.id == definition.id }) {
             let previous = monitors[index]
             previous.session.setMonitoring(false)
@@ -127,6 +125,7 @@ extension ServiceDefinition {
             replacement.saveWebhook(previous.webhookSettings)
             monitors[index] = replacement
         } else { monitors.append(replacement) }
+        applyMaintenance()
         CompanionBridge.shared.publish(catalog: self)
     }
     func remove(_ definition: ServiceDefinition) async throws {
@@ -193,11 +192,10 @@ extension ServiceDefinition {
             favoriteIDs = contents.favorites
             monitors = contents.definitions.map { MonitorController(definition: $0) }
             for monitor in monitors {
-                monitor.onObservationPublished = { [weak self] in
-                    guard let self else { return }
-                    CompanionBridge.shared.publish(catalog: self)
-                }
+                monitor.onObservationPublished = { [weak self] in self?.noteObservation() }
             }
+            loadSideSettings()
+            applyMaintenance()
             CompanionBridge.shared.publish(catalog: self)
             // Discard navigation destinations that still retain pre-restore controllers.
             restoreRevision = UUID()
@@ -207,5 +205,73 @@ extension ServiceDefinition {
             writable = false
             throw BackupError.restoreRecoveryRequired
         }
+    }
+
+    func saveMaintenance(_ windows: [MaintenanceWindow]) {
+        guard writable, !restoring, let clean = MaintenanceSchedule.sanitized(windows) else { storageError = true; return }
+        do {
+            try BackupFileStore.writePrivate(JSONEncoder().encode(clean), to: dataRoot.appendingPathComponent("maintenance.json"), limit: 4096)
+            maintenanceWindows = clean
+            applyMaintenance()
+            storageError = false
+        } catch { storageError = true }
+    }
+
+    func saveDailySummary(_ settings: DailySummarySettings) {
+        guard writable, !restoring, settings.valid else { storageError = true; return }
+        do {
+            try BackupFileStore.writePrivate(JSONEncoder().encode(settings), to: dataRoot.appendingPathComponent("daily-summary.json"), limit: 4096)
+            dailySummary = settings
+            storageError = false
+            refreshDailySummary()
+        } catch { storageError = true }
+    }
+
+    private func loadSideSettings() {
+        let maintenanceURL = dataRoot.appendingPathComponent("maintenance.json")
+        if FileManager.default.fileExists(atPath: maintenanceURL.path) {
+            do {
+                let data = try BackupFileStore.read(maintenanceURL, limit: 4096)
+                guard let windows = MaintenanceSchedule.sanitized(try JSONDecoder().decode([MaintenanceWindow].self, from: data)) else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+                maintenanceWindows = windows
+            } catch { storageError = true }
+        }
+        let summaryURL = dataRoot.appendingPathComponent("daily-summary.json")
+        if FileManager.default.fileExists(atPath: summaryURL.path) {
+            do {
+                let data = try BackupFileStore.read(summaryURL, limit: 4096)
+                let settings = try JSONDecoder().decode(DailySummarySettings.self, from: data)
+                guard settings.valid else { throw CocoaError(.fileReadCorruptFile) }
+                dailySummary = settings
+            } catch { storageError = true }
+        }
+    }
+
+    private func applyMaintenance() {
+        for monitor in monitors { monitor.setMaintenance(maintenanceWindows) }
+    }
+
+    private func noteObservation() {
+        CompanionBridge.shared.publish(catalog: self)
+        refreshDailySummary()
+    }
+
+    private func refreshDailySummary() {
+        guard dailySummary.enabled else {
+            Task { await MonitorNotifications.shared.cancelDaily() }
+            return
+        }
+        let minute = dailySummary.minuteOfDay
+        let blocks: [(String, DailySummaryStats?)] = monitors.map { monitor in
+            let now = Date()
+            let analytics = HistoryAnalytics(entries: monitor.history, from: now.addingTimeInterval(-86400), to: now)
+            let latencies = monitor.history.compactMap(\.latencyMilliseconds)
+            return (monitor.definition.displayName, DailySummary.stats(analytics: analytics, latencies: latencies))
+        }
+        let body = DailySummaryText.body(blocks)
+        let title = DailySummaryText.title(blocks)
+        Task { await MonitorNotifications.shared.scheduleDaily(title: title, body: body, minuteOfDay: minute) }
     }
 }

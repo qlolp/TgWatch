@@ -4,7 +4,7 @@ import TgWatchCore
 actor WebhookSender {
     private var busy = false
     func send(settings: WebhookSettings, event: WebhookEvent) async throws -> Bool {
-        guard !busy, settings.enabled, ServiceDefinition.validAddress(settings.address),
+        guard !busy, settings.enabled, WebhookAddress.isValid(settings.address),
               let url = URL(string: settings.address) else { return false }
         busy = true; defer { busy = false }
         let config = URLSessionConfiguration.ephemeral
@@ -38,6 +38,10 @@ struct WebhookView: View {
     @State private var enabled = false
     @State private var json = true
     @State private var saved = false
+    @State private var topic = ""
+    @State private var server = ""
+    @State private var token = ""
+    @State private var presetFailed = false
     var body: some View {
         Form {
             Section {
@@ -60,6 +64,20 @@ struct WebhookView: View {
                 }
                 if controller.webhookError { Text("webhookFailed").foregroundStyle(.red) }
                 Text("webhookPrivacy").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("ntfyPreset") {
+                Text("ntfyHint").font(.caption).foregroundStyle(.secondary)
+                TextField("ntfyTopic", text: $topic).textInputAutocapitalization(.never).autocorrectionDisabled()
+                TextField("ntfyServer", text: $server).textInputAutocapitalization(.never).autocorrectionDisabled()
+                SecureField("ntfyToken", text: $token)
+                Button("ntfyApply") {
+                    guard let composed = NtfyPreset.url(server: server, topic: topic, token: token) else { presetFailed = true; return }
+                    address = composed
+                    enabled = true
+                    presetFailed = false
+                    token = ""
+                }
+                if presetFailed { Text("ntfyInvalid").foregroundStyle(.red) }
             }
         }
         .navigationTitle("webhook")

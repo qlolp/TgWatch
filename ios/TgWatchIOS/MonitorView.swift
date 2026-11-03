@@ -68,6 +68,9 @@ struct MonitorView: View {
                     Menu {
                         NavigationLink("vpnComparison") { VPNComparisonView(fixture: controller.fixtureMode) }
                         NavigationLink("backupTitle") { BackupView(catalog: catalog) }
+                        NavigationLink("maintenanceWindows") { MaintenanceView(catalog: catalog) }
+                        NavigationLink("dailySummary") { DailySummaryView(catalog: catalog) }
+                        NavigationLink("archiveImport") { ArchiveImportView(catalog: catalog) }
                         NavigationLink("alertSettings") { AlertSettingsView(controller: controller) }
                         NavigationLink("eventJournal") { EventJournalView(controller: controller) }
                         NavigationLink("latencyReport") { LatencyReportView(controller: controller) }

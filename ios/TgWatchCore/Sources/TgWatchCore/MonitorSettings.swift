@@ -45,5 +45,5 @@ public struct WebhookSettings: Codable, Equatable, Sendable {
     public init(enabled: Bool = false, address: String = "", json: Bool = true) {
         self.enabled = enabled; self.address = address; self.json = json
     }
-    public var valid: Bool { address.utf8.count <= 1024 && (!enabled || ServiceDefinition.validAddress(address)) }
+    public var valid: Bool { address.utf8.count <= 1024 && (!enabled || WebhookAddress.isValid(address)) }
 }
