@@ -67,7 +67,7 @@ Tasks 1–2 committed together as `01062d3` because both modify controller initi
 - [x] Обновить README (schema 3, общий network observer, границы admission, ограничения физической проверки).
 - [x] Запустить полный core suite, BuildProject и доступные UI-проверки; ошибки окружения явно отделить от успеха.
 
-Local UI execution was stopped after failing to return a result; UI verification remains pending CI.
+Local UI execution was stopped after failing to return a result; GitHub iOS CI subsequently passed (run 41795806146).
 Final core suite: 109 passed. BuildProject with test targets: passed.
 
 ## Дальнейшие выпуски
@@ -83,6 +83,6 @@ Final core suite: 109 passed. BuildProject with test targets: passed.
 ## Публикация
 
 - [x] Свежий независимый review всего diff от `62eec3e`, исправить существенные замечания с тестами.
-- [ ] Сохранить документ с результатами проверок и оставшимися ограничениями.
-- [ ] Commit, push `feat/ios-monitoring-foundations`, PR в `main`; проверить GitHub CI и исправить относящиеся к изменениям сбои.
-- [ ] Передать пользователю ссылки на подробный план, PR и точный список реализованного блока. Не отмечать весь roadmap выполненным.
+- [x] Сохранить документ с результатами проверок и оставшимися ограничениями.
+- [x] Commit, push `feat/ios-monitoring-foundations`, PR в `main`; проверить GitHub CI и исправить относящиеся к изменениям сбои.
+- [x] Передать пользователю ссылки на подробный план, PR и точный список реализованного блока. Не отмечать весь roadmap выполненным.
