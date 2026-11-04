@@ -9,7 +9,7 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
     var snapshot: CompanionSnapshot?
     var isReachable = false
     var isRefreshing = false
-    var statusMessage: String?
+    var statusMessage: LocalizedStringKey?
 
     override init() {
         super.init()

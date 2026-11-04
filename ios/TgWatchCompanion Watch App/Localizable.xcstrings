@@ -1,0 +1,166 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%lld ms" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld мс"
+          }
+        }
+      }
+    },
+    "Available" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Доступен"
+          }
+        }
+      }
+    },
+    "Down" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Недоступен"
+          }
+        }
+      }
+    },
+    "iPhone unreachable. Open app on iPhone." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Нет связи с iPhone. Откройте приложение на iPhone."
+          }
+        }
+      }
+    },
+    "No data yet" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Пока нет данных"
+          }
+        }
+      }
+    },
+    "Offline" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Нет сети"
+          }
+        }
+      }
+    },
+    "Open TgWatch on iPhone to sync reachability status." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Откройте TgWatch на iPhone, чтобы обновить данные о доступности сервисов."
+          }
+        }
+      }
+    },
+    "Partial" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Частично"
+          }
+        }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Обновить"
+          }
+        }
+      }
+    },
+    "Refresh failed: %@" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Не удалось обновить: %@"
+          }
+        }
+      }
+    },
+    "Session activating..." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Подключение..."
+          }
+        }
+      }
+    },
+    "Slow" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Медленно"
+          }
+        }
+      }
+    },
+    "Stale" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Устарело"
+          }
+        }
+      }
+    },
+    "TgWatch" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "TgWatch"
+          }
+        }
+      }
+    },
+    "Unknown" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Неизвестно"
+          }
+        }
+      }
+    },
+    "WatchConnectivity unsupported" : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "WatchConnectivity не поддерживается"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}

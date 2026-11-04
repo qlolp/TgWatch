@@ -14,6 +14,7 @@ struct ServicesRootView: View {
         }
         .id(catalog.restoreRevision)
         .environment(egress)
+        .onAppear { CompanionBridge.shared.register(egress: egress) }
         .alert("restoreSuccess", isPresented: $catalog.restoreCompleted) {
             Button("OK", role: .cancel) {}
         }

@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import Network
 import TgWatchCore
 @MainActor final class MonitorController: ObservableObject {
     @Published var history: [HistoryEntry] = []
@@ -31,28 +30,28 @@ import TgWatchCore
     let fixtureMode: Bool
     let session: MonitorSession
     private let store: HistoryStore
-    private let path = NWPathMonitor()
+    private var networkSubscription: UUID?
+    private static let admission = ProbeAdmission(limit: 2)
     private var networkKind = "unknown"
     private var maintenance: [MaintenanceWindow] = []
     private var writeTask: Task<Void, Never>?
-    init(definition: ServiceDefinition = .telegram) {
+    init(definition: ServiceDefinition = .telegram, dataRoot: URL, fixtureMode: String? = nil) {
         self.definition = definition
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TgWatch")
-        let directory = definition.kind == .telegram ? root : root.appendingPathComponent("targets/\(definition.id)/\(definition.revision.uuidString)")
+        let directory = MonitorStorage.directory(for: definition, root: dataRoot)
         var isFixture = false
         var runner: any ProbeRunner = definition.kind == .telegram ? ProbeEngine(transport: AppleProbeTransport()) : ServiceProbeRunner(definition: definition)
-        var file = directory.appendingPathComponent("history-v1.json")
+        let file = directory.appendingPathComponent("history-v1.json")
         #if DEBUG
-        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--fixture"), ProcessInfo.processInfo.arguments.count > index + 1 {
+        if let fixtureMode {
             isFixture = true
-            runner = FixtureRunner(mode: ProcessInfo.processInfo.arguments[index+1])
-            file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("fixture.json")
+            runner = FixtureRunner(mode: fixtureMode)
         }
         #endif
         dataDirectory = file.deletingLastPathComponent()
-        fixtureMode = isFixture
+        self.fixtureMode = isFixture
         preferencesURL = file.deletingLastPathComponent().appendingPathComponent("preferences.json")
-        session = MonitorSession(runner: runner); store = HistoryStore(url: file)
+        session = MonitorSession(runner: AdmittedProbeRunner(base: runner, admission: Self.admission))
+        store = HistoryStore(url: file)
         if FileManager.default.fileExists(atPath: preferencesURL.path) {
             do {
                 let data = try Data(contentsOf: preferencesURL)
@@ -84,18 +83,14 @@ import TgWatchCore
             self?.onObservationPublished?() // Includes route/lifecycle/clock invalidation, not only new results.
         }
         session.onObservation = { [weak self] value in self?.save(value) }
-        path.pathUpdateHandler = { [weak self] value in
-            let unavailable = value.status == .unsatisfied
-            let kind = Self.networkKind(of: value)
-            Task { @MainActor [weak self] in
+        if !isFixture {
+            networkSubscription = NetworkPathObserver.shared.hub.subscribe { [weak self] state in
                 guard let self else { return }
-                self.networkKind = kind
-                // Every delivered path update may change routing, even with identical interface names.
+                self.networkKind = state.kind
                 self.resetContinuity()
-                self.session.networkChanged(unavailable: unavailable)
+                self.session.networkChanged(unavailable: state.unavailable)
             }
         }
-        if !isFixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.ios.path")) }
         Task { await reload() }
     }
     private func save(_ snapshot: ProbeSnapshot) {
@@ -224,6 +219,17 @@ import TgWatchCore
             alertError = false
         } catch { alertError = true }
     }
+    func flushHistoryForBackup() async throws {
+        await writeTask?.value
+        do {
+            try await store.flush()
+            historyUnavailable = false
+        } catch {
+            historyUnavailable = true
+            throw error
+        }
+    }
+
     func stopAndFlush() async {
         session.setMonitoring(false)
         session.setActive(false)
@@ -247,14 +253,11 @@ import TgWatchCore
         lastObservedStatus = nil
         lastObservation = nil
     }
-    nonisolated private static func networkKind(of path: NWPath) -> String {
-        if path.status == .unsatisfied { return NetworkKind.unavailable.rawValue }
-        if path.usesInterfaceType(.wifi) { return NetworkKind.wifi.rawValue }
-        if path.usesInterfaceType(.cellular) { return NetworkKind.cellular.rawValue }
-        if path.usesInterfaceType(.wiredEthernet) { return NetworkKind.wired.rawValue }
-        return NetworkKind.other.rawValue
+    deinit {
+        if let networkSubscription {
+            Task { @MainActor in NetworkPathObserver.shared.hub.unsubscribe(networkSubscription) }
+        }
     }
-    deinit { path.cancel() }
 }
 enum CheckProfile: Int, Codable, CaseIterable, Identifiable {
     case economy = 60

@@ -66,6 +66,27 @@ final class MonitorFlowTests: XCTestCase {
         add(screenshot)
     }
 
+    func testFixtureHistoryCanBeExported() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--fixture", "ok", "-AppleLanguages", "(en)"]
+        app.launch()
+        app.buttons["checkNow"].tap()
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "Available"),
+                    evaluatedWith: app.staticTexts["status"])
+        waitForExpectations(timeout: 5)
+        app.buttons["moreOptions"].tap()
+        app.buttons["backup"].tap()
+        let password = app.secureTextFields["backupPassword"]
+        XCTAssertTrue(password.waitForExistence(timeout: 5))
+        password.tap()
+        password.typeText("fixture-password-123")
+        let confirmation = app.secureTextFields["backupPasswordConfirmation"]
+        confirmation.tap()
+        confirmation.typeText("fixture-password-123")
+        app.buttons["exportBackup"].tap()
+        XCTAssertTrue(app.buttons["shareBackup"].waitForExistence(timeout: 10))
+    }
+
     func testRussianOfflineFixture() {
         let app = XCUIApplication(); app.launchArguments = ["--fixture", "offline", "-AppleLanguages", "(ru)"]
         app.launch(); app.buttons["checkNow"].tap()

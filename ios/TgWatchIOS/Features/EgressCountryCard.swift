@@ -1,6 +1,5 @@
 import SwiftUI
 import Observation
-import Network
 import TgWatchCore
 
 @MainActor @Observable final class EgressController {
@@ -13,8 +12,9 @@ import TgWatchCore
     private var generation = 0
     private var lastAttempt: ContinuousClock.Instant?
     @ObservationIgnored private var task: Task<Void, Never>?
-    private let path = NWPathMonitor()
+    @ObservationIgnored private var networkSubscription: UUID?
     private let fixture: Bool
+    @ObservationIgnored var onChange: (() -> Void)?
 
     init() {
         #if DEBUG
@@ -22,15 +22,13 @@ import TgWatchCore
         #else
         fixture = false
         #endif
-        path.pathUpdateHandler = { [weak self] path in
-            let offline = path.status == .unsatisfied
-            Task { @MainActor [weak self] in
+        if !fixture {
+            networkSubscription = NetworkPathObserver.shared.hub.subscribe { [weak self] state in
                 guard let self else { return }
-                self.offline = offline
+                self.offline = state.unavailable
                 self.refresh()
             }
         }
-        if !fixture { path.start(queue: DispatchQueue(label: "ru.tgwatch.egress")) }
     }
 
     func setActive(_ value: Bool) {
@@ -45,6 +43,7 @@ import TgWatchCore
         task?.cancel()
         address = nil
         checkedAt = nil
+        onChange?()
         checking = false
         failed = false
         guard active else { return }
@@ -67,6 +66,7 @@ import TgWatchCore
                 guard !Task.isCancelled, generation == self.generation, self.active else { return }
                 self.address = result
                 self.checkedAt = Date()
+                self.onChange?()
                 self.checking = false
             } catch {
                 guard !Task.isCancelled, generation == self.generation, self.active else { return }
@@ -80,7 +80,12 @@ import TgWatchCore
         }
     }
 
-    deinit { task?.cancel(); path.cancel() }
+    deinit {
+        task?.cancel()
+        if let networkSubscription {
+            Task { @MainActor in NetworkPathObserver.shared.hub.unsubscribe(networkSubscription) }
+        }
+    }
 }
 
 struct EgressCountryCard: View {

@@ -9,6 +9,8 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
         public let observedAt: Date
         public let validUntil: Date
         public let countryFlag: String?
+        public let countryObservedAt: Date?
+        public let countryValidUntil: Date?
 
         public init(
             id: String,
@@ -17,7 +19,9 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
             latencyMilliseconds: Double?,
             observedAt: Date,
             validUntil: Date,
-            countryFlag: String? = nil
+            countryFlag: String? = nil,
+            countryObservedAt: Date? = nil,
+            countryValidUntil: Date? = nil
         ) {
             self.id = id
             self.displayName = displayName
@@ -26,6 +30,18 @@ public struct CompanionSnapshot: Codable, Equatable, Sendable {
             self.observedAt = observedAt
             self.validUntil = validUntil
             self.countryFlag = countryFlag
+            self.countryObservedAt = countryObservedAt
+            self.countryValidUntil = countryValidUntil
+        }
+
+        public func freshCountryFlag(at date: Date) -> String? {
+            guard let countryObservedAt, let countryValidUntil,
+                  date.timeIntervalSince1970.isFinite,
+                  countryObservedAt.timeIntervalSince1970.isFinite,
+                  countryValidUntil.timeIntervalSince1970.isFinite,
+                  countryValidUntil >= countryObservedAt,
+                  date >= countryObservedAt, date <= countryValidUntil else { return nil }
+            return countryFlag
         }
 
         public func isStale(at date: Date = Date()) -> Bool {

@@ -118,6 +118,11 @@ public actor HistoryStore {
         coarse = rolled.coarse
         entries = rolled.raw
     }
+    /// Persists retained observations, including writes that previously failed.
+    public func flush() throws {
+        try persist(load())
+    }
+
     public func clear() throws {
         try persist([], archive: LongTermHistory(), minutes: [], coarse: [])
         archive = LongTermHistory()

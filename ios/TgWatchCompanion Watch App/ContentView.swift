@@ -9,7 +9,7 @@ struct ContentView: View {
                 List {
                     if let snapshot = sessionManager.snapshot, !snapshot.items.isEmpty {
                         ForEach(snapshot.items) { item in
-                            itemRow(item, stale: snapshot.isStale(item, at: context.date))
+                            itemRow(item, stale: snapshot.isStale(item, at: context.date), date: context.date)
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 6) {
@@ -50,14 +50,14 @@ struct ContentView: View {
         }
     }
 
-    private func itemRow(_ item: CompanionSnapshot.Item, stale: Bool) -> some View {
+    private func itemRow(_ item: CompanionSnapshot.Item, stale: Bool, date: Date) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(item.displayName)
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()
-                if let flag = item.countryFlag {
+                if let flag = item.freshCountryFlag(at: date) {
                     Text(flag)
                 }
             }
@@ -116,7 +116,7 @@ struct ContentView: View {
         }
     }
 
-    private func statusTitle(for statusRaw: String) -> String {
+    private func statusTitle(for statusRaw: String) -> LocalizedStringKey {
         switch statusRaw {
         case "ok": return "Available"
         case "slow": return "Slow"

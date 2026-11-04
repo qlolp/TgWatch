@@ -63,7 +63,9 @@ struct BackupView: View {
                 .foregroundStyle(.secondary)
 
             SecureField("backupPasswordPlaceholder", text: $exportPassword)
+                .accessibilityIdentifier("backupPassword")
             SecureField("backupPasswordConfirmation", text: $exportConfirmPassword)
+                .accessibilityIdentifier("backupPasswordConfirmation")
 
             if !exportValidationMessage.isEmpty {
                 Text(exportValidationMessage)
@@ -83,12 +85,14 @@ struct BackupView: View {
                 }
             }
             .disabled(isExporting || !isExportValid)
+            .accessibilityIdentifier("exportBackup")
 
             if let exportFileURL {
                 HStack {
                     ShareLink(item: exportFileURL) {
                         Label("shareBackup", systemImage: "square.and.arrow.up")
                     }
+                    .accessibilityIdentifier("shareBackup")
                 }
             }
 
